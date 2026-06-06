@@ -245,6 +245,29 @@ python main.py run -i "E:/Videos/云南" --day day1
 python main.py -c other.yaml analyze
 ```
 
+### 9. 修正已生成的内容（refine）
+
+如果某些素材 AI 分析或口播有误（比如把巴黎机场误判为曼谷素万那普），
+先用 `ai.context` / `ai.context_file` 写好行程背景和规范，然后：
+
+```powershell
+# 默认：审阅 texts/ 和 scripts/ 下的所有文件
+python main.py refine
+
+# 只审阅 texts/
+python main.py refine --target texts
+
+# 修正单个文件
+python main.py refine -i output/Franch/texts/001_机场轻轨清晨.json
+
+# 修正某个文件夹下的所有 json
+python main.py refine -i output/Franch/texts/
+```
+
+会调用 `video_analyze` 任务用的 AI（一般是 gemini）审 texts，
+用 `voiceover` 任务用的 AI（一般是 deepseek）审 scripts。
+结果直接覆盖原文件，AI 会在末尾追加 `_changelog` 字段说明改动原因。
+
 ---
 
 ## 常见问题

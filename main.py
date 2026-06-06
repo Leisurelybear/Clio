@@ -15,6 +15,8 @@ from vlog_tool.pipeline import (
     run_generate_scripts,
     run_label_videos,
     run_plan_vlog,
+    run_refine_scripts,
+    run_refine_texts,
 )
 from vlog_tool.utils import discover_ffmpeg_bin, find_videos
 
@@ -135,6 +137,19 @@ def main(argv: list[str] | None = None) -> int:
     _add_io_args(p_run)
     p_run.add_argument("--day", default="day1", help="日 vlog 标签")
 
+    p_refine = sub.add_parser("refine", help="用 AI + trip 上下文 审阅并修正已有分析/口播")
+    p_refine.add_argument(
+        "--target", "-t",
+        choices=["texts", "scripts", "all"],
+        default="all",
+        help="要 refine 的目标（默认 all）",
+    )
+    p_refine.add_argument(
+        "-i", "--input",
+        type=Path,
+        help="指定单个 .json 文件或目录；省略则处理整个 texts/ 或 scripts/",
+    )
+
     args = parser.parse_args(argv)
     config_path = Path(args.config)
     if not config_path.exists():
@@ -161,6 +176,22 @@ def main(argv: list[str] | None = None) -> int:
             run_plan_vlog(config, args.day)
         elif args.command == "run":
             run_full_pipeline(config, args.day)
+        elif args.command == "refine":
+            if not config.ai.context:
+                print(
+                    "警告: config.yaml 里没有配置 ai.context 或 ai.context_file，"
+                    "refine 效果有限（AI 不知道你的行程背景和规范）。",
+                    file=sys.stderr,
+                )
+            target_path = getattr(args, "input", None)
+            if args.target in ("texts", "all"):
+                run_refine_texts(config, target_path)
+            if args.target in ("scripts", "all"):
+                if args.target == "all" and target_path is not None:
+                    scripts_path = None
+                else:
+                    scripts_path = target_path
+                run_refine_scripts(config, scripts_path)
     except FileNotFoundError as e:
         print(f"错误: {e}", file=sys.stderr)
         return 1

@@ -5,7 +5,13 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-from vlog_tool.analyze import analyze_video, generate_voiceover, plan_daily_vlog
+from vlog_tool.analyze import (
+    analyze_video,
+    generate_voiceover,
+    plan_daily_vlog,
+    refine_script,
+    refine_text,
+)
 from vlog_tool.compress import compress_video
 from vlog_tool.config import AppConfig
 from vlog_tool.utils import (
@@ -58,6 +64,50 @@ def _write_text_file(path: Path, analysis: dict, source: Path, compressed: Path)
         lines.append(f"- {h}")
 
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _rewrite_text_file(path: Path, analysis: dict) -> None:
+    """根据已存在的 analysis 重写 .txt（不需要源文件/压缩文件路径）。"""
+    source_name = analysis.get("source_file", "?")
+    lines = [
+        f"# {analysis.get('title', '未命名')}",
+        "",
+        f"**源文件**: {source_name}",
+        "",
+        "## 简介",
+        analysis.get("summary", ""),
+        "",
+        f"**地点**: {analysis.get('location', '未知')}",
+        f"**氛围**: {analysis.get('mood', '')}",
+        f"**建议使用**: {analysis.get('suggested_use', '')}",
+        "",
+        "## 时间轴",
+    ]
+    for item in analysis.get("timeline", []):
+        lines.append(
+            f"- [{item.get('start', '?')} - {item.get('end', '?')}] {item.get('description', '')}"
+        )
+    lines.extend(["", "## 亮点"])
+    for h in analysis.get("highlights", []):
+        lines.append(f"- {h}")
+    if analysis.get("_changelog"):
+        lines.extend(["", "## 本次 refine 改动"])
+        for item in analysis["_changelog"]:
+            lines.append(f"- {item}")
+    path.write_text("\n".join(lines), encoding="utf-8")
+
+
+def _rewrite_script_md(path: Path, script: dict) -> None:
+    md = (
+        f"# {script.get('title', path.stem)} 口播\n\n"
+        f"{script.get('voiceover', '')}\n\n"
+        f"**剪辑建议**: {script.get('edit_tip', '')}\n"
+    )
+    if script.get("_changelog"):
+        md += "\n## 本次 refine 改动\n"
+        for item in script["_changelog"]:
+            md += f"- {item}\n"
+    path.write_text(md, encoding="utf-8")
 
 
 def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None:
@@ -271,6 +321,84 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1") -> None:
     ])
     out_md.write_text("\n".join(lines), encoding="utf-8")
     print(f"  -> {out_md.name}")
+
+
+def _collect_target_files(path: Path | None, default_dir: Path, pattern: str = "*.json") -> list[Path]:
+    """把 -i 参数或默认目录解析为要处理的文件列表。"""
+    target = path or default_dir
+    if not target.exists():
+        raise FileNotFoundError(f"路径不存在: {target}")
+    if target.is_file():
+        if target.suffix.lower() != ".json":
+            raise ValueError(f"仅支持 .json 文件: {target}")
+        return [target]
+    return sorted(target.glob(pattern))
+
+
+def _load_analysis_for_script(script_path: Path, texts_dir: Path) -> dict | None:
+    """根据口播文件名反查对应的素材分析（001_xxx_voiceover.json → 001_xxx.json）。"""
+    stem = script_path.stem
+    if stem.endswith("_voiceover"):
+        analysis_stem = stem[: -len("_voiceover")]
+    else:
+        analysis_stem = stem
+    candidate = texts_dir / f"{analysis_stem}.json"
+    if candidate.is_file():
+        return json.loads(candidate.read_text(encoding="utf-8"))
+    return None
+
+
+def run_refine_texts(config: AppConfig, path: Path | None = None) -> int:
+    """审阅并修正 texts/*.json；同步重写同名 .txt。返回处理条数。"""
+    files = _collect_target_files(path, config.texts_dir)
+    if not files:
+        print(f"未找到 json 文件: {path or config.texts_dir}")
+        return 0
+    print(f"[refine:texts] 目标 {len(files)} 个文件")
+    for json_file in files:
+        print(f"[refine] {json_file.name}")
+        analysis = json.loads(json_file.read_text(encoding="utf-8"))
+        try:
+            refined = refine_text(analysis, config)
+        except Exception as e:
+            print(f"  失败: {e}")
+            continue
+        json_file.write_text(json.dumps(refined, ensure_ascii=False, indent=2), encoding="utf-8")
+        txt_path = json_file.with_suffix(".txt")
+        _rewrite_text_file(txt_path, refined)
+        changelog = refined.get("_changelog") or []
+        if changelog:
+            print(f"  改动 ({len(changelog)}): {'; '.join(changelog)[:120]}")
+        else:
+            print("  无改动")
+    return len(files)
+
+
+def run_refine_scripts(config: AppConfig, path: Path | None = None) -> int:
+    """审阅并修正 scripts/*_voiceover.json；同步重写同名 .md。"""
+    files = _collect_target_files(path, config.scripts_dir, pattern="*_voiceover.json")
+    if not files:
+        print(f"未找到 voiceover json 文件: {path or config.scripts_dir}")
+        return 0
+    print(f"[refine:scripts] 目标 {len(files)} 个文件")
+    for json_file in files:
+        print(f"[refine] {json_file.name}")
+        script = json.loads(json_file.read_text(encoding="utf-8"))
+        analysis = _load_analysis_for_script(json_file, config.texts_dir)
+        try:
+            refined = refine_script(script, analysis, config)
+        except Exception as e:
+            print(f"  失败: {e}")
+            continue
+        json_file.write_text(json.dumps(refined, ensure_ascii=False, indent=2), encoding="utf-8")
+        md_path = json_file.with_name(json_file.stem + ".md")
+        _rewrite_script_md(md_path, refined)
+        changelog = refined.get("_changelog") or []
+        if changelog:
+            print(f"  改动 ({len(changelog)}): {'; '.join(changelog)[:120]}")
+        else:
+            print("  无改动")
+    return len(files)
 
 
 def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:

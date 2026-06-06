@@ -252,6 +252,30 @@ python main.py run -i "E:/Videos/Yunnan" --day day1
 python main.py -c other.yaml analyze              # use a different config
 ```
 
+### 9. Fix existing outputs (refine)
+
+If some AI analysis or voiceover is wrong (e.g. mistaking Paris CDG for
+Bangkok Suvarnabhumi), first write your trip context into `ai.context` /
+`ai.context_file`, then run:
+
+```powershell
+# default: review all of texts/ and scripts/
+python main.py refine
+
+# only texts
+python main.py refine --target texts
+
+# refine a single file
+python main.py refine -i output/Franch/texts/001_CDG_RER.json
+
+# refine every json in a folder
+python main.py refine -i output/Franch/texts/
+```
+
+The `video_analyze` provider (usually gemini) reviews texts, and the
+`voiceover` provider (usually deepseek) reviews scripts. Results overwrite
+the original files; the AI appends a `_changelog` field explaining changes.
+
 ---
 
 ## FAQ
