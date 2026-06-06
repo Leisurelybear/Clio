@@ -21,7 +21,7 @@ def compress_video(
         raise ValueError(f"无法读取视频时长: {input_path}")
 
     cfg = config.compress
-    vf = f"scale=min({cfg.max_width},iw):-2,fps={cfg.fps}"
+    vf = f"scale=min({cfg.max_width}\\,iw):-2,fps={cfg.fps}"
 
     args = ["-i", str(input_path), "-vf", vf, "-c:v", cfg.codec]
 
