@@ -96,9 +96,13 @@ def run_compress_all(config: AppConfig) -> list[ClipRecord]:
     records: list[ClipRecord] = []
 
     for i, video in enumerate(videos, start=1):
-        out = config.compressed_dir / f"{format_index(i, config.naming.index_width)}_{video.stem}.mp4"
-        print(f"[压缩] {video.name} -> {out.name}")
-        compress_video(video, out, config)
+        idx = format_index(i, config.naming.index_width)
+        out = config.compressed_dir / f"{idx}_{video.stem}.mp4"
+        if config.analyze.skip_existing and out.exists():
+            print(f"[跳过压缩] {video.name} (已存在: {out.name})")
+        else:
+            print(f"[压缩] {video.name} -> {out.name}")
+            compress_video(video, out, config)
         records.append(ClipRecord(index=i, stem=out.stem, source_path=video, compressed_path=out))
     return records
 
@@ -112,28 +116,30 @@ def run_analyze_all(config: AppConfig) -> list[ClipRecord]:
     records: list[ClipRecord] = []
 
     for i, video in enumerate(videos, start=1):
-        compressed = config.compressed_dir / f"{format_index(i, config.naming.index_width)}_{video.stem}.mp4"
-        text_path = config.texts_dir / f"{format_index(i, config.naming.index_width)}.txt"
+        idx = format_index(i, config.naming.index_width)
+        compressed = config.compressed_dir / f"{idx}_{video.stem}.mp4"
 
         if not compressed.exists():
             print(f"[压缩] {video.name}")
             compress_video(video, compressed, config)
+        else:
+            print(f"[跳过压缩] {video.name} (已存在)")
 
-        if config.analyze.skip_existing and text_path.exists():
-            print(f"[跳过] 已有分析: {text_path.name}")
-            analysis = json.loads(text_path.with_suffix(".json").read_text(encoding="utf-8")) if text_path.with_suffix(".json").exists() else {}
-            stem = text_path.stem
-            if analysis.get("title"):
-                stem = _build_stem(i, analysis["title"], config)
+        existing = sorted(config.texts_dir.glob(f"{idx}_*.json"))
+        if config.analyze.skip_existing and existing:
+            json_path = existing[0]
+            text_path = json_path.with_suffix(".txt")
+            analysis = json.loads(json_path.read_text(encoding="utf-8"))
+            print(f"[跳过分析] {video.name} (已存在: {json_path.name})")
             records.append(ClipRecord(
-                index=i, stem=stem, source_path=video,
+                index=i, stem=json_path.stem, source_path=video,
                 compressed_path=compressed, text_path=text_path, analysis=analysis,
             ))
             continue
 
         print(f"[分析] {video.name} (使用压缩版)")
         analysis = analyze_video(str(compressed), config)
-        analysis["index"] = format_index(i, config.naming.index_width)
+        analysis["index"] = idx
         analysis["source_file"] = video.name
 
         stem = _build_stem(i, analysis.get("title", video.stem), config)
@@ -174,6 +180,10 @@ def run_label_videos(config: AppConfig) -> None:
             continue
 
         out = labeled_dir / f"{json_file.stem}_labeled.mp4"
+        if config.analyze.skip_existing and out.exists():
+            print(f"[跳过标注] {out.name} (已存在)")
+            continue
+
         label = idx.replace("'", "")
         vf = (
             f"drawtext=text='{label}':fontsize=36:fontcolor=white:"
@@ -191,7 +201,7 @@ def run_generate_scripts(config: AppConfig) -> None:
         data = json.loads(json_file.read_text(encoding="utf-8"))
         data["index"] = data.get("index", json_file.stem[:3])
         out = config.scripts_dir / f"{json_file.stem}_voiceover.json"
-        if out.exists():
+        if config.analyze.skip_existing and out.exists():
             print(f"[跳过] {out.name}")
             continue
 
@@ -211,6 +221,13 @@ def run_generate_scripts(config: AppConfig) -> None:
 
 def run_plan_vlog(config: AppConfig, day_label: str = "day1") -> None:
     config.plans_dir.mkdir(parents=True, exist_ok=True)
+
+    out_json = config.plans_dir / f"{day_label}_plan.json"
+    out_md = config.plans_dir / f"{day_label}_plan.md"
+    if config.analyze.skip_existing and out_json.exists() and out_md.exists():
+        print(f"[跳过] {day_label} 计划 (已存在)")
+        return
+
     clips = []
     for json_file in sorted(config.texts_dir.glob("*.json")):
         data = json.loads(json_file.read_text(encoding="utf-8"))
@@ -230,9 +247,6 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1") -> None:
 
     print(f"[规划] {day_label}，共 {len(clips)} 条素材")
     plan = plan_daily_vlog(clips, config, day_label)
-
-    out_json = config.plans_dir / f"{day_label}_plan.json"
-    out_md = config.plans_dir / f"{day_label}_plan.md"
     out_json.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
 
     lines = [

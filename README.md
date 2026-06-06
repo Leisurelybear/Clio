@@ -143,6 +143,12 @@ python main.py plan --day day1  # 日 vlog 规划
 python main.py label            # 烧录序号
 ```
 
+> 重复执行会**自动跳过已生成的素材**（读取 `config.yaml` 的 `skip_existing`），可以从中断处继续。
+> 想要强制重跑某个步骤时加 `--force`：
+> ```powershell
+> python main.py analyze --force
+> ```
+
 ---
 
 ## 输出目录结构

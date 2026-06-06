@@ -103,6 +103,11 @@ def main(argv: list[str] | None = None) -> int:
         default="config.yaml",
         help="配置文件路径（默认 config.yaml）",
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="忽略已存在的输出，强制重新生成（覆盖 config.yaml 的 skip_existing）",
+    )
 
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -139,6 +144,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_check(config_path, getattr(args, "input", None))
 
     config = _prepare_config(config_path, args)
+    if args.force:
+        config.analyze.skip_existing = False
 
     try:
         if args.command == "compress":
