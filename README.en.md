@@ -265,36 +265,130 @@ target word count, structure, etc.).
 
 ## Command Reference
 
+Full reference for every subcommand. Short forms shown for the common cases.
+
+### Global flags
+
+| Flag | Applies to | Description |
+|------|------------|-------------|
+| `-c, --config <file>` | all | config file (default `config.yaml`) |
+| `-i, --input <path>` | most | footage folder / single json / json dir (overrides config.yaml) |
+| `-o, --output <path>` | most | output dir (default `output/<footage-folder-name>`) |
+| `--force` | all | ignore existing outputs and rerun (overrides `analyze.skip_existing`) |
+
+### `check` — environment check
+
+Verifies the virtualenv, ffmpeg / ffprobe, the footage folder, and the API
+key for every AI task. Makes no network calls.
+
 ```powershell
 python main.py check
-python main.py analyze -i "E:/Videos/Yunnan"     # analyze a folder
-python main.py run -i "E:/Videos/Yunnan" --day day1
-python main.py -c other.yaml analyze              # use a different config
+python main.py check -i "E:/Videos/Yunnan"     # also verify the footage folder
 ```
 
-### 9. Fix existing outputs (refine)
+Prints `[OK] xxx` / `[FAIL] xxx` plus the number of video files found.
 
-If some AI analysis or voiceover is wrong (e.g. mistaking Paris CDG for
-Bangkok Suvarnabhumi), first write your trip context into `ai.context` /
-`ai.context_file`, then run:
+### `compress` — compress only
+
+Runs ffmpeg to produce 640p / ~5 MB / audio-stripped mp4s.
+**Does not** call any AI. Useful when you want to batch-compress and
+cherry-pick manually.
 
 ```powershell
-# default: review all of texts/ and scripts/
+python main.py compress -i "E:/Videos/Yunnan"
+```
+
+Writes to `output/<folder>/compressed/`, named `<index>_<original-stem>.mp4`
+(e.g. `001_GL010683.mp4`). Existing files are skipped when
+`analyze.skip_existing: true`.
+
+### `analyze` — compress + AI analysis (most common)
+
+Compresses (if needed) and then sends each compressed clip to the
+`ai.tasks.video_analyze` provider (default: Gemini) for content analysis.
+
+```powershell
+python main.py analyze -i "E:/Videos/Yunnan"
+python main.py analyze --force     # rerun everything, ignoring skip_existing
+```
+
+Output triple:
+- `output/<folder>/texts/<index>_<title>.json` — structured (machine-readable)
+- `output/<folder>/texts/<index>_<title>.txt`  — human-readable, with timeline
+- `output/<folder>/summary.csv` — one row per clip
+
+> Re-runs **skip** existing `.json` / `.txt` (when
+> `analyze.skip_existing: true`). Add `--force` to redo everything.
+
+### `scripts` — voiceover generation
+
+For every `texts/` file, calls the `ai.tasks.voiceover` provider (default:
+DeepSeek) with `templates/vlog_template.md` to draft a voiceover.
+
+```powershell
+python main.py scripts
+```
+
+Writes `output/<folder>/scripts/<index>_<title>_voiceover.{json,md}`.
+The `.md` is ready to paste into 剪映.
+
+### `plan` — daily vlog editing plan
+
+Sends every `texts/` summary to the `ai.tasks.vlog_plan` provider, which
+picks a narratively coherent subset and orders them.
+
+```powershell
+python main.py plan --day day1
+python main.py plan --day "Day2_Loire_Valley"
+```
+
+`--day` shows up in the filename and the vlog title. Output:
+`output/<folder>/plans/<day>_plan.{json,md}`.
+
+### `label` — burn index numbers onto clips
+
+Burns the index (`001`, `002`, ...) onto the top-left of each compressed
+clip, so you can match the plan to footage inside 剪映.
+
+```powershell
+python main.py label
+```
+
+Writes to `output/<folder>/labeled/<index>_<title>_labeled.mp4`.
+
+### `run` — one-shot full pipeline
+
+Runs `analyze` → `scripts` → `plan` → `label` in sequence. Any step can
+also be run on its own.
+
+```powershell
+python main.py run -i "E:/Videos/Yunnan" --day day1
+```
+
+### `refine` — review and correct existing outputs
+
+If some analysis or voiceover is wrong (e.g. mistaking Paris CDG for
+Bangkok Suvarnabhumi), first put your trip background into `ai.context` /
+`ai.context_file`, then:
+
+```powershell
+# default: review every texts/ and scripts/ file
 python main.py refine
 
-# only texts
+# texts only
 python main.py refine --target texts
 
-# refine a single file
+# a single file
 python main.py refine -i output/Franch/texts/001_CDG_RER.json
 
-# refine every json in a folder
+# every json in a folder
 python main.py refine -i output/Franch/texts/
 ```
 
-The `video_analyze` provider (usually gemini) reviews texts, and the
-`voiceover` provider (usually deepseek) reviews scripts. Results overwrite
-the original files; the AI appends a `_changelog` field explaining changes.
+The `video_analyze` provider (usually gemini) reviews `texts/`; the
+`voiceover` provider (usually deepseek) reviews `scripts/`. Results
+overwrite the original file; the AI appends a `_changelog` field
+describing what it changed.
 
 ---
 

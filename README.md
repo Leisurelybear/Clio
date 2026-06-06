@@ -255,14 +255,100 @@ output/
 
 ## 命令参考
 
+所有子命令的完整说明。短形式仅列高频用法。
+
+### 全局参数
+
+| 参数 | 适用范围 | 说明 |
+|------|----------|------|
+| `-c, --config <文件>` | 全部 | 配置文件路径（默认 `config.yaml`） |
+| `-i, --input <路径>` | 多数子命令 | 素材文件夹 / 单个 json / json 目录（覆盖 config.yaml） |
+| `-o, --output <路径>` | 多数子命令 | 输出目录（默认 `output/<素材文件夹名>`） |
+| `--force` | 全部 | 忽略已存在的输出，强制重新生成（覆盖 `analyze.skip_existing`） |
+
+### `check` — 环境检查
+
+验证虚拟环境、ffmpeg / ffprobe、素材目录、每个 AI 任务的 API key 是否就绪。
+不会发起任何网络请求。
+
 ```powershell
 python main.py check
-python main.py analyze -i "E:/Videos/云南"     # 分析文件夹
-python main.py run -i "E:/Videos/云南" --day day1
-python main.py -c other.yaml analyze
+python main.py check -i "E:/Videos/云南"     # 同时验证指定素材目录
 ```
 
-### 9. 修正已生成的内容（refine）
+输出 `[OK] xxx` 或 `[FAIL] xxx`，以及发现多少个视频文件。
+
+### `compress` — 仅压缩
+
+把素材文件夹中的视频用 ffmpeg 压成 640p / 5MB / 去声音的 mp4 备用。
+**不**调 AI。适合想先批量压缩、再人工筛选的场景。
+
+```powershell
+python main.py compress -i "E:/Videos/云南"
+```
+
+输出到 `output/<素材文件夹名>/compressed/`，命名格式 `<序号>_<原文件名>.mp4`（如 `001_GL010683.mp4`）。
+已经存在的压缩文件会自动跳过（`skip_existing: true` 时）。
+
+### `analyze` — 压缩 + AI 分析（最常用）
+
+先压缩（如果还没压缩），再对每条压缩视频调 `ai.tasks.video_analyze` 配置的厂家（默认 Gemini）做内容分析。
+
+```powershell
+python main.py analyze -i "E:/Videos/云南"
+python main.py analyze --force     # 强制重新分析（覆盖 skip_existing）
+```
+
+输出三件套：
+- `output/<素材文件夹名>/texts/<序号>_<标题>.json` — 结构化分析（机器可读）
+- `output/<素材文件夹名>/texts/<序号>_<标题>.txt` — 人类可读版（含时间轴）
+- `output/<素材文件夹名>/summary.csv` — 全素材总览表（一行一条）
+
+> 重复执行会**自动跳过**已生成的 `.json` / `.txt`（`analyze.skip_existing: true` 时）。
+> 想全部重跑加 `--force`。
+
+### `scripts` — 生成口播文案
+
+对 `texts/` 里的每条分析，调 `ai.tasks.voiceover` 厂家（默认 DeepSeek）按
+`templates/vlog_template.md` 模板生成口播文案。
+
+```powershell
+python main.py scripts
+```
+
+输出到 `output/<素材文件夹名>/scripts/<序号>_<标题>_voiceover.{json,md}`。
+`.md` 是可以直接粘进剪映的成稿。
+
+### `plan` — 日 vlog 剪辑规划
+
+把当天所有 `texts/` 摘要给 `ai.tasks.vlog_plan` 厂家，让它挑出最有叙事感的若干片段排成剪辑顺序。
+
+```powershell
+python main.py plan --day day1
+python main.py plan --day "Day2_卢瓦尔河谷"
+```
+
+`--day` 标签会出现在输出文件名和 vlog 标题里。输出到 `output/<素材文件夹名>/plans/<day>_plan.{json,md}`。
+
+### `label` — 烧录序号标注
+
+在压缩视频左上角烧录序号（`001` / `002` / ...），便于剪映里对照 plan 选片段。
+
+```powershell
+python main.py label
+```
+
+输出到 `output/<素材文件夹名>/labeled/<序号>_<标题>_labeled.mp4`。
+
+### `run` — 一键全流程
+
+依次跑 `analyze` → `scripts` → `plan` → `label`，中间任何一步都可单独重跑。
+
+```powershell
+python main.py run -i "E:/Videos/云南" --day day1
+```
+
+### `refine` — 审阅修正已有输出
 
 如果某些素材 AI 分析或口播有误（比如把巴黎机场误判为曼谷素万那普），
 先用 `ai.context` / `ai.context_file` 写好行程背景和规范，然后：
