@@ -104,6 +104,11 @@ ai:
 | `video_analyze` | 看视频、输出时间轴 | `gemini` |
 | `voiceover` | 生成口播文案 | `gemini` / `openai` / 任意 OpenAI 兼容 |
 | `vlog_plan` | 推荐剪辑顺序 | 同上 |
+| `refine_text` | 审阅修正已有素材分析（`refine` 命令） | 同上（纯文本） |
+| `refine_script` | 审阅修正已有口播文案（`refine` 命令） | 同上（纯文本） |
+
+> `refine_text` 默认复用 `video_analyze` 的 provider，`refine_script` 默认复用
+> `voiceover`。在 `ai.tasks` 里显式声明可改成更便宜的纯文本模型（典型：全切 deepseek）。
 
 ### 6. 其他配置
 

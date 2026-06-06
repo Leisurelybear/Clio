@@ -8,6 +8,8 @@ class TaskName(str, Enum):
     VIDEO_ANALYZE = "video_analyze"
     VOICEOVER = "voiceover"
     VLOG_PLAN = "vlog_plan"
+    REFINE_TEXT = "refine_text"
+    REFINE_SCRIPT = "refine_script"
 
 
 class TextAIProvider(Protocol):

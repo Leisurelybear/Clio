@@ -167,6 +167,14 @@ def _parse_tasks(raw: dict) -> dict[str, TaskConfig]:
             provider=cfg["provider"],
             model=cfg["model"],
         )
+    # 默认回退：refine_text 用 video_analyze 的 provider，refine_script 用 voiceover。
+    # 用户可以在 ai.tasks 里显式覆盖（典型场景：refine 切到更便宜的 deepseek）。
+    if "refine_text" not in tasks and "video_analyze" in tasks:
+        src = tasks["video_analyze"]
+        tasks["refine_text"] = TaskConfig(provider=src.provider, model=src.model)
+    if "refine_script" not in tasks and "voiceover" in tasks:
+        src = tasks["voiceover"]
+        tasks["refine_script"] = TaskConfig(provider=src.provider, model=src.model)
     return tasks
 
 

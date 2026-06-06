@@ -94,6 +94,23 @@ vlog-video-analysis/
 5. `main.py` 注册 subcommand
 6. 更新 READMEs
 
+### 改 refine 阶段用的 AI
+
+`refine_text` 默认回退到 `video_analyze`、`refine_script` 默认回退到 `voiceover`
+（逻辑在 `vlog_tool/config.py:_parse_tasks`）。要切到更便宜的纯文本模型，
+在 `ai.tasks` 里显式加：
+
+```yaml
+ai:
+  tasks:
+    refine_text:
+      provider: deepseek
+      model: deepseek-chat
+    refine_script:
+      provider: deepseek
+      model: deepseek-chat
+```
+
 ### 加一个新的 CLI subcommand
 
 1. `main.py` 加 `p_X = sub.add_parser(...)` 和 dispatch 分支
@@ -113,7 +130,7 @@ vlog-video-analysis/
 ## 7. 项目当前状态
 
 最后更新：见 `git log --oneline -10`。
-最近做的 6 个 commit 顺序：
+最近做的 7 个 commit 顺序：
 1. `chore: scaffold initial Vlog editing helper project`
 2. `fix(compress): escape comma in scale expression`  ← Windows ffmpeg filter 逗号转义
 3. `feat(pipeline): make all steps resume-safe`  ← skip_existing 真接上
@@ -121,6 +138,8 @@ vlog-video-analysis/
 5. `fix(ai): clearer error when API key is missing or misconfigured`  ← 防止 key 被回显
 6. `feat(ai): support per-trip context preamble`  ← ai.context / ai.context_file
 7. `feat(cli): add refine subcommand to polish existing outputs`  ← 用 trip context 修正旧输出
+8. `docs: add AGENTS.md`  ← AI 维护手册
+9. `feat(ai): independent provider for refine tasks`  ← refine_text / refine_script 可独立配
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
