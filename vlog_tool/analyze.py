@@ -94,9 +94,13 @@ def refine_text(analysis: dict, config: AppConfig) -> dict:
 
 
 def refine_script(script: dict, analysis: dict | None, config: AppConfig) -> dict:
-    """依据 trip 上下文审阅并修正现有的口播文案。"""
-    provider, model = get_task_provider(config, TaskName.REFINE_SCRIPT)
-    task_cfg = config.ai.tasks[TaskName.REFINE_SCRIPT.value]
+    """依据 trip 上下文审阅并修正现有的口播文案。
+
+    复用 refine_text 任务的 provider/model 配置 —— texts 和 scripts 审阅
+    都是纯文本输入输出，没必要拆两个任务。
+    """
+    provider, model = get_task_provider(config, TaskName.REFINE_TEXT)
+    task_cfg = config.ai.tasks[TaskName.REFINE_TEXT.value]
     print(f"  AI: {task_cfg.provider}/{model}")
     analysis_json = (
         json.dumps(analysis, ensure_ascii=False, indent=2) if analysis else "（无）"

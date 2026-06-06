@@ -96,7 +96,7 @@ vlog-video-analysis/
 
 ### 改 refine 阶段用的 AI
 
-`refine_text` 默认回退到 `video_analyze`、`refine_script` 默认回退到 `voiceover`
+`refine_text` 默认回退到 `video_analyze`（texts 和 scripts 审阅共用这一个）
 （逻辑在 `vlog_tool/config.py:_parse_tasks`）。要切到更便宜的纯文本模型，
 在 `ai.tasks` 里显式加：
 
@@ -104,9 +104,6 @@ vlog-video-analysis/
 ai:
   tasks:
     refine_text:
-      provider: deepseek
-      model: deepseek-chat
-    refine_script:
       provider: deepseek
       model: deepseek-chat
 ```
@@ -139,7 +136,7 @@ ai:
 6. `feat(ai): support per-trip context preamble`  ← ai.context / ai.context_file
 7. `feat(cli): add refine subcommand to polish existing outputs`  ← 用 trip context 修正旧输出
 8. `docs: add AGENTS.md`  ← AI 维护手册
-9. `feat(ai): independent provider for refine tasks`  ← refine_text / refine_script 可独立配
+9. `feat(ai): independent provider for refine tasks`  ← refine_text 独立可配（texts/scripts 共用）
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。

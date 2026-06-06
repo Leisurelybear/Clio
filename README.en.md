@@ -108,12 +108,11 @@ ai:
 | `video_analyze` | Watch the video, output a timeline | `gemini` |
 | `voiceover` | Generate a voiceover script | `gemini` / `openai` / any OpenAI-compatible |
 | `vlog_plan` | Recommend the edit order | same as above |
-| `refine_text` | Review and correct existing analyses (`refine` command) | same as above (text-only) |
-| `refine_script` | Review and correct existing voiceovers (`refine` command) | same as above (text-only) |
+| `refine_text` | Review and correct existing analyses/voiceovers (`refine` cmd) | same as above (text-only) |
 
-> `refine_text` falls back to `video_analyze`'s provider, `refine_script` to
-> `voiceover`. Override under `ai.tasks` to use a cheaper text model
-> (typical: switch both to deepseek).
+> `refine_text` falls back to `video_analyze`'s provider. It is shared by
+> the texts and scripts review (both are text-only). Override under
+> `ai.tasks.refine_text` to use a cheaper model.
 
 ### 6. Other settings
 

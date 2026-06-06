@@ -49,12 +49,10 @@ ai:
       model: deepseek-chat
 
     # 可选：refine 阶段（`python main.py refine`）专用 provider。
-    # 默认回退：refine_text → video_analyze，refine_script → voiceover。
-    # 显式声明后可独立选便宜的纯文本模型（典型场景：全切 deepseek 省钱）。
+    # 默认回退到 video_analyze 的 provider。
+    # texts 和 scripts 审阅共用这一个任务（都是纯文本）。
+    # 显式声明后可换成更便宜的纯文本模型（典型场景：全切 deepseek 省钱）。
     # refine_text:
-    #   provider: deepseek
-    #   model: deepseek-chat
-    # refine_script:
     #   provider: deepseek
     #   model: deepseek-chat
 
