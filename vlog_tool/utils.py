@@ -11,6 +11,20 @@ from vlog_tool.config import AppConfig
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
 
 
+def mask_if_looks_like_key(value: str) -> str:
+    """如果字符串看起来像 API key 而非环境变量名，遮蔽中间部分。
+
+    避免错误信息把误填的 key 原样回显到终端/日志。
+    """
+    if not value:
+        return value
+    if value.startswith(("sk-", "sk_", "AIza", "gho_", "ghp_", "xai-")) and len(value) > 12:
+        return f"{value[:4]}***{value[-4:]}"
+    if len(value) > 32 and " " not in value:
+        return f"{value[:6]}***{value[-4:]}"
+    return value
+
+
 def discover_ffmpeg_bin(name: str) -> str | None:
     found = shutil.which(name)
     if found:

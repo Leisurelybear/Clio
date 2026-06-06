@@ -3,6 +3,7 @@ from __future__ import annotations
 import httpx
 
 from vlog_tool.config import ProviderConfig, ProxyConfig
+from vlog_tool.utils import mask_if_looks_like_key
 
 
 class OpenAICompatProvider:
@@ -12,8 +13,12 @@ class OpenAICompatProvider:
 
     def __init__(self, cfg: ProviderConfig, proxy: ProxyConfig):
         if not cfg.api_key:
+            env_name = mask_if_looks_like_key(cfg.api_key_env) or "<未设置>"
             raise ValueError(
-                f"Provider '{cfg.name}' 缺少 API Key，请设置环境变量 {cfg.api_key_env}"
+                f"Provider '{cfg.name}' 缺少 API Key。\n"
+                f"  方法 1: 在 .env 中设置环境变量 {env_name}=你的key\n"
+                f"  方法 2: 在 config.yaml 的 providers.{cfg.name}.api_key 字段直接填入 key\n"
+                f"  （如果误把 key 填到了 api_key_env 字段，请改回环境变量名）"
             )
         self._api_key = cfg.api_key
         self._base_url = (cfg.base_url or "https://api.openai.com/v1").rstrip("/")

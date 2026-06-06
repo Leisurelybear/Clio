@@ -80,7 +80,8 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
         key_ok = provider and provider.api_key not in PLACEHOLDER_KEYS
         detail = f"{task_cfg.provider}/{task_cfg.model}"
         if provider and not key_ok:
-            detail += f" (需设置 {provider.api_key_env})"
+            env_name = provider.api_key_env or "<未设置 api_key_env>"
+            detail += f" (需设置 {env_name}，或在 api_key 字段填入 key)"
         status(f"  {task_name}", bool(provider) and key_ok, detail)
 
     status(
