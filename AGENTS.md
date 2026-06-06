@@ -32,6 +32,7 @@ vlog-video-analysis/
 │   ├── compress.py            # ffmpeg 包装
 │   ├── prompts.py             # 所有 prompt 模板（常量）
 │   ├── utils.py               # ffmpeg 路径发现、文件 IO、mask_if_looks_like_key
+│   ├── log.py                 # 按小时切文件的日志（Tee stdout/stderr + HourlyFileHandler）
 │   └── ai/
 │       ├── base.py            # TaskName 枚举、Provider Protocol
 │       ├── factory.py         # 按名字查找 provider
@@ -43,6 +44,7 @@ vlog-video-analysis/
 ├── config.example.yaml        # 提交到 git 的配置模板
 ├── .env.example               # 提交到 git 的环境变量模板
 ├── config.yaml / .env         # 用户本地真实配置，gitignore
+├── logs/                      # 运行日志（gitignore；按小时切：YYYY-MM-DD-HH.log）
 ├── setup.ps1                  # 一键环境
 ├── README.md / README.en.md   # 用户文档（双语）
 └── AGENTS.md                  # 本文件
@@ -123,11 +125,13 @@ ai:
 - **不要**在配置文件里留真实 API key / 代理 IP / 本地路径
 - **不要**写测试代码（除非用户明确要求）
 - 看到 `<system-reminder>` 里的工作目录、当前时间等信息时，不要在回答里复述
+- **Push 之前必须显式向用户确认**。本地 commit 可以做（实现完一个功能就 commit），
+  但 `git push` 永远要先停下问一句"是否 push"，等用户点头再执行。
 
 ## 7. 项目当前状态
 
 最后更新：见 `git log --oneline -10`。
-最近做的 7 个 commit 顺序：
+最近做的 commit 顺序：
 1. `chore: scaffold initial Vlog editing helper project`
 2. `fix(compress): escape comma in scale expression`  ← Windows ffmpeg filter 逗号转义
 3. `feat(pipeline): make all steps resume-safe`  ← skip_existing 真接上
@@ -137,6 +141,7 @@ ai:
 7. `feat(cli): add refine subcommand to polish existing outputs`  ← 用 trip context 修正旧输出
 8. `docs: add AGENTS.md`  ← AI 维护手册
 9. `feat(ai): independent provider for refine tasks`  ← refine_text 独立可配（texts/scripts 共用）
+10. `feat(log): persist execution logs to per-hour files`  ← logs/YYYY-MM-DD-HH.log（gitignored）
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。

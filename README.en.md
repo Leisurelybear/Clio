@@ -181,6 +181,21 @@ python main.py label            # burn index labels
 > python main.py analyze --force
 > ```
 
+### 9. Inspect run logs
+
+Every CLI run writes its `print()` output and errors to **both** the console
+and the `logs/` directory. Files are rotated by hour, named
+`logs/YYYY-MM-DD-HH.log` (e.g. `logs/2026-06-06-14.log`). Long runs that
+cross an hour boundary get a new file automatically — no restart needed.
+
+```powershell
+# tail the most recent run's log
+Get-Content (Get-ChildItem logs/*.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1) -Tail 50
+```
+
+Override the directory via `paths.logs_dir` in `config.yaml`. The `logs/`
+folder is gitignored.
+
 ---
 
 ## Output Layout

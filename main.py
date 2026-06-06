@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from vlog_tool.config import apply_run_paths, load_config
+from vlog_tool.log import setup_logging
 from vlog_tool.pipeline import (
     run_analyze_all,
     run_compress_all,
@@ -155,6 +156,9 @@ def main(argv: list[str] | None = None) -> int:
     if not config_path.exists():
         print(f"配置文件不存在: {config_path}", file=sys.stderr)
         return 1
+
+    base_config = load_config(config_path)
+    setup_logging(base_config.paths.logs_dir)
 
     if args.command == "check":
         return run_check(config_path, getattr(args, "input", None))

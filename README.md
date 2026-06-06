@@ -174,6 +174,19 @@ python main.py label            # 烧录序号
 > python main.py analyze --force
 > ```
 
+### 9. 查看运行日志
+
+所有 CLI 运行的 `print()` / 错误信息会**同时**写到控制台和 `logs/` 目录。
+日志按小时切分，文件名格式：`logs/YYYY-MM-DD-HH.log`（如 `logs/2026-06-06-14.log`）。
+跨小时的长时间任务会自动切到新文件，无需重启。
+
+```powershell
+# 看最近一次运行的日志
+Get-Content (Get-ChildItem logs/*.log | Sort-Object LastWriteTime -Descending | Select-Object -First 1) -Tail 50
+```
+
+日志目录可通过 `config.yaml` 的 `paths.logs_dir` 修改。日志**不**提交到 git（已在 `.gitignore`）。
+
 ---
 
 ## 输出目录结构
