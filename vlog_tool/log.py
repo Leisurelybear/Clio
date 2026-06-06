@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import TextIO
@@ -120,3 +121,61 @@ def setup_logging(logs_dir: Path, level: int = logging.INFO) -> logging.Logger:
 
     _initialized = True
     return logger
+
+
+def format_size(num_bytes: float) -> str:
+    """人类可读体积：1.2 MB / 456 KB / 0 B。"""
+    if num_bytes < 1024:
+        return f"{int(num_bytes)} B"
+    if num_bytes < 1024 * 1024:
+        return f"{num_bytes / 1024:.1f} KB"
+    if num_bytes < 1024 * 1024 * 1024:
+        return f"{num_bytes / (1024 * 1024):.2f} MB"
+    return f"{num_bytes / (1024 * 1024 * 1024):.2f} GB"
+
+
+def format_duration(seconds: float) -> str:
+    """紧凑时长：45s / 1m23s / 1h02m03s。"""
+    seconds = max(0, int(seconds))
+    if seconds < 60:
+        return f"{seconds}s"
+    if seconds < 3600:
+        m, s = divmod(seconds, 60)
+        return f"{m}m{s:02d}s"
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h}h{m:02d}m{s:02d}s"
+
+
+class timed:
+    """上下文管理器：进入时打印起始时间戳，退出时打印耗时。
+
+    用法::
+
+        with timed("压缩 GL010683.mp4"):
+            compress(...)
+
+    输出::
+
+        [压缩 GL010683.mp4] 起始 21:52:30
+        [压缩 GL010683.mp4] 完成 用时 1m23s
+
+    也可在 with 块内读 `t.elapsed` 获取当前已耗时。
+    """
+
+    def __init__(self, label: str) -> None:
+        self._label = label
+        self._t0 = 0.0
+
+    def __enter__(self) -> "timed":
+        self._t0 = time.monotonic()
+        print(f"[{self._label}] 起始 {datetime.now().strftime('%H:%M:%S')}")
+        return self
+
+    def __exit__(self, *exc) -> None:
+        elapsed = time.monotonic() - self._t0
+        print(f"[{self._label}] 完成 用时 {format_duration(elapsed)}")
+
+    @property
+    def elapsed(self) -> float:
+        return time.monotonic() - self._t0
