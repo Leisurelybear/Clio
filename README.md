@@ -120,6 +120,25 @@ proxy:
   url: "socks5://192.168.6.1:1080"
 ```
 
+### 6.5 给 AI 加一段「行程背景/规范」
+
+AI 偶尔会把素材误判成无关地点（比如把巴黎机场 RER 认成曼谷素万那普）。
+在 `config.yaml` 里加 `ai.context` 或 `ai.context_file`，内容会作为**前言**自动注入到所有 AI 提示词前面：
+
+```yaml
+ai:
+  context: "所有素材均拍摄于 2024 年 7 月法国巴黎，不要误判为其他城市。"
+  # 或长文本用文件：
+  # context_file: ./templates/trip_context.md
+```
+
+模板和示例见 `templates/trip_context.md`，建议至少写：
+
+- 旅行时间 / 地点
+- 命名约定（中文标题 vs. 外文原文）
+- 容易误判的特例（如机场、地铁）
+- 输出语言与风格
+
 ### 7. 检查环境
 
 ```powershell

@@ -13,6 +13,12 @@ proxy:
 
 # AI 厂家与任务配置（每个步骤可独立指定厂家和模型）
 ai:
+  # 可选：trip 背景 + 规范说明。每次 AI 调用前会自动注入到提示词前面。
+  # 用 inline 短文本（context）或者一个文件（context_file）都行，二选一。
+  # 适合写：拍摄时间地点、命名约定、避免误判的提示、输出语言等。
+  # context: "所有素材均拍摄于 2024 年 7 月法国巴黎，不要误判为其他城市。"
+  # context_file: ./templates/trip_context.md
+
   providers:
     gemini:
       type: gemini

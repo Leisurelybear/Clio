@@ -9,11 +9,24 @@ from vlog_tool.config import AppConfig
 from vlog_tool.prompts import ANALYZE_PROMPT, PLAN_PROMPT, SCRIPT_PROMPT
 
 
+def _wrap_with_context(prompt: str, config: AppConfig) -> str:
+    """如果有 trip 上下文/规范，附加在 prompt 前面。"""
+    if not config.ai.context:
+        return prompt
+    return (
+        "## 背景与规范（请严格遵守）\n\n"
+        f"{config.ai.context}\n\n"
+        "---\n\n"
+        f"{prompt}"
+    )
+
+
 def analyze_video(video_path: str, config: AppConfig) -> dict:
     provider, model = get_video_provider(config, TaskName.VIDEO_ANALYZE)
     task_cfg = config.ai.tasks[TaskName.VIDEO_ANALYZE.value]
     print(f"  AI: {task_cfg.provider}/{model}")
-    text = provider.analyze_video(video_path, ANALYZE_PROMPT, model)
+    prompt = _wrap_with_context(ANALYZE_PROMPT, config)
+    text = provider.analyze_video(video_path, prompt, model)
     return extract_json(text)
 
 
@@ -26,7 +39,7 @@ def generate_voiceover(clip_data: dict, template: str, config: AppConfig) -> dic
         f"- {t.get('start', '?')}-{t.get('end', '?')}: {t.get('description', '')}"
         for t in clip_data.get("timeline", [])
     )
-    prompt = SCRIPT_PROMPT.format(
+    base = SCRIPT_PROMPT.format(
         index=clip_data.get("index", ""),
         title=clip_data.get("title", ""),
         summary=clip_data.get("summary", ""),
@@ -35,6 +48,7 @@ def generate_voiceover(clip_data: dict, template: str, config: AppConfig) -> dic
         template=template,
         target_words=config.script.target_words,
     )
+    prompt = _wrap_with_context(base, config)
     text = provider.generate_text(prompt, model)
     return extract_json(text)
 
@@ -44,10 +58,11 @@ def plan_daily_vlog(clips: list[dict], config: AppConfig, day_label: str = "day1
     task_cfg = config.ai.tasks[TaskName.VLOG_PLAN.value]
     print(f"  AI: {task_cfg.provider}/{model}")
 
-    prompt = PLAN_PROMPT.format(
+    base = PLAN_PROMPT.format(
         clips_json=json.dumps(clips, ensure_ascii=False, indent=2),
         max_clips=config.plan.max_clips_per_day,
         target_duration_sec=config.plan.target_duration_sec,
     )
-    text = provider.generate_text(f"日 vlog 标签: {day_label}\n\n{prompt}", model)
+    prompt = _wrap_with_context(f"日 vlog 标签: {day_label}\n\n{base}", config)
+    text = provider.generate_text(prompt, model)
     return extract_json(text)

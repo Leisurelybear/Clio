@@ -43,6 +43,7 @@ class TaskConfig:
 class AIConfig:
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
     tasks: dict[str, TaskConfig] = field(default_factory=dict)
+    context: str = ""  # 内容会作为"前言"注入到所有 AI 提示词
 
 
 @dataclass
@@ -169,6 +170,20 @@ def _parse_tasks(raw: dict) -> dict[str, TaskConfig]:
     return tasks
 
 
+def _load_context(ai_raw: dict, base: Path) -> str:
+    """加载 AI 上下文规范：可内联（ai.context），也可放文件（ai.context_file）。"""
+    inline = (ai_raw.get("context") or "").strip()
+    if inline:
+        return inline
+    file_ref = (ai_raw.get("context_file") or "").strip()
+    if not file_ref:
+        return ""
+    path = _path(file_ref, base)
+    if not path.is_file():
+        return ""
+    return path.read_text(encoding="utf-8").strip()
+
+
 def _legacy_ai_config(raw: dict) -> AIConfig:
     """兼容旧版 gemini: 配置块。"""
     gemini_raw = raw.get("gemini", {})
@@ -207,6 +222,7 @@ def load_config(config_path: str | Path = "config.yaml") -> AppConfig:
         ai = AIConfig(
             providers=_parse_providers(ai_raw.get("providers")),
             tasks=_parse_tasks(ai_raw.get("tasks")),
+            context=_load_context(ai_raw, base),
         )
     else:
         ai = _legacy_ai_config(raw)

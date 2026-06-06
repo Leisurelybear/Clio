@@ -124,6 +124,26 @@ proxy:
   url: "socks5://192.168.6.1:1080"
 ```
 
+### 6.5 Give the AI a "trip context / spec" preamble
+
+AI models sometimes misidentify locations (e.g. mistaking Paris's CDG RER
+for Bangkok's Suvarnabhumi). Add `ai.context` or `ai.context_file` to
+`config.yaml`; its content is prepended to every AI prompt:
+
+```yaml
+ai:
+  context: "All footage was shot in Paris, France in July 2024. Do not confuse it with other cities."
+  # or, for longer text, use a file:
+  # context_file: ./templates/trip_context.md
+```
+
+A sample is provided at `templates/trip_context.md`. At minimum, document:
+
+- Trip dates and locations
+- Naming conventions (Chinese titles vs. foreign-language originals)
+- Known confusion cases (airports, metros, etc.)
+- Output language and style
+
 ### 7. Verify the environment
 
 ```powershell
