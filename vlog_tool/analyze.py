@@ -6,19 +6,15 @@ from vlog_tool.ai.base import TaskName
 from vlog_tool.ai.factory import get_task_provider, get_video_provider
 from vlog_tool.ai.gemini import extract_json
 from vlog_tool.config import AppConfig
-from vlog_tool.prompts import ANALYZE_PROMPT, PLAN_PROMPT, REFINE_SCRIPT_PROMPT, REFINE_TEXT_PROMPT, SCRIPT_PROMPT
-
-
-def _wrap_with_context(prompt: str, config: AppConfig) -> str:
-    """如果有 trip 上下文/规范，附加在 prompt 前面。"""
-    if not config.ai.context:
-        return prompt
-    return (
-        "## 背景与规范（请严格遵守）\n\n"
-        f"{config.ai.context}\n\n"
-        "---\n\n"
-        f"{prompt}"
-    )
+from vlog_tool.prompts import (
+    ANALYZE_PROMPT,
+    PLAN_PROMPT,
+    REFINE_SCRIPT_FIX_PROMPT,
+    REFINE_SCRIPT_PROMPT,
+    REFINE_TEXT_FIX_PROMPT,
+    REFINE_TEXT_PROMPT,
+    SCRIPT_PROMPT,
+)
 
 
 def _wrap_with_context(prompt: str, config: AppConfig) -> str:
@@ -80,24 +76,35 @@ def plan_daily_vlog(clips: list[dict], config: AppConfig, day_label: str = "day1
     return extract_json(text)
 
 
-def refine_text(analysis: dict, config: AppConfig) -> dict:
-    """依据 trip 上下文审阅并修正现有的素材分析。"""
+def refine_text(analysis: dict, config: AppConfig, fix: str | None = None) -> dict:
+    """审阅并修正现有的素材分析。
+
+    fix 非空时切换为「按用户意见定向修正」模式（仅改用户提到的字段，
+    changelog 第一条固定写"按用户意见修改了 XXX"）。
+    """
     provider, model = get_task_provider(config, TaskName.REFINE_TEXT)
     task_cfg = config.ai.tasks[TaskName.REFINE_TEXT.value]
     print(f"  AI: {task_cfg.provider}/{model}")
-    base = REFINE_TEXT_PROMPT.format(
-        existing_json=json.dumps(analysis, ensure_ascii=False, indent=2),
-    )
+    if fix:
+        base = REFINE_TEXT_FIX_PROMPT.format(
+            fix_instruction=fix.strip(),
+            existing_json=json.dumps(analysis, ensure_ascii=False, indent=2),
+        )
+    else:
+        base = REFINE_TEXT_PROMPT.format(
+            existing_json=json.dumps(analysis, ensure_ascii=False, indent=2),
+        )
     prompt = _wrap_with_context(base, config)
     text = provider.generate_text(prompt, model)
     return extract_json(text)
 
 
-def refine_script(script: dict, analysis: dict | None, config: AppConfig) -> dict:
-    """依据 trip 上下文审阅并修正现有的口播文案。
+def refine_script(script: dict, analysis: dict | None, config: AppConfig, fix: str | None = None) -> dict:
+    """审阅并修正现有的口播文案。
 
     复用 refine_text 任务的 provider/model 配置 —— texts 和 scripts 审阅
     都是纯文本输入输出，没必要拆两个任务。
+    fix 非空时切换为定向修正模式（同 refine_text）。
     """
     provider, model = get_task_provider(config, TaskName.REFINE_TEXT)
     task_cfg = config.ai.tasks[TaskName.REFINE_TEXT.value]
@@ -105,10 +112,18 @@ def refine_script(script: dict, analysis: dict | None, config: AppConfig) -> dic
     analysis_json = (
         json.dumps(analysis, ensure_ascii=False, indent=2) if analysis else "（无）"
     )
-    base = REFINE_SCRIPT_PROMPT.format(
-        analysis_json=analysis_json,
-        existing_json=json.dumps(script, ensure_ascii=False, indent=2),
-    )
+    existing_json = json.dumps(script, ensure_ascii=False, indent=2)
+    if fix:
+        base = REFINE_SCRIPT_FIX_PROMPT.format(
+            fix_instruction=fix.strip(),
+            analysis_json=analysis_json,
+            existing_json=existing_json,
+        )
+    else:
+        base = REFINE_SCRIPT_PROMPT.format(
+            analysis_json=analysis_json,
+            existing_json=existing_json,
+        )
     prompt = _wrap_with_context(base, config)
     text = provider.generate_text(prompt, model)
     return extract_json(text)

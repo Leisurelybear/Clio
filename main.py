@@ -39,8 +39,10 @@ def _add_io_args(parser: argparse.ArgumentParser) -> None:
 
 def _prepare_config(config_path: Path, args: argparse.Namespace):
     config = load_config(config_path)
-    if getattr(args, "input", None) or getattr(args, "output", None):
-        config = apply_run_paths(config, args.input, args.output)
+    input_override = getattr(args, "input", None)
+    output_override = getattr(args, "output", None)
+    if input_override or output_override:
+        config = apply_run_paths(config, input_override, output_override)
     return config
 
 
@@ -150,6 +152,15 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="指定单个 .json 文件或目录；省略则处理整个 texts/ 或 scripts/",
     )
+    p_refine.add_argument(
+        "--fix", "-f",
+        type=str,
+        default="",
+        help=(
+            "指定具体修改意见（必须配合 -i 单文件使用）。"
+            "例: --fix '把 location 从曼谷素万那普机场改成巴黎戴高乐机场'"
+        ),
+    )
 
     args = parser.parse_args(argv)
     config_path = Path(args.config)
@@ -187,15 +198,23 @@ def main(argv: list[str] | None = None) -> int:
                     "refine 效果有限（AI 不知道你的行程背景和规范）。",
                     file=sys.stderr,
                 )
+            fix = (getattr(args, "fix", "") or "").strip() or None
             target_path = getattr(args, "input", None)
-            if args.target in ("texts", "all"):
-                run_refine_texts(config, target_path)
-            if args.target in ("scripts", "all"):
-                if args.target == "all" and target_path is not None:
-                    scripts_path = None
-                else:
-                    scripts_path = target_path
-                run_refine_scripts(config, scripts_path)
+            if fix and (target_path is None or target_path.is_dir()):
+                print("错误: --fix 必须配合 -i 指定单个 .json 文件", file=sys.stderr)
+                return 1
+            try:
+                if args.target in ("texts", "all"):
+                    run_refine_texts(config, target_path, fix=fix)
+                if args.target in ("scripts", "all"):
+                    if args.target == "all" and target_path is not None:
+                        scripts_path = None
+                    else:
+                        scripts_path = target_path
+                    run_refine_scripts(config, scripts_path, fix=fix)
+            except ValueError as e:
+                print(f"错误: {e}", file=sys.stderr)
+                return 1
     except FileNotFoundError as e:
         print(f"错误: {e}", file=sys.stderr)
         return 1

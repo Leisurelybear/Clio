@@ -348,18 +348,26 @@ def _load_analysis_for_script(script_path: Path, texts_dir: Path) -> dict | None
     return None
 
 
-def run_refine_texts(config: AppConfig, path: Path | None = None) -> int:
-    """审阅并修正 texts/*.json；同步重写同名 .txt。返回处理条数。"""
+def run_refine_texts(config: AppConfig, path: Path | None = None, fix: str | None = None) -> int:
+    """审阅并修正 texts/*.json；同步重写同名 .txt。返回处理条数。
+
+    fix 非空时：仅处理 -i 指定的单文件，prompt 切换为「按用户意见定向修正」。
+    """
+    if fix and (path is None or path.is_dir()):
+        raise ValueError("--fix 必须配合 -i 指定单个 json 文件，不能用于目录")
     files = _collect_target_files(path, config.texts_dir)
     if not files:
         print(f"未找到 json 文件: {path or config.texts_dir}")
         return 0
-    print(f"[refine:texts] 目标 {len(files)} 个文件")
+    label = "refine:fix:texts" if fix else "refine:texts"
+    print(f"[{label}] 目标 {len(files)} 个文件")
+    if fix:
+        print(f"  修改意见: {fix}")
     for json_file in files:
         print(f"[refine] {json_file.name}")
         analysis = json.loads(json_file.read_text(encoding="utf-8"))
         try:
-            refined = refine_text(analysis, config)
+            refined = refine_text(analysis, config, fix=fix)
         except Exception as e:
             print(f"  失败: {e}")
             continue
@@ -374,19 +382,27 @@ def run_refine_texts(config: AppConfig, path: Path | None = None) -> int:
     return len(files)
 
 
-def run_refine_scripts(config: AppConfig, path: Path | None = None) -> int:
-    """审阅并修正 scripts/*_voiceover.json；同步重写同名 .md。"""
+def run_refine_scripts(config: AppConfig, path: Path | None = None, fix: str | None = None) -> int:
+    """审阅并修正 scripts/*_voiceover.json；同步重写同名 .md。
+
+    fix 非空时：仅处理 -i 指定的单文件。
+    """
+    if fix and (path is None or path.is_dir()):
+        raise ValueError("--fix 必须配合 -i 指定单个 json 文件，不能用于目录")
     files = _collect_target_files(path, config.scripts_dir, pattern="*_voiceover.json")
     if not files:
         print(f"未找到 voiceover json 文件: {path or config.scripts_dir}")
         return 0
-    print(f"[refine:scripts] 目标 {len(files)} 个文件")
+    label = "refine:fix:scripts" if fix else "refine:scripts"
+    print(f"[{label}] 目标 {len(files)} 个文件")
+    if fix:
+        print(f"  修改意见: {fix}")
     for json_file in files:
         print(f"[refine] {json_file.name}")
         script = json.loads(json_file.read_text(encoding="utf-8"))
         analysis = _load_analysis_for_script(json_file, config.texts_dir)
         try:
-            refined = refine_script(script, analysis, config)
+            refined = refine_script(script, analysis, config, fix=fix)
         except Exception as e:
             print(f"  失败: {e}")
             continue

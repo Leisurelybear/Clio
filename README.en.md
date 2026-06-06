@@ -367,9 +367,12 @@ python main.py run -i "E:/Videos/Yunnan" --day day1
 
 ### `refine` — review and correct existing outputs
 
-If some analysis or voiceover is wrong (e.g. mistaking Paris CDG for
-Bangkok Suvarnabhumi), first put your trip background into `ai.context` /
-`ai.context_file`, then:
+`refine` runs in two modes:
+
+#### 1. Review mode (default)
+
+The AI reads `ai.context` / `ai.context_file` and fixes obvious errors
+on its own (misidentified locations, naming inconsistencies, etc.).
 
 ```powershell
 # default: review every texts/ and scripts/ file
@@ -385,10 +388,26 @@ python main.py refine -i output/Franch/texts/001_CDG_RER.json
 python main.py refine -i output/Franch/texts/
 ```
 
-The `video_analyze` provider (usually gemini) reviews `texts/`; the
-`voiceover` provider (usually deepseek) reviews `scripts/`. Results
-overwrite the original file; the AI appends a `_changelog` field
-describing what it changed.
+#### 2. Targeted-fix mode (`--fix`)
+
+You supply an explicit instruction; the AI changes **only** the fields
+you mention and leaves everything else untouched. Must be paired with
+`-i` to point at a single file (no directory mode — too easy to misuse).
+
+```powershell
+# fix a misidentified location
+python main.py refine -i output/Franch/texts/001_CDG_RER.json `
+    --fix "Change location from 'Bangkok Suvarnabhumi' to 'Paris CDG'"
+
+# correct a specific line in a voiceover
+python main.py refine -i output/Franch/scripts/001_CDG_RER_voiceover.json `
+    --fix "In voiceover, replace 'Bangkok morning' with 'Paris morning'"
+```
+
+The `_changelog` field's first entry reads "applied user instruction
+on XXX" for audit purposes. Both modes call the `video_analyze`
+provider (default gemini) for `texts/` and the `voiceover` provider
+(default deepseek) for `scripts/`; results overwrite the original file.
 
 ---
 

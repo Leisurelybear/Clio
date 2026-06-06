@@ -350,8 +350,11 @@ python main.py run -i "E:/Videos/云南" --day day1
 
 ### `refine` — 审阅修正已有输出
 
-如果某些素材 AI 分析或口播有误（比如把巴黎机场误判为曼谷素万那普），
-先用 `ai.context` / `ai.context_file` 写好行程背景和规范，然后：
+`refine` 有两种模式：
+
+#### 1. 审阅模式（默认）
+
+AI 依据 `ai.context` / `ai.context_file` 自动审阅并修正错误（地点误判、命名不一致等）。
 
 ```powershell
 # 默认：审阅 texts/ 和 scripts/ 下的所有文件
@@ -367,9 +370,24 @@ python main.py refine -i output/Franch/texts/001_机场轻轨清晨.json
 python main.py refine -i output/Franch/texts/
 ```
 
-会调用 `video_analyze` 任务用的 AI（一般是 gemini）审 texts，
-用 `voiceover` 任务用的 AI（一般是 deepseek）审 scripts。
-结果直接覆盖原文件，AI 会在末尾追加 `_changelog` 字段说明改动原因。
+#### 2. 定向修正模式（`--fix`）
+
+你给一句具体修改意见，AI **只改**这条意见提到的字段，其它一字不动。
+必须配合 `-i` 指定单个文件，避免误伤。
+
+```powershell
+# 把 location 字段从误判改成正确地名
+python main.py refine -i output/Franch/texts/001_机场轻轨清晨.json `
+    --fix "把 location 从曼谷素万那普机场改成巴黎戴高乐机场"
+
+# 修正 voiceover 文案里的具体错误
+python main.py refine -i output/Franch/scripts/001_机场轻轨清晨_voiceover.json `
+    --fix "把 voiceover 第一句'曼谷的早晨'改成'巴黎的早晨'"
+```
+
+`_changelog` 字段的第一条会写"按用户意见修改了 XXX"，方便审计。
+两种模式都会调用 `video_analyze` 任务的 AI（默认 gemini）审 texts、
+`voiceover` 任务的 AI（默认 deepseek）审 scripts，结果直接覆盖原文件。
 
 ---
 
