@@ -15,6 +15,7 @@ class PathsConfig:
     ffmpeg: str = ""
     ffprobe: str = ""
     recursive: bool = False
+    logs_dir: Path = Path("./logs")
 
 
 @dataclass
@@ -240,6 +241,7 @@ def load_config(config_path: str | Path = "config.yaml") -> AppConfig:
             ffmpeg=paths_raw.get("ffmpeg", ""),
             ffprobe=paths_raw.get("ffprobe", ""),
             recursive=paths_raw.get("recursive", False),
+            logs_dir=_path(paths_raw.get("logs_dir", "./logs"), base),
         ),
         proxy=ProxyConfig(**raw.get("proxy", {})),
         ai=ai,

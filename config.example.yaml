@@ -6,6 +6,8 @@ paths:
   recursive: false          # true = 扫描子文件夹内所有视频
   ffmpeg: ""
   ffprobe: ""
+  logs_dir: "./logs"        # 按小时切文件：logs/YYYY-MM-DD-HH.log
+                            # 整个 CLI 跑下来所有 print() / 错误 / 日志都会同时落这里
 
 proxy:
   enabled: false
