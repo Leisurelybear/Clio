@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,6 +15,7 @@ from vlog_tool.analyze import (
 )
 from vlog_tool.compress import compress_video
 from vlog_tool.config import AppConfig
+from vlog_tool.log import format_duration, timed
 from vlog_tool.utils import (
     find_videos,
     format_index,
@@ -37,6 +39,18 @@ class ClipRecord:
 def _build_stem(index: int, title: str, config: AppConfig) -> str:
     idx = format_index(index, config.naming.index_width)
     return f"{idx}_{sanitize_name(title)}"
+
+
+def _eta_line(label: str, i: int, total: int, name: str, completed: int, elapsed_total: float) -> str:
+    """生成 `[label i/total] name（平均 X，剩余 ~Y）` 形式的进度行。"""
+    if completed > 0:
+        avg = elapsed_total / completed
+        remaining = avg * (total - i)
+        return (
+            f"[{label} {i}/{total}] {name}"
+            f"（平均 {format_duration(avg)}，剩余 ~{format_duration(remaining)}）"
+        )
+    return f"[{label} 1/{total}] {name}"
 
 
 def _write_text_file(path: Path, analysis: dict, source: Path, compressed: Path) -> None:
@@ -145,15 +159,21 @@ def run_compress_all(config: AppConfig) -> list[ClipRecord]:
     config.compressed_dir.mkdir(parents=True, exist_ok=True)
     records: list[ClipRecord] = []
 
-    for i, video in enumerate(videos, start=1):
-        idx = format_index(i, config.naming.index_width)
-        out = config.compressed_dir / f"{idx}_{video.stem}.mp4"
-        if config.analyze.skip_existing and out.exists():
-            print(f"[跳过压缩] {video.name} (已存在: {out.name})")
-        else:
-            print(f"[压缩] {video.name} -> {out.name}")
-            compress_video(video, out, config)
-        records.append(ClipRecord(index=i, stem=out.stem, source_path=video, compressed_path=out))
+    with timed(f"run_compress_all（{len(videos)} 个）"):
+        completed = 0
+        elapsed_total = 0.0
+        for i, video in enumerate(videos, start=1):
+            idx = format_index(i, config.naming.index_width)
+            out = config.compressed_dir / f"{idx}_{video.stem}.mp4"
+            if config.analyze.skip_existing and out.exists():
+                print(f"[跳过压缩] {video.name} (已存在: {out.name})")
+            else:
+                print(_eta_line("压缩", i, len(videos), video.name, completed, elapsed_total))
+                t0 = time.monotonic()
+                compress_video(video, out, config)
+                elapsed_total += time.monotonic() - t0
+                completed += 1
+            records.append(ClipRecord(index=i, stem=out.stem, source_path=video, compressed_path=out))
     return records
 
 
@@ -165,45 +185,51 @@ def run_analyze_all(config: AppConfig) -> list[ClipRecord]:
     print(f"素材目录: {config.paths.input_dir}（{len(videos)} 个视频）")
     records: list[ClipRecord] = []
 
-    for i, video in enumerate(videos, start=1):
-        idx = format_index(i, config.naming.index_width)
-        compressed = config.compressed_dir / f"{idx}_{video.stem}.mp4"
+    with timed(f"run_analyze_all（{len(videos)} 个）"):
+        completed = 0
+        elapsed_total = 0.0
+        for i, video in enumerate(videos, start=1):
+            idx = format_index(i, config.naming.index_width)
+            compressed = config.compressed_dir / f"{idx}_{video.stem}.mp4"
 
-        if not compressed.exists():
-            print(f"[压缩] {video.name}")
-            compress_video(video, compressed, config)
-        else:
-            print(f"[跳过压缩] {video.name} (已存在)")
+            if not compressed.exists():
+                print(f"[压缩] {video.name}")
+                compress_video(video, compressed, config)
+            else:
+                print(f"[跳过压缩] {video.name} (已存在)")
 
-        existing = sorted(config.texts_dir.glob(f"{idx}_*.json"))
-        if config.analyze.skip_existing and existing:
-            json_path = existing[0]
-            text_path = json_path.with_suffix(".txt")
-            analysis = json.loads(json_path.read_text(encoding="utf-8"))
-            print(f"[跳过分析] {video.name} (已存在: {json_path.name})")
+            existing = sorted(config.texts_dir.glob(f"{idx}_*.json"))
+            if config.analyze.skip_existing and existing:
+                json_path = existing[0]
+                text_path = json_path.with_suffix(".txt")
+                analysis = json.loads(json_path.read_text(encoding="utf-8"))
+                print(f"[跳过分析] {video.name} (已存在: {json_path.name})")
+                records.append(ClipRecord(
+                    index=i, stem=json_path.stem, source_path=video,
+                    compressed_path=compressed, text_path=text_path, analysis=analysis,
+                ))
+                continue
+
+            print(_eta_line("分析", i, len(videos), video.name, completed, elapsed_total))
+            t0 = time.monotonic()
+            analysis = analyze_video(str(compressed), config)
+            elapsed_total += time.monotonic() - t0
+            completed += 1
+            analysis["index"] = idx
+            analysis["source_file"] = video.name
+
+            stem = _build_stem(i, analysis.get("title", video.stem), config)
+            final_text = config.texts_dir / f"{stem}.txt"
+            json_path = config.texts_dir / f"{stem}.json"
+
+            _write_text_file(final_text, analysis, video, compressed)
+            json_path.write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
+
             records.append(ClipRecord(
-                index=i, stem=json_path.stem, source_path=video,
-                compressed_path=compressed, text_path=text_path, analysis=analysis,
+                index=i, stem=stem, source_path=video,
+                compressed_path=compressed, text_path=final_text, analysis=analysis,
             ))
-            continue
-
-        print(f"[分析] {video.name} (使用压缩版)")
-        analysis = analyze_video(str(compressed), config)
-        analysis["index"] = idx
-        analysis["source_file"] = video.name
-
-        stem = _build_stem(i, analysis.get("title", video.stem), config)
-        final_text = config.texts_dir / f"{stem}.txt"
-        json_path = config.texts_dir / f"{stem}.json"
-
-        _write_text_file(final_text, analysis, video, compressed)
-        json_path.write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
-
-        records.append(ClipRecord(
-            index=i, stem=stem, source_path=video,
-            compressed_path=compressed, text_path=final_text, analysis=analysis,
-        ))
-        print(f"  -> {final_text.name}")
+            print(f"  -> {final_text.name}")
 
     _write_csv(config.summary_csv, records, config)
     print(f"\nCSV 已保存: {config.summary_csv}")
@@ -216,57 +242,72 @@ def run_label_videos(config: AppConfig) -> None:
     labeled_dir = config.paths.output_dir / "labeled"
     labeled_dir.mkdir(parents=True, exist_ok=True)
 
-    for json_file in sorted(config.texts_dir.glob("*.json")):
-        data = json.loads(json_file.read_text(encoding="utf-8"))
-        idx = data.get("index", json_file.stem[:3])
-        title = data.get("title", json_file.stem)
-        source_name = data.get("source_file", "")
-        compressed = None
-        for f in config.compressed_dir.glob(f"{idx}_*"):
-            compressed = f
-            break
-        if not compressed or not compressed.exists():
-            print(f"[跳过] 找不到压缩文件: {idx}")
-            continue
+    files = sorted(config.texts_dir.glob("*.json"))
+    with timed(f"run_label_videos（{len(files)} 个）"):
+        completed = 0
+        elapsed_total = 0.0
+        for i, json_file in enumerate(files, start=1):
+            data = json.loads(json_file.read_text(encoding="utf-8"))
+            idx = data.get("index", json_file.stem[:3])
+            title = data.get("title", json_file.stem)
+            source_name = data.get("source_file", "")
+            compressed = None
+            for f in config.compressed_dir.glob(f"{idx}_*"):
+                compressed = f
+                break
+            if not compressed or not compressed.exists():
+                print(f"[跳过] 找不到压缩文件: {idx}")
+                continue
 
-        out = labeled_dir / f"{json_file.stem}_labeled.mp4"
-        if config.analyze.skip_existing and out.exists():
-            print(f"[跳过标注] {out.name} (已存在)")
-            continue
+            out = labeled_dir / f"{json_file.stem}_labeled.mp4"
+            if config.analyze.skip_existing and out.exists():
+                print(f"[跳过标注] {out.name} (已存在)")
+                continue
 
-        label = idx.replace("'", "")
-        vf = (
-            f"drawtext=text='{label}':fontsize=36:fontcolor=white:"
-            f"box=1:boxcolor=black@0.5:boxborderw=8:x=20:y=20"
-        )
-        run_ffmpeg(["-i", str(compressed), "-vf", vf, "-an", "-y", str(out)], ffmpeg)
-        print(f"[标注] {out.name}")
+            print(_eta_line("标注", i, len(files), json_file.stem, completed, elapsed_total))
+            t0 = time.monotonic()
+            label = idx.replace("'", "")
+            vf = (
+                f"drawtext=text='{label}':fontsize=36:fontcolor=white:"
+                f"box=1:boxcolor=black@0.5:boxborderw=8:x=20:y=20"
+            )
+            run_ffmpeg(["-i", str(compressed), "-vf", vf, "-an", "-y", str(out)], ffmpeg)
+            elapsed_total += time.monotonic() - t0
+            completed += 1
+            print(f"  -> {out.name}")
 
 
 def run_generate_scripts(config: AppConfig) -> None:
     config.scripts_dir.mkdir(parents=True, exist_ok=True)
     template = config.script.template_file.read_text(encoding="utf-8") if config.script.template_file.exists() else ""
 
-    for json_file in sorted(config.texts_dir.glob("*.json")):
-        data = json.loads(json_file.read_text(encoding="utf-8"))
-        data["index"] = data.get("index", json_file.stem[:3])
-        out = config.scripts_dir / f"{json_file.stem}_voiceover.json"
-        if config.analyze.skip_existing and out.exists():
-            print(f"[跳过] {out.name}")
-            continue
+    files = sorted(config.texts_dir.glob("*.json"))
+    with timed(f"run_generate_scripts（{len(files)} 个）"):
+        completed = 0
+        elapsed_total = 0.0
+        for i, json_file in enumerate(files, start=1):
+            data = json.loads(json_file.read_text(encoding="utf-8"))
+            data["index"] = data.get("index", json_file.stem[:3])
+            out = config.scripts_dir / f"{json_file.stem}_voiceover.json"
+            if config.analyze.skip_existing and out.exists():
+                print(f"[跳过] {out.name}")
+                continue
 
-        print(f"[口播] {json_file.stem}")
-        script = generate_voiceover(data, template, config)
-        out.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+            print(_eta_line("口播", i, len(files), json_file.stem, completed, elapsed_total))
+            t0 = time.monotonic()
+            script = generate_voiceover(data, template, config)
+            elapsed_total += time.monotonic() - t0
+            completed += 1
+            out.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
-        md_out = config.scripts_dir / f"{json_file.stem}_voiceover.md"
-        md_out.write_text(
-            f"# {script.get('title', json_file.stem)} 口播\n\n"
-            f"{script.get('voiceover', '')}\n\n"
-            f"**剪辑建议**: {script.get('edit_tip', '')}\n",
-            encoding="utf-8",
-        )
-        print(f"  -> {md_out.name}")
+            md_out = config.scripts_dir / f"{json_file.stem}_voiceover.md"
+            md_out.write_text(
+                f"# {script.get('title', json_file.stem)} 口播\n\n"
+                f"{script.get('voiceover', '')}\n\n"
+                f"**剪辑建议**: {script.get('edit_tip', '')}\n",
+                encoding="utf-8",
+            )
+            print(f"  -> {md_out.name}")
 
 
 def run_plan_vlog(config: AppConfig, day_label: str = "day1") -> None:
@@ -295,8 +336,9 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1") -> None:
         print("没有可用的分析结果，请先运行 analyze")
         return
 
-    print(f"[规划] {day_label}，共 {len(clips)} 条素材")
-    plan = plan_daily_vlog(clips, config, day_label)
+    with timed(f"run_plan_vlog {day_label}（{len(clips)} 条）"):
+        print(f"[规划] {day_label}，共 {len(clips)} 条素材")
+        plan = plan_daily_vlog(clips, config, day_label)
     out_json.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
 
     lines = [
@@ -363,22 +405,28 @@ def run_refine_texts(config: AppConfig, path: Path | None = None, fix: str | Non
     print(f"[{label}] 目标 {len(files)} 个文件")
     if fix:
         print(f"  修改意见: {fix}")
-    for json_file in files:
-        print(f"[refine] {json_file.name}")
-        analysis = json.loads(json_file.read_text(encoding="utf-8"))
-        try:
-            refined = refine_text(analysis, config, fix=fix)
-        except Exception as e:
-            print(f"  失败: {e}")
-            continue
-        json_file.write_text(json.dumps(refined, ensure_ascii=False, indent=2), encoding="utf-8")
-        txt_path = json_file.with_suffix(".txt")
-        _rewrite_text_file(txt_path, refined)
-        changelog = refined.get("_changelog") or []
-        if changelog:
-            print(f"  改动 ({len(changelog)}): {'; '.join(changelog)[:120]}")
-        else:
-            print("  无改动")
+    completed = 0
+    elapsed_total = 0.0
+    with timed(f"{label}（{len(files)} 个）"):
+        for i, json_file in enumerate(files, start=1):
+            print(_eta_line("refine", i, len(files), json_file.name, completed, elapsed_total))
+            t0 = time.monotonic()
+            analysis = json.loads(json_file.read_text(encoding="utf-8"))
+            try:
+                refined = refine_text(analysis, config, fix=fix)
+            except Exception as e:
+                print(f"  失败: {e}")
+                continue
+            elapsed_total += time.monotonic() - t0
+            completed += 1
+            json_file.write_text(json.dumps(refined, ensure_ascii=False, indent=2), encoding="utf-8")
+            txt_path = json_file.with_suffix(".txt")
+            _rewrite_text_file(txt_path, refined)
+            changelog = refined.get("_changelog") or []
+            if changelog:
+                print(f"  改动 ({len(changelog)}): {'; '.join(changelog)[:120]}")
+            else:
+                print("  无改动")
     return len(files)
 
 
@@ -397,34 +445,40 @@ def run_refine_scripts(config: AppConfig, path: Path | None = None, fix: str | N
     print(f"[{label}] 目标 {len(files)} 个文件")
     if fix:
         print(f"  修改意见: {fix}")
-    for json_file in files:
-        print(f"[refine] {json_file.name}")
-        script = json.loads(json_file.read_text(encoding="utf-8"))
-        analysis = _load_analysis_for_script(json_file, config.texts_dir)
-        try:
-            refined = refine_script(script, analysis, config, fix=fix)
-        except Exception as e:
-            print(f"  失败: {e}")
-            continue
-        json_file.write_text(json.dumps(refined, ensure_ascii=False, indent=2), encoding="utf-8")
-        md_path = json_file.with_name(json_file.stem + ".md")
-        _rewrite_script_md(md_path, refined)
-        changelog = refined.get("_changelog") or []
-        if changelog:
-            print(f"  改动 ({len(changelog)}): {'; '.join(changelog)[:120]}")
-        else:
-            print("  无改动")
+    completed = 0
+    elapsed_total = 0.0
+    with timed(f"{label}（{len(files)} 个）"):
+        for i, json_file in enumerate(files, start=1):
+            print(_eta_line("refine", i, len(files), json_file.name, completed, elapsed_total))
+            t0 = time.monotonic()
+            script = json.loads(json_file.read_text(encoding="utf-8"))
+            analysis = _load_analysis_for_script(json_file, config.texts_dir)
+            try:
+                refined = refine_script(script, analysis, config, fix=fix)
+            except Exception as e:
+                print(f"  失败: {e}")
+                continue
+            elapsed_total += time.monotonic() - t0
+            completed += 1
+            json_file.write_text(json.dumps(refined, ensure_ascii=False, indent=2), encoding="utf-8")
+            md_path = json_file.with_name(json_file.stem + ".md")
+            _rewrite_script_md(md_path, refined)
+            changelog = refined.get("_changelog") or []
+            if changelog:
+                print(f"  改动 ({len(changelog)}): {'; '.join(changelog)[:120]}")
+            else:
+                print("  无改动")
     return len(files)
 
 
 def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:
     config.paths.output_dir.mkdir(parents=True, exist_ok=True)
-    print("=== 1/4 分析素材（含压缩） ===")
-    run_analyze_all(config)
-    print("\n=== 2/4 生成口播文案 ===")
-    run_generate_scripts(config)
-    print("\n=== 3/4 日 vlog 剪辑规划 ===")
-    run_plan_vlog(config, day_label)
-    print("\n=== 4/4 烧录序号标注 ===")
-    run_label_videos(config)
+    with timed("=== 1/4 分析素材（含压缩） ==="):
+        run_analyze_all(config)
+    with timed("=== 2/4 生成口播文案 ==="):
+        run_generate_scripts(config)
+    with timed("=== 3/4 日 vlog 剪辑规划 ==="):
+        run_plan_vlog(config, day_label)
+    with timed("=== 4/4 烧录序号标注 ==="):
+        run_label_videos(config)
     print("\n完成！输出目录:", config.paths.output_dir)

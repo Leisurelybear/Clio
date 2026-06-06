@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from vlog_tool.config import AppConfig
+from vlog_tool.log import format_size, timed
 from vlog_tool.utils import get_duration_sec, resolve_binary, run_ffmpeg
 
 
@@ -40,5 +41,15 @@ def compress_video(
         args.extend(["-crf", str(cfg.crf)])
 
     args.extend(["-y", str(output_path)])
-    run_ffmpeg(args, ffmpeg)
+    orig_size = input_path.stat().st_size
+    cmd_preview = f"ffmpeg {' '.join(args)}"
+    print(f"  ffmpeg: {cmd_preview}")
+    with timed(f"压缩 {input_path.name} -> {output_path.name}"):
+        run_ffmpeg(args, ffmpeg)
+    new_size = output_path.stat().st_size
+    ratio = (1 - new_size / orig_size) * 100 if orig_size > 0 else 0
+    print(
+        f"  体积: {format_size(orig_size)} -> {format_size(new_size)}"
+        f"（压缩 {ratio:.0f}%，目标 {cfg.target_size_mb:.0f} MB）"
+    )
     return output_path
