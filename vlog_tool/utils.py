@@ -1,0 +1,99 @@
+from __future__ import annotations
+
+import os
+import re
+import shutil
+import subprocess
+from pathlib import Path
+
+from vlog_tool.config import AppConfig
+
+VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
+
+
+def discover_ffmpeg_bin(name: str) -> str | None:
+    found = shutil.which(name)
+    if found:
+        return found
+
+    local_app = Path(os.environ.get("LOCALAPPDATA", ""))
+    search_roots = [
+        local_app / "Microsoft/WinGet/Packages",
+        Path("C:/ffmpeg"),
+        Path("G:/ffmpeg"),
+    ]
+    for root in search_roots:
+        if not root.is_dir():
+            continue
+        matches = sorted(root.glob(f"**/{name}.exe"))
+        if matches:
+            return str(matches[0])
+    return None
+
+
+def resolve_binary(configured: str, fallback: str) -> str:
+    if configured:
+        path = Path(configured)
+        if path.is_file():
+            return str(path)
+        raise FileNotFoundError(f"找不到可执行文件: {configured}")
+
+    found = discover_ffmpeg_bin(fallback)
+    if found:
+        return found
+    raise FileNotFoundError(
+        f"找不到 {fallback}。请运行 setup.ps1 安装，或在 config.yaml 的 paths 中填写路径。"
+    )
+
+
+def find_videos(directory: Path, recursive: bool = False) -> list[Path]:
+    if not directory.is_dir():
+        raise NotADirectoryError(f"素材目录不存在: {directory}")
+    if recursive:
+        files = [
+            p for p in sorted(directory.rglob("*"))
+            if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS
+        ]
+    else:
+        files = [
+            p for p in sorted(directory.iterdir())
+            if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS
+        ]
+    return files
+
+
+def get_duration_sec(video_path: Path, ffprobe: str) -> float:
+    cmd = [
+        ffprobe,
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        str(video_path),
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    return float(result.stdout.strip())
+
+
+def sanitize_name(text: str, max_len: int = 40) -> str:
+    text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", text)
+    text = re.sub(r"\s+", "_", text.strip())
+    return text[:max_len] or "clip"
+
+
+def format_index(index: int, width: int) -> str:
+    return str(index).zfill(width)
+
+
+def probe_video_info(video_path: Path, ffprobe: str) -> dict:
+    duration = get_duration_sec(video_path, ffprobe)
+    size_mb = video_path.stat().st_size / (1024 * 1024)
+    return {"duration_sec": round(duration, 2), "size_mb": round(size_mb, 2)}
+
+
+def run_ffmpeg(args: list[str], ffmpeg: str) -> None:
+    cmd = [ffmpeg, *args]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    if result.returncode != 0:
+        raise RuntimeError(
+            f"ffmpeg 执行失败:\n{' '.join(cmd)}\n{result.stderr}"
+        )

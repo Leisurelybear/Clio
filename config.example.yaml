@@ -1,0 +1,69 @@
+# Vlog 剪辑辅助工具配置（示例，请复制为 config.yaml 后按需修改）
+
+paths:
+  input_dir: "./videos"
+  output_dir: "./output"
+  recursive: false          # true = 扫描子文件夹内所有视频
+  ffmpeg: ""
+  ffprobe: ""
+
+proxy:
+  enabled: false
+  url: "socks5://127.0.0.1:1080"
+
+# AI 厂家与任务配置（每个步骤可独立指定厂家和模型）
+ai:
+  providers:
+    gemini:
+      type: gemini
+      api_key_env: GEMINI_API_KEY
+      poll_interval_sec: 5
+
+    openai:
+      type: openai
+      api_key_env: OPENAI_API_KEY
+      base_url: https://api.openai.com/v1
+
+    deepseek:
+      type: openai              # OpenAI 兼容接口
+      api_key_env: DEEPSEEK_API_KEY
+      base_url: https://api.deepseek.com/v1
+
+  tasks:
+    video_analyze:              # 视频理解（需支持视频的厂家，如 gemini）
+      provider: gemini
+      model: gemini-2.5-flash
+
+    voiceover:                  # 口播文案（纯文本）
+      provider: gemini
+      model: gemini-2.5-flash
+
+    vlog_plan:                  # 日 vlog 剪辑规划（纯文本）
+      provider: gemini
+      model: gemini-2.5-flash
+
+compress:
+  target_size_mb: 5
+  max_width: 640
+  fps: 15
+  codec: libx264
+  crf: 32
+  remove_audio: true
+
+analyze:
+  compressed_subdir: compressed
+  texts_subdir: texts
+  skip_existing: true
+
+naming:
+  index_width: 3
+
+script:
+  scripts_subdir: scripts
+  template_file: ./templates/vlog_template.md
+  target_words: 80
+
+plan:
+  plans_subdir: plans
+  max_clips_per_day: 12
+  target_duration_sec: 180
