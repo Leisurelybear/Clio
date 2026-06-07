@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Vlog 剪辑 UI</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header>
+  <div class="proj">
+    <span class="label">项目:</span>
+    <span id="proj-name" class="value">加载中...</span>
+  </div>
+  <div class="actions">
+    <button id="btn-reload" title="重新扫描磁盘上的文件">重新加载</button>
+    <span id="status" class="status"></span>
+  </div>
+</header>
+
+<main>
+  <aside id="sidebar">
+    <h3>视频 <span id="video-count" class="muted"></span></h3>
+    <ul id="video-list"></ul>
+  </aside>
+
+  <section id="player-pane">
+    <div class="player-wrap">
+      <video id="player" controls preload="metadata"></video>
+    </div>
+    <div id="player-info">
+      <span id="player-name">请选择左侧视频</span>
+      <span id="player-time">00:00 / 00:00</span>
+    </div>
+    <div class="player-tip">
+      提示: 点右侧 timeline/plan 的 segment 跳到对应时间。Ctrl+S 保存。
+    </div>
+  </section>
+
+  <aside id="editor">
+    <div class="tabs">
+      <button class="tab active" data-tab="texts">分析 (texts)</button>
+      <button class="tab" data-tab="voiceover">口播 (scripts)</button>
+      <button class="tab" data-tab="plan">规划 (plan)</button>
+    </div>
+
+    <div id="tab-texts" class="tab-pane active"></div>
+    <div id="tab-voiceover" class="tab-pane"></div>
+    <div id="tab-plan" class="tab-pane"></div>
+
+    <div class="editor-actions">
+      <button id="btn-save" class="primary">保存</button>
+    </div>
+  </aside>
+</main>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
