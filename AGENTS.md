@@ -183,6 +183,10 @@ ai:
 26. `feat(ui): add source toggle with match indicators`  ← R-001 前端，HTML/CSS/JS +63/-4
 27. `docs(ui): document source toggle`  ← R-001 文档，ui/README.md +31/-1
 28. `fix(ui): accept CJK punctuation (full-width colon) in basenames`  ← 沙盒正则过严，`：` U+FF1A 被拒，video 002 voiceover 404
+29. `docs: add R-006 (UI sidebar project/video hierarchy) to ROADMAP`  ← R-006 ROADMAP 录入
+30. `feat(ui): split sidebar into project and video sections`  ← R-006a HTML+CSS，sidebar 两段结构
+31. `feat(ui): wire sidebar project/video hierarchy with entity state machine`  ← R-006b JS，state.currentEntity + selectPlan
+32. `docs(ui): document sidebar project/video hierarchy`  ← R-006c README 布局图更新
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。

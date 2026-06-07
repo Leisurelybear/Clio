@@ -86,9 +86,9 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - 灰显入口：`opacity: 0.4; cursor: not-allowed;` + `title="待 R-004 / R-005 实现"`
 
 **子任务**：
-- [ ] R-006a：`vlog_tool/ui/static/index.html` + `style.css`：sidebar 两段结构 + 灰显样式
-- [ ] R-006b：`vlog_tool/ui/static/app.js`：state.currentEntity + selectPlan + 右栏内容分发；plan 内容从 tab 拆出来作为独立渲染分支
-- [ ] R-006c：`vlog_tool/ui/README.md`：界面布局图更新 + 项目级 section 说明
+- [x] R-006a：`vlog_tool/ui/static/index.html` + `style.css`：sidebar 两段结构 + 灰显样式  ← `a648e60`
+- [x] R-006b：`vlog_tool/ui/static/app.js`：state.currentEntity + selectPlan + 右栏内容分发；plan 内容从 tab 拆出来作为独立渲染分支  ← `c42d347`
+- [x] R-006c：`vlog_tool/ui/README.md`：界面布局图更新 + 项目级 section 说明  ← `778c44a`
 
 
 ## 需求 R-002：一键剪辑（从 plan 切出所有片段）
@@ -150,6 +150,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | --- | --- |
 | `0d52cf6`..`439911c` | 本地 Web UI（拆 6 commit：backend / CLI / frontend / docs / plan-seek fix / AGENTS 同步） |
 | `88679ee` `f1d09ac` `ec83f48` | R-001 UI 源切换（后端双 source / 顶部 toggle + match 角标 / README 文档） |
+| `a648e60` `c42d347` `778c44a` | R-006 sidebar 分层（HTML+CSS / JS state machine / README 布局图） |
 | `a2597f0` | 删 plan tab 跳转 bug |
 | `25128d1` | AI 调用加重试与退避 |
 | `835b7e9` | 配置加载时校验 proxy / tasks |
