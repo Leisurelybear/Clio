@@ -214,6 +214,26 @@ def _legacy_ai_config(raw: dict) -> AIConfig:
     )
 
 
+def _validate_config(config: AppConfig) -> None:
+    """早期校验：让拼写错误和明显遗漏在 load 时就 fail，不要等到运行时。"""
+    if config.proxy.enabled and not config.proxy.url:
+        raise ValueError(
+            "proxy.enabled=true 但 proxy.url 为空。"
+            "请填写 url（如 socks5://127.0.0.1:1080），"
+            "或把 enabled 改成 false。"
+        )
+    provider_names = set(config.ai.providers)
+    for task_name, task_cfg in config.ai.tasks.items():
+        if task_cfg.provider not in provider_names:
+            available = ", ".join(sorted(provider_names)) or "<无>"
+            raise ValueError(
+                f"ai.tasks.{task_name}.provider = '{task_cfg.provider}'，"
+                f"但 ai.providers 里没有这个名字。"
+                f"已配置的厂家: {available}。"
+                "请检查拼写，或在 ai.providers 里补上对应厂家。"
+            )
+
+
 def load_config(config_path: str | Path = "config.yaml") -> AppConfig:
     config_file = Path(config_path).resolve()
     base = config_file.parent
@@ -234,7 +254,7 @@ def load_config(config_path: str | Path = "config.yaml") -> AppConfig:
     else:
         ai = _legacy_ai_config(raw)
 
-    return AppConfig(
+    config = AppConfig(
         paths=PathsConfig(
             input_dir=_path(paths_raw.get("input_dir", "."), base),
             output_dir=_path(paths_raw.get("output_dir", "./output"), base),
@@ -258,6 +278,8 @@ def load_config(config_path: str | Path = "config.yaml") -> AppConfig:
         ),
         plan=PlanConfig(**raw.get("plan", {})),
     )
+    _validate_config(config)
+    return config
 
 
 def apply_run_paths(
