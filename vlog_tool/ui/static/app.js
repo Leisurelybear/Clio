@@ -174,6 +174,21 @@ function updateEntityUI() {
   $$('.project-item').forEach(p => p.classList.remove('active'));
   if (state.currentEntity === 'plan') {
     document.querySelector('.project-item[data-entity="plan"]').classList.add('active');
+    // plan mode: no video is "selected" (the player is independent)
+    $$('.video-item').forEach(v => v.classList.remove('active'));
+  }
+}
+
+function playVideoSegment(file, seekTo) {
+  const player = $('player');
+  const doSeek = () => { player.currentTime = seekTo; player.play().catch(() => {}); };
+  $('player-name').textContent = file;
+  if (player.src && player.src.includes(encodeURIComponent(file)) && player.readyState >= 1) {
+    doSeek();
+  } else {
+    const onLoaded = () => { doSeek(); player.removeEventListener('loadedmetadata', onLoaded); };
+    player.addEventListener('loadedmetadata', onLoaded);
+    player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}`;
   }
 }
 
@@ -322,14 +337,7 @@ function renderPlan() {
       const v = state.videos.find(x => x.index === seg.index);
       if (!v) { setStatus(`找不到视频 [${seg.index}]`, 'warn'); return; }
       const seekTo = parseTimecode((seg.use_timeline || '').split('-')[0].trim());
-      const player = $('player');
-      const doSeek = () => { player.currentTime = seekTo; player.play().catch(() => {}); };
-      if (player.src && player.src.includes(encodeURIComponent(v.file)) && player.readyState >= 1) {
-        doSeek();
-      } else {
-        player.addEventListener('loadedmetadata', doSeek, { once: true });
-        selectVideo(v.file);
-      }
+      playVideoSegment(v.file, seekTo);
     };
     li.querySelectorAll('[data-k]').forEach(inp => {
       inp.oninput = (e) => {
