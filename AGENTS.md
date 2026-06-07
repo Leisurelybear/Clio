@@ -169,6 +169,12 @@ ai:
 16. `chore: remove orphan video_analysis.py`  ← 已废弃的单文件 demo
 17. `refactor(utils): move extract_json out of ai/gemini.py`  ← 通用工具不应在 gemini 模块
 18. `feat(config): validate proxy/tasks at load time`  ← 拼写错误提前 fail
+19. `feat(ai): retry transient API failures with exponential backoff`  ← with_retry 助手，gemini 5xx + openai 429/5xx
+20. `feat(ui): add stdlib HTTP server backend for visual editor`  ← vlog_tool/ui/server.py，纯 stdlib
+21. `feat(ui): add 'serve' subcommand to start the UI from the CLI`  ← main.py 13 行
+22. `feat(ui): add HTML/CSS/JS frontend for the visual editor`  ← 静态三件套，无构建
+23. `docs(ui): document the visual editor UI`  ← vlog_tool/ui/README.md + 两份顶层 README
+24. `fix(ui): plan tab sequence click now also seeks the video`  ← 解析 use_timeline 起始时间
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
@@ -222,6 +228,7 @@ ai:
 .\.venv\Scripts\python.exe main.py analyze --force    # 全跑一次
 .\.venv\Scripts\python.exe main.py analyze             # 验证 skip 生效（应全跳过）
 .\.venv\Scripts\python.exe main.py refine              # 验证 trip context 注入
+.\.venv\Scripts\python.exe main.py serve --no-browser  # 验证 UI 起得来（再 Ctrl+C 退出）
 ```
 
 ## 10. 沟通模板
