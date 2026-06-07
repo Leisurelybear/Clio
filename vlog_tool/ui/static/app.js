@@ -2,6 +2,7 @@ const state = {
   config: null,
   source: 'compressed',
   videos: [],
+  currentEntity: 'video',  // 'video' | 'plan'
   currentVideo: null,
   currentTab: 'texts',
   texts: null,
@@ -121,6 +122,7 @@ async function selectVideo(file) {
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换视频吗？')) return;
   }
+  state.currentEntity = 'video';
   state.currentVideo = file;
   state.dirty = false;
   state.texts = null;
@@ -150,6 +152,29 @@ async function selectVideo(file) {
 
   renderVideoList();
   renderActiveTab();
+  updateEntityUI();
+}
+
+async function selectPlan() {
+  if (state.dirty) {
+    if (!confirm('当前 tab 有未保存的修改，确定切换到规划吗？')) return;
+  }
+  state.currentEntity = 'plan';
+  state.dirty = false;
+  if (!state.plan) {
+    try { state.plan = await api('GET', '/api/plan?day=day1'); }
+    catch (e) { state.plan = null; }
+  }
+  updateEntityUI();
+  renderActiveTab();
+}
+
+function updateEntityUI() {
+  $('editor').className = state.currentEntity === 'plan' ? 'entity-plan' : 'entity-video';
+  $$('.project-item').forEach(p => p.classList.remove('active'));
+  if (state.currentEntity === 'plan') {
+    $('.project-item[data-entity="plan"]').classList.add('active');
+  }
 }
 
 async function setSource(source) {
@@ -177,11 +202,14 @@ async function setSource(source) {
 }
 
 function renderActiveTab() {
+  if (state.currentEntity === 'plan') {
+    renderPlan();
+    return;
+  }
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === state.currentTab));
   $$('.tab-pane').forEach(p => p.classList.toggle('active', p.id === `tab-${state.currentTab}`));
   if (state.currentTab === 'texts') renderTexts();
   else if (state.currentTab === 'voiceover') renderVoiceover();
-  else if (state.currentTab === 'plan') renderPlan();
 }
 
 function renderTexts() {
@@ -315,20 +343,22 @@ function renderPlan() {
 
 async function save() {
   if (!state.dirty) { setStatus('没有改动需要保存', 'warn'); return; }
-  const tab = state.currentTab;
-  const v = state.videos.find(x => x.file === state.currentVideo);
   try {
-    if (tab === 'texts') {
-      if (!v || !v.text_json) throw new Error('当前视频没有 texts JSON');
-      const r = await api('PUT', `/api/texts?file=${encodeURIComponent(v.text_json)}`, state.texts);
-      if (!r.ok) throw new Error(r.error);
-    } else if (tab === 'voiceover') {
-      if (!v || !v.script_json) throw new Error('当前视频没有 voiceover JSON');
-      const r = await api('PUT', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`, state.voiceover);
-      if (!r.ok) throw new Error(r.error);
-    } else if (tab === 'plan') {
+    if (state.currentEntity === 'plan') {
       const r = await api('PUT', '/api/plan?day=day1', state.plan);
       if (!r.ok) throw new Error(r.error);
+    } else {
+      const tab = state.currentTab;
+      const v = state.videos.find(x => x.file === state.currentVideo);
+      if (tab === 'texts') {
+        if (!v || !v.text_json) throw new Error('当前视频没有 texts JSON');
+        const r = await api('PUT', `/api/texts?file=${encodeURIComponent(v.text_json)}`, state.texts);
+        if (!r.ok) throw new Error(r.error);
+      } else if (tab === 'voiceover') {
+        if (!v || !v.script_json) throw new Error('当前视频没有 voiceover JSON');
+        const r = await api('PUT', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`, state.voiceover);
+        if (!r.ok) throw new Error(r.error);
+      }
     }
     state.dirty = false;
     updateSaveBtn();
@@ -353,6 +383,17 @@ async function init() {
 
   $$('.source-toggle button').forEach(b => {
     b.onclick = () => setSource(b.dataset.source);
+  });
+
+  $$('.project-item').forEach(p => {
+    p.onclick = () => {
+      if (p.classList.contains('disabled')) {
+        const name = p.querySelector('.name').textContent;
+        setStatus(`「${name}」功能待对应 R-XXX 实现`, 'warn');
+        return;
+      }
+      if (p.dataset.entity === 'plan') selectPlan();
+    };
   });
 
   $('btn-reload').onclick = async () => {
