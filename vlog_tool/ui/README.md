@@ -23,6 +23,8 @@ python main.py serve --host 0.0.0.0     # 暴露到局域网（注意安全）
 
 侧栏分两段：**项目**（跨视频的产物）放上面，**视频**（per-video 产物）放下面。
 点 sidebar 的项目条目会切换右栏内容；点视频条目会切换右栏 + 播放器。
+⚙ 设置也是项目级入口：点开后右侧渲染完整 config.yaml 编辑表单。
+▶ 运行灰显（待 R-005 实现）。
 
 ```
 ┌────────────────────────────────────────────┐
@@ -56,7 +58,7 @@ python main.py serve --host 0.0.0.0     # 暴露到局域网（注意安全）
 └──────────┴──────────────────┴──────────────┘
 ```
 
-⚙ 设置 / ▶ 运行 灰显 + `title="待 R-XXX 实现"` tooltip（待 R-004 / R-005 完成后启用）。
+点 ⚙ 设置时，右栏渲染完整 config 嵌套表单（paths / ai / compress / analyze / script / plan 等全部字段），保存后提示**需重启服务生效**。校验失败（如 provider 拼写错误）时弹出错误红字，不写文件。
 
 ## 数据来源
 
@@ -67,6 +69,7 @@ UI 只读 / 写 `config.yaml` 里 `paths.output_dir` 下的文件：
 | 分析 (texts) | sidebar → 视频 → tab「分析」 | `output/texts*/*.json` | `title`, `location`, `mood`, `summary`, `timeline[]` |
 | 口播 (scripts) | sidebar → 视频 → tab「口播」 | `output/scripts/*_voiceover.json` | `title`, `voiceover`, `edit_tip`, `duration_hint_sec` |
 | 规划 (plan) | sidebar → 📋 规划 | `output/plans/day<N>_plan.json` | `theme`, `opening_tip`, `ending_tip`, `sequence[]` |
+| 设置 (config) | sidebar → ⚙ 设置 | `config.yaml`（全字段编辑） | 全部字段，嵌套表单渲染，保存后需重启服务 |
 
 `texts*` 通配同时匹配 `texts/` 和 `texts - 巴黎/` 之类的目录。
 

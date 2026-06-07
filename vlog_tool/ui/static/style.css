@@ -137,8 +137,13 @@ aside, section { overflow-y: auto; }
 #editor.entity-plan .tabs { display: none; }
 #editor.entity-plan .tab-pane:not(#tab-plan) { display: none; }
 #editor.entity-plan #tab-plan { display: block; }
-/* entity-video: plan pane is hidden (lives in sidebar as separate entity) */
-#editor.entity-video #tab-plan { display: none; }
+/* entity-config: editor is showing the config; hide tab bar, show config pane */
+#editor.entity-config .tabs { display: none; }
+#editor.entity-config .tab-pane:not(#tab-config) { display: none; }
+#editor.entity-config #tab-config { display: block; }
+/* entity-video: plan and config panes are hidden (live in sidebar as separate entities) */
+#editor.entity-video #tab-plan,
+#editor.entity-video #tab-config { display: none; }
 .tab-pane h3 {
   margin: 12px 0 6px; font-size: 0.78em; color: #888;
   text-transform: uppercase; letter-spacing: 0.05em;
@@ -188,6 +193,45 @@ aside, section { overflow-y: auto; }
 .editor-actions button.dirty { background: #ff9800; }
 .editor-actions button:hover { opacity: 0.9; }
 .editor-actions button:disabled { background: #555; cursor: not-allowed; }
+
+/* config form */
+.config-form { font-size: 0.82em; }
+.config-form .config-fieldset {
+  border: 1px solid #3a3a3a; border-radius: 3px;
+  margin: 6px 0; padding: 8px 10px; background: #222;
+}
+.config-form .config-fieldset legend {
+  color: #4a9eff; font-weight: 600; font-size: 0.95em;
+  padding: 0 6px;
+}
+.config-form .config-field {
+  display: flex; align-items: center; gap: 6px;
+  margin: 4px 0; padding: 2px 0;
+}
+.config-form .config-key {
+  color: #aaa; min-width: 120px; flex-shrink: 0;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.9em;
+}
+.config-form input[type="text"],
+.config-form input[type="password"],
+.config-form input[type="number"] {
+  flex: 1; background: #1a1a1a; color: #ddd; border: 1px solid #444;
+  padding: 3px 6px; border-radius: 2px; font: inherit; font-size: 0.95em;
+}
+.config-form input[type="text"]:focus,
+.config-form input[type="password"]:focus,
+.config-form input[type="number"]:focus { outline: none; border-color: #4a9eff; }
+.config-form input[type="checkbox"] { margin: 0; }
+.config-form textarea {
+  flex: 1; background: #1a1a1a; color: #ddd; border: 1px solid #444;
+  padding: 3px 6px; border-radius: 2px; font: inherit; font-size: 0.95em;
+  resize: vertical; line-height: 1.4;
+}
+.config-form textarea:focus { outline: none; border-color: #4a9eff; }
+.config-form .config-bool { display: flex; align-items: center; gap: 8px; }
+.config-form .config-array-item { margin: 4px 0 4px 12px; border-left: 2px solid #333; padding-left: 8px; }
+.config-form .hint { color: #666; font-size: 0.8em; margin: 2px 0 0; display: block; }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: #1a1a1a; }

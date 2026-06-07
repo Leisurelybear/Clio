@@ -1,8 +1,9 @@
 const state = {
   config: null,
+  configRaw: null,
   source: 'compressed',
   videos: [],
-  currentEntity: 'video',  // 'video' | 'plan'
+  currentEntity: 'video',  // 'video' | 'plan' | 'config'
   currentVideo: null,
   currentTab: 'texts',
   texts: null,
@@ -65,6 +66,20 @@ function parseTimecode(s) {
     return parts[0] * 60 + parts[1];
   }
   return parseFloat(s) || 0;
+}
+
+function getDeep(obj, path) {
+  return String(path).split('.').reduce((o, k) => (o != null ? o[k] : undefined), obj);
+}
+
+function setDeep(obj, path, value) {
+  const keys = String(path).split('.');
+  let cur = obj;
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (!cur[keys[i]] || typeof cur[keys[i]] !== 'object') cur[keys[i]] = {};
+    cur = cur[keys[i]];
+  }
+  cur[keys[keys.length - 1]] = value;
 }
 
 function markDirty() { state.dirty = true; updateSaveBtn(); }
@@ -169,12 +184,33 @@ async function selectPlan() {
   renderActiveTab();
 }
 
+async function selectConfig() {
+  if (state.dirty) {
+    if (!confirm('当前 tab 有未保存的修改，确定切换到设置吗？')) return;
+  }
+  state.currentEntity = 'config';
+  state.dirty = false;
+  try {
+    state.configRaw = await api('GET', '/api/config/raw');
+  } catch (e) {
+    setStatus('配置加载失败: ' + e.message, 'err');
+    state.configRaw = {};
+  }
+  updateEntityUI();
+  renderActiveTab();
+}
+
 function updateEntityUI() {
-  $('editor').className = state.currentEntity === 'plan' ? 'entity-plan' : 'entity-video';
+  const cls = state.currentEntity === 'plan' ? 'entity-plan'
+    : state.currentEntity === 'config' ? 'entity-config'
+    : 'entity-video';
+  $('editor').className = cls;
   $$('.project-item').forEach(p => p.classList.remove('active'));
   if (state.currentEntity === 'plan') {
     document.querySelector('.project-item[data-entity="plan"]').classList.add('active');
-    // plan mode: no video is "selected" (the player is independent)
+    $$('.video-item').forEach(v => v.classList.remove('active'));
+  } else if (state.currentEntity === 'config') {
+    document.querySelector('.project-item[data-entity="config"]').classList.add('active');
     $$('.video-item').forEach(v => v.classList.remove('active'));
   }
 }
@@ -228,6 +264,10 @@ async function setSource(source) {
 function renderActiveTab() {
   if (state.currentEntity === 'plan') {
     renderPlan();
+    return;
+  }
+  if (state.currentEntity === 'config') {
+    renderConfig();
     return;
   }
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === state.currentTab));
@@ -358,9 +398,92 @@ function renderPlan() {
   });
 }
 
+function labelFromPath(path) {
+  return path ? path.split('.').pop() : 'config';
+}
+
+function _renderConfigForm(obj, path) {
+  if (obj === null || obj === undefined) {
+    return `<span class="config-null">(空)</span>`;
+  }
+  if (typeof obj === 'boolean') {
+    return `<label class="config-field config-bool"><span class="config-key">${labelFromPath(path)}</span> <input type="checkbox" data-path="${path}" ${obj ? 'checked' : ''}></label>`;
+  }
+  if (typeof obj === 'number') {
+    const isInt = Number.isInteger(obj);
+    return `<label class="config-field config-num"><span class="config-key">${labelFromPath(path)}</span> <input type="number" data-path="${path}" step="${isInt ? '1' : 'any'}" value="${obj}"></label>`;
+  }
+  if (typeof obj === 'string') {
+    const multiline = obj.length > 80 || obj.includes('\n');
+    if (multiline) {
+      return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <textarea data-path="${path}" rows="4">${escapeHtml(obj)}</textarea></label>`;
+    }
+    const isPwd = path.endsWith('api_key') || path.endsWith('api_key_env');
+    return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <input type="${isPwd ? 'password' : 'text'}" data-path="${path}" value="${escapeHtml(obj)}"></label>`;
+  }
+  if (Array.isArray(obj)) {
+    const allStr = obj.every(x => typeof x === 'string');
+    if (allStr) {
+      return `<fieldset class="config-fieldset"><legend>${labelFromPath(path)}</legend><label class="config-field config-str"><textarea data-path="${path}" rows="${Math.max(2, obj.length)}">${escapeHtml(obj.join('\n'))}</textarea><span class="hint">每行一项</span></label></fieldset>`;
+    }
+    return `<fieldset class="config-fieldset"><legend>${labelFromPath(path)}</legend>${obj.map((item, i) =>
+      `<div class="config-array-item">${_renderConfigForm(item, path + '[' + i + ']')}</div>`
+    ).join('')}</fieldset>`;
+  }
+  if (typeof obj === 'object') {
+    let html = `<fieldset class="config-fieldset"><legend>${labelFromPath(path) || '配置'}</legend>`;
+    for (const [key, val] of Object.entries(obj)) {
+      html += _renderConfigForm(val, path ? `${path}.${key}` : key);
+    }
+    html += '</fieldset>';
+    return html;
+  }
+  return `<span class="muted">${escapeHtml(String(obj))}</span>`;
+}
+
+function renderConfig() {
+  const pane = $('tab-config');
+  if (!state.configRaw || Object.keys(state.configRaw).length === 0) {
+    pane.innerHTML = '<p class="muted">配置数据不可用</p>';
+    return;
+  }
+  pane.innerHTML = `<div class="config-form">${_renderConfigForm(state.configRaw, '')}</div>`;
+  // bind change handlers
+  pane.querySelectorAll('[data-path]').forEach(el => {
+    const onchange = () => {
+      let val;
+      if (el.type === 'checkbox') {
+        val = el.checked;
+      } else if (el.type === 'number') {
+        val = el.value.includes('.') ? parseFloat(el.value) : (el.value === '' ? '' : parseInt(el.value, 10));
+        if (isNaN(val)) val = el.value;
+      } else {
+        val = el.value;
+      }
+      setDeep(state.configRaw, el.dataset.path, val);
+      markDirty();
+    };
+    el.onchange = onchange;
+    if (el.tagName === 'INPUT' && el.type === 'text') {
+      el.oninput = onchange;
+    }
+    if (el.tagName === 'TEXTAREA') {
+      el.oninput = onchange;
+    }
+  });
+}
+
 async function save() {
   if (!state.dirty) { setStatus('没有改动需要保存', 'warn'); return; }
   try {
+    if (state.currentEntity === 'config') {
+      const r = await api('PUT', '/api/config/raw', state.configRaw);
+      if (r.error) throw new Error(r.error);
+      state.dirty = false;
+      updateSaveBtn();
+      setStatus('配置已保存（需重启服务生效）', 'ok');
+      return;
+    }
     if (state.currentEntity === 'plan') {
       const r = await api('PUT', '/api/plan?day=day1', state.plan);
       if (!r.ok) throw new Error(r.error);
@@ -410,6 +533,7 @@ async function init() {
         return;
       }
       if (p.dataset.entity === 'plan') selectPlan();
+      else if (p.dataset.entity === 'config') selectConfig();
     };
   });
 

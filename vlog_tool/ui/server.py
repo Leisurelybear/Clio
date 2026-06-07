@@ -13,12 +13,16 @@ import mimetypes
 import os
 import re
 import shutil
+import tempfile
 import threading
 import webbrowser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlparse
+
+import yaml
 
 from vlog_tool.config import AppConfig
 
@@ -81,7 +85,46 @@ def _find_compressed_for_original(stem: str, comp_dir: Path) -> tuple[str, str] 
     return None
 
 
-def make_handler(config: AppConfig) -> type[BaseHTTPRequestHandler]:
+def _coerce_config_types(new_val: Any, ref_val: Any) -> Any:
+    if ref_val is None:
+        return new_val
+    if isinstance(ref_val, bool):
+        if isinstance(new_val, str):
+            return new_val.lower() in ("true", "1", "yes")
+        return bool(new_val)
+    if isinstance(ref_val, int):
+        if new_val is None:
+            return None
+        try:
+            return int(new_val)
+        except (ValueError, TypeError):
+            return new_val
+    if isinstance(ref_val, float):
+        if new_val is None:
+            return None
+        try:
+            return float(new_val)
+        except (ValueError, TypeError):
+            return new_val
+    if isinstance(ref_val, str):
+        return str(new_val) if not isinstance(new_val, str) else new_val
+    if isinstance(ref_val, list) and isinstance(new_val, list):
+        if ref_val and new_val:
+            return [_coerce_config_types(n, ref_val[0]) for n in new_val]
+        return new_val
+    if isinstance(ref_val, dict) and isinstance(new_val, dict):
+        result = {}
+        for k in ref_val:
+            if k in new_val:
+                result[k] = _coerce_config_types(new_val[k], ref_val[k])
+        for k in new_val:
+            if k not in result:
+                result[k] = new_val[k]
+        return result
+    return new_val
+
+
+def make_handler(config: AppConfig, config_path: Path | None = None) -> type[BaseHTTPRequestHandler]:
     output_dir = config.paths.output_dir
     input_dir = config.paths.input_dir
     static_dir = STATIC_DIR
@@ -212,6 +255,13 @@ def make_handler(config: AppConfig) -> type[BaseHTTPRequestHandler]:
                     "plans_dir": str(output_dir / "plans"),
                 })
 
+            if path == "/api/config/raw":
+                if not config_path or not config_path.is_file():
+                    return self._send_json({"error": "config file not available"}, 500)
+                with open(config_path, "r", encoding="utf-8") as f:
+                    raw = yaml.safe_load(f) or {}
+                return self._send_json(raw)
+
             if path == "/api/videos":
                 source = qs.get("source", ["compressed"])[0]
                 if source not in ("compressed", "original"):
@@ -323,6 +373,32 @@ def make_handler(config: AppConfig) -> type[BaseHTTPRequestHandler]:
             except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
                 return self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, 400)
 
+            if path == "/api/config/raw":
+                if not config_path:
+                    return self._send_json({"ok": False, "error": "config_path not available"}, 500)
+                try:
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        ref_raw = yaml.safe_load(f) or {}
+                except Exception as e:
+                    return self._send_json({"ok": False, "error": f"无法读取当前配置: {e}"}, 500)
+                coerced = _coerce_config_types(obj, ref_raw)
+                try:
+                    yml = yaml.dump(coerced, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
+                except Exception as e:
+                    return self._send_json({"ok": False, "error": f"YAML 序列化失败: {e}"}, 400)
+                tmp = tempfile.NamedTemporaryFile(mode="wb", suffix=".yaml", delete=False, dir=str(config_path.parent))
+                try:
+                    tmp.write(yml.encode("utf-8"))
+                    tmp.close()
+                    from vlog_tool.config import load_config
+                    load_config(tmp.name)
+                except (ValueError, FileNotFoundError, Exception) as e:
+                    os.unlink(tmp.name)
+                    return self._send_json({"ok": False, "error": f"配置校验失败: {e}"}, 400)
+                _save_atomic(config_path, yml.encode("utf-8"))
+                os.unlink(tmp.name)
+                return self._send_json({"ok": True, "path": str(config_path)})
+
             if path == "/api/texts":
                 fname = qs.get("file", [""])[0]
                 p = self._resolve_texts(fname)
@@ -357,11 +433,12 @@ def make_handler(config: AppConfig) -> type[BaseHTTPRequestHandler]:
 
 def run(
     config: AppConfig,
+    config_path: Path | None = None,
     host: str = "127.0.0.1",
     port: int = 8765,
     open_browser: bool = True,
 ) -> int:
-    handler = make_handler(config)
+    handler = make_handler(config, config_path)
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
     print(f"  UI 启动: {url}")

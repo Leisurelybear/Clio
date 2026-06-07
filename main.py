@@ -224,6 +224,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "serve":
             return run_ui(
                 config,
+                config_path=config_path,
                 host=args.host,
                 port=args.port,
                 open_browser=not args.no_browser,
