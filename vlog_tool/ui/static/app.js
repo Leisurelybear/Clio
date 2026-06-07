@@ -205,7 +205,16 @@ async function setSource(source) {
   try {
     await loadVideos();
     if (state.videos.length) {
-      await selectVideo(state.videos[0].file);
+      if (state.currentEntity === 'plan') {
+        // stay in plan: don't auto-select a video, just clear the player
+        $('player').removeAttribute('src');
+        $('player-name').textContent = '请选择左侧视频或规划节点';
+        // re-render plan so segment click handlers use the new source's v.file
+        renderActiveTab();
+        setStatus(`已切到 ${source} 视图（仍停留在规划）`, 'ok');
+      } else {
+        await selectVideo(state.videos[0].file);
+      }
     } else {
       $('player').removeAttribute('src');
       $('player-name').textContent = '请选择左侧视频';
