@@ -190,6 +190,7 @@ ai:
 33. `fix(ui): use querySelector for the plan project-item in updateEntityUI`  ← $ 是 getElementById，CSS 选择器要用 querySelector
 34. `fix(ui): plan segment click plays the video without switching entity`  ← plan/video 独立：playVideoSegment 不动 entity
 35. `fix(ui): source toggle in plan view does not switch entity`  ← setSource 分支：plan 时只刷新列表+清空 player，不调 selectVideo；renderActiveTab 同步刷新 plan 节点的 v.file
+36. `feat(ui): add config editor (R-004)`  ← 后端 raw config API + 校验 + .bak 保存；前端递归嵌套表单渲染 + 保存提示重启
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
