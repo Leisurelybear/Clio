@@ -55,6 +55,7 @@ vlog-video-analysis/
 ├── logs/                      # 运行日志（gitignore；按小时切：YYYY-MM-DD-HH.log）
 ├── setup.ps1                  # 一键环境
 ├── README.md / README.en.md   # 用户文档（双语）
+├── ROADMAP.md                 # 需求追踪（sub-task 粒度）
 └── AGENTS.md                  # 本文件
 ```
 
@@ -87,6 +88,9 @@ vlog-video-analysis/
 - 输出格式必须是 JSON（不是 markdown 代码块），`extract_json()` 才能解析
 
 ## 5. 添加新功能的标准做法
+
+> **先在 `ROADMAP.md` 录一条需求，拆成 sub-task，再开干。** 完成时把对应 sub-task 标 `[x]`
+> 并把 commit hash 写到"已完成"表里。AGENTS.md 里的 commit 列表会定期跟 ROADMAP 对齐。
 
 ### 加一个新的 AI 厂家
 
