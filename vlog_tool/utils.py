@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -9,6 +10,22 @@ from pathlib import Path
 from vlog_tool.config import AppConfig
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
+
+
+def extract_json(text: str) -> dict:
+    """从 AI 返回的文本中容错提取 JSON 对象。
+
+    先尝试整体解析（多数情况）；失败时用正则抓第一个 {...} 块。
+    都失败时抛出 ValueError，含原文前 500 字方便排查。
+    """
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        match = re.search(r"\{[\s\S]*\}", text)
+        if match:
+            return json.loads(match.group())
+        raise ValueError(f"AI 返回内容无法解析为 JSON:\n{text[:500]}")
 
 
 def mask_if_looks_like_key(value: str) -> str:

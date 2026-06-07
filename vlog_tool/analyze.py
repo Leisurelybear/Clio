@@ -4,7 +4,6 @@ import json
 
 from vlog_tool.ai.base import TaskName
 from vlog_tool.ai.factory import get_task_provider, get_video_provider
-from vlog_tool.ai.gemini import extract_json
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_size, timed
 from vlog_tool.prompts import (
@@ -16,6 +15,7 @@ from vlog_tool.prompts import (
     REFINE_TEXT_PROMPT,
     SCRIPT_PROMPT,
 )
+from vlog_tool.utils import extract_json
 
 
 def _wrap_with_context(prompt: str, config: AppConfig) -> str:

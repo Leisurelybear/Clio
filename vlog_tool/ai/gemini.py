@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import json
-import re
 import time
-from pathlib import Path
 
 import httpx
 from google import genai
@@ -11,17 +8,6 @@ from google.genai import types
 
 from vlog_tool.config import ProviderConfig, ProxyConfig
 from vlog_tool.utils import mask_if_looks_like_key
-
-
-def extract_json(text: str) -> dict:
-    text = text.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        match = re.search(r"\{[\s\S]*\}", text)
-        if match:
-            return json.loads(match.group())
-        raise ValueError(f"AI 返回内容无法解析为 JSON:\n{text[:500]}")
 
 
 class GeminiProvider:
