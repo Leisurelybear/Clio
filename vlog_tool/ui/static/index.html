@@ -23,6 +23,22 @@
 
 <main>
   <aside id="sidebar">
+    <h3>项目</h3>
+    <ul id="project-list">
+      <li class="project-item" data-entity="plan" title="打开规划 (plan) 面板">
+        <span class="icon">📋</span>
+        <span class="name">规划</span>
+        <span class="muted">day1</span>
+      </li>
+      <li class="project-item disabled" data-entity="config" title="待 R-004 实现">
+        <span class="icon">⚙</span>
+        <span class="name">设置</span>
+      </li>
+      <li class="project-item disabled" data-entity="run" title="待 R-005 实现">
+        <span class="icon">▶</span>
+        <span class="name">运行</span>
+      </li>
+    </ul>
     <h3>视频 <span id="video-count" class="muted"></span></h3>
     <ul id="video-list"></ul>
   </aside>
@@ -44,7 +60,6 @@
     <div class="tabs">
       <button class="tab active" data-tab="texts">分析 (texts)</button>
       <button class="tab" data-tab="voiceover">口播 (scripts)</button>
-      <button class="tab" data-tab="plan">规划 (plan)</button>
     </div>
 
     <div id="tab-texts" class="tab-pane active"></div>

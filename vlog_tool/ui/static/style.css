@@ -63,6 +63,19 @@ aside, section { overflow-y: auto; }
 }
 #video-count { font-weight: normal; text-transform: none; letter-spacing: 0; }
 #video-list { list-style: none; padding: 0; margin: 0; }
+#project-list { list-style: none; padding: 0; margin: 0 0 4px; }
+.project-item {
+  padding: 8px 12px; cursor: pointer;
+  border-bottom: 1px solid #2f2f2f;
+  display: flex; align-items: center; gap: 6px;
+}
+.project-item:hover { background: #2f2f2f; }
+.project-item.active { background: #094771; }
+.project-item.active .name { color: #fff; }
+.project-item.disabled { opacity: 0.4; cursor: not-allowed; }
+.project-item.disabled:hover { background: transparent; }
+.project-item .icon { font-size: 1.05em; width: 1.2em; text-align: center; }
+.project-item .name { flex: 1; font-weight: 500; }
 .video-item {
   padding: 8px 12px; cursor: pointer;
   border-bottom: 1px solid #2f2f2f;
@@ -120,6 +133,12 @@ aside, section { overflow-y: auto; }
 
 .tab-pane { display: none; padding: 12px; flex: 1; overflow-y: auto; }
 .tab-pane.active { display: block; }
+/* entity-plan: editor is showing the plan; hide tab bar and other panes */
+#editor.entity-plan .tabs { display: none; }
+#editor.entity-plan .tab-pane:not(#tab-plan) { display: none; }
+#editor.entity-plan #tab-plan { display: block; }
+/* entity-video: plan pane is hidden (lives in sidebar as separate entity) */
+#editor.entity-video #tab-plan { display: none; }
 .tab-pane h3 {
   margin: 12px 0 6px; font-size: 0.78em; color: #888;
   text-transform: uppercase; letter-spacing: 0.05em;
