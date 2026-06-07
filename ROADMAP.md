@@ -9,6 +9,48 @@
 
 （暂无）
 
+## 需求 R-004：UI 读取和编辑 config
+
+**背景**：现在 UI 只读 paths（output_dir / compressed_dir / texts_dirs / scripts_dir / plans_dir / input_dir）
+用于定位文件。要改 config 必须手开 `config.yaml` 改完再重启服务。
+AI provider / context / tasks 切换在 UI 里完成能省一次重启外的来回。
+
+**验收**：
+- UI 新增「设置」tab（与 texts/voiceover/plan 并列）
+- 显示完整 config 树：paths / ai.providers / ai.tasks / ai.context[_file] / compress / analyze 等所有 section
+- 表单可改（dict 嵌套结构 → 嵌套 form）
+- 改完点保存 → 写回 `config.yaml`（先 .bak 备份）→ 弹「需重启服务生效」提示
+- 校验：路径是否存在、provider 名字是否注册、tasks.provider 是否引用已注册 provider
+- 失败/重名校验不通过 → 表单内红字提示，不写文件
+
+**子任务**：
+- [ ] R-004a：后端 `GET /api/config/raw` 返回 config 原始 dict；`PUT /api/config/raw` 校验并写回（带 .bak 备份）
+- [ ] R-004b：UI 加「设置」tab；渲染完整 config 为嵌套 form（dict / list / scalar）
+- [ ] R-004c：UI 表单编辑 + 保存（弹确认 → PUT → 提示重启 + 校验失败红字）
+- [ ] R-004d：文档：`vlog_tool/ui/README.md` 加「设置」tab 用法
+
+## 需求 R-005：UI 化 analyze 流水线
+
+**背景**：现在 `main.py analyze` 是 CLI（compress → analyze → voiceover → plan）。
+要全跑流水线必须开终端。UI 化让「从把视频放进去到能编辑 AI 输出」一气呵成，
+全部在浏览器里点完。
+
+**验收**：
+- UI 头部「运行」按钮 + 进度面板（弹窗 / 抽屉 / 新 tab，暂定 header 按钮 + 底部状态栏）
+- 点按钮触发整条流水线（默认行为与 `main.py analyze` 一致）
+- 每个 task × 每个 video 实时显示 `[i/N]` + ETA
+- 跑完 / 出错有 toast 通知
+- 不锁 texts/voiceover/plan tab 的编辑（同时打开也没问题）
+- 进度数据存 `output/.progress.json`；UI 轮询读（2s 间隔）
+- 走后台线程；UI 不能因为 analyze 卡住而冻结
+
+**子任务**：
+- [ ] R-005a：`vlog_tool/progress.py` ProgressTracker：写 `output/.progress.json`（phase / current / total / message / started_at / eta / status）
+- [ ] R-005b：接入 `pipeline.run_analyze_all`：compress / analyze / voiceover / plan 关键节点调 `tracker.update`
+- [ ] R-005c：后端 `POST /api/run/start`（daemon 线程 + lock 防并发）；`GET /api/run/status` 读 `.progress.json`
+- [ ] R-005d：UI 头部「运行」按钮 + 进度面板（轮询 2s，渲染 phase / [i/N] / ETA / status）
+- [ ] R-005e：文档：`vlog_tool/ui/README.md` 加运行面板
+
 ## 需求 R-001：UI 切换展示原视频 vs 压缩视频
 
 **背景**：UI 现在只展示 `output/compressed/` 里的 640p 视频。想看 GoPro 4K 原片时没办法，
