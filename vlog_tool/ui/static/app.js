@@ -262,8 +262,16 @@ function renderPlan() {
     li.onclick = (e) => {
       if (e.target.matches('input, textarea')) return;
       const v = state.videos.find(x => x.index === seg.index);
-      if (v) selectVideo(v.file);
-      else setStatus(`找不到视频 [${seg.index}]`, 'warn');
+      if (!v) { setStatus(`找不到视频 [${seg.index}]`, 'warn'); return; }
+      const seekTo = parseTimecode((seg.use_timeline || '').split('-')[0].trim());
+      const player = $('player');
+      const doSeek = () => { player.currentTime = seekTo; player.play().catch(() => {}); };
+      if (player.src && player.src.includes(encodeURIComponent(v.file)) && player.readyState >= 1) {
+        doSeek();
+      } else {
+        player.addEventListener('loadedmetadata', doSeek, { once: true });
+        selectVideo(v.file);
+      }
     };
     li.querySelectorAll('[data-k]').forEach(inp => {
       inp.oninput = (e) => {
