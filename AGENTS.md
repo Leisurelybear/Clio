@@ -34,11 +34,18 @@ vlog-video-analysis/
 │   ├── utils.py               # ffmpeg 路径发现、文件 IO、mask_if_looks_like_key、extract_json
 │   ├── log.py                 # 日志：按小时切文件 + _TeeWriter + timed/format_size/format_duration
 │   │                           #     + sys.excepthook 把未捕获异常整成一条 ERROR 日志
+│   ├── ui/                    # 本地 Web UI（可视化编辑 AI 输出；stdib http.server，零新依赖）
+│   │   ├── server.py            #   UIHandler（BaseHTTPRequestHandler）+ make_handler + run
+│   │   ├── README.md            #   UI 使用文档
+│   │   └── static/              #   前端三件套（无构建步骤）
+│   │       ├── index.html
+│   │       ├── app.js
+│   │       └── style.css
 │   └── ai/
 │       ├── base.py            # TaskName 枚举、Provider Protocol
 │       ├── factory.py         # 按名字查找 provider
-│       ├── gemini.py          # 多模态：File API 上传 + 轮询 PROCESSING
-│       └── openai_compat.py   # OpenAI 兼容：DeepSeek / OpenAI / 通义 / Moonshot
+│       ├── gemini.py          # 多模态：File API 上传 + 轮询 PROCESSING（已包 with_retry）
+│       └── openai_compat.py   # OpenAI 兼容：DeepSeek / OpenAI / 通义 / Moonshot（已包 with_retry）
 ├── templates/
 │   ├── vlog_template.md       # 口播风格模板（用户可改）
 │   └── trip_context.md        # trip 背景与 AI 规范（自动注入到所有 prompt）

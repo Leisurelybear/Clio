@@ -391,6 +391,44 @@ python main.py refine -i output/Franch/scripts/001_机场轻轨清晨_voiceover.
 
 ---
 
+### `serve` · 启动本地 Web UI（可视化编辑）
+
+启动一个浏览器里的可视化编辑器，看视频 + 改 AI 输出（texts / scripts / plan），直接保存回 JSON。
+
+```bash
+python main.py serve                    # 默认 http://127.0.0.1:8765/，自动开浏览器
+python main.py serve --port 9000        # 换端口
+python main.py serve --no-browser       # 不自动开浏览器（远程机调试用）
+```
+
+| 参数 | 默认 | 说明 |
+| --- | --- | --- |
+| `--host` | `127.0.0.1` | 监听地址；改 `0.0.0.0` 可暴露到局域网（注意安全） |
+| `--port` | `8765` | 端口 |
+| `--no-browser` | — | 加上则不自动打开浏览器 |
+
+启动后打开的页面：左侧视频列表（自动扫描 `output/compressed/`），中间是视频播放器（支持拖动 / Range 请求），右侧三个 Tab：分析（texts）、口播（scripts）、规划（plan）。点 timeline / plan 里的 segment 自动跳到对应时间；`Ctrl+S` 保存。
+
+详见 `vlog_tool/ui/README.md`。
+
+
+## 可视化编辑 UI
+
+`serve` 子命令会启动一个本地 Web 服务，默认 `http://127.0.0.1:8765/`：
+
+- 左侧：视频列表（自动扫描 `output/compressed/`），每条标注是否已有 `texts` / `voiceover` JSON
+- 中间：HTML5 视频播放器（支持拖动 / 跳跃），点右侧 segment 自动跳转
+- 右侧：三个 Tab
+  - **分析 (texts)** — 编辑 `title` / `location` / `mood` / `summary`，每段 timeline 描述
+  - **口播 (scripts)** — 编辑 `voiceover` 文案 / `edit_tip` / `duration_hint_sec`
+  - **规划 (plan)** — 编辑日 vlog 主题、起止提示、每段 `sequence` 的 `reason` / `voiceover_hint`
+
+修改后点 "保存" 或按 `Ctrl+S` 写回原文件（atomic rename + 首次覆盖自动留 `.bak`）。
+
+零外部依赖：纯 stdlib `http.server`，不需要 Flask / FastAPI。安全：默认仅监听 127.0.0.1，所有文件 IO 沙盒在 `output_dir` 内，basename 不允许 `..` 或路径分隔符。
+
+详细文档见 `vlog_tool/ui/README.md`。
+
 ## 常见问题
 
 ### `找不到 ffmpeg`
