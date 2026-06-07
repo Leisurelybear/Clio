@@ -21,33 +21,52 @@ python main.py serve --host 0.0.0.0     # 暴露到局域网（注意安全）
 
 ## 界面布局
 
+侧栏分两段：**项目**（跨视频的产物）放上面，**视频**（per-video 产物）放下面。
+点 sidebar 的项目条目会切换右栏内容；点视频条目会切换右栏 + 播放器。
+
 ```
 ┌────────────────────────────────────────────┐
 │ 项目: E:\Videos\Franch2 [压缩|原视频] [重新加载] │
 ├──────────┬──────────────────┬──────────────┤
-│ 视频列表 │  视频播放器       │  Tab 切换    │
-│          │  ▶ 00:00 / 00:42 │ ┌──分析─┐    │
-│ [001]xxx │                  │ │ 摘要  │    │
-│ [002]yyy │                  │ │ 时间轴│    │
-│          │                  │ └────────┘    │
-│          │                  │ ┌──口播─┐    │
-│          │                  │ │ 文案  │    │
-│          │                  │ └────────┘    │
-│          │                  │ ┌──规划─┐    │
-│          │                  │ │ seq[] │    │
-│          │                  │ └────────┘    │
+│ 项目      │  视频播放器       │  视频模式    │
+│ 📋 规划   │  ▶ 00:00 / 00:42 │ ┌──分析─┐    │
+│    day1   │                  │ │ 摘要  │    │
+│ ⚙ 设置   │                  │ │ 时间轴│    │
+│ ▶ 运行   │                  │ └────────┘    │
+│ ────────  │                  │ ┌──口播─┐    │
+│ 视频      │                  │ │ 文案  │    │
+│ [001]xxx  │                  │ └────────┘    │
+│ [002]yyy  │                  │   [保存]     │
 └──────────┴──────────────────┴──────────────┘
 ```
+
+点 📋 规划时，tab 栏隐藏，右栏整块渲染规划面板 + 保存按钮；播放器保持上一个视频：
+
+```
+┌──────────┬──────────────────┬──────────────┐
+│ 📋 规划 ●│  视频播放器       │  规划模式    │
+│ ⚙ 设置   │  (上一个视频)     │ ┌ 主题 ──┐    │
+│ ▶ 运行   │                  │ │        │    │
+│          │                  │ └────────┘    │
+│ 视频      │                  │ ┌ 顺序 ──┐    │
+│ [001]xxx  │                  │ │ seg 1  │    │
+│ [002]yyy  │                  │ │ seg 2  │    │
+│          │                  │ └────────┘    │
+│          │                  │   [保存]     │
+└──────────┴──────────────────┴──────────────┘
+```
+
+⚙ 设置 / ▶ 运行 灰显 + `title="待 R-XXX 实现"` tooltip（待 R-004 / R-005 完成后启用）。
 
 ## 数据来源
 
 UI 只读 / 写 `config.yaml` 里 `paths.output_dir` 下的文件：
 
-| Tab | 文件 | 字段 |
-| --- | --- | --- |
-| 分析 (texts) | `output/texts*/*.json` | `title`, `location`, `mood`, `summary`, `timeline[]` |
-| 口播 (scripts) | `output/scripts/*_voiceover.json` | `title`, `voiceover`, `edit_tip`, `duration_hint_sec` |
-| 规划 (plan) | `output/plans/day<N>_plan.json` | `theme`, `opening_tip`, `ending_tip`, `sequence[]` |
+| 入口 | 路径 | 文件 | 字段 |
+| --- | --- | --- | --- |
+| 分析 (texts) | sidebar → 视频 → tab「分析」 | `output/texts*/*.json` | `title`, `location`, `mood`, `summary`, `timeline[]` |
+| 口播 (scripts) | sidebar → 视频 → tab「口播」 | `output/scripts/*_voiceover.json` | `title`, `voiceover`, `edit_tip`, `duration_hint_sec` |
+| 规划 (plan) | sidebar → 📋 规划 | `output/plans/day<N>_plan.json` | `theme`, `opening_tip`, `ending_tip`, `sequence[]` |
 
 `texts*` 通配同时匹配 `texts/` 和 `texts - 巴黎/` 之类的目录。
 
