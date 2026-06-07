@@ -107,6 +107,26 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [ ] R-007c：前端切换交互
 - [ ] R-007d：文档 / 迁移指南
 
+## 需求 R-008：UI 单步执行 + 文件夹/文件选择
+
+**背景**：当前 UI 只能看已有产物，要重新跑某个步骤（compress / analyze / voiceover / plan）
+必须开终端。用户期望在 UI 上选文件夹→选视频→点按钮→跑完看结果，不用切到命令行。
+
+**验收**：
+- 侧栏「▶ 运行」启用，作为 R-008 入口
+- 右栏显示运行面板：可选择步骤（compress / analyze / voiceover / plan / 全部）
+- 可单独选择输入目录（不限于 config 里的 `input_dir`，可手动输入路径或浏览选择）
+- 可在所选目录下勾选要处理的文件（而非全部跑）
+- 点击执行后面板显示实时进度 + ETA（复用 R-005 的 `.progress.json` 或直接 SSE）
+- 跑完后自动切到对应视图（如跑完 voiceover 切到口播 tab 刷新）
+
+**子任务**：
+- [ ] R-008a：后端 `/api/run/step` 端点，接受 `{ step: string, input_dir?: string, files?: string[] }`
+- [ ] R-008b：运行面板 UI（步骤选择、进度、结果查看）
+- [ ] R-008c：输入目录选择 + 文件勾选交互
+- [ ] R-008d：跑完后自动刷新对应视图
+- [ ] R-008e：文档 + 侧栏「运行」入口启用
+
 ## 需求 R-002：一键剪辑（从 plan 切出所有片段）
 
 **背景**：`plan.json` 的 `sequence[]` 已经给好了 `use_timeline` 范围，用户要在剪映里手动剪 →
