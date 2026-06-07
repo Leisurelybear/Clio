@@ -173,7 +173,7 @@ function updateEntityUI() {
   $('editor').className = state.currentEntity === 'plan' ? 'entity-plan' : 'entity-video';
   $$('.project-item').forEach(p => p.classList.remove('active'));
   if (state.currentEntity === 'plan') {
-    $('.project-item[data-entity="plan"]').classList.add('active');
+    document.querySelector('.project-item[data-entity="plan"]').classList.add('active');
   }
 }
 
