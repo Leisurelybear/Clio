@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 import sys
 import time
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import TextIO
@@ -72,9 +73,12 @@ class _TeeWriter:
             written = self._original.write(message)
         except Exception:
             written = 0
-        for line in message.splitlines():
-            if line:
-                self._logger.log(self._level, line)
+        if "Traceback (most recent call last):" in message:
+            self._logger.log(logging.ERROR, message.rstrip())
+        else:
+            for line in message.splitlines():
+                if line:
+                    self._logger.log(self._level, line)
         try:
             self._original.flush()
         except Exception:
@@ -97,12 +101,29 @@ class _TeeWriter:
 _initialized = False
 
 
+def _install_excepthook(logger: logging.Logger) -> None:
+    """把未捕获异常整成一条 ERROR 日志（避免 traceback 每行都污染）。"""
+    def hook(exc_type, exc_value, exc_tb):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_tb)
+            return
+        tb_text = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+        sys.__stderr__.write(tb_text)
+        try:
+            sys.__stderr__.flush()
+        except Exception:
+            pass
+        logger.error(tb_text.rstrip())
+    sys.excepthook = hook
+
+
 def setup_logging(logs_dir: Path, level: int = logging.INFO) -> logging.Logger:
     """初始化日志：把 stdout/stderr 同时写到控制台和 logs/YYYY-MM-DD-HH.log。
 
     - 跨小时自动切到新文件，无需重启
     - 多次调用是幂等的
     - 文件创建失败时退化为只在控制台输出
+    - 注册 sys.excepthook：未捕获异常整成一条 ERROR 日志
     """
     global _initialized
     logger = logging.getLogger(_LOGGER_NAME)
@@ -118,6 +139,7 @@ def setup_logging(logs_dir: Path, level: int = logging.INFO) -> logging.Logger:
 
     sys.stdout = _TeeWriter(sys.stdout, logger, logging.INFO)
     sys.stderr = _TeeWriter(sys.stderr, logger, logging.WARNING)
+    _install_excepthook(logger)
 
     _initialized = True
     return logger
