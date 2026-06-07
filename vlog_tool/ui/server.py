@@ -55,8 +55,39 @@ def _save_atomic(path: Path, data: bytes) -> None:
     os.replace(tmp, path)
 
 
+def _find_original_for_compressed(stem: str, input_dir: Path) -> str | None:
+    """For a compressed stem like '001_GL010695', find the matching original basename
+    in input_dir. Match is case-insensitive on the GoPro-style suffix (everything
+    after the first '_'). Returns the original filename or None if not found.
+    """
+    if "_" not in stem or not input_dir.is_dir():
+        return None
+    suffix = stem.split("_", 1)[1].lower()
+    for p in input_dir.iterdir():
+        if p.is_file() and p.stem.lower() == suffix:
+            return p.name
+    return None
+
+
+def _find_compressed_for_original(stem: str, comp_dir: Path) -> tuple[str, str] | None:
+    """For an original stem like 'GL010695', find the matching compressed file and
+    its index. Returns (compressed_basename, index) or None if not found.
+    """
+    if not comp_dir.is_dir():
+        return None
+    needle = stem.lower()
+    for p in comp_dir.iterdir():
+        if p.suffix.lower() not in VIDEO_EXTS or "_" not in p.stem:
+            continue
+        idx, rest = p.stem.split("_", 1)
+        if rest.lower() == needle:
+            return (p.name, idx)
+    return None
+
+
 def make_handler(config: AppConfig) -> type[BaseHTTPRequestHandler]:
     output_dir = config.paths.output_dir
+    input_dir = config.paths.input_dir
     static_dir = STATIC_DIR
 
     class Handler(BaseHTTPRequestHandler):
@@ -177,6 +208,7 @@ def make_handler(config: AppConfig) -> type[BaseHTTPRequestHandler]:
                 comp = output_dir / "compressed"
                 texts = _find_texts_dirs(output_dir)
                 return self._send_json({
+                    "input_dir": str(input_dir),
                     "output_dir": str(output_dir),
                     "compressed_dir": str(comp),
                     "texts_dirs": [str(d) for d in texts],
@@ -185,43 +217,74 @@ def make_handler(config: AppConfig) -> type[BaseHTTPRequestHandler]:
                 })
 
             if path == "/api/videos":
+                source = qs.get("source", ["compressed"])[0]
+                if source not in ("compressed", "original"):
+                    return self._send_json(
+                        {"ok": False, "error": "source must be compressed|original"}, 400
+                    )
                 comp_dir = output_dir / "compressed"
-                videos: list[dict] = []
-                if comp_dir.is_dir():
-                    # 先把所有 texts* 下的 sidecar JSON 索引: index -> [basename, ...]
-                    text_sidecars: dict[str, list[str]] = {}
-                    for td in _find_texts_dirs(output_dir):
-                        for f in td.iterdir():
-                            if f.suffix != ".json" or "_" not in f.stem:
-                                continue
-                            idx = f.stem.split("_", 1)[0]
-                            text_sidecars.setdefault(idx, []).append(f.name)
-                    script_sidecars: dict[str, list[str]] = {}
-                    sd = output_dir / "scripts"
-                    if sd.is_dir():
-                        for f in sd.iterdir():
-                            if f.suffix != ".json" or "_" not in f.stem:
-                                continue
-                            idx = f.stem.split("_", 1)[0]
-                            script_sidecars.setdefault(idx, []).append(f.name)
-                    for p in sorted(comp_dir.iterdir()):
-                        if p.suffix.lower() not in VIDEO_EXTS:
+                # texts/scripts sidecars are keyed by the compressed index in both views
+                text_sidecars: dict[str, list[str]] = {}
+                for td in _find_texts_dirs(output_dir):
+                    for f in td.iterdir():
+                        if f.suffix != ".json" or "_" not in f.stem:
                             continue
-                        stem = p.stem
-                        idx = stem.split("_", 1)[0] if "_" in stem else ""
-                        videos.append({
-                            "file": p.name,
-                            "index": idx,
-                            "text_json": (text_sidecars.get(idx) or [None])[0],
-                            "script_json": (script_sidecars.get(idx) or [None])[0],
-                        })
-                return self._send_json({"videos": videos})
+                        idx = f.stem.split("_", 1)[0]
+                        text_sidecars.setdefault(idx, []).append(f.name)
+                script_sidecars: dict[str, list[str]] = {}
+                sd = output_dir / "scripts"
+                if sd.is_dir():
+                    for f in sd.iterdir():
+                        if f.suffix != ".json" or "_" not in f.stem:
+                            continue
+                        idx = f.stem.split("_", 1)[0]
+                        script_sidecars.setdefault(idx, []).append(f.name)
+                videos: list[dict] = []
+                if source == "compressed":
+                    if comp_dir.is_dir():
+                        for p in sorted(comp_dir.iterdir()):
+                            if p.suffix.lower() not in VIDEO_EXTS:
+                                continue
+                            stem = p.stem
+                            idx = stem.split("_", 1)[0] if "_" in stem else ""
+                            orig = _find_original_for_compressed(stem, input_dir)
+                            videos.append({
+                                "file": p.name,
+                                "source": "compressed",
+                                "index": idx,
+                                "text_json": (text_sidecars.get(idx) or [None])[0],
+                                "script_json": (script_sidecars.get(idx) or [None])[0],
+                                "match": ({"source": "original", "file": orig} if orig else None),
+                            })
+                else:  # original
+                    if input_dir.is_dir():
+                        for p in sorted(input_dir.iterdir()):
+                            if p.suffix.lower() not in VIDEO_EXTS:
+                                continue
+                            comp = _find_compressed_for_original(p.stem, comp_dir)
+                            idx = comp[1] if comp else None
+                            videos.append({
+                                "file": p.name,
+                                "source": "original",
+                                "index": idx,
+                                "text_json": (text_sidecars.get(idx) or [None])[0] if idx else None,
+                                "script_json": (script_sidecars.get(idx) or [None])[0] if idx else None,
+                                "match": (
+                                    {"source": "compressed", "file": comp[0], "index": comp[1]}
+                                    if comp else None
+                                ),
+                            })
+                return self._send_json({"videos": videos, "source": source})
 
             if path == "/api/video":
                 fname = qs.get("file", [""])[0]
+                source = qs.get("source", ["compressed"])[0]
                 if not _is_safe_basename(fname):
                     return self.send_error(HTTPStatus.FORBIDDEN)
-                vp = output_dir / "compressed" / fname
+                if source == "original":
+                    vp = input_dir / fname
+                else:
+                    vp = output_dir / "compressed" / fname
                 if not vp.is_file() or vp.suffix.lower() not in VIDEO_EXTS:
                     return self.send_error(HTTPStatus.NOT_FOUND)
                 return self._send_video_range(vp)
