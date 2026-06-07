@@ -21,11 +21,11 @@
 - 压缩版 ↔ 原片尽量按 basename 匹配，列表里能看到对应关系
 
 **子任务**：
-- [ ] R-001a：后端 `/api/videos?source=compressed|original` 支持双来源
-- [ ] R-001b：后端 `/api/video?source=original` 从 `input_dir` 拉原片
-- [ ] R-001c：UI 顶部加 source toggle，切换时重新拉列表
-- [ ] R-001d：`vlog_tool/ui/README.md` 加 toggle 说明 + 边角 case 文档
-- [ ] R-001e：边角：原片没有 `001_` 这样的 index 前缀；UI 用 basename 匹配压缩版，列表里标出哪些匹配上哪些没
+- [x] R-001a：后端 `/api/videos?source=compressed|original` 支持双来源  ← `88679ee`
+- [x] R-001b：后端 `/api/video?source=original` 从 `input_dir` 拉原片  ← `88679ee`
+- [x] R-001c：UI 顶部加 source toggle，切换时重新拉列表  ← `f1d09ac`
+- [x] R-001d：`vlog_tool/ui/README.md` 加 toggle 说明 + 边角 case 文档  ← `ec83f48`
+- [x] R-001e：边角：原片没有 `001_` 这样的 index 前缀；UI 用 basename 匹配压缩版，列表里标出哪些匹配上哪些没  ← 拆到 `88679ee`（后端 helper）+ `f1d09ac`（UI match-badge）
 
 ## 需求 R-002：一键剪辑（从 plan 切出所有片段）
 
@@ -85,6 +85,7 @@
 | Commit | 简述 |
 | --- | --- |
 | `0d52cf6`..`439911c` | 本地 Web UI（拆 6 commit：backend / CLI / frontend / docs / plan-seek fix / AGENTS 同步） |
+| `88679ee` `f1d09ac` `ec83f48` | R-001 UI 源切换（后端双 source / 顶部 toggle + match 角标 / README 文档） |
 | `a2597f0` | 删 plan tab 跳转 bug |
 | `25128d1` | AI 调用加重试与退避 |
 | `835b7e9` | 配置加载时校验 proxy / tasks |

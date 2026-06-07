@@ -179,6 +179,9 @@ ai:
 22. `feat(ui): add HTML/CSS/JS frontend for the visual editor`  ← 静态三件套，无构建
 23. `docs(ui): document the visual editor UI`  ← vlog_tool/ui/README.md + 两份顶层 README
 24. `fix(ui): plan tab sequence click now also seeks the video`  ← 解析 use_timeline 起始时间
+25. `feat(ui): backend supports source=compressed|original for videos and video`  ← R-001 后端，server.py +91/-28
+26. `feat(ui): add source toggle with match indicators`  ← R-001 前端，HTML/CSS/JS +63/-4
+27. `docs(ui): document source toggle`  ← R-001 文档，ui/README.md +31/-1
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
