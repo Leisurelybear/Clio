@@ -1,5 +1,6 @@
 const state = {
   config: null,
+  source: 'compressed',
   videos: [],
   currentVideo: null,
   currentTab: 'texts',
@@ -76,11 +77,11 @@ function updateSaveBtn() {
 async function loadConfig() {
   state.config = await api('GET', '/api/config');
   $('proj-name').textContent = state.config.output_dir;
-  $('proj-name').title = `texts: ${state.config.texts_dirs.join(', ')}`;
+  $('proj-name').title = `input: ${state.config.input_dir}\noutput: ${state.config.output_dir}`;
 }
 
 async function loadVideos() {
-  const r = await api('GET', '/api/videos');
+  const r = await api('GET', `/api/videos?source=${state.source}`);
   state.videos = r.videos;
   $('video-count').textContent = `(${state.videos.length})`;
   renderVideoList();
@@ -93,13 +94,18 @@ function renderVideoList() {
     const li = document.createElement('li');
     li.className = 'video-item';
     if (state.currentVideo === v.file) li.classList.add('active');
+    if (!v.match) li.classList.add('no-match');
     const display = v.file.replace(/^\d+_/, '');
     const tCls = v.text_json ? 'has' : 'miss';
     const sCls = v.script_json ? 'has' : 'miss';
     const tLabel = v.text_json ? '✓ texts' : '· texts';
     const sLabel = v.script_json ? '✓ voiceover' : '· voiceover';
+    const counterpartLabel = state.source === 'compressed' ? '原' : '压';
+    const matchBadge = v.match
+      ? `<span class="match-badge" title="${escapeHtml(v.match.file)}">→ ${counterpartLabel}: ${escapeHtml(v.match.file)}</span>`
+      : `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
     li.innerHTML = `
-      <div class="video-name">${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)}</div>
+      <div class="video-name">${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)} ${matchBadge}</div>
       <div class="video-meta">
         <span class="${tCls}">${tLabel}</span>
         &nbsp;
@@ -124,7 +130,7 @@ async function selectVideo(file) {
   if (!v) return;
 
   const player = $('player');
-  player.src = `/api/video?file=${encodeURIComponent(file)}`;
+  player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}`;
   $('player-name').textContent = file;
 
   if (v.text_json) {
@@ -144,6 +150,30 @@ async function selectVideo(file) {
 
   renderVideoList();
   renderActiveTab();
+}
+
+async function setSource(source) {
+  if (source === state.source) return;
+  if (state.dirty) {
+    if (!confirm('当前 tab 有未保存的修改，确定切换源吗？')) return;
+  }
+  state.source = source;
+  state.currentVideo = null;
+  state.texts = null;
+  state.voiceover = null;
+  $$('.source-toggle button').forEach(b => b.classList.toggle('active', b.dataset.source === source));
+  try {
+    await loadVideos();
+    if (state.videos.length) {
+      await selectVideo(state.videos[0].file);
+    } else {
+      $('player').removeAttribute('src');
+      $('player-name').textContent = '请选择左侧视频';
+      setStatus(`当前视图没有视频 (${source})`, 'warn');
+    }
+  } catch (e) {
+    setStatus('切换源失败: ' + e.message, 'err');
+  }
 }
 
 function renderActiveTab() {
@@ -320,6 +350,10 @@ async function init() {
   } catch (e) {
     setStatus('初始化失败: ' + e.message, 'err');
   }
+
+  $$('.source-toggle button').forEach(b => {
+    b.onclick = () => setSource(b.dataset.source);
+  });
 
   $('btn-reload').onclick = async () => {
     try {

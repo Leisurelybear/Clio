@@ -22,6 +22,18 @@ header {
 }
 .proj .label { color: #888; margin-right: 6px; }
 .proj .value { font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+.source-toggle {
+  display: flex; background: #1a1a1a; border: 1px solid #444;
+  border-radius: 3px; overflow: hidden;
+}
+.source-toggle button {
+  background: transparent; color: #888; border: none;
+  padding: 4px 14px; cursor: pointer; font: inherit;
+  border-right: 1px solid #444;
+}
+.source-toggle button:last-child { border-right: none; }
+.source-toggle button:hover { background: #333; }
+.source-toggle button.active { background: #4a9eff; color: #fff; }
 .actions { display: flex; align-items: center; gap: 8px; }
 .actions button {
   background: #3a3a3a; color: #ddd; border: 1px solid #555;
@@ -58,7 +70,16 @@ aside, section { overflow-y: auto; }
 .video-item:hover { background: #2f2f2f; }
 .video-item.active { background: #094771; }
 .video-item.active .video-name { color: #fff; }
+.video-item.no-match { opacity: 0.55; }
 .video-name { font-weight: 500; word-break: break-all; }
+.match-badge {
+  display: inline-block; font-size: 0.72em;
+  background: #333; color: #aaa; padding: 1px 5px;
+  border-radius: 2px; margin-left: 4px;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+.match-badge.miss { background: #5a3030; color: #d88; }
+.video-item.active .match-badge { background: #1a3a5a; color: #bcd; }
 .video-meta { font-size: 0.8em; color: #888; margin-top: 3px; }
 .video-meta .has { color: #4caf50; }
 .video-meta .miss { opacity: 0.3; }
