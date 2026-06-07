@@ -5,11 +5,58 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
+from typing import Callable, TypeVar
 
 from vlog_tool.config import AppConfig
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
+
+T = TypeVar("T")
+
+
+def with_retry(
+    fn: Callable[[], T],
+    *,
+    attempts: int = 3,
+    base_delay: float = 1.0,
+    retry_on: tuple[type[BaseException], ...],
+    what: str = "operation",
+) -> T:
+    """调用 fn()，按指数退避（1s/2s/4s）重试最多 attempts 次。
+
+    只对 retry_on 列出的异常类型重试；其它异常（如 ValueError）立即抛出。
+    每次重试会打印一行（控制台 + 日志都看得到），最后一次失败时也打印。
+
+    用法::
+
+        return with_retry(
+            lambda: self._client.post(...).json()["choices"][0]["message"]["content"],
+            attempts=3, retry_on=(httpx.HTTPError,),
+            what="OpenAI 兼容 API",
+        )
+    """
+    last_exc: BaseException | None = None
+    for i in range(attempts):
+        try:
+            return fn()
+        except retry_on as e:
+            last_exc = e
+            if i + 1 >= attempts:
+                print(
+                    f"  [重试] {what} 失败 {attempts} 次，放弃: "
+                    f"{type(e).__name__}: {e}"
+                )
+                break
+            delay = base_delay * (2 ** i)
+            print(
+                f"  [重试] {what} 失败 ({type(e).__name__}: {str(e)[:80]})，"
+                f"{delay:.1f}s 后重试 ({i + 2}/{attempts})"
+            )
+            time.sleep(delay)
+    assert last_exc is not None
+    raise last_exc
 
 
 def extract_json(text: str) -> dict:

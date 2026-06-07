@@ -7,7 +7,13 @@ from google import genai
 from google.genai import types
 
 from vlog_tool.config import ProviderConfig, ProxyConfig
-from vlog_tool.utils import mask_if_looks_like_key
+from vlog_tool.utils import mask_if_looks_like_key, with_retry
+
+try:
+    from google.genai import errors as _genai_errors
+    _RETRY_ON: tuple[type[BaseException], ...] = (_genai_errors.ServerError, OSError)
+except ImportError:
+    _RETRY_ON = (OSError,)
 
 
 class GeminiProvider:
@@ -41,14 +47,32 @@ class GeminiProvider:
         return uploaded
 
     def generate_text(self, prompt: str, model: str) -> str:
-        response = self._client.models.generate_content(model=model, contents=prompt)
-        return response.text or ""
+        def _do() -> str:
+            response = self._client.models.generate_content(model=model, contents=prompt)
+            return response.text or ""
+
+        return with_retry(
+            _do,
+            attempts=3,
+            base_delay=1.0,
+            retry_on=_RETRY_ON,
+            what=f"Gemini {model}",
+        )
 
     def analyze_video(self, video_path: str, prompt: str, model: str) -> str:
-        uploaded = self._client.files.upload(file=video_path)
-        uploaded = self._wait_for_file(uploaded)
-        response = self._client.models.generate_content(
-            model=model,
-            contents=[uploaded, prompt],
+        def _do() -> str:
+            uploaded = self._client.files.upload(file=video_path)
+            uploaded = self._wait_for_file(uploaded)
+            response = self._client.models.generate_content(
+                model=model,
+                contents=[uploaded, prompt],
+            )
+            return response.text or ""
+
+        return with_retry(
+            _do,
+            attempts=3,
+            base_delay=1.0,
+            retry_on=_RETRY_ON,
+            what=f"Gemini 视频 {model}",
         )
-        return response.text or ""

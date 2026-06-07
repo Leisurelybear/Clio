@@ -3,7 +3,7 @@ from __future__ import annotations
 import httpx
 
 from vlog_tool.config import ProviderConfig, ProxyConfig
-from vlog_tool.utils import mask_if_looks_like_key
+from vlog_tool.utils import mask_if_looks_like_key, with_retry
 
 
 class OpenAICompatProvider:
@@ -28,20 +28,34 @@ class OpenAICompatProvider:
         self._client = httpx.Client(**client_kwargs)
 
     def generate_text(self, prompt: str, model: str) -> str:
-        response = self._client.post(
-            f"{self._base_url}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {self._api_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-            },
+        def _do() -> str:
+            response = self._client.post(
+                f"{self._base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                },
+            )
+            sc = response.status_code
+            if sc == 429 or sc >= 500:
+                raise httpx.HTTPStatusError(
+                    f"status {sc}", request=response.request, response=response
+                )
+            response.raise_for_status()
+            data = response.json()
+            return data["choices"][0]["message"]["content"]
+
+        return with_retry(
+            _do,
+            attempts=3,
+            base_delay=1.0,
+            retry_on=(httpx.HTTPError,),
+            what=f"OpenAI 兼容 {self._base_url}",
         )
-        response.raise_for_status()
-        data = response.json()
-        return data["choices"][0]["message"]["content"]
 
     def analyze_video(self, video_path: str, prompt: str, model: str) -> str:
         raise NotImplementedError(
