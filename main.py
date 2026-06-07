@@ -19,6 +19,7 @@ from vlog_tool.pipeline import (
     run_refine_scripts,
     run_refine_texts,
 )
+from vlog_tool.ui import run as run_ui
 from vlog_tool.utils import discover_ffmpeg_bin, find_videos
 
 PLACEHOLDER_KEYS = {"your_api_key_here", "YOUR_API_KEY", ""}
@@ -162,6 +163,11 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
 
+    p_serve = sub.add_parser("serve", help="启动本地 web UI（浏览器里可视化编辑 AI 输出）")
+    p_serve.add_argument("--host", default="127.0.0.1", help="监听地址（默认 127.0.0.1，不暴露到局域网）")
+    p_serve.add_argument("--port", type=int, default=8765, help="端口（默认 8765）")
+    p_serve.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
+
     args = parser.parse_args(argv)
     config_path = Path(args.config)
     if not config_path.exists():
@@ -215,6 +221,13 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError as e:
                 print(f"错误: {e}", file=sys.stderr)
                 return 1
+        elif args.command == "serve":
+            return run_ui(
+                config,
+                host=args.host,
+                port=args.port,
+                open_browser=not args.no_browser,
+            )
     except FileNotFoundError as e:
         print(f"错误: {e}", file=sys.stderr)
         return 1
