@@ -25,16 +25,12 @@ from vlog_tool.config import AppConfig
 STATIC_DIR = Path(__file__).parent / "static"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm"}
 
-# Basename 字符白名单: 字母数字 + 中文/unicode 词字符 + . _ - 和空格
-SAFE_NAME = re.compile(r"^[\w\-. ]+$")
-
-
 def _is_safe_basename(name: str) -> bool:
     if not name or len(name) > 200:
         return False
     if "/" in name or "\\" in name or ".." in name:
         return False
-    if not SAFE_NAME.match(name):
+    if any(ord(c) < 0x20 or ord(c) == 0x7F for c in name):
         return False
     return True
 
