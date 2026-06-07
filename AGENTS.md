@@ -187,6 +187,7 @@ ai:
 30. `feat(ui): split sidebar into project and video sections`  ← R-006a HTML+CSS，sidebar 两段结构
 31. `feat(ui): wire sidebar project/video hierarchy with entity state machine`  ← R-006b JS，state.currentEntity + selectPlan
 32. `docs(ui): document sidebar project/video hierarchy`  ← R-006c README 布局图更新
+33. `fix(ui): use querySelector for the plan project-item in updateEntityUI`  ← $ 是 getElementById，CSS 选择器要用 querySelector
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
