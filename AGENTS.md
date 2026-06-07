@@ -31,8 +31,9 @@ vlog-video-analysis/
 │   ├── analyze.py             # AI 交互（analyze_video, generate_voiceover, plan_daily_vlog, refine_*）
 │   ├── compress.py            # ffmpeg 包装
 │   ├── prompts.py             # 所有 prompt 模板（常量）
-│   ├── utils.py               # ffmpeg 路径发现、文件 IO、mask_if_looks_like_key
-│   ├── log.py                 # 按小时切文件的日志（Tee stdout/stderr + HourlyFileHandler）
+│   ├── utils.py               # ffmpeg 路径发现、文件 IO、mask_if_looks_like_key、extract_json
+│   ├── log.py                 # 日志：按小时切文件 + _TeeWriter + timed/format_size/format_duration
+│   │                           #     + sys.excepthook 把未捕获异常整成一条 ERROR 日志
 │   └── ai/
 │       ├── base.py            # TaskName 枚举、Provider Protocol
 │       ├── factory.py         # 按名字查找 provider
@@ -110,6 +111,17 @@ ai:
       model: deepseek-chat
 ```
 
+### refine 加定向修正模式（`--fix`）
+
+对已知的具体错误（地名拼错、编号错了等），`refine --fix '...'` 比
+让 AI 自由审阅更可靠：
+
+- 必须配合 `-i` 指定**单个** json 文件（避免误伤）
+- 切换 prompt 到「按用户意见定向修正」，AI 只改意见中提到的字段
+- `_changelog` 第一条固定写"按用户意见修改了 XXX"，方便审计
+- 实现：`vlog_tool/prompts.py` 的 `REFINE_TEXT_FIX_PROMPT` /
+  `REFINE_SCRIPT_FIX_PROMPT`，`analyze.py` 的 `refine_text(refine_script)` 多一个 `fix` 参数
+
 ### 加一个新的 CLI subcommand
 
 1. `main.py` 加 `p_X = sub.add_parser(...)` 和 dispatch 分支
@@ -142,9 +154,18 @@ ai:
 8. `docs: add AGENTS.md`  ← AI 维护手册
 9. `feat(ai): independent provider for refine tasks`  ← refine_text 独立可配（texts/scripts 共用）
 10. `feat(log): persist execution logs to per-hour files`  ← logs/YYYY-MM-DD-HH.log（gitignored）
+11. `docs: expand command reference with per-subcommand sections`  ← README 命令参考细化
+12. `feat(refine): add --fix mode for targeted single-file corrections`  ← 定向修正 prompt
+13. `feat(log): add format_size, format_duration, and timed() helpers`  ← 日志助手函数
+14. `feat(integration): detailed logs - commands, sizes, AI timing, ETA progress`  ← 接入 compress/analyze/pipeline
+15. `fix(log): uncaught exceptions as one ERROR entry, not per-line noise`  ← sys.excepthook
+16. `chore: remove orphan video_analysis.py`  ← 已废弃的单文件 demo
+17. `refactor(utils): move extract_json out of ai/gemini.py`  ← 通用工具不应在 gemini 模块
+18. `feat(config): validate proxy/tasks at load time`  ← 拼写错误提前 fail
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
+另外 WIP 一个 `templates/trip_context_2.md`（蓝色旗子场景的小补丁），暂未启用。
 
 ## 8. Gotchas（踩过的坑）
 
