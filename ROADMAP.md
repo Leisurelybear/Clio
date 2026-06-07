@@ -89,7 +89,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [x] R-006a：`vlog_tool/ui/static/index.html` + `style.css`：sidebar 两段结构 + 灰显样式  ← `a648e60`
 - [x] R-006b：`vlog_tool/ui/static/app.js`：state.currentEntity + selectPlan + 右栏内容分发；plan 内容从 tab 拆出来作为独立渲染分支  ← `c42d347`
 - [x] R-006c：`vlog_tool/ui/README.md`：界面布局图更新 + 项目级 section 说明  ← `778c44a`
-
+- [!] R-006d：规划视图切源时，播放器应自动切换到新源的对应视频（而非清空）。当前行为：`setSource` 在 plan 分支只清播放器 —— 用户需再点击左侧视频或 plan segment 才加载。预计修复：在 plan 分支用 `state.currentVideo?.index` 在新 `state.videos` 里查找对应文件并调 `playVideoSegment`。
 
 ## 需求 R-002：一键剪辑（从 plan 切出所有片段）
 
