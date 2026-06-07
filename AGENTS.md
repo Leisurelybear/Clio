@@ -182,6 +182,7 @@ ai:
 25. `feat(ui): backend supports source=compressed|original for videos and video`  ← R-001 后端，server.py +91/-28
 26. `feat(ui): add source toggle with match indicators`  ← R-001 前端，HTML/CSS/JS +63/-4
 27. `docs(ui): document source toggle`  ← R-001 文档，ui/README.md +31/-1
+28. `fix(ui): accept CJK punctuation (full-width colon) in basenames`  ← 沙盒正则过严，`：` U+FF1A 被拒，video 002 voiceover 404
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
