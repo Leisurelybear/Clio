@@ -91,6 +91,22 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [x] R-006c：`vlog_tool/ui/README.md`：界面布局图更新 + 项目级 section 说明  ← `778c44a`
 - [!] R-006d：规划视图切源时，播放器应自动切换到新源的对应视频（而非清空）。当前行为：`setSource` 在 plan 分支只清播放器 —— 用户需再点击左侧视频或 plan segment 才加载。预计修复：在 plan 分支用 `state.currentVideo?.index` 在新 `state.videos` 里查找对应文件并调 `playVideoSegment`。
 
+## 需求 R-007：UI 多项目切换
+
+**背景**：当前 UI 锚定一个 `output_dir`，想看另一个 vlog 项目必须改 `config.yaml` 后重启服务。
+用户期望在页面上切换项目，直接查看其他项目的视频列表和 AI 解析结果。
+
+**验收**：
+- UI 顶部/侧栏显示当前项目名，可点击切换
+- 切换后刷新视频列表 + 编辑内容（texts / scripts / plan 全部切到新项目的文件）
+- 无需重启服务
+
+**子任务**：
+- [ ] R-007a：设计"项目"在 config 中的表示方式（列表？目录发现？`projects: [...]`？）
+- [ ] R-007b：后端提供项目列表 + 切换端点
+- [ ] R-007c：前端切换交互
+- [ ] R-007d：文档 / 迁移指南
+
 ## 需求 R-002：一键剪辑（从 plan 切出所有片段）
 
 **背景**：`plan.json` 的 `sequence[]` 已经给好了 `use_timeline` 范围，用户要在剪映里手动剪 →
