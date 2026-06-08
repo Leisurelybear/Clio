@@ -121,6 +121,26 @@ async function loadVideos() {
   renderVideoList();
 }
 
+async function loadProject() {
+  try {
+    const proj = await api('GET', '/api/project');
+    if (proj.currentDay) state.currentDay = proj.currentDay;
+    if (proj.source && proj.source !== state.source) {
+      state.source = proj.source;
+      $$('.source-toggle button').forEach(b => b.classList.toggle('active', b.dataset.source === state.source));
+    }
+  } catch (e) { /* 非关键, 静默忽略 */ }
+}
+
+async function saveProject() {
+  try {
+    await api('PUT', '/api/project', {
+      currentDay: state.currentDay,
+      source: state.source,
+    });
+  } catch (e) { /* 静默 */ }
+}
+
 function renderVideoList() {
   const ul = $('video-list');
   ul.innerHTML = '';
@@ -272,6 +292,7 @@ async function setSource(source) {
   state.texts = null;
   state.voiceover = null;
   $$('.source-toggle button').forEach(b => b.classList.toggle('active', b.dataset.source === source));
+  saveProject();  // 持久化 source 选择
   try {
     await loadVideos();
     if (state.videos.length) {
@@ -427,6 +448,7 @@ function renderPlan() {
       state.plan = null;
       state.dirty = false;
       updateSidebarDay();
+      saveProject();
       await selectPlan();
     };
   }
@@ -642,12 +664,14 @@ async function save() {
 async function init() {
   try {
     await loadConfig();
+    await loadProject();
     await loadPlans();
     // 自动选择第一个可用 plan（如果有）
     if (state.availablePlans.length) {
-      state.currentDay = state.availablePlans[0].day_label;
+      // 如果 project 指定的 day 有对应 plan 则保留, 否则用第一个
+      const hasDay = state.availablePlans.some(p => p.day_label === state.currentDay);
+      if (!hasDay) state.currentDay = state.availablePlans[0].day_label;
       updateSidebarDay();
-      // 预加载 plan 数据
       try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); }
       catch (e) { /* ignore */ }
     }

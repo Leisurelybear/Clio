@@ -129,6 +129,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
     output_dir = config.paths.output_dir
     input_dir = config.paths.input_dir
     static_dir = STATIC_DIR
+    project_path = output_dir / "project.json"
+
+    DEFAULT_PROJECT = {"currentDay": "day1", "source": "compressed"}
 
     class Handler(BaseHTTPRequestHandler):
         # 把 server 端日志通过 print 输出, 走 _TeeWriter 同步进 logs/
@@ -262,6 +265,15 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 with open(config_path, "r", encoding="utf-8") as f:
                     raw = yaml.safe_load(f) or {}
                 return self._send_json(raw)
+
+            if path == "/api/project":
+                if project_path.is_file():
+                    try:
+                        data = json.loads(project_path.read_text(encoding="utf-8"))
+                    except (json.JSONDecodeError, OSError):
+                        data = {}
+                    return self._send_json({**DEFAULT_PROJECT, **data})
+                return self._send_json(dict(DEFAULT_PROJECT))
 
             if path == "/api/videos":
                 source = qs.get("source", ["compressed"])[0]
@@ -409,6 +421,14 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 _save_atomic(config_path, yml.encode("utf-8"))
                 os.unlink(tmp.name)
                 return self._send_json({"ok": True, "path": str(config_path)})
+
+            if path == "/api/project":
+                merged = {**DEFAULT_PROJECT, **obj}
+                project_path.write_text(
+                    json.dumps(merged, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                return self._send_json({"ok": True})
 
             if path == "/api/texts":
                 fname = qs.get("file", [""])[0]
