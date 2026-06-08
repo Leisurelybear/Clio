@@ -97,6 +97,14 @@ aside, section { overflow-y: auto; }
 .video-meta .has { color: #4caf50; }
 .video-meta .miss { opacity: 0.3; }
 
+/* step pipeline list */
+.step-list { list-style: none; padding: 4px 12px; margin: 0; }
+.step-item { display: flex; align-items: center; gap: 6px; padding: 2px 0; font-size: 0.8em; }
+.step-item .step-icon { width: 1.2em; text-align: center; color: #555; }
+.step-item.done .step-icon { color: #4caf50; }
+.step-item .step-label { color: #888; }
+.step-item.done .step-label { color: #aaa; }
+
 #player-pane {
   padding: 12px; display: flex; flex-direction: column;
   background: #1a1a1a; min-width: 0;

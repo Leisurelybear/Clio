@@ -129,15 +129,38 @@ async function loadProject() {
       state.source = proj.source;
       $$('.source-toggle button').forEach(b => b.classList.toggle('active', b.dataset.source === state.source));
     }
+    state.steps = proj.steps || {};
+    state.projectName = proj.name || '';
+    if (proj.lastEntity && ['video', 'plan', 'cut', 'config'].includes(proj.lastEntity)) {
+      state.lastEntity = proj.lastEntity;
+    }
+    if (proj.lastVideo) state.lastVideo = proj.lastVideo;
   } catch (e) { /* 非关键, 静默忽略 */ }
 }
 
-async function saveProject() {
+function renderSteps() {
+  const ul = $('step-list');
+  if (!ul) return;
+  const labels = { compress: '压缩', analyze: '分析', scripts: '口播', plan: '规划', label: '标号', cut: '裁剪' };
+  ul.innerHTML = '';
+  for (const [key, label] of Object.entries(labels)) {
+    const done = state.steps[key];
+    const li = document.createElement('li');
+    li.className = 'step-item' + (done ? ' done' : '');
+    li.innerHTML = `<span class="step-icon">${done ? '✓' : '○'}</span><span class="step-label">${label}</span>`;
+    ul.appendChild(li);
+  }
+}
+
+async function saveProject(extra) {
   try {
-    await api('PUT', '/api/project', {
+    await api('PUT', '/api/project', Object.assign({
       currentDay: state.currentDay,
       source: state.source,
-    });
+      lastEntity: state.currentEntity,
+      lastVideo: state.currentVideo,
+      name: state.projectName || undefined,
+    }, extra || {}));
   } catch (e) { /* 静默 */ }
 }
 
@@ -535,6 +558,9 @@ async function executeCut() {
     if (r.ok) {
       result.innerHTML = `<p class="ok">裁剪完成</p><p>输出目录: ${escapeHtml(r.output_dir)}</p>`;
       setStatus('裁剪完成', 'ok');
+      state.steps.cut = true;
+      renderSteps();
+      saveProject();
     } else {
       throw new Error(r.error || '裁剪失败');
     }
@@ -665,6 +691,7 @@ async function init() {
   try {
     await loadConfig();
     await loadProject();
+    renderSteps();
     await loadPlans();
     // 自动选择第一个可用 plan（如果有）
     if (state.availablePlans.length) {
@@ -705,6 +732,8 @@ async function init() {
   $('btn-reload').onclick = async () => {
     try {
       const cur = state.currentVideo;
+      await loadProject();
+      renderSteps();
       await loadVideos();
       if (cur && state.videos.find(x => x.file === cur)) {
         await selectVideo(cur);

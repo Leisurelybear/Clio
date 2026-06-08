@@ -131,7 +131,27 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
     static_dir = STATIC_DIR
     project_path = output_dir / "project.json"
 
-    DEFAULT_PROJECT = {"currentDay": "day1", "source": "compressed"}
+    DEFAULT_PROJECT = {
+        "currentDay": "day1",
+        "source": "compressed",
+        "name": output_dir.name,
+        "lastEntity": None,
+        "lastVideo": None,
+    }
+
+    def _detect_steps() -> dict:
+        """从文件系统推断各 pipeline 步骤是否已完成。"""
+        steps = {}
+        comp = output_dir / "compressed"
+        steps["compress"] = comp.is_dir() and any(comp.iterdir())
+        texts = [d for d in output_dir.iterdir() if d.is_dir() and d.name.startswith("texts")]
+        steps["analyze"] = any(t.iterdir() for t in texts)
+        steps["scripts"] = (output_dir / "scripts").is_dir() and any((output_dir / "scripts").iterdir())
+        plans_dir = output_dir / "plans"
+        steps["plan"] = plans_dir.is_dir() and any(plans_dir.iterdir())
+        steps["label"] = (output_dir / "labeled").is_dir() and any((output_dir / "labeled").iterdir())
+        steps["cut"] = (output_dir / "cuts").is_dir() and any((output_dir / "cuts").iterdir())
+        return steps
 
     class Handler(BaseHTTPRequestHandler):
         # 把 server 端日志通过 print 输出, 走 _TeeWriter 同步进 logs/
@@ -267,13 +287,15 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_json(raw)
 
             if path == "/api/project":
+                data = {}
                 if project_path.is_file():
                     try:
                         data = json.loads(project_path.read_text(encoding="utf-8"))
                     except (json.JSONDecodeError, OSError):
                         data = {}
-                    return self._send_json({**DEFAULT_PROJECT, **data})
-                return self._send_json(dict(DEFAULT_PROJECT))
+                merged = {**DEFAULT_PROJECT, **data}
+                merged["steps"] = _detect_steps()
+                return self._send_json(merged)
 
             if path == "/api/videos":
                 source = qs.get("source", ["compressed"])[0]
@@ -423,7 +445,11 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_json({"ok": True, "path": str(config_path)})
 
             if path == "/api/project":
+                import datetime
                 merged = {**DEFAULT_PROJECT, **obj}
+                merged["updatedAt"] = datetime.datetime.now().isoformat(timespec="seconds")
+                if not project_path.is_file():
+                    merged["createdAt"] = merged["updatedAt"]
                 project_path.write_text(
                     json.dumps(merged, ensure_ascii=False, indent=2),
                     encoding="utf-8",
