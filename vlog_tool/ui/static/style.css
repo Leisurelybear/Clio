@@ -149,6 +149,10 @@ aside, section { overflow-y: auto; }
 #editor.entity-cut .tabs { display: none; }
 #editor.entity-cut .tab-pane:not(#tab-cut) { display: none; }
 #editor.entity-cut #tab-cut { display: block; }
+/* entity-run: editor is showing the run panel; hide tab bar, show run pane */
+#editor.entity-run .tabs { display: none; }
+#editor.entity-run .tab-pane:not(#tab-run) { display: none; }
+#editor.entity-run #tab-run { display: block; }
 /* entity-config: editor is showing the config; hide tab bar, show config pane */
 #editor.entity-config .tabs { display: none; }
 #editor.entity-config .tab-pane:not(#tab-config) { display: none; }

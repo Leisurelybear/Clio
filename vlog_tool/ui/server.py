@@ -25,7 +25,7 @@ from urllib.parse import parse_qs, urlparse
 import yaml
 
 from vlog_tool.config import AppConfig
-from vlog_tool.pipeline import run_cut_all
+from vlog_tool.pipeline import run_cut_all, run_full_pipeline_tracked
 
 STATIC_DIR = Path(__file__).parent / "static"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm"}
@@ -154,6 +154,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         return steps
 
     class Handler(BaseHTTPRequestHandler):
+        # 共享状态（类级别，跨实例）
+        _run_lock = threading.Lock()
+        _run_thread: threading.Thread | None = None
         # 把 server 端日志通过 print 输出, 走 _TeeWriter 同步进 logs/
         def log_message(self, fmt, *args):
             print(f"  [serve] {self.address_string()} - {fmt % args}")
@@ -394,6 +397,18 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                             plans.append({"day_label": day_label, "path": str(p)})
                 return self._send_json({"plans": plans})
 
+            if path == "/api/run/status":
+                progress_file = output_dir / ".progress.json"
+                if progress_file.is_file():
+                    try:
+                        data = json.loads(progress_file.read_text(encoding="utf-8"))
+                    except (json.JSONDecodeError, OSError):
+                        data = {"status": "unknown"}
+                else:
+                    data = {"status": "idle"}
+                data["running"] = self._run_thread is not None and self._run_thread.is_alive()
+                return self._send_json(data)
+
             if path == "/api/plan":
                 day = qs.get("day", [""])[0]
                 if not _is_safe_basename(day) or not day:
@@ -496,6 +511,19 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     raise ValueError("expected a JSON object")
             except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
                 return self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, 400)
+
+            if path == "/api/run/start":
+                if self._run_thread is not None and self._run_thread.is_alive():
+                    return self._send_json({"ok": False, "error": "流水线正在运行中"}, 409)
+                day_label = obj.get("day_label", "day1")
+                def _run():
+                    try:
+                        run_full_pipeline_tracked(config, day_label)
+                    except Exception:
+                        pass  # error already written to .progress.json by tracker
+                self._run_thread = threading.Thread(target=_run, daemon=True)
+                self._run_thread.start()
+                return self._send_json({"ok": True, "message": f"流水线已启动（{day_label}）"})
 
             if path == "/api/cut":
                 day_label = obj.get("day_label", "day1")

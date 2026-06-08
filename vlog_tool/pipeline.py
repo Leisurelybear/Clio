@@ -17,6 +17,7 @@ from vlog_tool.compress import compress_video
 from vlog_tool.config import AppConfig
 from vlog_tool.cut import cut_one, parse_time_range
 from vlog_tool.log import format_duration, timed
+from vlog_tool.progress import ProgressTracker
 from vlog_tool.utils import (
     find_videos,
     format_index,
@@ -178,13 +179,16 @@ def run_compress_all(config: AppConfig) -> list[ClipRecord]:
     return records
 
 
-def run_analyze_all(config: AppConfig) -> list[ClipRecord]:
+def run_analyze_all(config: AppConfig, tracker: ProgressTracker | None = None) -> list[ClipRecord]:
     videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
     config.compressed_dir.mkdir(parents=True, exist_ok=True)
     config.texts_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"素材目录: {config.paths.input_dir}（{len(videos)} 个视频）")
     records: list[ClipRecord] = []
+
+    if tracker:
+        tracker.update(phase="compress", total=len(videos), message=f"压缩 {len(videos)} 个视频...")
 
     with timed(f"run_analyze_all（{len(videos)} 个）"):
         completed = 0
@@ -195,9 +199,13 @@ def run_analyze_all(config: AppConfig) -> list[ClipRecord]:
 
             if not compressed.exists():
                 print(f"[压缩] {video.name}")
+                if tracker:
+                    tracker.next(message=f"压缩 {video.name}")
                 compress_video(video, compressed, config)
             else:
                 print(f"[跳过压缩] {video.name} (已存在)")
+                if tracker:
+                    tracker.next(message=f"跳过压缩 {video.name}")
 
             existing = sorted(config.texts_dir.glob(f"{idx}_*.json"))
             if config.analyze.skip_existing and existing:
@@ -212,6 +220,8 @@ def run_analyze_all(config: AppConfig) -> list[ClipRecord]:
                 continue
 
             print(_eta_line("分析", i, len(videos), video.name, completed, elapsed_total))
+            if tracker:
+                tracker.update(phase="analyze", current=i, message=f"分析 {video.name}...")
             t0 = time.monotonic()
             analysis = analyze_video(str(compressed), config)
             elapsed_total += time.monotonic() - t0
@@ -237,13 +247,15 @@ def run_analyze_all(config: AppConfig) -> list[ClipRecord]:
     return records
 
 
-def run_label_videos(config: AppConfig) -> None:
+def run_label_videos(config: AppConfig, tracker: ProgressTracker | None = None) -> None:
     """用 ffmpeg 在压缩视频上烧录序号（便于剪映对照）。"""
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
     labeled_dir = config.paths.output_dir / "labeled"
     labeled_dir.mkdir(parents=True, exist_ok=True)
 
     files = sorted(config.texts_dir.glob("*.json"))
+    if tracker:
+        tracker.update(phase="label", total=len(files), message=f"烧录序号（{len(files)} 个）...")
     with timed(f"run_label_videos（{len(files)} 个）"):
         completed = 0
         elapsed_total = 0.0
@@ -258,14 +270,20 @@ def run_label_videos(config: AppConfig) -> None:
                 break
             if not compressed or not compressed.exists():
                 print(f"[跳过] 找不到压缩文件: {idx}")
+                if tracker:
+                    tracker.next(message=f"跳过 {idx}（无压缩文件）")
                 continue
 
             out = labeled_dir / f"{json_file.stem}_labeled.mp4"
             if config.analyze.skip_existing and out.exists():
                 print(f"[跳过标注] {out.name} (已存在)")
+                if tracker:
+                    tracker.next(message=f"跳过 {out.name}")
                 continue
 
             print(_eta_line("标注", i, len(files), json_file.stem, completed, elapsed_total))
+            if tracker:
+                tracker.next(message=f"标注 {json_file.stem}")
             t0 = time.monotonic()
             label = idx.replace("'", "")
             vf = (
@@ -278,11 +296,13 @@ def run_label_videos(config: AppConfig) -> None:
             print(f"  -> {out.name}")
 
 
-def run_generate_scripts(config: AppConfig) -> None:
+def run_generate_scripts(config: AppConfig, tracker: ProgressTracker | None = None) -> None:
     config.scripts_dir.mkdir(parents=True, exist_ok=True)
     template = config.script.template_file.read_text(encoding="utf-8") if config.script.template_file.exists() else ""
 
     files = sorted(config.texts_dir.glob("*.json"))
+    if tracker:
+        tracker.update(phase="voiceover", total=len(files), message=f"生成口播文案（{len(files)} 条）...")
     with timed(f"run_generate_scripts（{len(files)} 个）"):
         completed = 0
         elapsed_total = 0.0
@@ -292,9 +312,13 @@ def run_generate_scripts(config: AppConfig) -> None:
             out = config.scripts_dir / f"{json_file.stem}_voiceover.json"
             if config.analyze.skip_existing and out.exists():
                 print(f"[跳过] {out.name}")
+                if tracker:
+                    tracker.next(message=f"跳过 {json_file.stem}")
                 continue
 
             print(_eta_line("口播", i, len(files), json_file.stem, completed, elapsed_total))
+            if tracker:
+                tracker.next(message=f"生成口播 {json_file.stem}")
             t0 = time.monotonic()
             script = generate_voiceover(data, template, config)
             elapsed_total += time.monotonic() - t0
@@ -311,7 +335,7 @@ def run_generate_scripts(config: AppConfig) -> None:
             print(f"  -> {md_out.name}")
 
 
-def run_plan_vlog(config: AppConfig, day_label: str = "day1") -> None:
+def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressTracker | None = None) -> None:
     config.plans_dir.mkdir(parents=True, exist_ok=True)
 
     out_json = config.plans_dir / f"{day_label}_plan.json"
@@ -337,6 +361,8 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1") -> None:
         print("没有可用的分析结果，请先运行 analyze")
         return
 
+    if tracker:
+        tracker.update(phase="plan", total=1, current=0, message=f"生成 {day_label} 规划...")
     with timed(f"run_plan_vlog {day_label}（{len(clips)} 条）"):
         print(f"[规划] {day_label}，共 {len(clips)} 条素材")
         plan = plan_daily_vlog(clips, config, day_label)
@@ -483,6 +509,25 @@ def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:
     with timed("=== 4/4 烧录序号标注 ==="):
         run_label_videos(config)
     print("\n完成！输出目录:", config.paths.output_dir)
+
+
+def run_full_pipeline_tracked(config: AppConfig, day_label: str = "day1") -> None:
+    """带进度跟踪的全流水线（供 UI 后台线程调用）。"""
+    config.paths.output_dir.mkdir(parents=True, exist_ok=True)
+    tracker = ProgressTracker(config.paths.output_dir)
+    try:
+        with timed("=== 1/4 分析素材（含压缩） ==="):
+            run_analyze_all(config, tracker)
+        with timed("=== 2/4 生成口播文案 ==="):
+            run_generate_scripts(config, tracker)
+        with timed("=== 3/4 日 vlog 剪辑规划 ==="):
+            run_plan_vlog(config, day_label, tracker)
+        with timed("=== 4/4 烧录序号标注 ==="):
+            run_label_videos(config, tracker)
+        tracker.done(f"完成！输出目录: {config.paths.output_dir}")
+    except Exception as e:
+        tracker.error(str(e))
+        raise
 
 
 def run_cut_all(
