@@ -110,6 +110,8 @@ async function loadPlans() {
 function updateSidebarDay() {
   const el = document.querySelector('.project-item[data-entity="plan"] .muted');
   if (el) el.textContent = state.currentDay;
+  const badge = $('plan-badge');
+  if (badge) badge.textContent = state.currentDay;
 }
 
 async function loadVideos() {
@@ -392,47 +394,22 @@ function renderPlan() {
   if (!p) {
     pane.innerHTML = `
       <h3>日 vlog 规划</h3>
-      <label>日标签
-        <select id="plan-day-select">
-          ${state.availablePlans.map(dp =>
-            `<option value="${dp.day_label}" ${dp.day_label === state.currentDay ? 'selected' : ''}>${dp.day_label}</option>`
-          ).join('')}
-          <option value="__custom__">自定义...</option>
-        </select>
-      </label>
-      <p class="muted">当前标签「${escapeHtml(state.currentDay)}」没有对应的规划文件。</p>
-      <p class="hint">日标签用于区分多天拍摄，每个标签对应一个规划文件（如 day1_plan.json）。<br>
-      请先通过 CLI 运行 <code>python main.py plan --day ${escapeHtml(state.currentDay)}</code> 生成规划。</p>
+      <p class="muted">当前项目没有规划文件。</p>
+      <p class="hint">请先通过 CLI 运行 <code>python main.py plan</code> 生成规划。</p>
     `;
-    const daySelect = pane.querySelector('#plan-day-select');
-    if (daySelect) {
-      daySelect.onchange = async () => {
-        let day = daySelect.value;
-        if (day === '__custom__') {
-          day = prompt('输入新的日标签（例如 day2、paris_day1）:', state.currentDay);
-          if (!day || !day.trim()) return;
-          day = day.trim();
-        }
-        if (day === state.currentDay) return;
-        state.currentDay = day;
-        state.plan = null;
-        state.dirty = false;
-        updateSidebarDay();
-        await selectPlan();
-      };
-    }
     return;
   }
   pane.innerHTML = `
     <h3>日 vlog 元信息</h3>
+    ${state.availablePlans.length >= 2 ? `
     <label>日标签
       <select id="plan-day-select">
         ${state.availablePlans.map(dp =>
           `<option value="${dp.day_label}" ${dp.day_label === state.currentDay ? 'selected' : ''}>${dp.day_label}</option>`
         ).join('')}
-        <option value="__custom__">自定义...</option>
       </select>
     </label>
+    ` : ''}
     <label>主题 <input data-field="theme"></label>
     <label>开场提示 <textarea data-field="opening_tip" rows="2"></textarea></label>
     <label>收尾提示 <textarea data-field="ending_tip" rows="2"></textarea></label>
@@ -443,14 +420,9 @@ function renderPlan() {
   const daySelect = pane.querySelector('#plan-day-select');
   if (daySelect) {
     daySelect.onchange = async () => {
-      let day = daySelect.value;
-      if (day === '__custom__') {
-        day = prompt('输入新的日标签（例如 day2、paris_day1）:', state.currentDay);
-        if (!day || !day.trim()) return;
-        day = day.trim();
-      }
+      const day = daySelect.value;
       if (day === state.currentDay) return;
-      if (state.dirty && !confirm('切换日标签将丢弃当前修改，确定吗？')) return;
+      if (state.dirty && !confirm('切换日标签将丢弃当前修改，确定吗？')) { daySelect.value = state.currentDay; return; }
       state.currentDay = day;
       state.plan = null;
       state.dirty = false;
@@ -492,9 +464,12 @@ function renderPlan() {
 
 function renderCut() {
   const pane = $('tab-cut');
+  const planHint = state.plan
+    ? `基于规划: ${escapeHtml(state.currentDay)}`
+    : `<span class="err">暂无规划，请先运行 CLI <code>python main.py plan</code></span>`;
   pane.innerHTML = `
     <h3>裁剪设置</h3>
-    <label>日标签 <input id="cut-day" value="${escapeHtml(state.currentDay)}"></label>
+    <p class="hint">${planHint}</p>
     <label>视频来源
       <select id="cut-source">
         <option value="compressed" selected>压缩版 (compressed)</option>
@@ -505,7 +480,7 @@ function renderCut() {
     <label>输出目录 (留空则 output/cuts/&lt;day&gt;)
       <input id="cut-outdir" placeholder="例如 E:/剪辑素材/第一天"></label>
     <hr>
-    <button id="btn-cut-exec" class="primary">执行裁剪</button>
+    <button id="btn-cut-exec" class="primary" ${state.plan ? '' : 'disabled'}>执行裁剪</button>
     <div id="cut-result" style="margin-top:12px"></div>
   `;
   $('btn-cut-exec').onclick = executeCut;
@@ -518,7 +493,7 @@ async function executeCut() {
   btn.textContent = '裁剪中...';
   result.innerHTML = '<p class="muted">请等待，正在裁剪视频片段...</p>';
   try {
-    const dayLabel = $('cut-day').value.trim() || state.currentDay;
+    const dayLabel = state.currentDay;
     // 先校验规划文件是否存在
     let planCheck;
     try { planCheck = await api('GET', `/api/plan?day=${dayLabel}`); }
@@ -668,6 +643,14 @@ async function init() {
   try {
     await loadConfig();
     await loadPlans();
+    // 自动选择第一个可用 plan（如果有）
+    if (state.availablePlans.length) {
+      state.currentDay = state.availablePlans[0].day_label;
+      updateSidebarDay();
+      // 预加载 plan 数据
+      try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); }
+      catch (e) { /* ignore */ }
+    }
     await loadVideos();
     if (state.videos.length) {
       await selectVideo(state.videos[0].file);
