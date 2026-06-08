@@ -12,6 +12,9 @@ const state = {
   voiceover: null,
   plan: null,
   dirty: false,
+  projectName: null,
+  projects: [],
+  currentProject: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -92,7 +95,41 @@ function updateSaveBtn() {
   btn.textContent = state.dirty ? '保存 (有改动)' : '保存';
 }
 
-async function loadConfig() {
+async function loadProjects() {
+  try {
+    const r = await api('GET', '/api/projects');
+    state.projects = r.projects || [];
+    // Find current project
+    state.currentProject = state.projects.find(p => p.is_current) || null;
+    renderProjectSelector();
+  } catch (e) {
+    state.projects = [];
+    state.currentProject = null;
+    renderProjectSelector();
+  }
+}
+
+function renderProjectSelector() {
+  const sel = $('project-select');
+  if (!sel) return;
+  const curName = state.currentProject?.name || state.projectName || '';
+  sel.innerHTML = state.projects.map(p =>
+    `<option value="${escapeHtml(p.name)}" ${p.name === curName ? 'selected' : ''}>${escapeHtml(p.name)} ${p.is_current ? ' (当前)' : ''}</option>`
+  ).join('');
+  if (state.projects.length === 0) {
+    sel.innerHTML = '<option value="">(无项目，请新建)</option>';
+  }
+  sel.onchange = async () => {
+    const name = sel.value;
+    if (!name || name === curName) return;
+    if (state.dirty && !confirm('切换项目将丢弃当前修改，确定吗？')) {
+      sel.value = curName;
+      return;
+    }
+    // 通过 URL 参数切换项目，页面重载
+    window.location.search = `?project=${encodeURIComponent(name)}`;
+  };
+}
   state.config = await api('GET', '/api/config');
   $('proj-name').textContent = state.config.output_dir;
   $('proj-name').title = `input: ${state.config.input_dir}\noutput: ${state.config.output_dir}`;
@@ -184,6 +221,17 @@ async function saveProject(extra) {
 function renderVideoList() {
   const ul = $('video-list');
   ul.innerHTML = '';
+  if (!state.videos.length) {
+    ul.innerHTML = `
+      <li class="empty-state">
+        <span class="icon">📁</span>
+        <h4>暂无视频素材</h4>
+        <p>请将视频文件（.mp4/.mov/.mkv等）放入素材目录</p>
+        <p class="hint">素材目录: ${state.config?.input_dir || '未知'}</p>
+      </li>
+    `;
+    return;
+  }
   for (const v of state.videos) {
     const li = document.createElement('li');
     li.className = 'video-item';
@@ -847,7 +895,19 @@ async function save() {
 }
 
 async function init() {
+  // 从 URL 读取 project 参数
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlProject = urlParams.get('project');
+  if (urlProject) {
+    // 重载页面时带上 project 参数
+  }
+
   try {
+    await loadProjects();
+    // 如果 URL 指定了项目，但当前不是该项目，需要重载
+    if (urlProject && (!state.currentProject || state.currentProject.name !== urlProject)) {
+      // 页面会自动重载，因为切换时会设置 URL 参数
+    }
     await loadConfig();
     await loadProject();
     renderSteps();
@@ -866,6 +926,7 @@ async function init() {
       await selectVideo(state.videos[0].file);
     } else {
       setStatus('output_dir 下没有视频文件', 'warn');
+      renderVideoList(); // 显示空状态
     }
   } catch (e) {
     setStatus('初始化失败: ' + e.message, 'err');
@@ -924,6 +985,29 @@ async function init() {
   window.addEventListener('beforeunload', (e) => {
     if (state.dirty) { e.preventDefault(); e.returnValue = '有未保存的修改'; }
   });
+
+  // New project modal
+  const modal = $('modal-new-project');
+  $('btn-new-project').onclick = () => { modal.style.display = 'flex'; };
+  $('np-cancel').onclick = () => { modal.style.display = 'none'; };
+  modal.querySelector('.modal-backdrop').onclick = () => { modal.style.display = 'none'; };
+  $('np-create').onclick = async () => {
+    const name = $('np-name').value.trim();
+    const inputDir = $('np-input-dir').value.trim();
+    if (!name || !inputDir) { setStatus('请填写项目名称和素材目录', 'warn'); return; }
+    try {
+      const r = await api('POST', '/api/project/create', { name, input_dir: inputDir });
+      if (r.ok) {
+        modal.style.display = 'none';
+        // 重载页面到新项目
+        window.location.search = `?project=${encodeURIComponent(name)}`;
+      } else {
+        setStatus('创建失败: ' + (r.error || '未知错误'), 'err');
+      }
+    } catch (e) {
+      setStatus('创建失败: ' + e.message, 'err');
+    }
+  };
 }
 
 init();

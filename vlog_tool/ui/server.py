@@ -139,7 +139,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         "lastVideo": None,
     }
 
-    def _detect_steps() -> dict:
+    def _detect_steps(output_dir: Path) -> dict:
         """从文件系统推断各 pipeline 步骤是否已完成。"""
         steps = {}
         comp = output_dir / "compressed"
@@ -152,6 +152,34 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         steps["label"] = (output_dir / "labeled").is_dir() and any((output_dir / "labeled").iterdir())
         steps["cut"] = (output_dir / "cuts").is_dir() and any((output_dir / "cuts").iterdir())
         return steps
+
+    def _list_projects() -> list[dict]:
+        """列出所有可用项目（project.json 所在的目录）。"""
+        projects_root = output_dir.parent
+        projects = []
+        if projects_root.is_dir():
+            for p in sorted(projects_root.iterdir()):
+                if p.is_dir():
+                    proj_file = p / "project.json"
+                    if proj_file.is_file():
+                        try:
+                            data = json.loads(proj_file.read_text(encoding="utf-8"))
+                        except (json.JSONDecodeError, OSError):
+                            data = {}
+                        name = data.get("name") or p.name
+                        input_dir = data.get("input_dir") or str(config.paths.input_dir)
+                        projects.append({
+                            "name": name,
+                            "output_dir": str(p),
+                            "input_dir": input_dir,
+                            "currentDay": data.get("currentDay", "day1"),
+                            "source": data.get("source", "compressed"),
+                            "steps": _detect_steps(p),
+                            "createdAt": data.get("createdAt"),
+                            "updatedAt": data.get("updatedAt"),
+                            "is_current": p == output_dir,
+                        })
+        return projects
 
     class Handler(BaseHTTPRequestHandler):
         # 共享状态（类级别，跨实例）
@@ -194,6 +222,28 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             elif target.suffix == ".html":
                 ct = "text/html; charset=utf-8"
             self._send_bytes(target.read_bytes(), ct)
+
+        def _resolve_project_dir(self, qs: dict) -> Path:
+            """从查询参数解析项目目录，默认使用当前 output_dir。"""
+            project_name = qs.get("project", [None])[0]
+            if not project_name:
+                return output_dir
+            projects_root = output_dir.parent
+            # 遍历子目录，读取 project.json 匹配 name
+            if projects_root.is_dir():
+                for p in projects_root.iterdir():
+                    if not p.is_dir():
+                        continue
+                    proj_file = p / "project.json"
+                    if not proj_file.is_file():
+                        continue
+                    try:
+                        data = json.loads(proj_file.read_text(encoding="utf-8"))
+                    except (json.JSONDecodeError, OSError):
+                        continue
+                    if data.get("name") == project_name:
+                        return p
+            return output_dir
 
         def _send_video_range(self, path: Path) -> None:
             try:
@@ -271,15 +321,16 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_static(rel)
 
             if path == "/api/config":
-                comp = output_dir / "compressed"
-                texts = _find_texts_dirs(output_dir)
+                proj_dir = self._resolve_project_dir(qs)
+                comp = proj_dir / "compressed"
+                texts = _find_texts_dirs(proj_dir)
                 return self._send_json({
-                    "input_dir": str(input_dir),
-                    "output_dir": str(output_dir),
+                    "input_dir": str(input_dir),  # input_dir is shared for now
+                    "output_dir": str(proj_dir),
                     "compressed_dir": str(comp),
                     "texts_dirs": [str(d) for d in texts],
-                    "scripts_dir": str(output_dir / "scripts"),
-                    "plans_dir": str(output_dir / "plans"),
+                    "scripts_dir": str(proj_dir / "scripts"),
+                    "plans_dir": str(proj_dir / "plans"),
                 })
 
             if path == "/api/config/raw":
@@ -290,33 +341,39 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_json(raw)
 
             if path == "/api/project":
+                proj_dir = self._resolve_project_dir(qs)
+                proj_file = proj_dir / "project.json"
                 data = {}
-                if project_path.is_file():
+                if proj_file.is_file():
                     try:
-                        data = json.loads(project_path.read_text(encoding="utf-8"))
+                        data = json.loads(proj_file.read_text(encoding="utf-8"))
                     except (json.JSONDecodeError, OSError):
                         data = {}
                 merged = {**DEFAULT_PROJECT, **data}
-                merged["steps"] = _detect_steps()
+                merged["steps"] = _detect_steps(proj_dir)
                 return self._send_json(merged)
 
+            if path == "/api/projects":
+                return self._send_json({"projects": _list_projects()})
+
             if path == "/api/videos":
+                proj_dir = self._resolve_project_dir(qs)
                 source = qs.get("source", ["compressed"])[0]
                 if source not in ("compressed", "original"):
                     return self._send_json(
                         {"ok": False, "error": "source must be compressed|original"}, 400
                     )
-                comp_dir = output_dir / "compressed"
+                comp_dir = proj_dir / "compressed"
                 # texts/scripts sidecars are keyed by the compressed index in both views
                 text_sidecars: dict[str, list[str]] = {}
-                for td in _find_texts_dirs(output_dir):
+                for td in _find_texts_dirs(proj_dir):
                     for f in td.iterdir():
                         if f.suffix != ".json" or "_" not in f.stem:
                             continue
                         idx = f.stem.split("_", 1)[0]
                         text_sidecars.setdefault(idx, []).append(f.name)
                 script_sidecars: dict[str, list[str]] = {}
-                sd = output_dir / "scripts"
+                sd = proj_dir / "scripts"
                 if sd.is_dir():
                     for f in sd.iterdir():
                         if f.suffix != ".json" or "_" not in f.stem:
@@ -361,6 +418,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_json({"videos": videos, "source": source})
 
             if path == "/api/video":
+                proj_dir = self._resolve_project_dir(qs)
                 fname = qs.get("file", [""])[0]
                 source = qs.get("source", ["compressed"])[0]
                 if not _is_safe_basename(fname):
@@ -368,7 +426,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 if source == "original":
                     vp = input_dir / fname
                 else:
-                    vp = output_dir / "compressed" / fname
+                    vp = proj_dir / "compressed" / fname
                 if not vp.is_file() or vp.suffix.lower() not in VIDEO_EXTS:
                     return self.send_error(HTTPStatus.NOT_FOUND)
                 return self._send_video_range(vp)
@@ -388,7 +446,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_bytes(p.read_bytes(), "application/json; charset=utf-8")
 
             if path == "/api/plans":
-                plans_dir = output_dir / "plans"
+                proj_dir = self._resolve_project_dir(qs)
+                plans_dir = proj_dir / "plans"
                 plans = []
                 if plans_dir.is_dir():
                     for p in sorted(plans_dir.glob("*_plan.json")):
@@ -461,11 +520,20 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
             if path == "/api/project":
                 import datetime
-                merged = {**DEFAULT_PROJECT, **obj}
+                proj_dir = self._resolve_project_dir(qs)
+                proj_file = proj_dir / "project.json"
+                data = {}
+                if proj_file.is_file():
+                    try:
+                        data = json.loads(proj_file.read_text(encoding="utf-8"))
+                    except (json.JSONDecodeError, OSError):
+                        data = {}
+                merged = {**DEFAULT_PROJECT, **data, **obj}
                 merged["updatedAt"] = datetime.datetime.now().isoformat(timespec="seconds")
-                if not project_path.is_file():
+                if not proj_file.is_file():
                     merged["createdAt"] = merged["updatedAt"]
-                project_path.write_text(
+                proj_dir.mkdir(parents=True, exist_ok=True)
+                proj_file.write_text(
                     json.dumps(merged, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
@@ -555,6 +623,47 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     "output_dir": actual_out,
                     "day_label": day_label,
                 })
+
+            if path == "/api/project/create":
+                import datetime
+                name = (obj.get("name") or "").strip()
+                input_dir_raw = (obj.get("input_dir") or "").strip()
+                if not name:
+                    return self._send_json({"ok": False, "error": "name is required"}, 400)
+                if not input_dir_raw:
+                    return self._send_json({"ok": False, "error": "input_dir is required"}, 400)
+                input_path = Path(input_dir_raw)
+                if not input_path.is_dir():
+                    return self._send_json({"ok": False, "error": f"input_dir not found: {input_dir_raw}"}, 400)
+                # 生成安全的目录名
+                safe_name = re.sub(r"[^a-zA-Z0-9_\-\u4e00-\u9fff]", "_", name)
+                projects_root = output_dir.parent
+                proj_dir = projects_root / safe_name
+                # 如果同名目录已存在，加后缀
+                i = 1
+                orig_name = safe_name
+                while proj_dir.is_dir():
+                    safe_name = f"{orig_name}_{i}"
+                    proj_dir = projects_root / safe_name
+                    i += 1
+                proj_dir.mkdir(parents=True, exist_ok=True)
+                now = datetime.datetime.now().isoformat(timespec="seconds")
+                proj_data = {
+                    "name": name,
+                    "input_dir": str(input_path),
+                    "currentDay": "day1",
+                    "source": "compressed",
+                    "lastEntity": None,
+                    "lastVideo": None,
+                    "createdAt": now,
+                    "updatedAt": now,
+                }
+                proj_file = proj_dir / "project.json"
+                proj_file.write_text(
+                    json.dumps(proj_data, ensure_ascii=False, indent=2),
+                    encoding="utf-8",
+                )
+                return self._send_json({"ok": True, "project": {"name": name, "output_dir": str(proj_dir), "input_dir": str(input_path)}})
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 

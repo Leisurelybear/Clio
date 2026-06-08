@@ -102,12 +102,15 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - UI 顶部/侧栏显示当前项目名，可点击切换
 - 切换后刷新视频列表 + 编辑内容（texts / scripts / plan 全部切到新项目的文件）
 - 无需重启服务
+- 新项目可在 UI 中创建：输入项目名 + 素材目录 → 自动建项目目录、生成 project.json → 刷新切换
+- 空项目引导：视频列表为空时显示空状态 + 素材目录路径提示
 
 **子任务**：
-- [ ] R-007a：设计"项目"在 config 中的表示方式（列表？目录发现？`projects: [...]`？）
-- [ ] R-007b：后端提供项目列表 + 切换端点
-- [ ] R-007c：前端切换交互
-- [ ] R-007d：文档 / 迁移指南
+- [x] R-007a：后端 `/api/projects` 列出所有 `project.json` 所在目录（含 steps 检测）  ← `THIS_COMMIT`
+- [x] R-007b：后端 `/api/project/create` 新建项目（目录名安全化 + project.json 初始化）  ← `THIS_COMMIT`
+- [x] R-007c：侧栏项目选择器（下拉框）+ 新建项目模态框  ← `THIS_COMMIT`
+- [x] R-007d：URL `?project=name` 切换项目，页面重载自动加载新项目数据  ← `THIS_COMMIT`
+- [x] R-007e：空视频列表空状态引导（显示素材目录路径）  ← `THIS_COMMIT`
 
 ## 需求 R-008：UI 单步执行 + 文件夹/文件选择
 

@@ -292,3 +292,44 @@ aside, section { overflow-y: auto; }
 ::-webkit-scrollbar-track { background: #1a1a1a; }
 ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* project selector */
+#project-selector { display: flex; gap: 6px; padding: 0 4px; }
+#project-selector select, .sidebar-select {
+  flex: 1; background: #1a1a1a; color: #ddd; border: 1px solid #444;
+  padding: 5px 7px; border-radius: 2px; font: inherit; font-size: 0.9em;
+}
+.sidebar-btn {
+  background: #2a2a2a; color: #ddd; border: 1px solid #444;
+  padding: 5px 10px; border-radius: 2px; font: inherit; font-size: 0.9em; cursor: pointer;
+}
+.sidebar-btn:hover { background: #3a3a3a; }
+
+/* modal */
+.modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.7); }
+.modal-dialog {
+  position: relative; background: #1e1e1e; border: 1px solid #444; border-radius: 4px;
+  padding: 20px 24px; min-width: 360px; max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+.modal-dialog h3 { margin: 0 0 16px; color: #fff; }
+.modal-dialog label { display: block; margin-bottom: 12px; }
+.modal-dialog label span { display: block; margin-bottom: 4px; font-size: 0.9em; color: #aaa; }
+.modal-dialog input[type="text"] {
+  width: 100%; background: #1a1a1a; color: #ddd; border: 1px solid #444;
+  padding: 8px 10px; border-radius: 2px; font: inherit;
+}
+.modal-dialog .hint { margin: 8px 0 16px; font-size: 0.85em; color: #666; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.modal-actions button { padding: 8px 16px; border-radius: 2px; font: inherit; cursor: pointer; }
+.modal-actions .secondary { background: #2a2a2a; color: #ddd; border: 1px solid #444; }
+.modal-actions .secondary:hover { background: #3a3a3a; }
+.modal-actions .primary { background: #4a9eff; color: #fff; border: none; }
+.modal-actions .primary:hover { background: #3a8eef; }
+
+/* empty state */
+.empty-state { padding: 40px 20px; text-align: center; color: #666; }
+.empty-state .icon { font-size: 2.5em; margin-bottom: 12px; display: block; }
+.empty-state h4 { margin: 0 0 8px; color: #999; }
+.empty-state p { margin: 4px 0; font-size: 0.9em; }
