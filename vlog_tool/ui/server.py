@@ -25,6 +25,7 @@ from urllib.parse import parse_qs, urlparse
 import yaml
 
 from vlog_tool.config import AppConfig
+from vlog_tool.pipeline import run_cut_all
 
 STATIC_DIR = Path(__file__).parent / "static"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm"}
@@ -425,6 +426,49 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 data = json.dumps(obj, ensure_ascii=False, indent=2).encode("utf-8")
                 _save_atomic(p, data)
                 return self._send_json({"ok": True, "path": str(p)})
+
+            return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
+
+        def do_POST(self):
+            url = urlparse(self.path)
+            path = url.path
+            length = int(self.headers.get("Content-Length", 0))
+            raw = self.rfile.read(length) if length else b""
+            try:
+                obj = json.loads(raw.decode("utf-8"))
+                if not isinstance(obj, dict):
+                    raise ValueError("expected a JSON object")
+            except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
+                return self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, 400)
+
+            if path == "/api/cut":
+                day_label = obj.get("day_label", "day1")
+                source = obj.get("source", "compressed")
+                reencode = obj.get("reencode", False)
+                out_dir_raw = obj.get("output_dir", None)
+
+                if source not in ("compressed", "original"):
+                    return self._send_json({"ok": False, "error": "source must be compressed|original"}, 400)
+
+                out_path = Path(out_dir_raw) if out_dir_raw else None
+
+                try:
+                    run_cut_all(
+                        config,
+                        day_label=day_label,
+                        output_dir=out_path,
+                        reencode=bool(reencode),
+                        source=source,
+                    )
+                except Exception as e:
+                    return self._send_json({"ok": False, "error": str(e)}, 500)
+
+                actual_out = str(out_path or (output_dir / "cuts" / day_label))
+                return self._send_json({
+                    "ok": True,
+                    "output_dir": actual_out,
+                    "day_label": day_label,
+                })
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
