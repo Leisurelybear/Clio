@@ -350,6 +350,16 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     return self.send_error(HTTPStatus.NOT_FOUND)
                 return self._send_bytes(p.read_bytes(), "application/json; charset=utf-8")
 
+            if path == "/api/plans":
+                plans_dir = output_dir / "plans"
+                plans = []
+                if plans_dir.is_dir():
+                    for p in sorted(plans_dir.glob("*_plan.json")):
+                        day_label = p.stem.replace("_plan", "")
+                        if day_label:
+                            plans.append({"day_label": day_label, "path": str(p)})
+                return self._send_json({"plans": plans})
+
             if path == "/api/plan":
                 day = qs.get("day", [""])[0]
                 if not _is_safe_basename(day) or not day:

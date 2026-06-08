@@ -5,6 +5,8 @@ const state = {
   videos: [],
   currentEntity: 'video',  // 'video' | 'plan' | 'cut' | 'config'
   currentVideo: null,
+  currentDay: 'day1',
+  availablePlans: [],
   currentTab: 'texts',
   texts: null,
   voiceover: null,
@@ -96,6 +98,20 @@ async function loadConfig() {
   $('proj-name').title = `input: ${state.config.input_dir}\noutput: ${state.config.output_dir}`;
 }
 
+async function loadPlans() {
+  try {
+    const r = await api('GET', '/api/plans');
+    state.availablePlans = r.plans || [];
+  } catch (e) {
+    state.availablePlans = [];
+  }
+}
+
+function updateSidebarDay() {
+  const el = document.querySelector('.project-item[data-entity="plan"] .muted');
+  if (el) el.textContent = state.currentDay;
+}
+
 async function loadVideos() {
   const r = await api('GET', `/api/videos?source=${state.source}`);
   state.videos = r.videos;
@@ -161,7 +177,7 @@ async function selectVideo(file) {
     } catch (e) { setStatus('voiceover 加载失败: ' + e.message, 'err'); }
   }
   if (!state.plan) {
-    try { state.plan = await api('GET', '/api/plan?day=day1'); }
+    try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); }
     catch (e) { /* plan 可选, 加载失败不报错 */ }
   }
 
@@ -170,16 +186,18 @@ async function selectVideo(file) {
   updateEntityUI();
 }
 
-async function selectPlan() {
+async function selectPlan(dayOverride) {
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换到规划吗？')) return;
   }
   state.currentEntity = 'plan';
   state.dirty = false;
+  if (dayOverride) state.currentDay = dayOverride;
   if (!state.plan) {
-    try { state.plan = await api('GET', '/api/plan?day=day1'); }
+    try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); }
     catch (e) { state.plan = null; }
   }
+  updateSidebarDay();
   updateEntityUI();
   renderActiveTab();
 }
@@ -372,11 +390,19 @@ function renderPlan() {
   const p = state.plan;
   const pane = $('tab-plan');
   if (!p) {
-    pane.innerHTML = '<p class="muted">没有找到 day1_plan.json</p>';
+    pane.innerHTML = '<p class="muted">没有找到规划文件</p>';
     return;
   }
   pane.innerHTML = `
     <h3>日 vlog 元信息</h3>
+    <label>日标签
+      <select id="plan-day-select">
+        ${state.availablePlans.map(dp =>
+          `<option value="${dp.day_label}" ${dp.day_label === state.currentDay ? 'selected' : ''}>${dp.day_label}</option>`
+        ).join('')}
+        <option value="__custom__">自定义...</option>
+      </select>
+    </label>
     <label>主题 <input data-field="theme"></label>
     <label>开场提示 <textarea data-field="opening_tip" rows="2"></textarea></label>
     <label>收尾提示 <textarea data-field="ending_tip" rows="2"></textarea></label>
@@ -384,6 +410,24 @@ function renderPlan() {
     <p class="hint">点击 segment 跳到对应视频</p>
     <ol id="plan-list"></ol>
   `;
+  const daySelect = pane.querySelector('#plan-day-select');
+  if (daySelect) {
+    daySelect.onchange = async () => {
+      let day = daySelect.value;
+      if (day === '__custom__') {
+        day = prompt('输入新的日标签（例如 day2、paris_day1）:', state.currentDay);
+        if (!day || !day.trim()) return;
+        day = day.trim();
+      }
+      if (day === state.currentDay) return;
+      if (state.dirty && !confirm('切换日标签将丢弃当前修改，确定吗？')) return;
+      state.currentDay = day;
+      state.plan = null;
+      state.dirty = false;
+      updateSidebarDay();
+      await selectPlan();
+    };
+  }
   for (const k of ['theme', 'opening_tip', 'ending_tip']) {
     const el = pane.querySelector(`[data-field="${k}"]`);
     el.value = p[k] || '';
@@ -420,7 +464,7 @@ function renderCut() {
   const pane = $('tab-cut');
   pane.innerHTML = `
     <h3>裁剪设置</h3>
-    <label>日标签 <input id="cut-day" value="day1"></label>
+    <label>日标签 <input id="cut-day" value="${escapeHtml(state.currentDay)}"></label>
     <label>视频来源
       <select id="cut-source">
         <option value="compressed" selected>压缩版 (compressed)</option>
@@ -556,7 +600,7 @@ async function save() {
       return;
     }
     if (state.currentEntity === 'plan') {
-      const r = await api('PUT', '/api/plan?day=day1', state.plan);
+      const r = await api('PUT', `/api/plan?day=${state.currentDay}`, state.plan);
       if (!r.ok) throw new Error(r.error);
     } else {
       const tab = state.currentTab;
@@ -582,6 +626,7 @@ async function save() {
 async function init() {
   try {
     await loadConfig();
+    await loadPlans();
     await loadVideos();
     if (state.videos.length) {
       await selectVideo(state.videos[0].file);

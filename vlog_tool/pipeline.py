@@ -512,15 +512,27 @@ def run_cut_all(
     out_root = (output_dir or config.paths.output_dir / "cuts" / day_label).resolve()
     out_root.mkdir(parents=True, exist_ok=True)
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
-
-    if source == "compressed":
-        video_dir = config.compressed_dir
-    else:
-        video_dir = config.paths.input_dir
+    comp_dir = config.compressed_dir
+    input_dir = config.paths.input_dir
+    VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm"}
 
     print(f"[cut] 计划: {plan_path.name} ({len(seq)} 段)")
     print(f"[cut] 输出: {out_root}")
-    print(f"[cut] 视频来源: {source} ({video_dir})")
+    print(f"[cut] 视频来源: {source} ({comp_dir if source == 'compressed' else input_dir})")
+
+    def _resolve_video_path(idx: str) -> Path | None:
+        if source == "compressed":
+            candidates = sorted(comp_dir.glob(f"{idx}_*"))
+            return candidates[0] if candidates else None
+        else:
+            comp_candidates = sorted(comp_dir.glob(f"{idx}_*"))
+            if not comp_candidates:
+                return None
+            suffix = comp_candidates[0].stem.split("_", 1)[1].lower()
+            for p in input_dir.iterdir():
+                if p.is_file() and p.suffix.lower() in VIDEO_EXTS and p.stem.lower() == suffix:
+                    return p
+            return None
 
     clips: list[dict] = []
     completed = 0
@@ -535,11 +547,10 @@ def run_cut_all(
                 print(f"  [跳过] 第 {i} 段缺少 index 或 use_timeline")
                 continue
 
-            candidates = sorted(video_dir.glob(f"{idx}_*"))
-            if not candidates:
-                print(f"  [跳过] 找不到 index={idx} 的视频（{video_dir}）: {seg.get('title','')}")
+            video_path = _resolve_video_path(idx)
+            if video_path is None:
+                print(f"  [跳过] 找不到 index={idx} 的视频（{'compressed' if source == 'original' else 'video_dir'}）: {seg.get('title','')}")
                 continue
-            video_path = candidates[0]
 
             try:
                 start, end = parse_time_range(timeline)
