@@ -363,10 +363,10 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             if path == "/api/plan":
                 day = qs.get("day", [""])[0]
                 if not _is_safe_basename(day) or not day:
-                    return self.send_error(HTTPStatus.FORBIDDEN)
+                    return self._send_json({"error": "forbidden"}, 403)
                 p = output_dir / "plans" / f"{day}_plan.json"
                 if not p.is_file():
-                    return self.send_error(HTTPStatus.NOT_FOUND)
+                    return self._send_json({"error": f"规划文件不存在: {p}"}, 404)
                 return self._send_bytes(p.read_bytes(), "application/json; charset=utf-8")
 
             return self.send_error(HTTPStatus.NOT_FOUND)

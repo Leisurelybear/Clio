@@ -390,7 +390,37 @@ function renderPlan() {
   const p = state.plan;
   const pane = $('tab-plan');
   if (!p) {
-    pane.innerHTML = '<p class="muted">没有找到规划文件</p>';
+    pane.innerHTML = `
+      <h3>日 vlog 规划</h3>
+      <label>日标签
+        <select id="plan-day-select">
+          ${state.availablePlans.map(dp =>
+            `<option value="${dp.day_label}" ${dp.day_label === state.currentDay ? 'selected' : ''}>${dp.day_label}</option>`
+          ).join('')}
+          <option value="__custom__">自定义...</option>
+        </select>
+      </label>
+      <p class="muted">当前标签「${escapeHtml(state.currentDay)}」没有对应的规划文件。</p>
+      <p class="hint">日标签用于区分多天拍摄，每个标签对应一个规划文件（如 day1_plan.json）。<br>
+      请先通过 CLI 运行 <code>python main.py plan --day ${escapeHtml(state.currentDay)}</code> 生成规划。</p>
+    `;
+    const daySelect = pane.querySelector('#plan-day-select');
+    if (daySelect) {
+      daySelect.onchange = async () => {
+        let day = daySelect.value;
+        if (day === '__custom__') {
+          day = prompt('输入新的日标签（例如 day2、paris_day1）:', state.currentDay);
+          if (!day || !day.trim()) return;
+          day = day.trim();
+        }
+        if (day === state.currentDay) return;
+        state.currentDay = day;
+        state.plan = null;
+        state.dirty = false;
+        updateSidebarDay();
+        await selectPlan();
+      };
+    }
     return;
   }
   pane.innerHTML = `
@@ -488,8 +518,19 @@ async function executeCut() {
   btn.textContent = '裁剪中...';
   result.innerHTML = '<p class="muted">请等待，正在裁剪视频片段...</p>';
   try {
+    const dayLabel = $('cut-day').value.trim() || state.currentDay;
+    // 先校验规划文件是否存在
+    let planCheck;
+    try { planCheck = await api('GET', `/api/plan?day=${dayLabel}`); }
+    catch (e) {
+      result.innerHTML = `<p class="err">规划文件不存在: 请先运行 CLI 命令 <code>python main.py plan --day ${escapeHtml(dayLabel)}</code> 生成规划。</p>`;
+      setStatus('裁剪失败: 规划文件不存在', 'err');
+      btn.disabled = false;
+      btn.textContent = '执行裁剪';
+      return;
+    }
     const r = await api('POST', '/api/cut', {
-      day_label: $('cut-day').value.trim() || 'day1',
+      day_label: dayLabel,
       source: $('cut-source').value,
       reencode: $('cut-reencode').checked,
       output_dir: $('cut-outdir').value.trim() || null,

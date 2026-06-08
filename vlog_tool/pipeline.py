@@ -567,13 +567,20 @@ def run_cut_all(
             elapsed_total += time.monotonic() - t0
             completed += 1
 
-            # 复制对应的 texts JSON（如果存在）
+            # 复制对应的 texts JSON，附加 _cut_info 标明片段来源
             text_json = None
             matching_texts = sorted(config.texts_dir.glob(f"{idx}_*.json"))
             if matching_texts:
                 src = matching_texts[0]
+                data = json.loads(src.read_text(encoding="utf-8"))
+                data["_cut_info"] = {
+                    "seg_index": i,
+                    "timeline": timeline,
+                    "start_sec": round(start, 2),
+                    "end_sec": round(end, 2),
+                }
                 dst = out_root / f"{clip_stem}.json"
-                dst.write_bytes(src.read_bytes())
+                dst.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
                 text_json = dst.name
                 print(f"  -> texts: {dst.name}")
 
