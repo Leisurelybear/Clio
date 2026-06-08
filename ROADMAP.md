@@ -263,7 +263,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | --- | --- |
 | `a93b5f5` | R-004 UI 配置编辑（后端 raw config API / 递归嵌套表单 / 校验 + .bak 保存 / 文档） |
 | `6706dc3` | R-002 CLI 裁剪（cut.py + run_cut_all + 子命令 + manifest.md + 文档） |
-| `f3fc932` | R-002 UI 裁剪（POST /api/cut + sidebar 裁剪 tab + cut 表单 + 进度提示） |
+| `f3fc932`..`2ad23f5` | R-002 UI 裁剪（POST /api/cut + sidebar 裁剪 tab + cut 表单 + 进度提示） |
 | `0d52cf6`..`439911c` | 本地 Web UI（拆 6 commit：backend / CLI / frontend / docs / plan-seek fix / AGENTS 同步） |
 | `88679ee` `f1d09ac` `ec83f48` | R-001 UI 源切换（后端双 source / 顶部 toggle + match 角标 / README 文档） |
 | `a648e60` `c42d347` `778c44a` | R-006 sidebar 分层（HTML+CSS / JS state machine / README 布局图） |
