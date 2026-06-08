@@ -12,6 +12,7 @@ from vlog_tool.log import setup_logging
 from vlog_tool.pipeline import (
     run_analyze_all,
     run_compress_all,
+    run_cut_all,
     run_full_pipeline,
     run_generate_scripts,
     run_label_videos,
@@ -141,6 +142,26 @@ def main(argv: list[str] | None = None) -> int:
     _add_io_args(p_run)
     p_run.add_argument("--day", default="day1", help="日 vlog 标签")
 
+    p_cut = sub.add_parser("cut", help="根据规划从视频中裁剪片段")
+    p_cut.add_argument("--day", default="day1", help="日 vlog 标签（默认 day1）")
+    p_cut.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        help="输出目录（默认 output/cuts/<day>/）",
+    )
+    p_cut.add_argument(
+        "--reencode",
+        action="store_true",
+        help="重新编码（默认 -c copy 快剪；启用则用 libx264 精确剪）",
+    )
+    p_cut.add_argument(
+        "--source",
+        choices=["compressed", "original"],
+        default="compressed",
+        help="视频来源（compressed: 从压缩版裁剪 / original: 从原片裁剪）",
+    )
+
     p_refine = sub.add_parser("refine", help="用 AI + trip 上下文 审阅并修正已有分析/口播")
     p_refine.add_argument(
         "--target", "-t",
@@ -221,6 +242,14 @@ def main(argv: list[str] | None = None) -> int:
             except ValueError as e:
                 print(f"错误: {e}", file=sys.stderr)
                 return 1
+        elif args.command == "cut":
+            run_cut_all(
+                config,
+                day_label=args.day,
+                output_dir=args.out_dir,
+                reencode=args.reencode,
+                source=args.source,
+            )
         elif args.command == "serve":
             return run_ui(
                 config,

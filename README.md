@@ -18,6 +18,7 @@
 | 4 | 按模板生成口播文案 | `scripts` |
 | 5 | 推荐单日 vlog 片段顺序 | `plan --day day1` |
 | 6 | 烧录序号便于剪映对照 | `label` |
+| 7 | 按规划裁剪视频片段 | `cut --day day1 -o ./my_clips` |
 | — | 一键全流程 | `run --day day1` |
 
 ---
@@ -204,6 +205,8 @@ output/
 ├── plans/
 │   ├── day1_plan.md     # 推荐剪辑顺序与时间轴
 │   └── day1_plan.json
+├── cuts/
+│   └── day1/            # 裁剪出来的片段 + manifest.md
 └── summary.csv          # 所有素材总览表
 ```
 
@@ -221,7 +224,9 @@ output/
     │
     ├──► plan ────► 日 vlog 剪辑方案（选哪些片段、什么顺序）
     │
-    └──► label ───► 带序号的预览视频（剪映对照用）
+    ├──► label ───► 带序号的预览视频（剪映对照用）
+    │
+    ├──► cut ─────► 按 plan 裁剪出片段 + manifest.md
     │
     ▼
 用户在剪映中：按 plan 选片段 → 加特效 → 粘贴口播文案
@@ -339,6 +344,35 @@ python main.py label
 ```
 
 输出到 `output/<素材文件夹名>/labeled/<序号>_<标题>_labeled.mp4`。
+
+### `cut` — 按规划裁剪视频片段
+
+读取 `plans/<day>_plan.json`，按 `sequence[].use_timeline` 指定的时间范围，
+从对应压缩视频（或原片）中用 ffmpeg 裁剪出独立片段。
+
+```powershell
+# 默认输出到 output/cuts/day1/
+python main.py cut --day day1
+
+# 指定输出目录
+python main.py cut --day day1 --out-dir "E:/剪辑素材/第一天"
+
+# 从原片裁剪（而非压缩版）
+python main.py cut --day day1 --source original
+
+# 重新编码（默认 -c copy 几秒完成；启用则 h264 精确剪）
+python main.py cut --day day1 --reencode
+```
+
+| 参数 | 默认 | 说明 |
+|------|------|------|
+| `--day` | `day1` | 规划标签（对应 `plans/<day>_plan.json`） |
+| `--out-dir` | `output/cuts/<day>/` | 输出目录，用户可任意指定 |
+| `--source` | `compressed` | 视频来源：`compressed`（压缩版）或 `original`（原片） |
+| `--reencode` | — | h264 重新编码（默认 `-c copy` 快剪） |
+
+输出每个片段为 `<序号>_<标题>_seg_<编号>.mp4`，如果有对应的 `texts JSON` 也会复制到同目录。
+完成后生成 `manifest.md`（markdown 表格，含每个片段的信息）。
 
 ### `run` — 一键全流程
 

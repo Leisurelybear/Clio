@@ -177,14 +177,14 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - 完成时生成 `manifest.md`：每条 sequence 列出输出文件 / 时间范围 / 标题
 
 **子任务**：
-- [ ] R-002a：`vlog_tool/cut.py`：`cut_one(video, start, end, out, *, reencode=False)` 包装 ffmpeg
-- [ ] R-002b：`vlog_tool/cut.py`：`parse_time_range("00:00-00:20")` 复用 utils 已有逻辑
-- [ ] R-002c：`pipeline.py`：`run_cut_all(config, day, output_dir, reencode=False)` + 进度
-- [ ] R-002d：`main.py`：`cut` 子命令（`--day`, `--output`, `--reencode`）
-- [ ] R-002e：配套 texts JSON 复制到 `cuts/<day>/`（重命名 `001_xxx_seg_03.json`）
-- [ ] R-002f：进度走 `timed()` + `[i/N]` + ETA（与现有 pipeline 一致）
-- [ ] R-002g：生成 `manifest.md`（markdown 表格：# / 视频 / 时间 / 输出文件 / 标题）
-- [ ] R-002h：文档：`README.md` 加 `cut` 子命令
+- [x] R-002a：`vlog_tool/cut.py`：`cut_one(video, start, end, out, *, reencode=False)` 包装 ffmpeg
+- [x] R-002b：`vlog_tool/cut.py`：`parse_time_range("00:00-00:20")` 复用 utils 已有逻辑
+- [x] R-002c：`pipeline.py`：`run_cut_all(config, day, output_dir, reencode=False)` + 进度
+- [x] R-002d：`main.py`：`cut` 子命令（`--day`, `--output`, `--reencode`）
+- [x] R-002e：配套 texts JSON 复制到 `cuts/<day>/`（重命名 `001_xxx_seg_03.json`）
+- [x] R-002f：进度走 `timed()` + `[i/N]` + ETA（与现有 pipeline 一致）
+- [x] R-002g：生成 `manifest.md`（markdown 表格：# / 视频 / 时间 / 输出文件 / 标题）
+- [x] R-002h：文档：`README.md` 加 `cut` 子命令
 
 ## 需求 R-003：选择式 compress / analyze / refine
 
@@ -262,6 +262,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | Commit | 简述 |
 | --- | --- |
 | `a93b5f5` | R-004 UI 配置编辑（后端 raw config API / 递归嵌套表单 / 校验 + .bak 保存 / 文档） |
+| `56d39b2` | R-002 CLI 裁剪（cut.py + run_cut_all + 子命令 + manifest.md + 文档） |
 | `0d52cf6`..`439911c` | 本地 Web UI（拆 6 commit：backend / CLI / frontend / docs / plan-seek fix / AGENTS 同步） |
 | `88679ee` `f1d09ac` `ec83f48` | R-001 UI 源切换（后端双 source / 顶部 toggle + match 角标 / README 文档） |
 | `a648e60` `c42d347` `778c44a` | R-006 sidebar 分层（HTML+CSS / JS state machine / README 布局图） |
