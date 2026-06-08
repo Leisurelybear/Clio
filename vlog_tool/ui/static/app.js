@@ -110,8 +110,25 @@ async function loadPlans() {
 function updateSidebarDay() {
   const el = document.querySelector('.project-item[data-entity="plan"] .muted');
   if (el) el.textContent = state.currentDay;
-  const badge = $('plan-badge');
-  if (badge) badge.textContent = state.currentDay;
+  const sel = $('plan-day-select-sidebar');
+  if (!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = state.availablePlans.map(p =>
+    `<option value="${escapeHtml(p.day_label)}">${escapeHtml(p.day_label)}</option>`
+  ).join('');
+  sel.value = state.currentDay;
+  sel.onchange = async () => {
+    const day = sel.value;
+    if (day === state.currentDay) return;
+    if (state.dirty && !confirm('切换日标签将丢弃当前修改，确定吗？')) { sel.value = state.currentDay; return; }
+    state.currentDay = day;
+    state.dirty = false;
+    saveProject();
+    if (state.currentEntity === 'plan') {
+      state.plan = null;
+      await selectPlan();
+    }
+  };
 }
 
 async function loadVideos() {
@@ -592,6 +609,7 @@ async function executeCut() {
 }
 
 let _runPollTimer = null;
+let _lastRunDay = 'day1';
 
 const RUN_STEPS = [
   { key: 'analyze', label: '压缩 + AI 分析', hint: '将原片压缩为 640p，提交 Gemini 分析' },
@@ -633,16 +651,19 @@ async function startRun() {
     setStatus('请至少选择一个步骤', 'warn');
     return;
   }
+  _lastRunDay = $('run-day').value.trim() || state.currentDay;
+  if (_runPollTimer) clearInterval(_runPollTimer);
   btn.disabled = true;
   btn.textContent = '启动中...';
   try {
     const r = await api('POST', '/api/run/start', {
-      day_label: $('run-day').value.trim() || state.currentDay,
+      day_label: _lastRunDay,
       steps: checked,
     });
     if (r.ok) {
       setStatus(r.message || '流水线已启动', 'ok');
       prog.innerHTML = '<p class="muted">流水线已启动，等待进度...</p>';
+      _runPollTimer = setInterval(pollRunStatus, 2000);
     } else {
       throw new Error(r.error || '启动失败');
     }
@@ -680,21 +701,34 @@ async function pollRunStatus() {
         </div>
       `;
     } else if (s.status === 'done') {
+      _stopRunPoll();
       if (btn) { btn.disabled = false; btn.textContent = '▶ 运行选中步骤'; }
       prog.innerHTML = `<p class="ok">✓ 流水线完成</p><p>${escapeHtml(s.message || '')}</p>`;
       setStatus('流水线完成', 'ok');
-      renderSteps();
-      // 重新加载 plan 和 videos
+      state.currentDay = _lastRunDay;
       state.plan = null;
-      try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); } catch {}
+      await loadPlans();
+      updateSidebarDay();
+      renderSteps();
+      saveProject();
+      try { state.plan = await api('GET', `/api/plan?day=${_lastRunDay}`); } catch {}
       await loadVideos();
+      if (state.currentEntity === 'plan') selectPlan();
     } else if (s.status === 'error') {
+      _stopRunPoll();
       if (btn) { btn.disabled = false; btn.textContent = '▶ 运行选中步骤'; }
       prog.innerHTML = `<p class="err">✗ 流水线出错</p><p>${escapeHtml(s.message || '')}</p>`;
       setStatus('流水线出错', 'err');
     }
   } catch (e) {
     // poll error, ignore
+  }
+}
+
+function _stopRunPoll() {
+  if (_runPollTimer) {
+    clearInterval(_runPollTimer);
+    _runPollTimer = null;
   }
 }
 
@@ -842,12 +876,14 @@ async function init() {
   });
 
   $$('.project-item').forEach(p => {
-    p.onclick = () => {
+    p.onclick = (e) => {
       if (p.classList.contains('disabled')) {
         const name = p.querySelector('.name').textContent;
         setStatus(`「${name}」功能待对应 R-XXX 实现`, 'warn');
         return;
       }
+      // 点中 select 下拉框时不切换实体（由 select.onchange 处理）
+      if (e.target.tagName === 'SELECT') return;
       if (p.dataset.entity === 'plan') selectPlan();
       else if (p.dataset.entity === 'cut') selectCut();
       else if (p.dataset.entity === 'run') selectRun();

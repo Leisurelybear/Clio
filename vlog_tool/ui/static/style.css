@@ -72,6 +72,13 @@ aside, section { overflow-y: auto; }
 .project-item:hover { background: #2f2f2f; }
 .project-item.active { background: #094771; }
 .project-item.active .name { color: #fff; }
+.sidebar-day-select {
+  margin-left: auto; background: transparent; color: #ddd;
+  border: 1px solid #555; border-radius: 2px;
+  font-size: 0.8em; padding: 1px 3px; cursor: pointer;
+  max-width: 70px;
+}
+.sidebar-day-select:focus { outline: none; border-color: #4a9eff; }
 .project-item.disabled { opacity: 0.4; cursor: not-allowed; }
 .project-item.disabled:hover { background: transparent; }
 .project-item .icon { font-size: 1.05em; width: 1.2em; text-align: center; }
