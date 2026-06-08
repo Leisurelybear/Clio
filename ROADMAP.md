@@ -127,6 +127,40 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [ ] R-008d：跑完后自动刷新对应视图
 - [ ] R-008e：文档 + 侧栏「运行」入口启用
 
+> **F-001 建议**：外部分析建议 R-007（多项目切换）与 R-008（单步执行）合并为统一「项目管理 + 流水线」面板，用 `projects.json` 持久化项目列表。实现时可直接合并实施。
+
+## 需求 R-009：工程健壮性
+
+**背景**：当前项目在依赖管理、跨平台兼容、代码测试方面存在短板。
+固定依赖版本 + 补充 `setup.sh` + 为核心纯函数加单元测试。
+
+**验收**：
+- `requirements.txt` 锁定所有依赖版本（`pip freeze > requirements-locked.txt`）
+- 补充 Linux/macOS 的 `setup.sh`（与现有 `setup.ps1` 等效）
+- 核心纯函数（`utils.py` / `config.py` / `compress.py` 的纯函数部分）有单元测试覆盖
+- `main.py check` 对 venv 检测兼容 Linux `bin/` 和 Windows `Scripts/`
+
+**子任务**：
+- [ ] R-009a：锁依赖版本 + 迁移指南
+- [ ] R-009b：Linux `setup.sh`
+- [ ] R-009c：核心纯函数单元测试（pytest）
+- [ ] R-009d：venv 检测跨平台修复（B-007）
+
+## 需求 R-010：AI 输出质量
+
+**背景**：AI 分析结果偶尔有误（地点误判、时间轴不准、遗漏亮点），
+且用户无法干预 prompt 细节。支持外部 prompt 覆盖 + 置信度评分 + 多模型对比。
+
+**验收**：
+- 支持外部 prompt 文件覆盖系统默认 prompt（`templates/prompts/` 目录下同名文件）
+- analyze/texts 输出增加 `_confidence` 字段（AI 自评置信度）
+- CLI 支持对同一视频用多个模型分析并对比结果
+
+**子任务**：
+- [ ] R-010a：外部 prompt 文件覆盖机制
+- [ ] R-010b：置信度评分（修改 prompts 让 AI 输出 `_confidence`）
+- [ ] R-010c：多模型对比 CLI
+
 ## 需求 R-002：一键剪辑（从 plan 切出所有片段）
 
 **背景**：`plan.json` 的 `sequence[]` 已经给好了 `use_timeline` 范围，用户要在剪映里手动剪 →
@@ -179,6 +213,49 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 - `templates/trip_context_2.md`（蓝色旗子场景的小补丁）— 写好但未启用，启用时只需在
   `config.yaml` 把 `ai.context_file` 切到它
+
+## 已知问题（Bug Tracker）
+
+按优先级 P0（立即）→ P1（近期）→ P2（中期）→ P3（长期）排列。
+
+### P0 — 立即修复
+
+| ID | 问题 | 修复思路 |
+| --- | --- | --- |
+| B-001 | Gemini Files API 上传视频后未清理，耗尽配额 | `try/finally` 确保视频上传后请求删除 |
+| B-002 | with_retry 重试时重复上传同一视频 | 把上传移出重试逻辑，上传不重试 |
+| B-003 | 临时文件残留（中断时 .tmp 文件未被自动清理） | 改用 `tempfile.NamedTemporaryFile(delete=True)` 或 `try/finally` 清理 |
+
+### P1 — 近期
+
+| ID | 问题 | 修复思路 |
+| --- | --- | --- |
+| B-004 | ETA 估算偏低（成功项包含了失败项的时间） | 耗时统计移入 `finally` 块，只算成功项 |
+| B-007 | venv 跨平台检测只认 Windows `Scripts/`，Linux 是 `bin/` | 同时兼容 `bin/` 和 `Scripts/` |
+
+### P2 — 中期
+
+| ID | 问题 | 修复思路 |
+| --- | --- | --- |
+| B-005 | Linux 下 `sorted(Path.iterdir())` 顺序不保证（glob 也不保证顺序） | 显式 `sorted()` 后再匹配 |
+| B-008 | 函数隐式修改入参（如 `analyze_video` 等修改传入的 dict 字段） | 入参 `deepcopy()` 避免副作用 |
+| B-006 | （与 R-007/R-008 合并实施，参见 F-001） | — |
+
+### P3 — 长期
+
+| ID | 问题 | 修复思路 |
+| --- | --- | --- |
+| B-009 | AI 偶尔输出非纯 JSON，`extract_json` 解析失败 | 更精准提取合法 JSON（递归剥离 markdown） |
+| B-011 | 新用户 `python main.py check` 误判失败（提示不够友好） | 优化 check 步骤提示信息 |
+| B-010 | （待进一步确认） | — |
+
+## 性能优化
+
+| ID | 瓶颈 | 优化方案 | 优先级 |
+| --- | --- | --- | --- |
+| P-001 | `pipeline.py` 中视频压缩与 AI 分析串行执行，耗时久 | `ThreadPoolExecutor` 并行执行压缩 + AI 分析 | P2 |
+| P-002 | 重复调用 ffprobe 读取同一视频的 `duration_sec` / `size_mb` | 缓存已读取信息，复用结果 | P3 |
+| P-003 | `GET /api/videos` 每次遍历目录 I/O 开销大 | 加目录 mtime 缓存，复用未变更的扫描结果 | P3 |
 
 ## 已完成（最近，按时间倒序）
 

@@ -196,6 +196,11 @@ ai:
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
 另外 WIP 一个 `templates/trip_context_2.md`（蓝色旗子场景的小补丁），暂未启用。
 
+项目文档状态：
+- `ROADMAP.md` 当前跟踪：R-004（✓）/ R-005（进行中）/ R-001（✓）/ R-006（✓）/ R-007/ R-008/ R-009/ R-010 + Bug 跟踪（B-001~B-011）+ 性能优化（P-001~P-003）
+- 已知 Bug 按 P0~P3 优先级排列，P0 为立即修复（文件泄漏 / 重复上传 / 临时文件残留）
+- 外部分析建议 F-001（R-007+R-008 合并实施），已备注在 ROADMAP
+
 ## 8. Gotchas（踩过的坑）
 
 ### 8.1 ffmpeg filter 表达式里的逗号
@@ -231,6 +236,31 @@ ai:
 
 - 字段名虽然叫 `skip_existing`，实际是**所有 step 共享的跳过开关**
 - 不要新建一个 `scripts.skip_existing` —— 复用这一个
+
+### 8.7 Gemini Files API 上传未清理
+
+- `gemini.py` 中 `ensure_file_active` 上传视频到 File API 后，调用完成后**不会**请求删除文件
+- 多次 analyze 会累积大量文件，最终耗尽配额（每分钟/每天上传次数限制）
+- 修复：在 `finally` 块调用 `client.files.delete(name=file.name)` 确保清理
+- 注意：`with_retry` 不应包裹上传操作（否则重试时重复上传），上传成功后只重试 `wait` 和 `generate_content`
+
+### 8.8 临时文件残留
+
+- 项目中多处使用 `NamedTemporaryFile(delete=False)` 后忘记 `os.unlink`
+- `interrupt` / `KeyboardInterrupt` 时 .tmp 文件不会自动清理
+- 排查：检查 `server.py` / `utils.py` 中的临时文件用法，优先用 `delete=True` 或 `try/finally`
+
+### 8.9 函数副作用
+
+- `analyze_video` / `generate_voiceover` 等函数会修改传入的 dict 字段（如添加 `_file_path` 等标记）
+- 调用方如果复用了同一个 dict 会出现非预期的副作用
+- 修复：在修改前对入参做 `copy.deepcopy()`
+
+### 8.10 文件排序跨平台不一致
+
+- `Path.iterdir()` 在 Windows 上按文件系统顺序（近似创建时间），Linux 上不保证顺序
+- 这会导致 `index` 分配在不同系统上不一致
+- 修复：总是用 `sorted(Path.iterdir())` 保证统一顺序
 
 ## 9. 验证流程
 
