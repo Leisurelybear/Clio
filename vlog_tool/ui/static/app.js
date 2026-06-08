@@ -122,10 +122,10 @@ function updateSidebarDay() {
     if (day === state.currentDay) return;
     if (state.dirty && !confirm('切换日标签将丢弃当前修改，确定吗？')) { sel.value = state.currentDay; return; }
     state.currentDay = day;
+    state.plan = null;  // 总是清空，保证下次点 plan tab 时重新拉取
     state.dirty = false;
     saveProject();
     if (state.currentEntity === 'plan') {
-      state.plan = null;
       await selectPlan();
     }
   };
