@@ -593,13 +593,28 @@ async function executeCut() {
 
 let _runPollTimer = null;
 
+const RUN_STEPS = [
+  { key: 'analyze', label: '压缩 + AI 分析', hint: '将原片压缩为 640p，提交 Gemini 分析' },
+  { key: 'voiceover', label: '生成口播文案', hint: '基于分析结果生成每段的口播脚本' },
+  { key: 'plan', label: '日 vlog 规划', hint: '根据所有素材生成剪辑顺序和时间轴' },
+  { key: 'label', label: '烧录序号', hint: '在压缩视频左上角标上序号便于剪映对照' },
+];
+
 function renderRun() {
   const pane = $('tab-run');
+  const stepChecks = RUN_STEPS.map(s => `
+    <label class="run-step">
+      <input type="checkbox" class="run-step-cb" data-step="${s.key}" checked>
+      <span class="run-step-label">${s.label}</span>
+      <span class="run-step-hint">${s.hint}</span>
+    </label>
+  `).join('');
   pane.innerHTML = `
     <h3>运行流水线</h3>
-    <p class="hint">依次执行：压缩 → AI 分析 → 生成口播 → 日规划 → 烧录序号</p>
+    <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
     <label>日标签 <input id="run-day" value="${escapeHtml(state.currentDay)}"></label>
-    <button id="btn-run-start" class="primary">▶ 启动流水线</button>
+    <div class="run-step-list">${stepChecks}</div>
+    <button id="btn-run-start" class="primary">▶ 运行选中步骤</button>
     <div id="run-progress" style="margin-top:12px">
       <p class="muted">尚未运行</p>
     </div>
@@ -613,11 +628,17 @@ function renderRun() {
 async function startRun() {
   const btn = $('btn-run-start');
   const prog = $('run-progress');
+  const checked = [...document.querySelectorAll('.run-step-cb:checked')].map(cb => cb.dataset.step);
+  if (!checked.length) {
+    setStatus('请至少选择一个步骤', 'warn');
+    return;
+  }
   btn.disabled = true;
   btn.textContent = '启动中...';
   try {
     const r = await api('POST', '/api/run/start', {
       day_label: $('run-day').value.trim() || state.currentDay,
+      steps: checked,
     });
     if (r.ok) {
       setStatus(r.message || '流水线已启动', 'ok');
@@ -629,7 +650,7 @@ async function startRun() {
     prog.innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
     setStatus('启动失败: ' + e.message, 'err');
     btn.disabled = false;
-    btn.textContent = '▶ 启动流水线';
+    btn.textContent = '▶ 运行选中步骤';
   }
 }
 
@@ -640,7 +661,7 @@ async function pollRunStatus() {
   try {
     const s = await api('GET', '/api/run/status');
     if (s.status === 'idle' || s.status === 'unknown') {
-      if (btn) { btn.disabled = false; btn.textContent = '▶ 启动流水线'; }
+      if (btn) { btn.disabled = false; btn.textContent = '▶ 运行选中步骤'; }
       if (!s.running) {
         prog.innerHTML = '<p class="muted">尚未运行</p>';
       }
@@ -659,7 +680,7 @@ async function pollRunStatus() {
         </div>
       `;
     } else if (s.status === 'done') {
-      if (btn) { btn.disabled = false; btn.textContent = '▶ 启动流水线'; }
+      if (btn) { btn.disabled = false; btn.textContent = '▶ 运行选中步骤'; }
       prog.innerHTML = `<p class="ok">✓ 流水线完成</p><p>${escapeHtml(s.message || '')}</p>`;
       setStatus('流水线完成', 'ok');
       renderSteps();
@@ -668,7 +689,7 @@ async function pollRunStatus() {
       try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); } catch {}
       await loadVideos();
     } else if (s.status === 'error') {
-      if (btn) { btn.disabled = false; btn.textContent = '▶ 启动流水线'; }
+      if (btn) { btn.disabled = false; btn.textContent = '▶ 运行选中步骤'; }
       prog.innerHTML = `<p class="err">✗ 流水线出错</p><p>${escapeHtml(s.message || '')}</p>`;
       setStatus('流水线出错', 'err');
     }

@@ -25,7 +25,7 @@ from urllib.parse import parse_qs, urlparse
 import yaml
 
 from vlog_tool.config import AppConfig
-from vlog_tool.pipeline import run_cut_all, run_full_pipeline_tracked
+from vlog_tool.pipeline import run_cut_all, run_pipeline_steps
 
 STATIC_DIR = Path(__file__).parent / "static"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm"}
@@ -516,14 +516,16 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 if self._run_thread is not None and self._run_thread.is_alive():
                     return self._send_json({"ok": False, "error": "流水线正在运行中"}, 409)
                 day_label = obj.get("day_label", "day1")
+                steps = obj.get("steps")
                 def _run():
                     try:
-                        run_full_pipeline_tracked(config, day_label)
+                        run_pipeline_steps(config, day_label, steps)
                     except Exception:
-                        pass  # error already written to .progress.json by tracker
+                        pass
                 self._run_thread = threading.Thread(target=_run, daemon=True)
                 self._run_thread.start()
-                return self._send_json({"ok": True, "message": f"流水线已启动（{day_label}）"})
+                label = "+".join(steps) if steps else "全部"
+                return self._send_json({"ok": True, "message": f"流水线已启动（{label}）"})
 
             if path == "/api/cut":
                 day_label = obj.get("day_label", "day1")

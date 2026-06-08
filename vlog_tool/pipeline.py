@@ -511,19 +511,51 @@ def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:
     print("\n完成！输出目录:", config.paths.output_dir)
 
 
-def run_full_pipeline_tracked(config: AppConfig, day_label: str = "day1") -> None:
-    """带进度跟踪的全流水线（供 UI 后台线程调用）。"""
+_STEP_LABELS = {
+    "analyze": "分析素材（含压缩）",
+    "voiceover": "生成口播文案",
+    "plan": "日 vlog 剪辑规划",
+    "label": "烧录序号标注",
+}
+
+_STEP_FUNCS = {
+    "analyze": run_analyze_all,
+    "voiceover": run_generate_scripts,
+    "plan": run_plan_vlog,
+    "label": run_label_videos,
+}
+
+_STEP_DAY_ARG = {"plan"}
+
+
+def run_pipeline_steps(
+    config: AppConfig,
+    day_label: str = "day1",
+    steps: list[str] | None = None,
+    tracker: ProgressTracker | None = None,
+) -> None:
+    """运行指定步骤列表（可选的进度跟踪）。
+
+    steps 取值: analyze, voiceover, plan, label（默认全部）。
+    """
     config.paths.output_dir.mkdir(parents=True, exist_ok=True)
-    tracker = ProgressTracker(config.paths.output_dir)
+    if not steps:
+        steps = list(_STEP_FUNCS.keys())
+
+    if tracker is None:
+        tracker = ProgressTracker(config.paths.output_dir)
+
     try:
-        with timed("=== 1/4 分析素材（含压缩） ==="):
-            run_analyze_all(config, tracker)
-        with timed("=== 2/4 生成口播文案 ==="):
-            run_generate_scripts(config, tracker)
-        with timed("=== 3/4 日 vlog 剪辑规划 ==="):
-            run_plan_vlog(config, day_label, tracker)
-        with timed("=== 4/4 烧录序号标注 ==="):
-            run_label_videos(config, tracker)
+        for step in steps:
+            label = _STEP_LABELS.get(step, step)
+            if tracker:
+                tracker.update(phase=step, current=0, total=1, message=f"{label}...")
+            with timed(f"=== {label} ==="):
+                fn = _STEP_FUNCS[step]
+                if step in _STEP_DAY_ARG:
+                    fn(config, day_label, tracker)
+                else:
+                    fn(config, tracker)
         tracker.done(f"完成！输出目录: {config.paths.output_dir}")
     except Exception as e:
         tracker.error(str(e))

@@ -262,6 +262,25 @@ aside, section { overflow-y: auto; }
 #cut-result .err { color: #f44336; }
 #cut-result p { margin: 4px 0; word-break: break-all; }
 
+/* run pane step list */
+.run-step-list { margin: 12px 0; }
+.run-step {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  padding: 8px 10px;
+  margin-bottom: 4px;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.run-step:hover { background: #2a2a2a; }
+.run-step input[type="checkbox"] { width: auto !important; margin-top: 3px !important; }
+.run-step-label { font-weight: 500; color: #ddd; min-width: 110px; }
+.run-step-hint { font-size: 0.78em; color: #666; }
+#btn-run-start { width: 100%; padding: 10px; font-weight: 600; font-size: 1.05em; margin-top: 8px; }
+
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: #1a1a1a; }
 ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }

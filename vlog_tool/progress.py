@@ -76,7 +76,7 @@ class ProgressTracker:
             self._flush()
 
     def done(self, message: str = "") -> None:
-        self.update(phase="done", current=0, total=0, message=message or "完成", status="done", eta_sec=None)
+        self.update(phase="done", current=0, total=0, message=message or "完成", status="done")
 
     def error(self, message: str) -> None:
         self.update(status="error", message=message)

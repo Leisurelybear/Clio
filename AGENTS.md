@@ -191,13 +191,19 @@ ai:
 34. `fix(ui): plan segment click plays the video without switching entity`  ← plan/video 独立：playVideoSegment 不动 entity
 35. `fix(ui): source toggle in plan view does not switch entity`  ← setSource 分支：plan 时只刷新列表+清空 player，不调 selectVideo；renderActiveTab 同步刷新 plan 节点的 v.file
 36. `feat(ui): add config editor (R-004)`  ← 后端 raw config API + 校验 + .bak 保存；前端递归嵌套表单渲染 + 保存提示重启
+37. `feat(ui): add one-click cut from plan (R-002)`  ← cut CLI + cut API + UI cut tab
+38. `fix(cut): support per-day original source and plan day selection`  ← cut 双日修复
+39. `fix(ui): plan-not-found handling and segment _cut_info JSON`  ← cut 边角 case
+40. `feat(ui): add project metadata with persistent source/day state`  ← project.json
+41. `feat(ui): add pipeline runner with progress tracking (R-005)`  ← run tab + ProgressTracker + 后台线程
+42. `feat(ui): pipeline step selection and done() param fix`  ← R-005f checkbox 选步骤 + R-005g done() 修复
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
 另外 WIP 一个 `templates/trip_context_2.md`（蓝色旗子场景的小补丁），暂未启用。
 
 项目文档状态：
-- `ROADMAP.md` 当前跟踪：R-004（✓）/ R-005（进行中）/ R-001（✓）/ R-006（✓）/ R-007/ R-008/ R-009/ R-010 + Bug 跟踪（B-001~B-011）+ 性能优化（P-001~P-003）
+- `ROADMAP.md` 当前跟踪：R-004（✓）/ R-005（✓）/ R-001（✓）/ R-006（✓）/ R-007/ R-008/ R-009/ R-010 + Bug 跟踪（B-001~B-011）+ 性能优化（P-001~P-003）
 - 已知 Bug 按 P0~P3 优先级排列，P0 为立即修复（文件泄漏 / 重复上传 / 临时文件残留）
 - 外部分析建议 F-001（R-007+R-008 合并实施），已备注在 ROADMAP
 
