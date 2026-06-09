@@ -335,6 +335,18 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         # 共享状态（类级别，跨实例）
         _run_lock = threading.Lock()
         _run_thread: threading.Thread | None = None
+        _config_cache: dict[str, AppConfig] = {}
+
+        def _get_config(self, project_input: Path | None = None) -> AppConfig:
+            """返回项目专属配置（深合并 project.yaml 后的结果），缓存。"""
+            if project_input is None:
+                return config
+            key = str(project_input.resolve())
+            cache = self.__class__._config_cache
+            if key not in cache:
+                cache[key] = load_config(config_path, project_dir=project_input)
+            return cache[key]
+
         # 把 server 端日志通过 print 输出, 走 _TeeWriter 同步进 logs/
         def log_message(self, fmt, *args):
             print(f"  [serve] {self.address_string()} - {fmt % args}")
@@ -561,6 +573,16 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             if path == "/api/config/raw":
                 if not config_path or not config_path.is_file():
                     return self._send_json({"error": "config file not available"}, 500)
+                # 支持 ?project=X 读取项目专属配置
+                proj_input = self._resolve_project_input(qs)
+                if proj_input != input_dir:
+                    proj_yaml = proj_input / "project.yaml"
+                    if proj_yaml.is_file():
+                        with open(proj_yaml, "r", encoding="utf-8") as f:
+                            raw = yaml.safe_load(f) or {}
+                    else:
+                        raw = {}
+                    return self._send_json(raw)
                 with open(config_path, "r", encoding="utf-8") as f:
                     raw = yaml.safe_load(f) or {}
                 return self._send_json(raw)
@@ -727,6 +749,24 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             if path == "/api/config/raw":
                 if not config_path:
                     return self._send_json({"ok": False, "error": "config_path not available"}, 500)
+                # 支持 ?project=X 写入项目专属配置
+                proj_input = self._resolve_project_input(qs)
+                if proj_input != input_dir:
+                    target_path = proj_input / "project.yaml"
+                    try:
+                        yml = yaml.dump(obj, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
+                    except Exception as e:
+                        return self._send_json({"ok": False, "error": f"YAML 序列化失败: {e}"}, 400)
+                    # 通过加载合并配置来校验
+                    try:
+                        load_config(config_path, project_dir=proj_input)
+                    except Exception as e:
+                        return self._send_json({"ok": False, "error": f"配置校验失败: {e}"}, 400)
+                    _save_atomic(target_path, yml.encode("utf-8"))
+                    # 清除项目配置缓存，下次重新加载
+                    self.__class__._config_cache.pop(str(proj_input.resolve()), None)
+                    return self._send_json({"ok": True, "path": str(target_path)})
+                # 全局 config.yaml 写入（原有逻辑）
                 try:
                     with open(config_path, "r", encoding="utf-8") as f:
                         ref_raw = yaml.safe_load(f) or {}
@@ -807,6 +847,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
         def do_POST(self):
             url = urlparse(self.path)
+            qs = parse_qs(url.query)
             path = url.path
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length) if length else b""
@@ -822,9 +863,11 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     return self._send_json({"ok": False, "error": "流水线正在运行中"}, 409)
                 day_label = obj.get("day_label", "day1")
                 steps = obj.get("steps")
+                proj_input = self._resolve_project_input(qs)
+                cfg = self._get_config(proj_input)
                 def _run():
                     try:
-                        run_pipeline_steps(config, day_label, steps)
+                        run_pipeline_steps(cfg, day_label, steps)
                     except Exception:
                         pass
                 self._run_thread = threading.Thread(target=_run, daemon=True)
@@ -842,10 +885,12 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     return self._send_json({"ok": False, "error": "source must be compressed|original"}, 400)
 
                 out_path = Path(out_dir_raw) if out_dir_raw else None
+                proj_input = self._resolve_project_input(qs)
+                cfg = self._get_config(proj_input)
 
                 try:
                     run_cut_all(
-                        config,
+                        cfg,
                         day_label=day_label,
                         output_dir=out_path,
                         reencode=bool(reencode),

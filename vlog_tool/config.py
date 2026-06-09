@@ -177,18 +177,30 @@ def _parse_tasks(raw: dict) -> dict[str, TaskConfig]:
     return tasks
 
 
-def _load_context(ai_raw: dict, base: Path) -> str:
-    """加载 AI 上下文规范：可内联（ai.context），也可放文件（ai.context_file）。"""
+def _load_context(ai_raw: dict, base: Path, project_dir: Path | None = None) -> str:
+    """加载 AI 上下文规范。
+
+    优先级：
+    1. ai.context（内联文本）
+    2. ai.context_file 在 project_dir 下（如果指定了 project_dir）
+    3. ai.context_file 在 config.yaml 所在目录
+    """
     inline = (ai_raw.get("context") or "").strip()
     if inline:
         return inline
     file_ref = (ai_raw.get("context_file") or "").strip()
     if not file_ref:
         return ""
+    # 优先 project_dir（允许 project.yaml 覆盖后使用项目本地文件）
+    if project_dir is not None:
+        path = _path(file_ref, project_dir)
+        if path.is_file():
+            return path.read_text(encoding="utf-8").strip()
+    # 回退到 config.yaml 所在目录
     path = _path(file_ref, base)
-    if not path.is_file():
-        return ""
-    return path.read_text(encoding="utf-8").strip()
+    if path.is_file():
+        return path.read_text(encoding="utf-8").strip()
+    return ""
 
 
 def _legacy_ai_config(raw: dict) -> AIConfig:
@@ -234,13 +246,45 @@ def _validate_config(config: AppConfig) -> None:
             )
 
 
-def load_config(config_path: str | Path = "config.yaml") -> AppConfig:
+def deep_merge(base: dict, override: dict) -> dict:
+    """递归合并两个 dict：override 中的值覆盖 base 的同名 key。
+
+    对嵌套 dict 递归合并（不是替换），其它类型直接覆盖。
+    返回新 dict，不修改入参。
+    """
+    result = {}
+    for key in base:
+        if key in override:
+            if isinstance(base[key], dict) and isinstance(override[key], dict):
+                result[key] = deep_merge(base[key], override[key])
+            else:
+                result[key] = override[key]
+        else:
+            result[key] = base[key]
+    for key in override:
+        if key not in base:
+            result[key] = override[key]
+    return result
+
+
+def load_config(
+    config_path: str | Path = "config.yaml",
+    project_dir: Path | None = None,
+) -> AppConfig:
     config_file = Path(config_path).resolve()
     base = config_file.parent
     _load_dotenv(base)
 
     with config_file.open(encoding="utf-8") as f:
         raw: dict[str, Any] = yaml.safe_load(f) or {}
+
+    # Deep-merge project.yaml 中的配置（如果存在）
+    if project_dir is not None:
+        project_yaml = Path(project_dir).resolve() / "project.yaml"
+        if project_yaml.is_file():
+            with project_yaml.open(encoding="utf-8") as f:
+                project_raw: dict[str, Any] = yaml.safe_load(f) or {}
+            raw = deep_merge(raw, project_raw)
 
     paths_raw = raw.get("paths", {})
     ai_raw = raw.get("ai")
@@ -249,7 +293,7 @@ def load_config(config_path: str | Path = "config.yaml") -> AppConfig:
         ai = AIConfig(
             providers=_parse_providers(ai_raw.get("providers")),
             tasks=_parse_tasks(ai_raw.get("tasks")),
-            context=_load_context(ai_raw, base),
+            context=_load_context(ai_raw, base, project_dir=project_dir),
         )
     else:
         ai = _legacy_ai_config(raw)
