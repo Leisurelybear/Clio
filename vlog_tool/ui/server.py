@@ -757,11 +757,13 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                         yml = yaml.dump(obj, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
                     except Exception as e:
                         return self._send_json({"ok": False, "error": f"YAML 序列化失败: {e}"}, 400)
-                    # 通过加载合并配置来校验
+                    # 轻量校验：确保新内容是合法 YAML dict（完整合并在写入后由 _get_config 触发）
                     try:
-                        load_config(config_path, project_dir=proj_input)
+                        test = yaml.safe_load(yml)
+                        if not isinstance(test, dict):
+                            raise ValueError("配置必须是 YAML 对象（键值对）")
                     except Exception as e:
-                        return self._send_json({"ok": False, "error": f"配置校验失败: {e}"}, 400)
+                        return self._send_json({"ok": False, "error": f"配置格式错误: {e}"}, 400)
                     _save_atomic(target_path, yml.encode("utf-8"))
                     # 清除项目配置缓存，下次重新加载
                     self.__class__._config_cache.pop(str(proj_input.resolve()), None)

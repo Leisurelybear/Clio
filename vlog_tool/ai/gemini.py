@@ -61,17 +61,18 @@ class GeminiProvider:
 
     def analyze_video(self, video_path: str, prompt: str, model: str) -> str:
         # Upload once outside retry — B-002: avoid re-upload on transient errors
-        uploaded = self._client.files.upload(file=video_path)
-        uploaded = self._wait_for_file(uploaded)
-
-        def _do() -> str:
-            response = self._client.models.generate_content(
-                model=model,
-                contents=[uploaded, prompt],
-            )
-            return response.text or ""
-
+        uploaded = None
         try:
+            uploaded = self._client.files.upload(file=video_path)
+            uploaded = self._wait_for_file(uploaded)
+
+            def _do() -> str:
+                response = self._client.models.generate_content(
+                    model=model,
+                    contents=[uploaded, prompt],
+                )
+                return response.text or ""
+
             return with_retry(
                 _do,
                 attempts=3,
