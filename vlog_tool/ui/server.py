@@ -42,7 +42,7 @@ def _is_safe_basename(name: str) -> bool:
 
 def _find_texts_dirs(output_dir: Path) -> list[Path]:
     """返回所有 texts* 子目录 (texts, texts - 巴黎, ...)。"""
-    if not output_dir.is_dir():
+    if not output_dir or not output_dir.is_dir():
         return []
     return [d for d in output_dir.iterdir() if d.is_dir() and d.name.startswith("texts")]
 
@@ -373,27 +373,87 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 ct = "text/html; charset=utf-8"
             self._send_bytes(target.read_bytes(), ct)
 
-        def _resolve_project_dir(self, qs: dict) -> Path:
-            """从查询参数解析项目目录，默认使用当前 output_dir。"""
+        def _resolve_project_input(self, qs: dict) -> Path:
+            """从查询参数解析项目目录（input_dir），默认使用当前 input_dir。
+
+            多项目同名时按优先级：
+              1. 精确的目录名匹配（project_name == dir_name）
+              2. 当前 input_dir
+              3. 注册表中的首个匹配
+              4. 相邻目录的首个匹配
+            """
             project_name = qs.get("project", [None])[0]
             if not project_name:
-                return output_dir
-            projects_root = output_dir.parent
-            # 遍历子目录，读取 project.json 匹配 name
+                return input_dir
+
+            candidates: list[Path] = []
+            seen: set[str] = set()
+
+            def _read_name(p: Path) -> str | None:
+                proj_file = p / "project.json"
+                if not proj_file.is_file():
+                    return None
+                try:
+                    data = json.loads(proj_file.read_text(encoding="utf-8"))
+                    return data.get("name")
+                except (json.JSONDecodeError, OSError):
+                    return None
+
+            def _score(p: Path) -> int:
+                """打分：越高越优先。"""
+                s = 0
+                if p.name == project_name:
+                    s += 10  # 目录名与项目名完全一致
+                if p.resolve() == input_dir.resolve():
+                    s += 5   # 当前正在使用的项目
+                return s
+
+            # 1. 注册表优先（用户手动添加的顺序）
+            registry_file = _registry_path()
+            if registry_file.is_file():
+                try:
+                    reg = json.loads(registry_file.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    reg = {}
+                for p_str in reg.get("projects", []):
+                    p = Path(p_str)
+                    resolved = str(p.resolve())
+                    if resolved in seen:
+                        continue
+                    seen.add(resolved)
+                    name = _read_name(p)
+                    if name == project_name:
+                        candidates.append(p)
+
+            # 2. 相邻目录（自动发现）
+            projects_root = input_dir.parent
             if projects_root.is_dir():
-                for p in projects_root.iterdir():
+                for p in sorted(projects_root.iterdir()):
                     if not p.is_dir():
                         continue
-                    proj_file = p / "project.json"
-                    if not proj_file.is_file():
+                    resolved = str(p.resolve())
+                    if resolved in seen:
                         continue
-                    try:
-                        data = json.loads(proj_file.read_text(encoding="utf-8"))
-                    except (json.JSONDecodeError, OSError):
-                        continue
-                    if data.get("name") == project_name:
-                        return p
-            return output_dir
+                    seen.add(resolved)
+                    name = _read_name(p)
+                    if name == project_name:
+                        candidates.append(p)
+
+            if not candidates:
+                return input_dir
+            if len(candidates) == 1:
+                return candidates[0]
+            # 多个同名项目：按得分选最优
+            candidates.sort(key=_score, reverse=True)
+            return candidates[0]
+
+        def _get_project_output(self, qs_or_proj_dir: dict | Path) -> Path:
+            """返回指定项目的 output_dir。可传 qs dict 或已解析的 input_dir Path。"""
+            if isinstance(qs_or_proj_dir, dict):
+                proj_input = self._resolve_project_input(qs_or_proj_dir)
+            else:
+                proj_input = qs_or_proj_dir
+            return _project_output_dir(proj_input)
 
         def _send_video_range(self, path: Path) -> None:
             try:
@@ -430,28 +490,33 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 f.seek(start)
                 remaining = length
                 chunk = 64 * 1024
-                while remaining > 0:
-                    buf = f.read(min(chunk, remaining))
-                    if not buf:
-                        break
-                    self.wfile.write(buf)
-                    remaining -= len(buf)
+                try:
+                    while remaining > 0:
+                        buf = f.read(min(chunk, remaining))
+                        if not buf:
+                            break
+                        self.wfile.write(buf)
+                        remaining -= len(buf)
+                except (ConnectionResetError, BrokenPipeError):
+                    pass  # 客户端断开连接，忽略
 
-        def _resolve_texts(self, basename: str) -> Path | None:
+        def _resolve_texts(self, basename: str, proj_out: Path | None = None) -> Path | None:
             if not _is_safe_basename(basename):
                 return None
-            for d in _find_texts_dirs(output_dir):
+            base = proj_out or output_dir
+            for d in _find_texts_dirs(base):
                 p = d / basename
                 if p.is_file():
                     return p
             return None
 
-        def _resolve_in(self, subdir: str, basename: str) -> Path | None:
+        def _resolve_in(self, subdir: str, basename: str, proj_out: Path | None = None) -> Path | None:
             if not _is_safe_basename(basename):
                 return None
             if subdir == "texts":
-                return self._resolve_texts(basename)
-            d = output_dir / subdir
+                return self._resolve_texts(basename, proj_out)
+            base = proj_out or output_dir
+            d = base / subdir
             if not d.is_dir():
                 return None
             p = d / basename
@@ -480,16 +545,17 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_static(rel)
 
             if path == "/api/config":
-                proj_dir = self._resolve_project_dir(qs)
-                comp = proj_dir / "compressed"
-                texts = _find_texts_dirs(proj_dir)
+                proj_input = self._resolve_project_input(qs)
+                proj_out = self._get_project_output(proj_input)
+                comp = proj_out / "compressed"
+                texts = _find_texts_dirs(proj_out)
                 return self._send_json({
-                    "input_dir": str(input_dir),  # input_dir is shared for now
-                    "output_dir": str(proj_dir),
+                    "input_dir": str(proj_input),
+                    "output_dir": str(proj_out),
                     "compressed_dir": str(comp),
                     "texts_dirs": [str(d) for d in texts],
-                    "scripts_dir": str(proj_dir / "scripts"),
-                    "plans_dir": str(proj_dir / "plans"),
+                    "scripts_dir": str(proj_out / "scripts"),
+                    "plans_dir": str(proj_out / "plans"),
                 })
 
             if path == "/api/config/raw":
@@ -500,8 +566,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_json(raw)
 
             if path == "/api/project":
-                proj_dir = self._resolve_project_dir(qs)
-                proj_file = proj_dir / "project.json"
+                proj_input = self._resolve_project_input(qs)
+                proj_file = proj_input / "project.json"
                 data = {}
                 if proj_file.is_file():
                     try:
@@ -509,7 +575,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     except (json.JSONDecodeError, OSError):
                         data = {}
                 merged = {**DEFAULT_PROJECT, **data}
-                merged["steps"] = _detect_steps(proj_dir)
+                proj_out = _project_output_dir(proj_input)
+                merged["steps"] = _detect_steps(proj_out)
                 return self._send_json(merged)
 
             if path == "/api/projects":
@@ -517,23 +584,24 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_json({"projects": _list_projects(req_project)})
 
             if path == "/api/videos":
-                proj_dir = self._resolve_project_dir(qs)
+                proj_input = self._resolve_project_input(qs)
+                proj_out = self._get_project_output(proj_input)
                 source = qs.get("source", ["compressed"])[0]
                 if source not in ("compressed", "original"):
                     return self._send_json(
                         {"ok": False, "error": "source must be compressed|original"}, 400
                     )
-                comp_dir = proj_dir / "compressed"
+                comp_dir = proj_out / "compressed"
                 # texts/scripts sidecars are keyed by the compressed index in both views
                 text_sidecars: dict[str, list[str]] = {}
-                for td in _find_texts_dirs(proj_dir):
+                for td in _find_texts_dirs(proj_out):
                     for f in td.iterdir():
                         if f.suffix != ".json" or "_" not in f.stem:
                             continue
                         idx = f.stem.split("_", 1)[0]
                         text_sidecars.setdefault(idx, []).append(f.name)
                 script_sidecars: dict[str, list[str]] = {}
-                sd = proj_dir / "scripts"
+                sd = proj_out / "scripts"
                 if sd.is_dir():
                     for f in sd.iterdir():
                         if f.suffix != ".json" or "_" not in f.stem:
@@ -548,7 +616,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                                 continue
                             stem = p.stem
                             idx = stem.split("_", 1)[0] if "_" in stem else ""
-                            orig = _find_original_for_compressed(stem, input_dir)
+                            orig = _find_original_for_compressed(stem, proj_input)
                             videos.append({
                                 "file": p.name,
                                 "source": "compressed",
@@ -558,8 +626,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                                 "match": ({"source": "original", "file": orig} if orig else None),
                             })
                 else:  # original
-                    if input_dir.is_dir():
-                        for p in sorted(input_dir.iterdir()):
+                    if proj_input.is_dir():
+                        for p in sorted(proj_input.iterdir()):
                             if p.suffix.lower() not in VIDEO_EXTS:
                                 continue
                             comp = _find_compressed_for_original(p.stem, comp_dir)
@@ -578,36 +646,39 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_json({"videos": videos, "source": source})
 
             if path == "/api/video":
-                proj_dir = self._resolve_project_dir(qs)
+                proj_input = self._resolve_project_input(qs)
+                proj_out = self._get_project_output(proj_input)
                 fname = qs.get("file", [""])[0]
                 source = qs.get("source", ["compressed"])[0]
                 if not _is_safe_basename(fname):
                     return self.send_error(HTTPStatus.FORBIDDEN)
                 if source == "original":
-                    vp = input_dir / fname
+                    vp = proj_input / fname
                 else:
-                    vp = proj_dir / "compressed" / fname
+                    vp = proj_out / "compressed" / fname
                 if not vp.is_file() or vp.suffix.lower() not in VIDEO_EXTS:
                     return self.send_error(HTTPStatus.NOT_FOUND)
                 return self._send_video_range(vp)
 
             if path == "/api/texts":
+                proj_out = self._get_project_output(qs)
                 fname = qs.get("file", [""])[0]
-                p = self._resolve_texts(fname)
+                p = self._resolve_texts(fname, proj_out)
                 if p is None:
                     return self.send_error(HTTPStatus.NOT_FOUND)
                 return self._send_bytes(p.read_bytes(), "application/json; charset=utf-8")
 
             if path == "/api/voiceover":
+                proj_out = self._get_project_output(qs)
                 fname = qs.get("file", [""])[0]
-                p = self._resolve_in("scripts", fname)
+                p = self._resolve_in("scripts", fname, proj_out)
                 if p is None:
                     return self.send_error(HTTPStatus.NOT_FOUND)
                 return self._send_bytes(p.read_bytes(), "application/json; charset=utf-8")
 
             if path == "/api/plans":
-                proj_dir = self._resolve_project_dir(qs)
-                plans_dir = proj_dir / "plans"
+                proj_out = self._get_project_output(qs)
+                plans_dir = proj_out / "plans"
                 plans = []
                 if plans_dir.is_dir():
                     for p in sorted(plans_dir.glob("*_plan.json")):
@@ -617,7 +688,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_json({"plans": plans})
 
             if path == "/api/run/status":
-                progress_file = output_dir / ".progress.json"
+                progress_file = self._get_project_output(qs) / ".progress.json"
                 if progress_file.is_file():
                     try:
                         data = json.loads(progress_file.read_text(encoding="utf-8"))
@@ -632,7 +703,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 day = qs.get("day", [""])[0]
                 if not _is_safe_basename(day) or not day:
                     return self._send_json({"error": "forbidden"}, 403)
-                p = output_dir / "plans" / f"{day}_plan.json"
+                proj_out = self._get_project_output(qs)
+                p = proj_out / "plans" / f"{day}_plan.json"
                 if not p.is_file():
                     return self._send_json({"error": f"规划文件不存在: {p}"}, 404)
                 return self._send_bytes(p.read_bytes(), "application/json; charset=utf-8")
@@ -680,8 +752,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
             if path == "/api/project":
                 import datetime
-                proj_dir = self._resolve_project_dir(qs)
-                proj_file = proj_dir / "project.json"
+                proj_input = self._resolve_project_input(qs)
+                proj_file = proj_input / "project.json"
                 data = {}
                 if proj_file.is_file():
                     try:
@@ -692,7 +764,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 merged["updatedAt"] = datetime.datetime.now().isoformat(timespec="seconds")
                 if not proj_file.is_file():
                     merged["createdAt"] = merged["updatedAt"]
-                proj_dir.mkdir(parents=True, exist_ok=True)
+                proj_input.mkdir(parents=True, exist_ok=True)
                 proj_file.write_text(
                     json.dumps(merged, ensure_ascii=False, indent=2),
                     encoding="utf-8",
@@ -700,8 +772,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_json({"ok": True})
 
             if path == "/api/texts":
+                proj_out = self._get_project_output(qs)
                 fname = qs.get("file", [""])[0]
-                p = self._resolve_texts(fname)
+                p = self._resolve_texts(fname, proj_out)
                 if p is None:
                     return self._send_json({"ok": False, "error": "forbidden or not found"}, 403)
                 data = json.dumps(obj, ensure_ascii=False, indent=2).encode("utf-8")
@@ -709,8 +782,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_json({"ok": True, "path": str(p)})
 
             if path == "/api/voiceover":
+                proj_out = self._get_project_output(qs)
                 fname = qs.get("file", [""])[0]
-                p = self._resolve_in("scripts", fname)
+                p = self._resolve_in("scripts", fname, proj_out)
                 if p is None:
                     return self._send_json({"ok": False, "error": "forbidden or not found"}, 403)
                 data = json.dumps(obj, ensure_ascii=False, indent=2).encode("utf-8")
@@ -721,7 +795,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 day = qs.get("day", [""])[0]
                 if not _is_safe_basename(day) or not day:
                     return self._send_json({"ok": False, "error": "forbidden"}, 403)
-                p = output_dir / "plans" / f"{day}_plan.json"
+                proj_out = self._get_project_output(qs)
+                p = proj_out / "plans" / f"{day}_plan.json"
                 data = json.dumps(obj, ensure_ascii=False, indent=2).encode("utf-8")
                 _save_atomic(p, data)
                 return self._send_json({"ok": True, "path": str(p)})
@@ -851,7 +926,8 @@ def run(
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
     print(f"  UI 启动: {url}")
-    print(f"  output_dir: {config.paths.output_dir}")
+    print(f"  项目目录: {config.paths.input_dir}")
+    print(f"  输出目录: {config.paths.output_dir}")
     print("  Ctrl+C 退出")
     if open_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
