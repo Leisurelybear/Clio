@@ -105,41 +105,22 @@ async function loadProjects() {
   try {
     const r = await api('GET', '/api/projects');
     state.projects = r.projects || [];
-    // Find current project
     state.currentProject = state.projects.find(p => p.is_current) || null;
     if (state.currentProject) {
       state.currentProjectName = state.currentProject.name;
     }
-    renderProjectSelector();
+    updateProjectSidebar();
   } catch (e) {
     state.projects = [];
     state.currentProject = null;
     state.currentProjectName = null;
-    renderProjectSelector();
+    updateProjectSidebar();
   }
 }
 
-function renderProjectSelector() {
-  const sel = $('project-select');
-  if (!sel) return;
-  const curName = state.currentProject?.name || state.projectName || '';
-  sel.innerHTML = state.projects.map(p =>
-    `<option value="${escapeHtml(p.name)}" ${p.name === curName ? 'selected' : ''}>${escapeHtml(p.name)} ${p.is_current ? ' (当前)' : ''}</option>`
-  ).join('');
-  if (state.projects.length === 0) {
-    sel.innerHTML = '<option value="">(无项目，请新建)</option>';
-  }
-  sel.onchange = async () => {
-    const name = sel.value;
-    if (!name || name === curName) return;
-    if (state.dirty && !confirm('切换项目将丢弃当前修改，确定吗？')) {
-      sel.value = curName;
-      return;
-    }
-    // 通过 URL 参数切换项目，页面重载
-    state.currentProjectName = name;
-    window.location.search = `?project=${encodeURIComponent(name)}`;
-  };
+function updateProjectSidebar() {
+  const el = $('proj-name-sidebar');
+  if (el) el.textContent = state.currentProject?.name || state.projectName || '未命名';
 }
 
 async function loadConfig() {
@@ -1000,10 +981,10 @@ async function init() {
   });
 
   // New project modal
-  const modal = $('modal-new-project');
-  $('btn-new-project').onclick = () => { modal.style.display = 'flex'; };
-  $('np-cancel').onclick = () => { modal.style.display = 'none'; };
-  modal.querySelector('.modal-backdrop').onclick = () => { modal.style.display = 'none'; };
+  const newModal = $('modal-new-project');
+  $('btn-new-project').onclick = () => { newModal.style.display = 'flex'; };
+  $('np-cancel').onclick = () => { newModal.style.display = 'none'; };
+  newModal.querySelector('.modal-backdrop').onclick = () => { newModal.style.display = 'none'; };
   $('np-create').onclick = async () => {
     const name = $('np-name').value.trim();
     const inputDir = $('np-input-dir').value.trim();
@@ -1011,8 +992,7 @@ async function init() {
     try {
       const r = await api('POST', '/api/project/create', { name, input_dir: inputDir });
       if (r.ok) {
-        modal.style.display = 'none';
-        // 重载页面到新项目
+        newModal.style.display = 'none';
         window.location.search = `?project=${encodeURIComponent(name)}`;
       } else {
         setStatus('创建失败: ' + (r.error || '未知错误'), 'err');
@@ -1021,6 +1001,49 @@ async function init() {
       setStatus('创建失败: ' + e.message, 'err');
     }
   };
+
+  // Open project modal
+  const openModal = $('modal-open-project');
+  const openList = $('project-list-modal');
+  $('btn-open-project').onclick = async () => {
+    openModal.style.display = 'flex';
+    // 刷新项目列表
+    try {
+      const r = await api('GET', '/api/projects');
+      const allProjects = r.projects || [];
+      openList.innerHTML = allProjects.length
+        ? allProjects.map(p => `
+          <div class="project-card ${p.is_current ? 'active' : ''}" data-name="${escapeHtml(p.name)}">
+            <div class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(当前)' : ''}</div>
+            <div class="project-card-meta">
+              输出目录: ${escapeHtml(p.output_dir)}<br>
+              素材目录: ${escapeHtml(p.input_dir)}<br>
+              步骤: ${[['compress','压缩'],['analyze','分析'],['scripts','口播'],['plan','规划'],['label','标号'],['cut','裁剪']]
+                .map(([k,l]) => p.steps?.[k] ? `<span class="step-dot done" title="${l}已完成">✓${l}</span>` : `<span class="step-dot" title="${l}未完成">○${l}</span>`)
+                .join(' ')}
+            </div>
+          </div>
+        `).join('')
+        : '<p class="muted">暂无项目，请先新建</p>';
+      // 点击卡片切换项目
+      openList.querySelectorAll('.project-card').forEach(card => {
+        card.onclick = () => {
+          const name = card.dataset.name;
+          if (name === state.currentProject?.name) {
+            openModal.style.display = 'none';
+            return;
+          }
+          if (state.dirty && !confirm('切换项目将丢弃当前修改，确定吗？')) return;
+          openModal.style.display = 'none';
+          window.location.search = `?project=${encodeURIComponent(name)}`;
+        };
+      });
+    } catch (e) {
+      openList.innerHTML = '<p class="err">加载项目列表失败: ' + escapeHtml(e.message) + '</p>';
+    }
+  };
+  $('op-cancel').onclick = () => { openModal.style.display = 'none'; };
+  openModal.querySelector('.modal-backdrop').onclick = () => { openModal.style.display = 'none'; };
 }
 
 init();

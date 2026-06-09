@@ -23,9 +23,12 @@
 
 <main>
   <aside id="sidebar">
-    <h3>项目</h3>
-    <div id="project-selector" style="margin-bottom:8px;">
-      <select id="project-select" class="sidebar-select" title="切换项目"></select>
+    <h3>
+      <span>项目</span>
+      <span id="proj-name-sidebar" class="value" title="当前项目名">加载中...</span>
+    </h3>
+    <div id="project-actions" style="margin-bottom:8px;display:flex;gap:6px;">
+      <button id="btn-open-project" class="sidebar-btn" title="打开已有项目">📂 打开项目</button>
       <button id="btn-new-project" class="sidebar-btn" title="新建项目">＋ 新建</button>
     </div>
     <ul id="project-list">
@@ -99,6 +102,21 @@
       <button id="np-cancel" class="secondary">取消</button>
       <button id="np-create" class="primary">创建并切换</button>
     </div>
+  </div>
+</div>
+
+<!-- Open Project Modal -->
+<div id="modal-open-project" class="modal" style="display:none;">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog">
+    <h3>打开项目</h3>
+    <div id="project-list-modal">
+      <p class="muted">正在加载项目列表...</p>
+    </div>
+    <div class="modal-actions">
+      <button id="op-cancel" class="secondary">取消</button>
+    </div>
+    <p class="hint" style="margin-top:12px;">选择一个项目后自动切换</p>
   </div>
 </div>
 

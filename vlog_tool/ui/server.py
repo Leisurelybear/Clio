@@ -153,8 +153,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         steps["cut"] = (output_dir / "cuts").is_dir() and any((output_dir / "cuts").iterdir())
         return steps
 
-    def _list_projects() -> list[dict]:
-        """列出所有可用项目（project.json 所在的目录）。"""
+    def _list_projects(current_project_name: str | None = None) -> list[dict]:
+        """列出所有可用项目。可指定当前项目名标记 `is_current`。"""
         projects_root = output_dir.parent
         projects = []
         if projects_root.is_dir():
@@ -177,8 +177,13 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                             "steps": _detect_steps(p),
                             "createdAt": data.get("createdAt"),
                             "updatedAt": data.get("updatedAt"),
-                            "is_current": p == output_dir,
+                            "is_current": (
+                                name == current_project_name
+                                if current_project_name
+                                else p == output_dir
+                            ),
                         })
+        return projects
         return projects
 
     class Handler(BaseHTTPRequestHandler):
@@ -363,7 +368,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return self._send_json(merged)
 
             if path == "/api/projects":
-                return self._send_json({"projects": _list_projects()})
+                req_project = qs.get("project", [None])[0]
+                return self._send_json({"projects": _list_projects(req_project)})
 
             if path == "/api/videos":
                 proj_dir = self._resolve_project_dir(qs)

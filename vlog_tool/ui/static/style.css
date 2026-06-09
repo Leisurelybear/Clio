@@ -333,3 +333,20 @@ aside, section { overflow-y: auto; }
 .empty-state .icon { font-size: 2.5em; margin-bottom: 12px; display: block; }
 .empty-state h4 { margin: 0 0 8px; color: #999; }
 .empty-state p { margin: 4px 0; font-size: 0.9em; }
+
+/* project cards in modal */
+#project-list-modal { max-height: 50vh; overflow-y: auto; margin: 12px 0; }
+.project-card {
+  background: #1a1a1a; border: 1px solid #333; border-radius: 3px;
+  padding: 12px; margin-bottom: 6px; cursor: pointer;
+}
+.project-card:hover { background: #2a2a2a; border-color: #4a9eff; }
+.project-card.active { border-color: #4a9eff; background: #0d2a4a; }
+.project-card-name { font-weight: 500; color: #ddd; margin-bottom: 6px; }
+.project-card-meta { font-size: 0.82em; color: #666; }
+.step-dot { display: inline-block; margin-right: 4px; font-size: 0.82em; }
+.step-dot.done { color: #4caf50; }
+
+/* sidebar heading with inline name */
+#sidebar h3 { display: flex; align-items: center; gap: 6px; }
+#proj-name-sidebar { font-size: 0.82em; font-weight: normal; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
