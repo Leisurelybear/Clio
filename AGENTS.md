@@ -97,6 +97,9 @@ vlog-video-analysis/
 
 - **模块拆分**：当前 `server.py` / `app.js` 集中了 UI 层所有逻辑，后续应该拆成不同文件/目录，每个负责独立功能
 - **去本地化**：移除所有代码中硬编码的本机路径、机器名、特定目录结构等，方便项目通用化/开源
+- **两阶段计划已定稿**，见 `docs/superpowers/specs/2026-06-09-architecture-cleanup-and-r008-design.md`
+  - Phase 1：server.py 拆 routes/ + services.py，app.js 拆 state/api/viewer，.gitignore 补漏，去本地化，修 bug
+  - Phase 2：R-008 UI 单步执行（选目录 → 选文件 → 跑步骤 → 进度 → 自动刷新）
 
 ## 5. 添加新功能的标准做法
 
