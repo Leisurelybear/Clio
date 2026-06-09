@@ -23,8 +23,8 @@ python main.py serve --host 0.0.0.0     # 暴露到局域网（注意安全）
 
 侧栏分两段：**项目**（跨视频的产物）放上面，**视频**（per-video 产物）放下面。
 点 sidebar 的项目条目会切换右栏内容；点视频条目会切换右栏 + 播放器。
-⚙ 设置也是项目级入口：点开后右侧渲染完整 config.yaml 编辑表单。
-▶ 运行灰显（待 R-005 实现）。
+⚙ 设置也是项目级入口：点开后右侧渲染完整 config 编辑表单。
+▶ 运行：支持多步骤流水线（压缩→分析→口播→规划→标号），实时进度 + ETA。
 
 ```
 ┌────────────────────────────────────────────┐
@@ -58,7 +58,10 @@ python main.py serve --host 0.0.0.0     # 暴露到局域网（注意安全）
 └──────────┴──────────────────┴──────────────┘
 ```
 
-点 ⚙ 设置时，右栏渲染完整 config 嵌套表单（paths / ai / compress / analyze / script / plan 等全部字段），保存后提示**需重启服务生效**。校验失败（如 provider 拼写错误）时弹出错误红字，不写文件。
+点 ⚙ 设置时，右栏渲染完整 config 嵌套表单（paths / ai / compress / analyze / script / plan 等全部字段）。
+- 编辑**全局 config.yaml**：保存后需重启服务生效。
+- 编辑**项目专属 project.yaml**（通过 `?project=X` 切换）：保存后立即生效，下次流水线运行自动加载新配置。
+校验失败（如 provider 拼写错误）时弹出错误红字，不写文件。
 
 ## 数据来源
 
@@ -69,7 +72,9 @@ UI 只读 / 写 `config.yaml` 里 `paths.output_dir` 下的文件：
 | 分析 (texts) | sidebar → 视频 → tab「分析」 | `output/texts*/*.json` | `title`, `location`, `mood`, `summary`, `timeline[]` |
 | 口播 (scripts) | sidebar → 视频 → tab「口播」 | `output/scripts/*_voiceover.json` | `title`, `voiceover`, `edit_tip`, `duration_hint_sec` |
 | 规划 (plan) | sidebar → 📋 规划 | `output/plans/day<N>_plan.json` | `theme`, `opening_tip`, `ending_tip`, `sequence[]` |
-| 设置 (config) | sidebar → ⚙ 设置 | `config.yaml`（全字段编辑） | 全部字段，嵌套表单渲染，保存后需重启服务 |
+| 设置 (config) | sidebar → ⚙ 设置 | `project.yaml`（如存在）或 `config.yaml` | 全部字段，嵌套表单渲染 |
+| 设置 (config) | sidebar → ⚙ 设置（全局） | `config.yaml`（全字段编辑） | 保存后需重启服务 |
+| 多项目 | sidebar 顶部选择器 / URL `?project=name` | 自动发现 `project.json` | 支持新建、打开、切换 |
 
 `texts*` 通配同时匹配 `texts/` 和 `texts - 巴黎/` 之类的目录。
 
@@ -124,3 +129,5 @@ header 右侧的 **`压缩` / `原视频`** 切换按钮决定侧栏列的是哪
 | 浏览器打开空白 | 看终端输出 + `logs/YYYY-MM-DD-HH.log` |
 | `texts` tab 一直说"没有 JSON" | 视频列表里该行 `texts` 状态是 `·` 灰色；说明 `output/texts*` 下没匹配文件 |
 | 保存后 clip 看到旧内容 | 按浏览器 `Ctrl+Shift+R` 强刷；服务器 `/api/videos` 走的是缓存头 `no-store`，但浏览器可能缓了 JSON |
+| 设置 tab 显示"配置数据不可用" | 当前项目没有 `project.yaml` 且全局 `config.yaml` 读取失败；检查 config.yaml 是否存在并格式正确 |
+| 切换项目后 AI 行为没变 | 检查项目目录下是否有 `project.yaml`；没有则使用全局 config.yaml 的 AI 配置 |

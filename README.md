@@ -245,12 +245,31 @@ output/
 | `fps` | 15 | 帧率 |
 | `remove_audio` | true | 去除声音 |
 
-### AI 参数 (`gemini`)
+### AI 参数
 
 | 参数 | 默认值 | 说明 |
 |------|--------|------|
-| `model` | gemini-2.5-flash | 分析/文案模型 |
-| `poll_interval_sec` | 5 | 上传后等待处理完成的轮询间隔 |
+| （见 `config.example.yaml` 的 `ai` 段） | — | 每个任务可独立指定 provider 和 model |
+
+### 项目专属配置 (`project.yaml`)
+
+每个项目目录下可以放一个 `project.yaml`，只需写与全局 `config.yaml` **不同的字段**：
+
+```yaml
+# 例：巴黎项目使用专属 AI context 和压缩参数
+ai:
+  context_file: ./trip_context_paris.md
+compress:
+  fps: 1
+  target_size_mb: 5
+```
+
+加载时自动 deep-merge 到全局配置之上：
+- 嵌套字典递归合并（如 `ai.tasks`），不会覆盖整个块
+- 未覆盖的字段继承全局 `config.yaml`
+- `ai.context_file` 相对路径优先按项目目录解析
+- UI 设置 tab 通过 `?project=X` 自动读写当前项目的 `project.yaml`
+- CLI 目前通过 `--input` 覆盖目录，后续将支持 `--project`
 
 ### 口播模板
 

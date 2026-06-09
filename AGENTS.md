@@ -167,7 +167,7 @@ ai:
 
 ## 7. 项目当前状态
 
-最后更新：见 `git log --oneline -10`。
+最后更新：2026-06-10（全面 review + ROADMAP 同步）。
 最近做的 commit 顺序：
 1. `chore: scaffold initial Vlog editing helper project`
 2. `fix(compress): escape comma in scale expression`  ← Windows ffmpeg filter 逗号转义
@@ -212,15 +212,21 @@ ai:
 41. `feat(ui): add pipeline runner with progress tracking (R-005)`  ← run tab + ProgressTracker + 后台线程
 42. `feat(ui): pipeline step selection and done() param fix`  ← R-005f checkbox 选步骤 + R-005g done() 修复
 43. `feat(ui): multi-project switching with create (R-007)`  ← /api/projects, /api/project/create, sidebar selector, modal, URL param switching, empty state
+44. `fix(ai): clean up Gemini File API uploads and move upload out of retry`  ← B-001+B-002，上传仅一次 + finally 清理
+45. `fix(ui): prevent temp file leak on interrupt in config save`  ← B-003，NamedTemporaryFile → with 语句 + 显式 unlink
+46. `feat(config): per-project configuration via project.yaml`  ← deep_merge + _get_config cache + server.py 适配
+47. `chore: add local state files to .gitignore`  ← projects.json + *.bak + .opencode/
+48. `fix: address review findings - gemini upload cleanup scope and project config validation`  ← 上传移入 try + PUT project.yaml 校验修正
+49. `fix(ui): fall back to global config when project has no project.yaml`  ← 无 project.yaml 时回退到 config.yaml 而非返回空
+50. `docs(roadmap): record comprehensive code review findings`  ← B-012~B-020 + D-001~D-004 + A-001~A-005
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
-另外 WIP 一个 `templates/trip_context_2.md`（蓝色旗子场景的小补丁），暂未启用。
 
 项目文档状态：
-- `ROADMAP.md` 当前跟踪：R-004（✓）/ R-005（✓）/ R-001（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010 + Bug 跟踪（B-001~B-011）+ 性能优化（P-001~P-003）
-- 已知 Bug 按 P0~P3 优先级排列，P0 为立即修复（文件泄漏 / 重复上传 / 临时文件残留）
-- 外部分析建议 F-001（R-007+R-008 合并实施），已备注在 ROADMAP
+- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010 + Bug 跟踪（B-001~B-020）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-005）
+- B-001/B-002/B-003 已修复；仍有多项 P0~P3 Bug 待修
+- per-project 配置已实现：每个项目目录下可选 `project.yaml`，deep-merge 覆盖全局 config.yaml
 
 ## 8. Gotchas（踩过的坑）
 

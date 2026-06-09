@@ -249,12 +249,32 @@ User in 剪映: follow the plan → add effects → paste the voiceover
 | `fps` | 15 | output frame rate |
 | `remove_audio` | true | strip audio |
 
-### AI parameters (`gemini`)
+### AI parameters
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `model` | gemini-2.5-flash | analysis / script model |
-| `poll_interval_sec` | 5 | polling interval while Gemini processes uploads |
+| (see `config.example.yaml` `ai` section) | — | each task can use a different provider and model |
+
+### Per-project configuration (`project.yaml`)
+
+Place an optional `project.yaml` in each project directory with only the fields
+that differ from the global `config.yaml`:
+
+```yaml
+# Example: Paris trip uses its own AI context and compression settings
+ai:
+  context_file: ./trip_context_paris.md
+compress:
+  fps: 1
+  target_size_mb: 5
+```
+
+On load, it deep-merges into the global config:
+- Nested dicts merge recursively (e.g. `ai.tasks`)
+- Unspecified fields inherit from global `config.yaml`
+- `ai.context_file` relative paths resolve against the project directory first
+- The UI Settings tab auto-detects via `?project=X` and reads/writes `project.yaml`
+- CLI currently uses `--input` for directory override; `--project` support planned
 
 ### Voiceover template
 

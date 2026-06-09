@@ -37,6 +37,9 @@ ai:
       api_key_env: DEEPSEEK_API_KEY
       base_url: https://api.deepseek.com/v1
 
+  # 注意：model 请填写厂商实际支持的模型名。
+  # DeepSeek 官网可用：deepseek-chat（V3）、deepseek-reasoner（R1）。
+  # 部分三方 API 或自定义网关支持 deepseek-v4-flash 等变体名，请按实际可用名填写。
   tasks:
     video_analyze:              # 视频理解（需支持视频的厂家，如 gemini）
       provider: gemini
