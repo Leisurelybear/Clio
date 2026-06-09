@@ -6,3 +6,7 @@ config.yaml
 __pycache__/
 *.pyc
 .pytest_cache/
+*.bak
+projects.json
+projects.json.bak
+.opencode/
