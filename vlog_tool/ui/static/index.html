@@ -98,6 +98,8 @@
     <label>项目名称 <input id="np-name" type="text" placeholder="如：2025国庆巴黎行"></label>
     <label>素材目录 <input id="np-input-dir" type="text" placeholder="如：E:\Videos\Paris2025"></label>
     <p class="hint">素材目录需包含视频文件（.mp4/.mov/.mkv 等）</p>
+    <label>输出目录（可选） <input id="np-output-dir" type="text" placeholder="留空则自动创建到当前配置文件同级目录下"></label>
+    <p class="hint">指定存放压缩、分析结果等中间文件的目录路径</p>
     <div class="modal-actions">
       <button id="np-cancel" class="secondary">取消</button>
       <button id="np-create" class="primary">创建并切换</button>
@@ -116,7 +118,12 @@
     <div class="modal-actions">
       <button id="op-cancel" class="secondary">取消</button>
     </div>
-    <p class="hint" style="margin-top:12px;">选择一个项目后自动切换</p>
+    <hr style="margin:16px 0;border-color:var(--border);">
+    <p class="hint" style="margin-bottom:8px;">或者输入素材目录路径（需包含 project.json）</p>
+    <div style="display:flex;gap:8px;">
+      <input id="op-custom-path" type="text" placeholder="如：D:\Projects\MyVlog" style="flex:1;">
+      <button id="op-open-path" class="primary">打开</button>
+    </div>
   </div>
 </div>
 
