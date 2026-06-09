@@ -64,7 +64,8 @@ vlog-video-analysis/
 ### 4.1 Commit
 
 - **英文** message，**Conventional Commits** 风格：`type(scope): subject`
-- **一个功能一个 commit**（用户明确要求；不要把多个独立功能合在一起）
+- **每个 commit 尽可能小**，覆盖一个独立的小功能/修复模块，方便后续分支开发和回滚
+- **不要把多个独立功能合在一个 commit 里**
 - 常见 type：`feat` / `fix` / `refactor` / `docs` / `chore`
 - rebase 改历史时优先用 `git rebase -i --root`；Windows 下交互式 editor 容易卡，用 `git filter-branch --msg-filter` 走字节级 Python 脚本（见 [§8 Gotchas](#8-gotchas)）
 
@@ -86,6 +87,11 @@ vlog-video-analysis/
 - 全部放在 `vlog_tool/prompts.py`，用常量
 - trip 上下文通过 `_wrap_with_context()` 在所有 prompt 前面统一注入；**不要**在每个 prompt 里手写 prefix
 - 输出格式必须是 JSON（不是 markdown 代码块），`extract_json()` 才能解析
+
+### 4.5 未来重构方向
+
+- **模块拆分**：当前 `server.py` / `app.js` 集中了 UI 层所有逻辑，后续应该拆成不同文件/目录，每个负责独立功能
+- **去本地化**：移除所有代码中硬编码的本机路径、机器名、特定目录结构等，方便项目通用化/开源
 
 ## 5. 添加新功能的标准做法
 
