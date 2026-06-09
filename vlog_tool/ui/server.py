@@ -917,6 +917,11 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 try:
                     with open(config_path, "r", encoding="utf-8") as f:
                         raw = yaml.safe_load(f) or {}
+                    # 修正 paths 为当前项目的实际路径
+                    paths = raw.get("paths", {})
+                    paths["input_dir"] = str(proj_input.resolve())
+                    paths["output_dir"] = str(_project_output_dir(proj_input).resolve())
+                    raw["paths"] = paths
                     yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
                     _save_atomic(target_path, yml.encode("utf-8"))
                     self.__class__._config_cache.pop(str(proj_input.resolve()), None)
