@@ -324,13 +324,43 @@ async function selectConfig() {
   state.currentEntity = 'config';
   state.dirty = false;
   try {
-    state.configRaw = await api('GET', '/api/config/raw');
+    const resp = await api('GET', '/api/config/raw');
+    if (resp.needs_init) {
+      state.configRaw = null;
+      state._needsConfigInit = true;
+    } else {
+      state.configRaw = resp;
+      state._needsConfigInit = false;
+    }
   } catch (e) {
     setStatus('配置加载失败: ' + e.message, 'err');
     state.configRaw = {};
+    state._needsConfigInit = false;
   }
   updateEntityUI();
   renderActiveTab();
+}
+
+async function initProjectConfig() {
+  try {
+    const btn = $('btn-config-init');
+    if (btn) { btn.disabled = true; btn.textContent = '创建中...'; }
+    const r = await api('POST', '/api/config/init');
+    if (r.ok) {
+      setStatus('项目配置文件已创建', 'ok');
+      // 重新加载配置
+      state.configRaw = await api('GET', '/api/config/raw');
+      state._needsConfigInit = false;
+      renderActiveTab();
+    } else {
+      setStatus('创建失败: ' + (r.error || '未知错误'), 'err');
+    }
+  } catch (e) {
+    setStatus('创建失败: ' + e.message, 'err');
+  } finally {
+    const btn = $('btn-config-init');
+    if (btn) { btn.disabled = false; btn.textContent = '为该项目创建配置文件'; }
+  }
 }
 
 async function selectCut() {
@@ -870,6 +900,17 @@ function _renderConfigForm(obj, path) {
 
 function renderConfig() {
   const pane = $('tab-config');
+  if (state._needsConfigInit) {
+    pane.innerHTML = `
+      <h3>项目配置初始化</h3>
+      <p class="muted">该项目还没有专属配置文件。</p>
+      <p class="hint">创建后将以当前全局配置为模板，后续修改只影响本项目。</p>
+      <button id="btn-config-init" class="primary" style="margin-top:12px;padding:10px 20px;width:100%;">为该项目创建配置文件</button>
+    `;
+    const btn = $('btn-config-init');
+    if (btn) btn.onclick = initProjectConfig;
+    return;
+  }
   if (!state.configRaw || Object.keys(state.configRaw).length === 0) {
     pane.innerHTML = '<p class="muted">配置数据不可用</p>';
     return;

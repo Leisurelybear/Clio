@@ -576,16 +576,19 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             if path == "/api/config/raw":
                 if not config_path or not config_path.is_file():
                     return self._send_json({"error": "config file not available"}, 500)
-                # 读取全局配置 + 项目专属覆盖（如有），返回有效配置
                 proj_input = self._resolve_project_input(qs)
+                # 非默认项目且无 project.yaml → 告知前端需要初始化
+                if proj_input != input_dir:
+                    proj_yaml = proj_input / "project.yaml"
+                    if not proj_yaml.is_file():
+                        return self._send_json({"needs_init": True})
+                # 返回合并后的有效配置
                 with open(config_path, "r", encoding="utf-8") as f:
                     raw = yaml.safe_load(f) or {}
                 if proj_input != input_dir:
-                    proj_yaml = proj_input / "project.yaml"
-                    if proj_yaml.is_file():
-                        with open(proj_yaml, "r", encoding="utf-8") as f:
-                            project_raw = yaml.safe_load(f) or {}
-                        raw = deep_merge(raw, project_raw)
+                    with open(proj_yaml, "r", encoding="utf-8") as f:
+                        project_raw = yaml.safe_load(f) or {}
+                    raw = deep_merge(raw, project_raw)
                 return self._send_json(raw)
 
             if path == "/api/project":
@@ -903,6 +906,23 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 self._run_thread.start()
                 label = "+".join(steps) if steps else "全部"
                 return self._send_json({"ok": True, "message": f"流水线已启动（{label}）"})
+
+            if path == "/api/config/init":
+                proj_input = self._resolve_project_input(qs)
+                if proj_input == input_dir:
+                    return self._send_json({"ok": False, "error": "默认项目已有 config.yaml，无需初始化"}, 400)
+                target_path = proj_input / "project.yaml"
+                if target_path.is_file():
+                    return self._send_json({"ok": False, "error": "project.yaml 已存在"}, 409)
+                try:
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        raw = yaml.safe_load(f) or {}
+                    yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
+                    _save_atomic(target_path, yml.encode("utf-8"))
+                    self.__class__._config_cache.pop(str(proj_input.resolve()), None)
+                    return self._send_json({"ok": True, "path": str(target_path)})
+                except Exception as e:
+                    return self._send_json({"ok": False, "error": str(e)}, 500)
 
             if path == "/api/cut":
                 day_label = obj.get("day_label", "day1")
