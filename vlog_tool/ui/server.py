@@ -580,9 +580,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     if proj_yaml.is_file():
                         with open(proj_yaml, "r", encoding="utf-8") as f:
                             raw = yaml.safe_load(f) or {}
-                    else:
-                        raw = {}
-                    return self._send_json(raw)
+                        return self._send_json(raw)
+                    # 无 project.yaml → 回退到全局配置（下方公共代码）
                 with open(config_path, "r", encoding="utf-8") as f:
                     raw = yaml.safe_load(f) or {}
                 return self._send_json(raw)
