@@ -69,26 +69,31 @@ vlog-video-analysis/
 - 常见 type：`feat` / `fix` / `refactor` / `docs` / `chore`
 - rebase 改历史时优先用 `git rebase -i --root`；Windows 下交互式 editor 容易卡，用 `git filter-branch --msg-filter` 走字节级 Python 脚本（见 [§8 Gotchas](#8-gotchas)）
 
-### 4.2 代码风格
+### 4.2 工作流程
+
+- **先规划再实现**：任何功能改动前，先在 AGENTS.md 或 ROADMAP.md 记录规划，确定方案后再写代码
+- **功能模块记录**：每个新增功能模块必须在文档中记录（README.md 面向用户，AGENTS.md 面向 AI），包括用途、入口、关键约定
+
+### 4.3 代码风格
 
 - 不要写注释，除非解释**为什么**（WHAT 自己看得见）
 - 中文 user-facing 文案（CLI 提示、错误信息、README 中文版）
 - 默认 `skip_existing=True` 的策略被所有 step 共享（改 `analyze` 这一个开关就行）
 - AI 返回的 JSON 用 `extract_json()` 容错（先 `json.loads`，再正则抓 `{}`）
 
-### 4.3 配置
+### 4.4 配置
 
 - 仓库提交 `config.example.yaml` 和 `.env.example`；真实 `config.yaml` 和 `.env` 在 `.gitignore` 里
 - 任何含**本地路径、代理 IP、API key** 的字段都不要进 example（用占位符）
 - 配置文件改动后建议同时更新 example 和 README/en
 
-### 4.4 提示词
+### 4.5 提示词
 
 - 全部放在 `vlog_tool/prompts.py`，用常量
 - trip 上下文通过 `_wrap_with_context()` 在所有 prompt 前面统一注入；**不要**在每个 prompt 里手写 prefix
 - 输出格式必须是 JSON（不是 markdown 代码块），`extract_json()` 才能解析
 
-### 4.5 未来重构方向
+### 4.6 未来重构方向
 
 - **模块拆分**：当前 `server.py` / `app.js` 集中了 UI 层所有逻辑，后续应该拆成不同文件/目录，每个负责独立功能
 - **去本地化**：移除所有代码中硬编码的本机路径、机器名、特定目录结构等，方便项目通用化/开源
