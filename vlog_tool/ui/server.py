@@ -314,6 +314,15 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
             if path in ("/", "/index.html"):
                 return self._send_static("index.html")
+            if path == "/favicon.ico":
+                # 返回简单的 SVG favicon，避免 404
+                svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text y=".9em" font-size="90">📹</text></svg>'
+                self.send_response(200)
+                self.send_header("Content-Type", "image/svg+xml")
+                self.send_header("Cache-Control", "public, max-age=31536000")
+                self.end_headers()
+                self.wfile.write(svg.encode("utf-8"))
+                return
             if path.startswith("/static/"):
                 rel = path[len("/static/"):]
                 if ".." in rel or rel.startswith("/"):

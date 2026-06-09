@@ -15,6 +15,7 @@ const state = {
   projectName: null,
   projects: [],
   currentProject: null,
+  currentProjectName: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -41,6 +42,11 @@ async function api(method, url, body) {
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
+  }
+  // 自动附加 project 查询参数
+  const sep = url.includes('?') ? '&' : '?';
+  if (state.currentProjectName) {
+    url += `${sep}project=${encodeURIComponent(state.currentProjectName)}`;
   }
   const r = await fetch(url, opts);
   if (!r.ok) {
@@ -101,10 +107,14 @@ async function loadProjects() {
     state.projects = r.projects || [];
     // Find current project
     state.currentProject = state.projects.find(p => p.is_current) || null;
+    if (state.currentProject) {
+      state.currentProjectName = state.currentProject.name;
+    }
     renderProjectSelector();
   } catch (e) {
     state.projects = [];
     state.currentProject = null;
+    state.currentProjectName = null;
     renderProjectSelector();
   }
 }
@@ -127,9 +137,12 @@ function renderProjectSelector() {
       return;
     }
     // 通过 URL 参数切换项目，页面重载
+    state.currentProjectName = name;
     window.location.search = `?project=${encodeURIComponent(name)}`;
   };
 }
+
+async function loadConfig() {
   state.config = await api('GET', '/api/config');
   $('proj-name').textContent = state.config.output_dir;
   $('proj-name').title = `input: ${state.config.input_dir}\noutput: ${state.config.output_dir}`;
@@ -528,7 +541,7 @@ function renderPlan() {
   }
   pane.innerHTML = `
     <h3>日 vlog 元信息</h3>
-    ${state.availablePlans.length >= 2 ? `
+    ${state.availablePlans.length >= 1 ? `
     <label>日标签
       <select id="plan-day-select">
         ${state.availablePlans.map(dp =>
@@ -899,7 +912,7 @@ async function init() {
   const urlParams = new URLSearchParams(window.location.search);
   const urlProject = urlParams.get('project');
   if (urlProject) {
-    // 重载页面时带上 project 参数
+    state.currentProjectName = urlProject;
   }
 
   try {
