@@ -24,7 +24,7 @@ from urllib.parse import parse_qs, urlparse
 
 import yaml
 
-from vlog_tool.config import AppConfig
+from vlog_tool.config import AppConfig, load_config
 from vlog_tool.pipeline import run_cut_all, run_pipeline_steps
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -737,17 +737,19 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     yml = yaml.dump(coerced, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
                 except Exception as e:
                     return self._send_json({"ok": False, "error": f"YAML 序列化失败: {e}"}, 400)
-                tmp = tempfile.NamedTemporaryFile(mode="wb", suffix=".yaml", delete=False, dir=str(config_path.parent))
+                tmp_path: Path | None = None
                 try:
-                    tmp.write(yml.encode("utf-8"))
-                    tmp.close()
-                    from vlog_tool.config import load_config
-                    load_config(tmp.name)
+                    with tempfile.NamedTemporaryFile(mode="wb", suffix=".yaml", delete=False, dir=str(config_path.parent)) as tmp:
+                        tmp.write(yml.encode("utf-8"))
+                        tmp_path = Path(tmp.name)
+                    load_config(tmp_path)
                 except (ValueError, FileNotFoundError, Exception) as e:
-                    os.unlink(tmp.name)
+                    if tmp_path and tmp_path.exists():
+                        tmp_path.unlink()
                     return self._send_json({"ok": False, "error": f"配置校验失败: {e}"}, 400)
                 _save_atomic(config_path, yml.encode("utf-8"))
-                os.unlink(tmp.name)
+                if tmp_path and tmp_path.exists():
+                    tmp_path.unlink()
                 return self._send_json({"ok": True, "path": str(config_path)})
 
             if path == "/api/project":
