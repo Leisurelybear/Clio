@@ -602,7 +602,7 @@ function renderCut() {
     </label>
     <label><input type="checkbox" id="cut-reencode"> 重新编码 (默认 -c copy 快速)</label>
     <label>输出目录 (留空则 output/cuts/&lt;day&gt;)
-      <input id="cut-outdir" placeholder="例如 E:/剪辑素材/第一天"></label>
+      <span class="input-with-browse"><input id="cut-outdir" placeholder="例如 E:/剪辑素材/第一天"><button class="browse-btn" data-target="cut-outdir" type="button">浏览</button></span></label>
     <hr>
     <button id="btn-cut-exec" class="primary" ${state.plan ? '' : 'disabled'}>执行裁剪</button>
     <div id="cut-result" style="margin-top:12px"></div>
@@ -652,6 +652,55 @@ async function executeCut() {
   }
 }
 
+/* ── Directory browser ── */
+let _browseResolve = null;  // callback(path) when user selects
+
+function openBrowseDir(targetInputId) {
+  const modal = $('modal-browse-dir');
+  if (!modal) return;
+  _browseResolve = (path) => {
+    const inp = document.getElementById(targetInputId);
+    if (inp) inp.value = path;
+  };
+  modal.style.display = 'flex';
+  loadBrowseDir('');
+}
+
+async function loadBrowseDir(path) {
+  const pathEl = $('browse-path');
+  const listEl = $('browse-dir-list');
+  const upBtn = $('browse-up');
+  const selectBtn = $('browse-select');
+  pathEl.textContent = '加载中...';
+  listEl.innerHTML = '';
+  upBtn.style.display = 'none';
+  selectBtn.disabled = true;
+  try {
+    const r = await api('GET', `/api/fs/dirs?path=${encodeURIComponent(path)}`);
+    if (r.error) { pathEl.textContent = '错误: ' + r.error; return; }
+    pathEl.textContent = r.path || '(选择驱动器)';
+    selectBtn.disabled = r.is_drive_list;
+    upBtn.style.display = r.parent && !r.is_drive_list ? '' : 'none';
+    upBtn.onclick = () => loadBrowseDir(r.parent);
+    if (r.is_drive_list) {
+      listEl.innerHTML = r.dirs.map(d =>
+        `<div class="browse-item" data-path="${d}">📁 ${d}</div>`
+      ).join('');
+    } else {
+      listEl.innerHTML = r.dirs.map(d =>
+        `<div class="browse-item" data-path="${d}">📁 ${d.replace(/^.*[\\/]/, '')}</div>`
+      ).join('');
+    }
+    // click to navigate
+    listEl.querySelectorAll('.browse-item').forEach(el => {
+      el.onclick = () => {
+        loadBrowseDir(el.dataset.path);
+      };
+    });
+  } catch (e) {
+    pathEl.textContent = '加载失败: ' + e.message;
+  }
+}
 let _runPollTimer = null;
 let _lastRunDay = 'day1';
 
@@ -948,6 +997,28 @@ async function init() {
     };
   });
 
+  // Browse buttons
+  document.querySelectorAll('.browse-btn').forEach(btn => {
+    btn.onclick = () => openBrowseDir(btn.dataset.target);
+  });
+  const browseSelect = $('browse-select');
+  if (browseSelect) {
+    browseSelect.onclick = () => {
+      const pathEl = $('browse-path');
+      if (!pathEl || !_browseResolve) return;
+      _browseResolve(pathEl.textContent);
+      _browseResolve = null;
+      $('modal-browse-dir').style.display = 'none';
+    };
+  }
+  const browseCancel = $('browse-cancel');
+  if (browseCancel) {
+    browseCancel.onclick = () => {
+      _browseResolve = null;
+      $('modal-browse-dir').style.display = 'none';
+    };
+  }
+
   $('btn-reload').onclick = async () => {
     try {
       const cur = state.currentVideo;
@@ -1070,6 +1141,13 @@ async function init() {
   $('op-custom-path').onkeydown = (e) => {
     if (e.key === 'Enter') $('op-open-path').click();
   };
+
+  // Browse modal backdrop close
+  const browseModal = $('modal-browse-dir');
+  if (browseModal) {
+    const backdrop = browseModal.querySelector('.modal-backdrop');
+    if (backdrop) backdrop.onclick = () => { _browseResolve = null; browseModal.style.display = 'none'; };
+  }
 }
 
 init();

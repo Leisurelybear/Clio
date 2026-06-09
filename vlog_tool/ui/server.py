@@ -13,6 +13,8 @@ import mimetypes
 import os
 import re
 import shutil
+import string
+import sys
 import tempfile
 import threading
 import traceback
@@ -730,6 +732,28 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 if not p.is_file():
                     return self._send_json({"error": f"规划文件不存在: {p}"}, 404)
                 return self._send_bytes(p.read_bytes(), "application/json; charset=utf-8")
+
+            if path == "/api/fs/dirs":
+                dir_path = qs.get("path", [""])[0]
+                if not dir_path:
+                    if sys.platform == "win32":
+                        drives = [f"{d}:\\" for d in string.ascii_uppercase if Path(f"{d}:\\").is_dir()]
+                        return self._send_json({"path": "", "dirs": drives, "parent": None, "is_drive_list": True})
+                    return self._send_json({"path": "/", "dirs": ["/"], "parent": None, "is_drive_list": True})
+                try:
+                    p = Path(dir_path).resolve()
+                    if not p.is_dir():
+                        return self._send_json({"error": "not a directory"}, 400)
+                    dirs = sorted(
+                        str(d) for d in p.iterdir()
+                        if d.is_dir() and not d.name.startswith(".")
+                    )
+                    parent = str(p.parent) if p.parent != p else None
+                    return self._send_json({"path": str(p), "dirs": dirs, "parent": parent, "is_drive_list": False})
+                except PermissionError:
+                    return self._send_json({"error": "access denied"}, 403)
+                except OSError as e:
+                    return self._send_json({"error": str(e)}, 500)
 
             return self.send_error(HTTPStatus.NOT_FOUND)
 

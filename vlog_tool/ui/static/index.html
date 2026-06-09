@@ -96,9 +96,9 @@
   <div class="modal-dialog">
     <h3>新建项目</h3>
     <label>项目名称 <input id="np-name" type="text" placeholder="如：2025国庆巴黎行"></label>
-    <label>素材目录 <input id="np-input-dir" type="text" placeholder="如：E:\Videos\Paris2025"></label>
+    <label>素材目录 <span class="input-with-browse"><input id="np-input-dir" type="text" placeholder="如：E:\Videos\Paris2025"><button class="browse-btn" data-target="np-input-dir" type="button">浏览</button></span></label>
     <p class="hint">素材目录需包含视频文件（.mp4/.mov/.mkv 等）</p>
-    <label>输出目录（可选） <input id="np-output-dir" type="text" placeholder="留空则自动创建到当前配置文件同级目录下"></label>
+    <label>输出目录（可选） <span class="input-with-browse"><input id="np-output-dir" type="text" placeholder="留空则自动创建到当前配置文件同级目录下"><button class="browse-btn" data-target="np-output-dir" type="button">浏览</button></span></label>
     <p class="hint">指定存放压缩、分析结果等中间文件的目录路径</p>
     <div class="modal-actions">
       <button id="np-cancel" class="secondary">取消</button>
@@ -123,6 +123,24 @@
     <div style="display:flex;gap:8px;">
       <input id="op-custom-path" type="text" placeholder="如：D:\Projects\MyVlog" style="flex:1;">
       <button id="op-open-path" class="primary">打开</button>
+      <button class="browse-btn" data-target="op-custom-path" type="button">浏览</button>
+    </div>
+  </div>
+</div>
+
+<!-- Directory Browser Modal -->
+<div id="modal-browse-dir" class="modal" style="display:none;">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog modal-dialog-wide">
+    <h3>选择目录</h3>
+    <div class="browse-path" id="browse-path">正在加载...</div>
+    <div class="browse-dir-list" id="browse-dir-list">
+      <p class="muted">正在加载...</p>
+    </div>
+    <div class="modal-actions" style="margin-top:12px;">
+      <button id="browse-up" class="secondary">上级目录</button>
+      <button id="browse-select" class="primary" disabled>选择当前目录</button>
+      <button id="browse-cancel" class="secondary">取消</button>
     </div>
   </div>
 </div>

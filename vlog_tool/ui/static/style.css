@@ -350,3 +350,35 @@ aside, section { overflow-y: auto; }
 /* sidebar heading with inline name */
 #sidebar h3 { display: flex; align-items: center; gap: 6px; }
 #proj-name-sidebar { font-size: 0.82em; font-weight: normal; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 140px; }
+
+/* input with browse button */
+.input-with-browse { display: flex; gap: 6px; }
+.input-with-browse input { flex: 1; }
+.browse-btn {
+  background: #2a2a2a; color: #ddd; border: 1px solid #444;
+  padding: 5px 12px; border-radius: 2px; cursor: pointer;
+  font: inherit; font-size: 0.85em; white-space: nowrap;
+}
+.browse-btn:hover { background: #3a3a3a; }
+
+/* directory browser modal */
+.modal-dialog-wide { min-width: 480px; max-width: 70vw; }
+.browse-path {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.85em; color: #4a9eff; padding: 6px 8px;
+  background: #1a1a1a; border: 1px solid #333; border-radius: 2px;
+  margin-bottom: 8px; word-break: break-all;
+}
+.browse-dir-list {
+  max-height: 50vh; overflow-y: auto;
+  border: 1px solid #333; border-radius: 2px; background: #1a1a1a;
+}
+.browse-item {
+  padding: 7px 10px; cursor: pointer; font-size: 0.9em;
+  border-bottom: 1px solid #2a2a2a;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+.browse-item:last-child { border-bottom: none; }
+.browse-item:hover { background: #094771; color: #fff; }
+.browse-item.selected { background: #094771; color: #fff; }
+.browse-item .browse-icon { margin-right: 6px; opacity: 0.6; }
