@@ -1047,6 +1047,27 @@ async function init() {
   };
   $('op-cancel').onclick = () => { openModal.style.display = 'none'; };
   openModal.querySelector('.modal-backdrop').onclick = () => { openModal.style.display = 'none'; };
+  // 自定义路径打开项目
+  $('op-open-path').onclick = async () => {
+    const path = $('op-custom-path').value.trim();
+    if (!path) { setStatus('请输入项目目录路径', 'warn'); return; }
+    try {
+      const r = await api('POST', '/api/project/add', { input_dir: path });
+      if (r.ok) {
+        openModal.style.display = 'none';
+        const name = r.project?.name || path.split(/[\\/]/).pop();
+        window.location.search = `?project=${encodeURIComponent(name)}`;
+      } else {
+        setStatus('打开项目失败: ' + (r.error || '未知错误'), 'err');
+      }
+    } catch (e) {
+      setStatus('打开项目失败: ' + e.message, 'err');
+    }
+  };
+  // Enter 键触发打开
+  $('op-custom-path').onkeydown = (e) => {
+    if (e.key === 'Enter') $('op-open-path').click();
+  };
 }
 
 init();
