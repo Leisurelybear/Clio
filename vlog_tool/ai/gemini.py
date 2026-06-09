@@ -60,19 +60,29 @@ class GeminiProvider:
         )
 
     def analyze_video(self, video_path: str, prompt: str, model: str) -> str:
+        # Upload once outside retry — B-002: avoid re-upload on transient errors
+        uploaded = self._client.files.upload(file=video_path)
+        uploaded = self._wait_for_file(uploaded)
+
         def _do() -> str:
-            uploaded = self._client.files.upload(file=video_path)
-            uploaded = self._wait_for_file(uploaded)
             response = self._client.models.generate_content(
                 model=model,
                 contents=[uploaded, prompt],
             )
             return response.text or ""
 
-        return with_retry(
-            _do,
-            attempts=3,
-            base_delay=1.0,
-            retry_on=_RETRY_ON,
-            what=f"Gemini 视频 {model}",
-        )
+        try:
+            return with_retry(
+                _do,
+                attempts=3,
+                base_delay=1.0,
+                retry_on=_RETRY_ON,
+                what=f"Gemini 视频 {model}",
+            )
+        finally:
+            # B-001: always clean up uploaded files to avoid quota exhaustion
+            if uploaded is not None:
+                try:
+                    self._client.files.delete(name=uploaded.name)
+                except Exception:
+                    pass
