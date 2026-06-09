@@ -267,7 +267,8 @@ async function selectVideo(file) {
   if (!v) return;
 
   const player = $('player');
-  player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}`;
+  const projParam = state.currentProjectName ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
+  player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${projParam}`;
   $('player-name').textContent = file;
 
   if (v.text_json) {
@@ -374,7 +375,8 @@ function playVideoSegment(file, seekTo) {
   } else {
     const onLoaded = () => { doSeek(); player.removeEventListener('loadedmetadata', onLoaded); };
     player.addEventListener('loadedmetadata', onLoaded);
-    player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}`;
+    const projParam = state.currentProjectName ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
+    player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${projParam}`;
   }
 }
 
