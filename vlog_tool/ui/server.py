@@ -27,7 +27,7 @@ from urllib.parse import parse_qs, urlparse
 
 import yaml
 
-from vlog_tool.config import AppConfig, load_config
+from vlog_tool.config import AppConfig, deep_merge, load_config
 from vlog_tool.pipeline import run_cut_all, run_pipeline_steps
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -576,17 +576,16 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             if path == "/api/config/raw":
                 if not config_path or not config_path.is_file():
                     return self._send_json({"error": "config file not available"}, 500)
-                # 支持 ?project=X 读取项目专属配置
+                # 读取全局配置 + 项目专属覆盖（如有），返回有效配置
                 proj_input = self._resolve_project_input(qs)
+                with open(config_path, "r", encoding="utf-8") as f:
+                    raw = yaml.safe_load(f) or {}
                 if proj_input != input_dir:
                     proj_yaml = proj_input / "project.yaml"
                     if proj_yaml.is_file():
                         with open(proj_yaml, "r", encoding="utf-8") as f:
-                            raw = yaml.safe_load(f) or {}
-                        return self._send_json(raw)
-                    # 无 project.yaml → 回退到全局配置（下方公共代码）
-                with open(config_path, "r", encoding="utf-8") as f:
-                    raw = yaml.safe_load(f) or {}
+                            project_raw = yaml.safe_load(f) or {}
+                        raw = deep_merge(raw, project_raw)
                 return self._send_json(raw)
 
             if path == "/api/project":
