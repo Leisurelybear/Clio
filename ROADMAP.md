@@ -216,8 +216,26 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 ## 暂存 / WIP
 
-- `templates/trip_context_2.md`（蓝色旗子场景的小补丁）— 写好但未启用，启用时只需在
-  `config.yaml` 把 `ai.context_file` 切到它
+- （暂无）
+
+## 文档维护（来自 2026-06-10 全面 review）
+
+| ID | 问题 | 说明 |
+| --- | --- | --- |
+| D-001 | AGENTS.md §7 commit 列表过期 | 最后一条是 R-007，缺 6 个新 commit |
+| D-002 | vlog_tool/ui/README.md 运行状态描述过期 | "▶ 运行灰显（待 R-005 实现）" — R-005 已完成 |
+| D-003 | README.md / README.en.md 未提 per-project 配置 | `project.yaml` 分层配置功能未写入用户文档 |
+| D-004 | config.example.yaml model 名与实际使用不符 | example 写 `deepseek-chat`，config.yaml 用 `deepseek-v4-flash`，应备注说明 |
+
+## 架构改进（来自 review，与设计文档 Phase 1 对齐）
+
+| ID | 问题 | 说明 |
+| --- | --- | --- |
+| A-001 | server.py → 989 行单一闭包 | 拆 routes/ + services.py（设计文档 Phase 1b） |
+| A-002 | app.js → 1076 行全局函数 | 拆 state.js / api.js / viewer.js（设计文档 Phase 1c） |
+| A-003 | `_write_text_file` / `_rewrite_text_file` 80% 重复 | 提取公共函数 |
+| A-004 | `updateEntityUI` 四个几乎相同的分支 | 用一个 selector 统一处理 |
+| A-005 | `project.json` output_dir 和 `project.yaml` paths.output_dir 不同步 | 两份配置来源不一致，应统一或互相感知
 
 ## 已知问题（Bug Tracker）
 
@@ -225,34 +243,42 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 ### P0 — 立即修复
 
-| ID | 问题 | 修复思路 |
-| --- | --- | --- |
-| B-001 | Gemini Files API 上传视频后未清理，耗尽配额 | `try/finally` 确保视频上传后请求删除 |
-| B-002 | with_retry 重试时重复上传同一视频 | 把上传移出重试逻辑，上传不重试 |
-| B-003 | 临时文件残留（中断时 .tmp 文件未被自动清理） | 改用 `tempfile.NamedTemporaryFile(delete=True)` 或 `try/finally` 清理 |
+| ID | 问题 | 修复思路 | 状态 |
+| --- | --- | --- | --- |
+| B-001 | Gemini Files API 上传视频后未清理，耗尽配额 | `try/finally` 确保视频上传后请求删除 | ✅ `a9996a9` |
+| B-002 | with_retry 重试时重复上传同一视频 | 把上传移出重试逻辑，上传不重试 | ✅ `a9996a9` |
+| B-003 | 临时文件残留（中断时 .tmp 文件未被自动清理） | 改用 `with` 语句或 `try/finally` 清理 | ✅ `0533051` |
+| B-012 | `_run()` 静默吞异常 — pipeline 失败 UI 无感知 | `except Exception: pass` → 写 progress.json error 状态 + 打印日志 | 🆕 |
+| B-013 | `apply_run_paths` 直接修改入参 config 对象 | 返回新 config 或 `copy.deepcopy()` 再修改 | 🆕 |
+| B-014 | `requirements.txt` 无版本号 — breaking change 风险 | `pip freeze` 锁版本，参考 R-009a | 🆕 |
 
 ### P1 — 近期
 
-| ID | 问题 | 修复思路 |
-| --- | --- | --- |
-| B-004 | ETA 估算偏低（成功项包含了失败项的时间） | 耗时统计移入 `finally` 块，只算成功项 |
-| B-007 | venv 跨平台检测只认 Windows `Scripts/`，Linux 是 `bin/` | 同时兼容 `bin/` 和 `Scripts/` |
+| ID | 问题 | 修复思路 | 状态 |
+| --- | --- | --- | --- |
+| B-004 | ETA 估算偏低（成功项包含了失败项的时间） | 耗时统计移入 `finally` 块，只算成功项 | |
+| B-007 | venv 跨平台检测只认 Windows `Scripts/`，Linux 是 `bin/` | 同时兼容 `bin/` 和 `Scripts/` | |
+| B-015 | `project.yaml` 写入时只做了 YAML 格式校验，未跑 `_validate_config` | `do_PUT /api/config/raw?project=X` 写前做完整合并校验 | 🆕 |
+| B-016 | `config.yaml` 里 `deepseek-v4-flash` 可能是无效模型名（AGENTS §8.4） | 确认实际可用模型名，更新 config 或加备注 | 🆕 |
 
 ### P2 — 中期
 
-| ID | 问题 | 修复思路 |
-| --- | --- | --- |
-| B-005 | Linux 下 `sorted(Path.iterdir())` 顺序不保证（glob 也不保证顺序） | 显式 `sorted()` 后再匹配 |
-| B-008 | 函数隐式修改入参（如 `analyze_video` 等修改传入的 dict 字段） | 入参 `deepcopy()` 避免副作用 |
-| B-006 | （与 R-007/R-008 合并实施，参见 F-001） | — |
+| ID | 问题 | 修复思路 | 状态 |
+| --- | --- | --- | --- |
+| B-005 | Linux 下 `sorted(Path.iterdir())` 顺序不保证（glob 也不保证顺序） | 显式 `sorted()` 后再匹配 | |
+| B-008 | 函数隐式修改入参（如 `analyze_video` 等修改传入的 dict 字段） | 入参 `deepcopy()` 避免副作用 | |
+| B-017 | `_find_texts_dirs` 匹配 `texts*` 太宽 — `texts_backup` 也会匹配 | 用更精确的 glob 或加排除规则 | 🆕 |
+| B-018 | `_config_cache` 只增不减（仅在 PUT config 时 pop） | 项目列表刷新时清理失效缓存 | 🆕 |
 
 ### P3 — 长期
 
-| ID | 问题 | 修复思路 |
-| --- | --- | --- |
-| B-009 | AI 偶尔输出非纯 JSON，`extract_json` 解析失败 | 更精准提取合法 JSON（递归剥离 markdown） |
-| B-011 | 新用户 `python main.py check` 误判失败（提示不够友好） | 优化 check 步骤提示信息 |
-| B-010 | （待进一步确认） | — |
+| ID | 问题 | 修复思路 | 状态 |
+| --- | --- | --- | --- |
+| B-009 | AI 偶尔输出非纯 JSON，`extract_json` 解析失败 | 更精准提取合法 JSON（递归剥离 markdown） | |
+| B-011 | 新用户 `python main.py check` 误判失败（提示不够友好） | 优化 check 步骤提示信息 | |
+| B-010 | （待进一步确认） | — | |
+| B-019 | `VIDEO_EXTS` 重复定义（utils.py 含 .avi/.mkv，server.py 没有） | 移到 `vlog_tool/_constants.py` 统一引用 | 🆕 |
+| B-020 | `_write_csv` 中 `format_index(rec.index, 3)` 硬编码 `3` 而非使用 config | 改用 `config.naming.index_width` | 🆕 |
 
 ## 性能优化
 
@@ -266,6 +292,12 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `80e83ec` | fix(ui): fall back to global config when project has no project.yaml |
+| `41ba068` | fix: address review findings - gemini cleanup scope + project config validation |
+| `d785643` | chore: add local state files to .gitignore |
+| `d6d62ef` | feat(config): per-project configuration via project.yaml (deep-merge + _get_config cache) |
+| `0533051` | fix(ui): prevent temp file leak on interrupt (B-003) |
+| `a9996a9` | fix(ai): clean up Gemini File API uploads + move upload out of retry (B-001, B-002) |
 | `a93b5f5` | R-004 UI 配置编辑（后端 raw config API / 递归嵌套表单 / 校验 + .bak 保存 / 文档） |
 | `6706dc3` | R-002 CLI 裁剪（cut.py + run_cut_all + 子命令 + manifest.md + 文档） |
 | `f3fc932`..`2ad23f5` | R-002 UI 裁剪（POST /api/cut + sidebar 裁剪 tab + cut 表单 + 进度提示） |
