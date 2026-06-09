@@ -126,64 +126,209 @@ def _coerce_config_types(new_val: Any, ref_val: Any) -> Any:
 
 
 def make_handler(config: AppConfig, config_path: Path | None = None) -> type[BaseHTTPRequestHandler]:
-    output_dir = config.paths.output_dir
-    input_dir = config.paths.input_dir
+    output_dir = config.paths.output_dir   # 默认输出目录（来自 config.yaml）
+    input_dir = config.paths.input_dir       # 项目根目录（素材目录）
     static_dir = STATIC_DIR
-    project_path = output_dir / "project.json"
+    project_path = input_dir / "project.json"
+
+    # 兼容旧版：如果新位置没有 project.json，从旧位置迁移
+    old_project_path = output_dir / "project.json"
+    if not project_path.is_file() and old_project_path.is_file():
+        try:
+            shutil.copy2(old_project_path, project_path)
+        except OSError:
+            pass
+    # 迁移后修复 name：如果 name 是旧 output_dir 的名称，改为 input_dir 名称
+    if project_path.is_file():
+        try:
+            cur = json.loads(project_path.read_text(encoding="utf-8"))
+            if cur.get("name") == output_dir.name and input_dir.name != output_dir.name:
+                cur["name"] = input_dir.name
+                project_path.write_text(json.dumps(cur, ensure_ascii=False, indent=2), encoding="utf-8")
+        except (json.JSONDecodeError, OSError):
+            pass
 
     DEFAULT_PROJECT = {
         "currentDay": "day1",
         "source": "compressed",
-        "name": output_dir.name,
+        "name": input_dir.name,
+        "output_dir": str(output_dir.resolve()),  # 默认输出目录
         "lastEntity": None,
         "lastVideo": None,
     }
 
-    def _detect_steps(output_dir: Path) -> dict:
+    def _project_output_dir(proj_input_dir: Path) -> Path:
+        """根据 project.json 或默认值返回项目的输出目录。"""
+        proj_file = proj_input_dir / "project.json"
+        if proj_file.is_file():
+            try:
+                data = json.loads(proj_file.read_text(encoding="utf-8"))
+                out = data.get("output_dir") or "output"
+            except (json.JSONDecodeError, OSError):
+                out = "output"
+        else:
+            out = "output"
+        out_path = Path(out)
+        if not out_path.is_absolute():
+            out_path = (proj_input_dir / out_path).resolve()
+        return out_path
+
+    def _detect_steps(proj_output_dir: Path) -> dict:
         """从文件系统推断各 pipeline 步骤是否已完成。"""
         steps = {}
-        comp = output_dir / "compressed"
-        steps["compress"] = comp.is_dir() and any(comp.iterdir())
-        texts = [d for d in output_dir.iterdir() if d.is_dir() and d.name.startswith("texts")]
-        steps["analyze"] = any(t.iterdir() for t in texts)
-        steps["scripts"] = (output_dir / "scripts").is_dir() and any((output_dir / "scripts").iterdir())
-        plans_dir = output_dir / "plans"
-        steps["plan"] = plans_dir.is_dir() and any(plans_dir.iterdir())
-        steps["label"] = (output_dir / "labeled").is_dir() and any((output_dir / "labeled").iterdir())
-        steps["cut"] = (output_dir / "cuts").is_dir() and any((output_dir / "cuts").iterdir())
+        if not proj_output_dir.is_dir():
+            return {k: False for k in ("compress", "analyze", "scripts", "plan", "label", "cut")}
+        comp = proj_output_dir / "compressed"
+        try:
+            steps["compress"] = comp.is_dir() and any(comp.iterdir())
+        except (PermissionError, OSError):
+            steps["compress"] = False
+        texts = [d for d in proj_output_dir.iterdir() if d.is_dir() and d.name.startswith("texts")]
+        try:
+            steps["analyze"] = any(t.iterdir() for t in texts)
+        except (PermissionError, OSError):
+            steps["analyze"] = False
+        scripts_dir = proj_output_dir / "scripts"
+        try:
+            steps["scripts"] = scripts_dir.is_dir() and any(scripts_dir.iterdir())
+        except (PermissionError, OSError):
+            steps["scripts"] = False
+        plans_dir = proj_output_dir / "plans"
+        try:
+            steps["plan"] = plans_dir.is_dir() and any(plans_dir.iterdir())
+        except (PermissionError, OSError):
+            steps["plan"] = False
+        try:
+            steps["label"] = (proj_output_dir / "labeled").is_dir() and any((proj_output_dir / "labeled").iterdir())
+        except (PermissionError, OSError):
+            steps["label"] = False
+        try:
+            steps["cut"] = (proj_output_dir / "cuts").is_dir() and any((proj_output_dir / "cuts").iterdir())
+        except (PermissionError, OSError):
+            steps["cut"] = False
         return steps
 
+    def _registry_path() -> Path:
+        if config_path:
+            return config_path.parent / "projects.json"
+        return Path("projects.json")
+
+    def _add_to_registry(dir_path: str) -> None:
+        registry_file = _registry_path()
+        paths: list[str] = []
+        if registry_file.is_file():
+            try:
+                reg = json.loads(registry_file.read_text(encoding="utf-8"))
+                paths = reg.get("projects", [])
+            except (json.JSONDecodeError, OSError):
+                paths = []
+        normalized = str(Path(dir_path).resolve())
+        if normalized not in paths:
+            paths.append(normalized)
+        data = json.dumps({"projects": paths}, ensure_ascii=False, indent=2).encode("utf-8")
+        _save_atomic(registry_file, data)
+
     def _list_projects(current_project_name: str | None = None) -> list[dict]:
-        """列出所有可用项目。可指定当前项目名标记 `is_current`。"""
-        projects_root = output_dir.parent
-        projects = []
+        """列出所有可用项目。"""
+        projects: list[dict] = []
+        seen_dirs: set[str] = set()
+
+        # 1. 从注册文件读已知项目
+        registry_file = _registry_path()
+        registered_paths: list[str] = []
+        if registry_file.is_file():
+            try:
+                reg = json.loads(registry_file.read_text(encoding="utf-8"))
+                registered_paths = reg.get("projects", [])
+            except (json.JSONDecodeError, OSError):
+                registered_paths = []
+        for p_str in registered_paths:
+            p = Path(p_str)
+            proj_file = p / "project.json"
+            if not proj_file.is_file():
+                continue
+            try:
+                data = json.loads(proj_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                data = {}
+            name = data.get("name") or p.name
+            proj_out = _project_output_dir(p)
+            seen_dirs.add(str(p.resolve()))
+            projects.append({
+                "name": name,
+                "input_dir": str(p),
+                "output_dir": str(proj_out),
+                "currentDay": data.get("currentDay", "day1"),
+                "source": data.get("source", "compressed"),
+                "steps": _detect_steps(proj_out),
+                "createdAt": data.get("createdAt"),
+                "updatedAt": data.get("updatedAt"),
+                "is_current": (
+                    name == current_project_name
+                    if current_project_name
+                    else p.resolve() == input_dir.resolve()
+                ),
+            })
+
+        # 2. 扫描 input_dir 的相邻目录（自动发现）
+        projects_root = input_dir.parent
         if projects_root.is_dir():
             for p in sorted(projects_root.iterdir()):
-                if p.is_dir():
-                    proj_file = p / "project.json"
-                    if proj_file.is_file():
-                        try:
-                            data = json.loads(proj_file.read_text(encoding="utf-8"))
-                        except (json.JSONDecodeError, OSError):
-                            data = {}
-                        name = data.get("name") or p.name
-                        input_dir = data.get("input_dir") or str(config.paths.input_dir)
-                        projects.append({
-                            "name": name,
-                            "output_dir": str(p),
-                            "input_dir": input_dir,
-                            "currentDay": data.get("currentDay", "day1"),
-                            "source": data.get("source", "compressed"),
-                            "steps": _detect_steps(p),
-                            "createdAt": data.get("createdAt"),
-                            "updatedAt": data.get("updatedAt"),
-                            "is_current": (
-                                name == current_project_name
-                                if current_project_name
-                                else p == output_dir
-                            ),
-                        })
-        return projects
+                if not p.is_dir():
+                    continue
+                proj_file = p / "project.json"
+                if not proj_file.is_file():
+                    continue
+                res = p.resolve()
+                if str(res) in seen_dirs:
+                    continue
+                try:
+                    data = json.loads(proj_file.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    data = {}
+                name = data.get("name") or p.name
+                proj_out = _project_output_dir(p)
+                projects.append({
+                    "name": name,
+                    "input_dir": str(p),
+                    "output_dir": str(proj_out),
+                    "currentDay": data.get("currentDay", "day1"),
+                    "source": data.get("source", "compressed"),
+                    "steps": _detect_steps(proj_out),
+                    "createdAt": data.get("createdAt"),
+                    "updatedAt": data.get("updatedAt"),
+                    "is_current": (
+                        name == current_project_name
+                        if current_project_name
+                        else p.resolve() == input_dir.resolve()
+                    ),
+                })
+
+        # 3. 始终包含当前 input_dir（兜底）
+        cur_resolved = str(input_dir.resolve())
+        if cur_resolved not in seen_dirs:
+            proj_file = input_dir / "project.json"
+            if proj_file.is_file():
+                try:
+                    data = json.loads(proj_file.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    data = {}
+            else:
+                data = {}
+            name = data.get("name") or input_dir.name
+            proj_out = _project_output_dir(input_dir)
+            projects.append({
+                "name": name,
+                "input_dir": str(input_dir),
+                "output_dir": str(proj_out),
+                "currentDay": data.get("currentDay", "day1"),
+                "source": data.get("source", "compressed"),
+                "steps": _detect_steps(proj_out),
+                "createdAt": data.get("createdAt"),
+                "updatedAt": data.get("updatedAt"),
+                "is_current": name == current_project_name if current_project_name else True,
+            })
+
         return projects
 
     class Handler(BaseHTTPRequestHandler):
@@ -643,6 +788,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 import datetime
                 name = (obj.get("name") or "").strip()
                 input_dir_raw = (obj.get("input_dir") or "").strip()
+                output_dir_raw = (obj.get("output_dir") or "").strip()
                 if not name:
                     return self._send_json({"ok": False, "error": "name is required"}, 400)
                 if not input_dir_raw:
@@ -650,22 +796,14 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 input_path = Path(input_dir_raw)
                 if not input_path.is_dir():
                     return self._send_json({"ok": False, "error": f"input_dir not found: {input_dir_raw}"}, 400)
-                # 生成安全的目录名
-                safe_name = re.sub(r"[^a-zA-Z0-9_\-\u4e00-\u9fff]", "_", name)
-                projects_root = output_dir.parent
-                proj_dir = projects_root / safe_name
-                # 如果同名目录已存在，加后缀
-                i = 1
-                orig_name = safe_name
-                while proj_dir.is_dir():
-                    safe_name = f"{orig_name}_{i}"
-                    proj_dir = projects_root / safe_name
-                    i += 1
-                proj_dir.mkdir(parents=True, exist_ok=True)
+                if output_dir_raw:
+                    proj_out = Path(output_dir_raw)
+                else:
+                    proj_out = input_path / "output"
                 now = datetime.datetime.now().isoformat(timespec="seconds")
                 proj_data = {
                     "name": name,
-                    "input_dir": str(input_path),
+                    "output_dir": str(proj_out),
                     "currentDay": "day1",
                     "source": "compressed",
                     "lastEntity": None,
@@ -673,12 +811,29 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     "createdAt": now,
                     "updatedAt": now,
                 }
-                proj_file = proj_dir / "project.json"
+                proj_file = input_path / "project.json"
                 proj_file.write_text(
                     json.dumps(proj_data, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
-                return self._send_json({"ok": True, "project": {"name": name, "output_dir": str(proj_dir), "input_dir": str(input_path)}})
+                _add_to_registry(str(input_path))
+                return self._send_json({"ok": True, "project": {"name": name, "input_dir": str(input_path), "output_dir": str(proj_out)}})
+
+            if path == "/api/project/add":
+                input_dir_raw = (obj.get("input_dir") or "").strip()
+                if not input_dir_raw:
+                    return self._send_json({"ok": False, "error": "input_dir is required"}, 400)
+                input_path = Path(input_dir_raw)
+                proj_file = input_path / "project.json"
+                if not proj_file.is_file():
+                    return self._send_json({"ok": False, "error": f"指定目录下没有 project.json: {input_dir_raw}"}, 400)
+                try:
+                    data = json.loads(proj_file.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError) as e:
+                    return self._send_json({"ok": False, "error": f"无法读取 project.json: {e}"}, 400)
+                name = data.get("name") or input_path.name
+                _add_to_registry(str(input_path))
+                return self._send_json({"ok": True, "project": {"name": name, "input_dir": str(input_path)}})
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
