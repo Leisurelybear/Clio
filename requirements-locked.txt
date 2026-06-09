@@ -1,0 +1,7 @@
+# Locked dependency versions (2026-06-10)
+# Generated from working venv — pin exact versions for reproducible builds.
+# If you need newer packages, update here; the loose requirements.txt
+# is for quick prototyping.
+google-genai==2.7.0
+httpx[socks]==0.28.1
+pyyaml==6.0.3

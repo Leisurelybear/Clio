@@ -15,6 +15,7 @@ import re
 import shutil
 import tempfile
 import threading
+import traceback
 import webbrowser
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -756,14 +757,18 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                         yml = yaml.dump(obj, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
                     except Exception as e:
                         return self._send_json({"ok": False, "error": f"YAML 序列化失败: {e}"}, 400)
-                    # 轻量校验：确保新内容是合法 YAML dict（完整合并在写入后由 _get_config 触发）
+                    # 完整校验：先写入目标位置，加载合并配置验证，失败则还原
+                    orig_backup = target_path.read_bytes() if target_path.is_file() else None
                     try:
-                        test = yaml.safe_load(yml)
-                        if not isinstance(test, dict):
-                            raise ValueError("配置必须是 YAML 对象（键值对）")
+                        _save_atomic(target_path, yml.encode("utf-8"))
+                        load_config(config_path, project_dir=proj_input)
                     except Exception as e:
-                        return self._send_json({"ok": False, "error": f"配置格式错误: {e}"}, 400)
-                    _save_atomic(target_path, yml.encode("utf-8"))
+                        # 校验失败 → 还原原文件
+                        if orig_backup is not None:
+                            target_path.write_bytes(orig_backup)
+                        else:
+                            target_path.unlink(missing_ok=True)
+                        return self._send_json({"ok": False, "error": f"配置校验失败: {e}"}, 400)
                     # 清除项目配置缓存，下次重新加载
                     self.__class__._config_cache.pop(str(proj_input.resolve()), None)
                     return self._send_json({"ok": True, "path": str(target_path)})
@@ -870,7 +875,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     try:
                         run_pipeline_steps(cfg, day_label, steps)
                     except Exception:
-                        pass
+                        traceback.print_exc()
                 self._run_thread = threading.Thread(target=_run, daemon=True)
                 self._run_thread.start()
                 label = "+".join(steps) if steps else "全部"

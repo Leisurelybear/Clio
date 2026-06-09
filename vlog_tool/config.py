@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -332,7 +333,8 @@ def apply_run_paths(
     output_dir: Path | None = None,
     output_by_input_name: bool = True,
 ) -> AppConfig:
-    """CLI 覆盖输入/输出目录。"""
+    """CLI 覆盖输入/输出目录。返回新对象，不修改入参。"""
+    config = deepcopy(config)
     if input_dir:
         config.paths.input_dir = input_dir.resolve()
     if output_dir:

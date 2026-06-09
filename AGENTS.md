@@ -251,7 +251,8 @@ ai:
 ### 8.4 DeepSeek 模型名
 
 - 标准模型：`deepseek-chat`（V3）、`deepseek-reasoner`（R1）
-- 用户配置里的 `deepseek-v4-flash` 是占位/自定义名 → 实际请求 404 时改回 `deepseek-chat`
+- 三方 API 网关可能支持自定义名如 `deepseek-v4-flash`，按实际可用名填写即可
+- 如遇 `404` 或 `model not found`，先回退到官网标准模型名验证
 
 ### 8.5 `api_key_env` 字段
 
