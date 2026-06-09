@@ -106,7 +106,7 @@ async function loadProjects() {
     const r = await api('GET', '/api/projects');
     state.projects = r.projects || [];
     state.currentProject = state.projects.find(p => p.is_current) || null;
-    if (state.currentProject) {
+    if (state.currentProject && !state.currentProjectName) {
       state.currentProjectName = state.currentProject.name;
     }
     updateProjectSidebar();
@@ -125,7 +125,7 @@ function updateProjectSidebar() {
 
 async function loadConfig() {
   state.config = await api('GET', '/api/config');
-  $('proj-name').textContent = state.config.output_dir;
+  $('proj-name').textContent = state.config.input_dir;
   $('proj-name').title = `input: ${state.config.input_dir}\noutput: ${state.config.output_dir}`;
 }
 
@@ -151,7 +151,7 @@ function updateSidebarDay() {
   sel.onchange = async () => {
     const day = sel.value;
     if (day === state.currentDay) return;
-    if (state.dirty && !confirm('切换日标签将丢弃当前修改，确定吗？')) { sel.value = state.currentDay; return; }
+    if (state.dirty && !confirm('切换分集将丢弃当前修改，确定吗？')) { sel.value = state.currentDay; return; }
     state.currentDay = day;
     state.plan = null;  // 总是清空，保证下次点 plan tab 时重新拉取
     state.dirty = false;
@@ -523,7 +523,7 @@ function renderPlan() {
   pane.innerHTML = `
     <h3>日 vlog 元信息</h3>
     ${state.availablePlans.length >= 1 ? `
-    <label>日标签
+    <label>分集
       <select id="plan-day-select">
         ${state.availablePlans.map(dp =>
           `<option value="${dp.day_label}" ${dp.day_label === state.currentDay ? 'selected' : ''}>${dp.day_label}</option>`
@@ -543,7 +543,7 @@ function renderPlan() {
     daySelect.onchange = async () => {
       const day = daySelect.value;
       if (day === state.currentDay) return;
-      if (state.dirty && !confirm('切换日标签将丢弃当前修改，确定吗？')) { daySelect.value = state.currentDay; return; }
+      if (state.dirty && !confirm('切换分集将丢弃当前修改，确定吗？')) { daySelect.value = state.currentDay; return; }
       state.currentDay = day;
       state.plan = null;
       state.dirty = false;
@@ -672,7 +672,7 @@ function renderRun() {
   pane.innerHTML = `
     <h3>运行流水线</h3>
     <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
-    <label>日标签 <input id="run-day" value="${escapeHtml(state.currentDay)}"></label>
+    <label>分集 <input id="run-day" value="${escapeHtml(state.currentDay)}"></label>
     <div class="run-step-list">${stepChecks}</div>
     <button id="btn-run-start" class="primary">▶ 运行选中步骤</button>
     <div id="run-progress" style="margin-top:12px">
@@ -900,7 +900,7 @@ async function init() {
     await loadProjects();
     // 如果 URL 指定了项目，但当前不是该项目，需要重载
     if (urlProject && (!state.currentProject || state.currentProject.name !== urlProject)) {
-      // 页面会自动重载，因为切换时会设置 URL 参数
+      state.currentProjectName = urlProject;
     }
     await loadConfig();
     await loadProject();
@@ -919,7 +919,7 @@ async function init() {
     if (state.videos.length) {
       await selectVideo(state.videos[0].file);
     } else {
-      setStatus('output_dir 下没有视频文件', 'warn');
+      setStatus('项目目录下没有视频文件', 'warn');
       renderVideoList(); // 显示空状态
     }
   } catch (e) {
@@ -988,9 +988,12 @@ async function init() {
   $('np-create').onclick = async () => {
     const name = $('np-name').value.trim();
     const inputDir = $('np-input-dir').value.trim();
+    const outputDir = $('np-output-dir').value.trim();
     if (!name || !inputDir) { setStatus('请填写项目名称和素材目录', 'warn'); return; }
     try {
-      const r = await api('POST', '/api/project/create', { name, input_dir: inputDir });
+      const body = { name, input_dir: inputDir };
+      if (outputDir) body.output_dir = outputDir;
+      const r = await api('POST', '/api/project/create', body);
       if (r.ok) {
         newModal.style.display = 'none';
         window.location.search = `?project=${encodeURIComponent(name)}`;
@@ -1016,8 +1019,8 @@ async function init() {
           <div class="project-card ${p.is_current ? 'active' : ''}" data-name="${escapeHtml(p.name)}">
             <div class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(当前)' : ''}</div>
             <div class="project-card-meta">
-              输出目录: ${escapeHtml(p.output_dir)}<br>
               素材目录: ${escapeHtml(p.input_dir)}<br>
+              输出目录: ${escapeHtml(p.output_dir)}<br>
               步骤: ${[['compress','压缩'],['analyze','分析'],['scripts','口播'],['plan','规划'],['label','标号'],['cut','裁剪']]
                 .map(([k,l]) => p.steps?.[k] ? `<span class="step-dot done" title="${l}已完成">✓${l}</span>` : `<span class="step-dot" title="${l}未完成">○${l}</span>`)
                 .join(' ')}
