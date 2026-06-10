@@ -452,7 +452,7 @@ def _load_analysis_for_script(script_path: Path, texts_dir: Path) -> dict | None
     return None
 
 
-def run_refine_texts(config: AppConfig, path: Path | None = None, fix: str | None = None) -> int:
+def run_refine_texts(config: AppConfig, path: Path | None = None, fix: str | None = None, context_override: str | None = None) -> int:
     """审阅并修正 texts/*.json；同步重写同名 .txt。返回处理条数。
 
     fix 非空时：仅处理 -i 指定的单文件，prompt 切换为「按用户意见定向修正」。
@@ -475,7 +475,7 @@ def run_refine_texts(config: AppConfig, path: Path | None = None, fix: str | Non
             t0 = time.monotonic()
             analysis = json.loads(json_file.read_text(encoding="utf-8"))
             try:
-                refined = refine_text(analysis, config, fix=fix)
+                refined = refine_text(analysis, config, fix=fix, context_override=context_override)
             except Exception as e:
                 print(f"  失败: {e}")
                 continue
@@ -492,7 +492,7 @@ def run_refine_texts(config: AppConfig, path: Path | None = None, fix: str | Non
     return len(files)
 
 
-def run_refine_scripts(config: AppConfig, path: Path | None = None, fix: str | None = None) -> int:
+def run_refine_scripts(config: AppConfig, path: Path | None = None, fix: str | None = None, context_override: str | None = None) -> int:
     """审阅并修正 scripts/*_voiceover.json；同步重写同名 .md。
 
     fix 非空时：仅处理 -i 指定的单文件。
@@ -516,7 +516,7 @@ def run_refine_scripts(config: AppConfig, path: Path | None = None, fix: str | N
             script = json.loads(json_file.read_text(encoding="utf-8"))
             analysis = _load_analysis_for_script(json_file, config.texts_dir)
             try:
-                refined = refine_script(script, analysis, config, fix=fix)
+                refined = refine_script(script, analysis, config, fix=fix, context_override=context_override)
             except Exception as e:
                 print(f"  失败: {e}")
                 continue
