@@ -208,12 +208,14 @@ def main(argv: list[str] | None = None) -> int:
         return run_check(config_path, getattr(args, "input", None))
 
     # ── Single-file detection ────────────────────────────────────────
-    # If -i points to a single file, don't let _prepare_config set it as input_dir
+    # If -i points to a single file for compress/analyze/scripts,
+    # don't let _prepare_config set it as input_dir (refine already handles -i correctly)
     single_file: Path | None = None
-    raw_input = getattr(args, "input", None)
-    if raw_input is not None and raw_input.is_file():
-        single_file = raw_input
-        args.input = None  # null out so _prepare_config doesn't use it
+    if args.command in ("compress", "analyze", "scripts"):
+        raw_input = getattr(args, "input", None)
+        if raw_input is not None and raw_input.is_file():
+            single_file = raw_input
+            args.input = None  # null out so _prepare_config doesn't use it
 
     config = _prepare_config(config_path, args)
     if args.force:
