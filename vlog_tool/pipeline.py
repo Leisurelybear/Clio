@@ -172,16 +172,24 @@ def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None
             })
 
 
-def run_compress_all(config: AppConfig) -> list[ClipRecord]:
-    videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
+def run_compress_all(config: AppConfig, single_file: Path | None = None) -> list[ClipRecord]:
+    if single_file:
+        videos = [single_file]
+    else:
+        videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
     config.compressed_dir.mkdir(parents=True, exist_ok=True)
     records: list[ClipRecord] = []
+
+    index_offset = 0
+    if single_file:
+        index_offset = _next_index(config.compressed_dir, config.naming.index_width) - 1
 
     with timed(f"run_compress_all（{len(videos)} 个）"):
         completed = 0
         elapsed_total = 0.0
         for i, video in enumerate(videos, start=1):
-            idx = format_index(i, config.naming.index_width)
+            idx_val = i + index_offset
+            idx = format_index(idx_val, config.naming.index_width)
             out = config.compressed_dir / f"{idx}_{video.stem}.mp4"
             if config.analyze.skip_existing and out.exists():
                 print(f"[跳过压缩] {video.name} (已存在: {out.name})")
@@ -191,7 +199,7 @@ def run_compress_all(config: AppConfig) -> list[ClipRecord]:
                 compress_video(video, out, config)
                 elapsed_total += time.monotonic() - t0
                 completed += 1
-            records.append(ClipRecord(index=i, stem=out.stem, source_path=video, compressed_path=out))
+            records.append(ClipRecord(index=idx_val, stem=out.stem, source_path=video, compressed_path=out))
     return records
 
 
