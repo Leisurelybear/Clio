@@ -3,7 +3,7 @@ const state = {
   configRaw: null,
   source: 'compressed',
   videos: [],
-  currentEntity: 'video',  // 'video' | 'plan' | 'cut' | 'config'
+  currentEntity: 'video',  // 'video' | 'plan' | 'run' | 'config'
   currentVideo: null,
   currentDay: 'day1',
   availablePlans: [],
@@ -160,7 +160,7 @@ async function loadProject() {
     }
     state.steps = proj.steps || {};
     state.projectName = proj.name || '';
-    if (proj.lastEntity && ['video', 'plan', 'cut', 'config'].includes(proj.lastEntity)) {
+    if (proj.lastEntity && ['video', 'plan', 'run', 'config'].includes(proj.lastEntity)) {
       state.lastEntity = proj.lastEntity;
     }
     if (proj.lastVideo) state.lastVideo = proj.lastVideo;
@@ -390,19 +390,8 @@ async function initProjectConfig() {
   }
 }
 
-async function selectCut() {
-  if (state.dirty) {
-    if (!confirm('当前 tab 有未保存的修改，确定切换到裁剪吗？')) return;
-  }
-  state.currentEntity = 'cut';
-  state.dirty = false;
-  updateEntityUI();
-  renderActiveTab();
-}
-
 function updateEntityUI() {
   const cls = state.currentEntity === 'plan' ? 'entity-plan'
-    : state.currentEntity === 'cut' ? 'entity-cut'
     : state.currentEntity === 'run' ? 'entity-run'
     : state.currentEntity === 'config' ? 'entity-config'
     : 'entity-video';
@@ -410,9 +399,6 @@ function updateEntityUI() {
   $$('.project-item').forEach(p => p.classList.remove('active'));
   if (state.currentEntity === 'plan') {
     document.querySelector('.project-item[data-entity="plan"]').classList.add('active');
-    $$('.video-item').forEach(v => v.classList.remove('active'));
-  } else if (state.currentEntity === 'cut') {
-    document.querySelector('.project-item[data-entity="cut"]').classList.add('active');
     $$('.video-item').forEach(v => v.classList.remove('active'));
   } else if (state.currentEntity === 'run') {
     document.querySelector('.project-item[data-entity="run"]').classList.add('active');
@@ -474,10 +460,6 @@ async function setSource(source) {
 function renderActiveTab() {
   if (state.currentEntity === 'plan') {
     renderPlan();
-    return;
-  }
-  if (state.currentEntity === 'cut') {
-    renderCut();
     return;
   }
   if (state.currentEntity === 'run') {
@@ -641,16 +623,13 @@ function renderPlan() {
     });
     ol.appendChild(li);
   });
-}
 
-function renderCut() {
-  const pane = $('tab-cut');
-  const planHint = state.plan
-    ? `基于规划: ${escapeHtml(state.currentDay)}`
-    : `<span class="err">暂无规划，请先运行 CLI <code>python main.py plan</code></span>`;
-  pane.innerHTML = `
-    <h3>裁剪设置</h3>
-    <p class="hint">${planHint}</p>
+  // ── 裁剪区块 ─────────────────────────────────────────────────────
+  const cutSection = document.createElement('div');
+  cutSection.className = 'cut-section';
+  cutSection.innerHTML = `
+    <h3>裁剪此分集</h3>
+    <p class="hint">基于规划 ${escapeHtml(state.currentDay)} 裁剪所有片段</p>
     <label>视频来源
       <select id="cut-source">
         <option value="compressed" selected>压缩版 (compressed)</option>
@@ -660,10 +639,10 @@ function renderCut() {
     <label><input type="checkbox" id="cut-reencode"> 重新编码 (默认 -c copy 快速)</label>
     <label>输出目录 (留空则 output/cuts/&lt;day&gt;)
       <span class="input-with-browse"><input id="cut-outdir" placeholder="例如 E:/剪辑素材/第一天"><button class="browse-btn" data-target="cut-outdir" type="button">浏览</button></span></label>
-    <hr>
-    <button id="btn-cut-exec" class="primary" ${state.plan ? '' : 'disabled'}>执行裁剪</button>
+    <button id="btn-cut-exec" class="primary">执行裁剪</button>
     <div id="cut-result" style="margin-top:12px"></div>
   `;
+  pane.appendChild(cutSection);
   $('btn-cut-exec').onclick = executeCut;
 }
 
@@ -975,7 +954,7 @@ function renderConfig() {
 async function save() {
   if (!state.dirty) { setStatus('没有改动需要保存', 'warn'); return; }
   try {
-  if (state.currentEntity === 'cut' || state.currentEntity === 'run') {
+  if (state.currentEntity === 'run') {
     setStatus('当前视图不需要保存', 'warn');
     return;
   }
@@ -1063,7 +1042,6 @@ async function init() {
       // 点中 select 下拉框时不切换实体（由 select.onchange 处理）
       if (e.target.tagName === 'SELECT') return;
       if (p.dataset.entity === 'plan') selectPlan();
-      else if (p.dataset.entity === 'cut') selectCut();
       else if (p.dataset.entity === 'run') selectRun();
       else if (p.dataset.entity === 'config') selectConfig();
     };
