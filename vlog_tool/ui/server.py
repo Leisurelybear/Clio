@@ -746,12 +746,20 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     p = Path(dir_path).resolve()
                     if not p.is_dir():
                         return self._send_json({"error": "not a directory"}, 400)
-                    dirs = sorted(
-                        str(d) for d in p.iterdir()
-                        if d.is_dir() and not d.name.startswith(".")
-                    )
+                    dirs: list[str] = []
+                    try:
+                        with os.scandir(p) as it:
+                            for entry in it:
+                                if entry.is_dir() and not entry.name.startswith("."):
+                                    dirs.append(entry.path)
+                    except PermissionError:
+                        pass
+                    dirs.sort(key=lambda x: Path(x).name.lower())
                     parent = str(p.parent) if p.parent != p else None
-                    return self._send_json({"path": str(p), "dirs": dirs, "parent": parent, "is_drive_list": False})
+                    return self._send_json({
+                        "path": str(p), "dirs": dirs,
+                        "parent": parent, "is_drive_list": False,
+                    })
                 except PermissionError:
                     return self._send_json({"error": "access denied"}, 403)
                 except OSError as e:
