@@ -43,6 +43,22 @@ def _build_stem(index: int, title: str, config: AppConfig) -> str:
     return f"{idx}_{sanitize_name(title)}"
 
 
+def _next_index(scan_dir: Path, index_width: int = 3) -> int:
+    """Scan scan_dir for {index}_* prefixed files and return next available index."""
+    if not scan_dir.is_dir():
+        return 1
+    max_idx = 0
+    for p in scan_dir.iterdir():
+        stem = p.stem
+        if "_" in stem:
+            prefix = stem.split("_", 1)[0]
+            if prefix.isdigit():
+                idx = int(prefix)
+                if idx > max_idx:
+                    max_idx = idx
+    return max_idx + 1
+
+
 def _eta_line(label: str, i: int, total: int, name: str, completed: int, elapsed_total: float) -> str:
     """生成 `[label i/total] name（平均 X，剩余 ~Y）` 形式的进度行。"""
     if completed > 0:
