@@ -209,10 +209,10 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [x] R-003a：审计现有子命令的 `-i` 单文件支持（`compress` / `analyze` / `scripts` / `plan` / `refine`）
 - [x] R-003b：补上 `scripts` 的 `-i` 单 JSON 支持 + `compress`/`analyze` 单文件支持
 - [x] R-003c：`refine --context "..."` 参数：临时追加到 prompt，写在 `ai.context` 之后
-- [ ] R-003d：UI 视频列表每项加 dropdown「重跑 texts / voiceover / 全部 / 标记 refine」
-- [ ] R-003e：UI refine tab 加临时 context textarea
-- [ ] R-003f：后端 `POST /api/rerun` 接受 `{video: <basename>, task: 'texts'|'voiceover'|'all'}`
-- [ ] R-003g：`pipeline.py`：`run_rerun_single(config, video_file, task_name)`
+- [x] R-003d：UI 视频列表每项加 dropdown「重跑 texts / voiceover / 全部」
+- [x] R-003f：后端 `POST /api/rerun` 接受 `{video, task, source}`
+- [ ] R-003e：UI refine tab 加临时 context textarea（延后单独做）
+- [ ] R-003g：pipeline `run_rerun_single`（已有单文件支持，无需独立函数）
 
 ## 暂存 / WIP
 
