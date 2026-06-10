@@ -28,7 +28,7 @@ from urllib.parse import parse_qs, urlparse
 import yaml
 
 from vlog_tool.config import AppConfig, deep_merge, load_config
-from vlog_tool.pipeline import run_cut_all, run_pipeline_steps
+from vlog_tool.pipeline import run_analyze_all, run_cut_all, run_generate_scripts, run_pipeline_steps
 
 STATIC_DIR = Path(__file__).parent / "static"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm"}
@@ -1010,6 +1010,58 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 name = data.get("name") or input_path.name
                 _add_to_registry(str(input_path))
                 return self._send_json({"ok": True, "project": {"name": name, "input_dir": str(input_path)}})
+
+            if path == "/api/rerun":
+                proj_input = self._resolve_project_input(qs)
+                cfg = self._get_config(proj_input)
+                proj_out = _project_output_dir(proj_input)
+
+                video_basename = (obj.get("video") or "").strip()
+                task = (obj.get("task") or "").strip()
+                if not video_basename or task not in ("texts", "voiceover", "all"):
+                    return self._send_json({"ok": False, "error": "需要 video (文件名) 和 task (texts|voiceover|all)"}, 400)
+                if self._run_thread is not None and self._run_thread.is_alive():
+                    return self._send_json({"ok": False, "error": "已有任务正在运行"}, 409)
+
+                stem = Path(video_basename).stem
+
+                # Resolve original video path (for texts/analyze rerun)
+                source_view = obj.get("source", "compressed")
+                if source_view == "original":
+                    original_video = proj_input / video_basename
+                    if not original_video.is_file():
+                        return self._send_json({"ok": False, "error": f"找不到原视频: {video_basename}"}, 404)
+                else:
+                    original_name = _find_original_for_compressed(stem, proj_input)
+                    if not original_name:
+                        return self._send_json({"ok": False, "error": f"找不到 {stem} 对应的原视频"}, 404)
+                    original_video = proj_input / original_name
+
+                # Resolve texts JSON path (for voiceover rerun)
+                texts_json = None
+                if task in ("voiceover", "all"):
+                    for td in _find_texts_dirs(proj_out):
+                        candidates = sorted(td.glob(f"{stem.split('_')[0] if '_' in stem else stem}_*.json"))
+                        if candidates:
+                            texts_json = candidates[0]
+                            break
+                    if texts_json is None:
+                        return self._send_json({"ok": False, "error": f"找不到 {stem} 对应的分析结果"}, 404)
+
+                def _rerun_worker():
+                    try:
+                        print(f"[rerun] {task} -> {video_basename}")
+                        if task in ("texts", "all"):
+                            run_analyze_all(cfg, single_file=original_video)
+                        if task in ("voiceover", "all"):
+                            run_generate_scripts(cfg, single_file=texts_json)
+                        print(f"[rerun] {task} -> {video_basename} 完成")
+                    except Exception:
+                        traceback.print_exc()
+
+                self._run_thread = threading.Thread(target=_rerun_worker, daemon=True)
+                self._run_thread.start()
+                return self._send_json({"ok": True, "message": f"已开始重跑 {task} ({video_basename})"})
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 

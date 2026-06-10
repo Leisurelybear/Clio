@@ -247,8 +247,54 @@ function renderVideoList() {
         &nbsp;
         <span class="${sCls}">${sLabel}</span>
       </div>
+      <div class="video-actions">
+        <button class="menu-btn" title="操作">⋮</button>
+        <div class="menu-dropdown">
+          <button class="menu-item" data-action="texts">重跑 texts</button>
+          <button class="menu-item" data-action="voiceover">重跑 voiceover</button>
+          <button class="menu-item" data-action="all">重跑全部</button>
+        </div>
+      </div>
     `;
-    li.onclick = () => selectVideo(v.file);
+    li.onclick = (e) => {
+      if (e.target.closest('.video-actions')) return;
+      selectVideo(v.file);
+    };
+    // ── Dot-menu toggle ──
+    const menuBtn = li.querySelector('.menu-btn');
+    const dropdown = li.querySelector('.menu-dropdown');
+    menuBtn.onclick = (e) => {
+      e.stopPropagation();
+      // close all other dropdowns first
+      document.querySelectorAll('.menu-dropdown.open').forEach(d => { if (d !== dropdown) d.classList.remove('open'); });
+      dropdown.classList.toggle('open');
+    };
+    // close on click outside
+    document.addEventListener('click', () => dropdown.classList.remove('open'), { once: true });
+    // ── Menu item click ──
+    dropdown.querySelectorAll('.menu-item').forEach(item => {
+      item.onclick = async (e) => {
+        e.stopPropagation();
+        dropdown.classList.remove('open');
+        const task = item.dataset.action;
+        const file = v.file;
+        setStatus(`正在重跑 ${task} (${file})...`, 'ok');
+        try {
+          const r = await api('POST', '/api/rerun', {
+            video: file,
+            task: task,
+            source: state.source,
+          });
+          if (r.ok) {
+            setStatus(r.message || `${task} 已启动`, 'ok');
+          } else {
+            throw new Error(r.error || '重跑失败');
+          }
+        } catch (e) {
+          setStatus('重跑失败: ' + e.message, 'err');
+        }
+      };
+    });
     ul.appendChild(li);
   }
 }
