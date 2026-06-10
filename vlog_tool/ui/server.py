@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import mimetypes
 import os
@@ -29,6 +30,7 @@ import yaml
 
 from vlog_tool.config import AppConfig, deep_merge, load_config
 from vlog_tool.pipeline import run_analyze_all, run_cut_all, run_generate_scripts, run_pipeline_steps
+from vlog_tool.progress import ProgressTracker
 
 STATIC_DIR = Path(__file__).parent / "static"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm"}
@@ -1056,15 +1058,30 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     if texts_json is None:
                         return self._send_json({"ok": False, "error": f"找不到 {stem} 对应的分析结果"}, 404)
 
-                def _rerun_worker():
+                def _rerun_worker(cfg=cfg, task=task, video_basename=video_basename,
+                                  original_video=original_video, texts_json=texts_json):
+                    # 深度拷贝 config，强制不跳过已有文件（用户主动点重跑就是要重新生成）
+                    cfg = copy.deepcopy(cfg)
+                    cfg.analyze.skip_existing = False
+                    tracker = ProgressTracker(cfg.paths.output_dir, rerun=True, rerun_video=video_basename)
+                    def _log(msg: str) -> None:
+                        print(f"  [rerun] {msg}")
+                        tracker.log(msg)
                     try:
-                        print(f"[rerun] {task} -> {video_basename}")
+                        _log(f"▶ 开始重跑 {task} — {video_basename}")
                         if task in ("texts", "all"):
-                            run_analyze_all(cfg, single_file=original_video)
+                            _log("步骤 1/2: 分析视频...")
+                            run_analyze_all(cfg, tracker=tracker, single_file=original_video)
+                            _log("✓ 分析完成")
                         if task in ("voiceover", "all"):
-                            run_generate_scripts(cfg, single_file=texts_json)
-                        print(f"[rerun] {task} -> {video_basename} 完成")
-                    except Exception:
+                            _log("步骤 2/2: 生成口播文案...")
+                            run_generate_scripts(cfg, tracker=tracker, single_file=texts_json)
+                            _log("✓ 口播生成完成")
+                        tracker.done(f"{task} → {video_basename} 完成")
+                        print(f"  [rerun] ✓ {task} -> {video_basename} 完成")
+                    except Exception as e:
+                        print(f"  [rerun] ✗ 重跑失败: {e}")
+                        tracker.error(f"重跑失败: {e}")
                         traceback.print_exc()
 
                 self._run_thread = threading.Thread(target=_rerun_worker, daemon=True)
