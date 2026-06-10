@@ -328,11 +328,14 @@ def run_label_videos(config: AppConfig, tracker: ProgressTracker | None = None) 
             print(f"  -> {out.name}")
 
 
-def run_generate_scripts(config: AppConfig, tracker: ProgressTracker | None = None) -> None:
+def run_generate_scripts(config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None) -> None:
     config.scripts_dir.mkdir(parents=True, exist_ok=True)
     template = config.script.template_file.read_text(encoding="utf-8") if config.script.template_file.exists() else ""
 
-    files = sorted(config.texts_dir.glob("*.json"))
+    if single_file:
+        files = [single_file]
+    else:
+        files = sorted(config.texts_dir.glob("*.json"))
     if tracker:
         tracker.update(phase="voiceover", total=len(files), message=f"生成口播文案（{len(files)} 条）...")
     with timed(f"run_generate_scripts（{len(files)} 个）"):
