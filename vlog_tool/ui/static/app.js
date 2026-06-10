@@ -391,7 +391,7 @@ async function initProjectConfig() {
   try {
     const btn = $('btn-config-init');
     if (btn) { btn.disabled = true; btn.textContent = '创建中...'; }
-    const r = await api('POST', '/api/config/init');
+    const r = await api('POST', '/api/config/init', {});
     if (r.ok) {
       setStatus('项目配置文件已创建', 'ok');
       // 重新加载配置
