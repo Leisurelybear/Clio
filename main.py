@@ -183,6 +183,12 @@ def main(argv: list[str] | None = None) -> int:
             "例: --fix '把 location 从曼谷素万那普机场改成巴黎戴高乐机场'"
         ),
     )
+    p_refine.add_argument(
+        "--context", "-C",
+        type=str,
+        default="",
+        help="临时上下文说明，附加到 ai.context 之后（仅本次 refine 生效）",
+    )
 
     p_serve = sub.add_parser("serve", help="启动本地 web UI（浏览器里可视化编辑 AI 输出）")
     p_serve.add_argument("--host", default="127.0.0.1", help="监听地址（默认 127.0.0.1，不暴露到局域网）")
@@ -201,17 +207,27 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "check":
         return run_check(config_path, getattr(args, "input", None))
 
+    # ── Single-file detection ────────────────────────────────────────
+    # If -i points to a single file, don't let _prepare_config set it as input_dir
+    single_file: Path | None = None
+    raw_input = getattr(args, "input", None)
+    if raw_input is not None and raw_input.is_file():
+        single_file = raw_input
+        args.input = None  # null out so _prepare_config doesn't use it
+
     config = _prepare_config(config_path, args)
     if args.force:
         config.analyze.skip_existing = False
 
+    context_override = (getattr(args, "context", "") or "").strip() or None
+
     try:
         if args.command == "compress":
-            run_compress_all(config)
+            run_compress_all(config, single_file=single_file)
         elif args.command == "analyze":
-            run_analyze_all(config)
+            run_analyze_all(config, single_file=single_file)
         elif args.command == "scripts":
-            run_generate_scripts(config)
+            run_generate_scripts(config, single_file=single_file)
         elif args.command == "label":
             run_label_videos(config)
         elif args.command == "plan":
@@ -219,7 +235,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "run":
             run_full_pipeline(config, args.day)
         elif args.command == "refine":
-            if not config.ai.context:
+            if not config.ai.context and not context_override:
                 print(
                     "警告: config.yaml 里没有配置 ai.context 或 ai.context_file，"
                     "refine 效果有限（AI 不知道你的行程背景和规范）。",
@@ -232,13 +248,13 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
             try:
                 if args.target in ("texts", "all"):
-                    run_refine_texts(config, target_path, fix=fix)
+                    run_refine_texts(config, target_path, fix=fix, context_override=context_override)
                 if args.target in ("scripts", "all"):
                     if args.target == "all" and target_path is not None:
                         scripts_path = None
                     else:
                         scripts_path = target_path
-                    run_refine_scripts(config, scripts_path, fix=fix)
+                    run_refine_scripts(config, scripts_path, fix=fix, context_override=context_override)
             except ValueError as e:
                 print(f"错误: {e}", file=sys.stderr)
                 return 1
