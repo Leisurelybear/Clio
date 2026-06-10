@@ -1048,10 +1048,12 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     original_video = proj_input / original_name
 
                 # Resolve texts JSON path (for voiceover rerun)
+                # 优先使用前端传过来的 index（原视频视图下 stem 不含序号前缀）
+                index_prefix = obj.get("index") or (stem.split("_", 1)[0] if "_" in stem else stem)
                 texts_json = None
                 if task in ("voiceover", "all"):
                     for td in _find_texts_dirs(proj_out):
-                        candidates = sorted(td.glob(f"{stem.split('_')[0] if '_' in stem else stem}_*.json"))
+                        candidates = sorted(td.glob(f"{index_prefix}_*.json"))
                         if candidates:
                             texts_json = candidates[0]
                             break
