@@ -62,8 +62,8 @@ class TestMaskIfLooksLikeKey:
         assert len(result) < 20
 
     def test_aiza_key(self):
-        result = mask_if_looks_like_key("AIzaSyDPk9cUOCBhTtZ9u8WjsB3SRNnTLuJui40")
-        assert result == "AIza***ui40"  # first 4 + *** + last 4
+        result = mask_if_looks_like_key("AIzaSyFakeKeyForTestPurposesOnly123")
+        assert result == "AIza***y123"  # first 4 + *** + last 4
 
     def test_ghp_token(self):
         result = mask_if_looks_like_key("ghp_xxxxxxxxxxxxxxxxxxxx")

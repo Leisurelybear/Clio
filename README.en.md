@@ -21,6 +21,8 @@ or any editor of your choice.
 | 5 | Recommended clip order for a single-day vlog | `plan --day day1` |
 | 6 | Burn the index number onto the video for editing reference | `label` |
 | — | One-shot full pipeline | `run --day day1` |
+| — | Web UI visual editor | `serve` |
+| — | Environment check | `check` |
 
 ---
 
@@ -517,19 +519,31 @@ Delete the corresponding `.txt` and `.json` from `output/texts/`, or set
 
 ```
 vlog-video-analysis/
-├── config.example.yaml  # config template (committed)
-├── config.yaml          # actual config (gitignored, copy from example)
-├── .env                 # API keys (gitignored)
-├── setup.ps1            # one-shot environment setup
-├── main.py              # CLI entry point
+├── config.example.yaml   # config template (committed)
+├── config.yaml           # actual config (gitignored, copy from example)
+├── .env                  # API keys (gitignored)
+├── requirements.txt           # loose dev dependencies
+├── requirements-locked.txt    # locked versions for CI/reproducible builds
+├── setup.ps1             # one-shot environment setup
+├── main.py               # CLI entry point
+├── .github/workflows/    # GitHub Actions CI
+├── vlog_tool/tests/      # unit tests (128 tests)
 ├── templates/
-│   └── vlog_template.md # voiceover style template
+│   ├── vlog_template.md  # voiceover style template
+│   └── trip_context.md   # trip background & AI spec
 └── vlog_tool/
-    ├── ai/              # provider abstraction (gemini / openai-compatible)
+    ├── ai/               # provider abstraction (gemini / openai-compatible)
     ├── compress.py
     ├── analyze.py
     ├── pipeline.py
-    └── prompts.py
+    ├── progress.py       # progress tracker (for UI polling)
+    ├── cut.py            # video clipping
+    ├── utils.py          # utilities
+    ├── log.py            # logging system
+    ├── config.py         # config parsing
+    └── ui/               # local web UI
+        ├── server.py
+        └── static/       # HTML/CSS/JS
 ```
 
 ---
@@ -540,6 +554,37 @@ vlog-video-analysis/
 - ffmpeg / ffprobe
 - Gemini API key
 - SOCKS5 proxy (required in mainland China)
+
+## Testing
+
+The project includes **128 pytest unit tests** covering core pure functions:
+
+| Module | Tests | Coverage |
+|--------|-------|----------|
+| `tests/test_config.py` | 34 | config loading / deep-merge / validation |
+| `tests/test_utils.py` | 34 | extract_json / mask_if_looks_like_key / sanitize_name / find_videos |
+| `tests/test_cut.py` | 25 | time parsing / filename generation |
+| `tests/test_log.py` | 13 | TeeWriter / timed / format_size / format_duration |
+| `tests/test_progress.py` | 12 | ProgressTracker read/write/init |
+
+Tests run automatically on GitHub Actions (Python 3.11 & 3.12) on every push
+to main or pull request.
+
+```bash
+# Run locally
+pip install pytest
+python -m pytest vlog_tool/tests/ -v
+```
+
+```bash
+# Run a single test module
+python -m pytest vlog_tool/tests/test_utils.py -v
+```
+
+### Locked dependencies
+
+`requirements-locked.txt` records exact versions for CI and reproducible builds.
+Use the looser `requirements.txt` for daily development.
 
 ---
 

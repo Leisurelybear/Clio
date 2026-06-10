@@ -140,15 +140,15 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 固定依赖版本 + 补充 `setup.sh` + 为核心纯函数加单元测试。
 
 **验收**：
-- `requirements.txt` 锁定所有依赖版本（`pip freeze > requirements-locked.txt`）
-- 补充 Linux/macOS 的 `setup.sh`（与现有 `setup.ps1` 等效）
-- 核心纯函数（`utils.py` / `config.py` / `compress.py` 的纯函数部分）有单元测试覆盖
-- `main.py check` 对 venv 检测兼容 Linux `bin/` 和 Windows `Scripts/`
+- ✅ `requirements.txt` 锁定所有依赖版本（`requirements-locked.txt`）
+- ✅ 核心纯函数有单元测试（128 用例，GitHub Actions CI）
+- [ ] 补充 Linux/macOS 的 `setup.sh`（与现有 `setup.ps1` 等效）
+- [ ] `main.py check` 对 venv 检测兼容 Linux `bin/` 和 Windows `Scripts/`
 
 **子任务**：
-- [ ] R-009a：锁依赖版本 + 迁移指南
+- [x] R-009a：锁依赖版本 + 迁移指南
 - [ ] R-009b：Linux `setup.sh`
-- [ ] R-009c：核心纯函数单元测试（pytest）
+- [x] R-009c：核心纯函数单元测试（pytest，128 用例，CI 自动跑）
 - [ ] R-009d：venv 检测跨平台修复（B-007）
 
 ## 需求 R-010：AI 输出质量
@@ -220,12 +220,12 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 ## 文档维护（来自 2026-06-10 全面 review）
 
-| ID | 问题 | 说明 |
-| --- | --- | --- |
-| D-001 | AGENTS.md §7 commit 列表过期 | 最后一条是 R-007，缺 6 个新 commit |
-| D-002 | vlog_tool/ui/README.md 运行状态描述过期 | "▶ 运行灰显（待 R-005 实现）" — R-005 已完成 |
-| D-003 | README.md / README.en.md 未提 per-project 配置 | `project.yaml` 分层配置功能未写入用户文档 |
-| D-004 | config.example.yaml model 名与实际使用不符 | example 写 `deepseek-chat`，config.yaml 用 `deepseek-v4-flash`，应备注说明 |
+| ID | 问题 | 说明 | 状态 |
+| --- | --- | --- | --- |
+| D-001 | AGENTS.md §7 commit 列表过期 | 最后一条是 R-007，缺 6 个新 commit | ✅ 已更新 |
+| D-002 | vlog_tool/ui/README.md 运行状态描述过期 | "▶ 运行灰显（待 R-005 实现）" — R-005 已完成 | ✅ 已修复 |
+| D-003 | README.md / README.en.md 未提 per-project 配置 | `project.yaml` 分层配置功能未写入用户文档 | ✅ 已补充 |
+| D-004 | config.example.yaml model 名与实际使用不符 | example 写 `deepseek-chat`，config.yaml 用 `deepseek-v4-flash`，应备注说明 | ✅ 已加注释 |
 
 ## 架构改进（来自 review，与设计文档 Phase 1 对齐）
 
@@ -248,9 +248,9 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-001 | Gemini Files API 上传视频后未清理，耗尽配额 | `try/finally` 确保视频上传后请求删除 | ✅ `a9996a9` |
 | B-002 | with_retry 重试时重复上传同一视频 | 把上传移出重试逻辑，上传不重试 | ✅ `a9996a9` |
 | B-003 | 临时文件残留（中断时 .tmp 文件未被自动清理） | 改用 `with` 语句或 `try/finally` 清理 | ✅ `0533051` |
-| B-012 | `_run()` 静默吞异常 — pipeline 失败 UI 无感知 | `except Exception: pass` → 写 progress.json error 状态 + 打印日志 | 🆕 |
-| B-013 | `apply_run_paths` 直接修改入参 config 对象 | 返回新 config 或 `copy.deepcopy()` 再修改 | 🆕 |
-| B-014 | `requirements.txt` 无版本号 — breaking change 风险 | `pip freeze` 锁版本，参考 R-009a | 🆕 |
+| B-012 | `_run()` 静默吞异常 — pipeline 失败 UI 无感知 | `except Exception: pass` → 写 progress.json error 状态 + 打印日志 | ✅ `9c73903` |
+| B-013 | `apply_run_paths` 直接修改入参 config 对象 | 返回新 config 或 `copy.deepcopy()` 再修改 | ✅ `9c73903` |
+| B-014 | `requirements.txt` 无版本号 — breaking change 风险 | `pip freeze` 锁版本，参考 R-009a | ✅ `requirements-locked.txt` |
 
 ### P1 — 近期
 
@@ -258,7 +258,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | --- | --- | --- | --- |
 | B-004 | ETA 估算偏低（成功项包含了失败项的时间） | 耗时统计移入 `finally` 块，只算成功项 | |
 | B-007 | venv 跨平台检测只认 Windows `Scripts/`，Linux 是 `bin/` | 同时兼容 `bin/` 和 `Scripts/` | |
-| B-015 | `project.yaml` 写入时只做了 YAML 格式校验，未跑 `_validate_config` | `do_PUT /api/config/raw?project=X` 写前做完整合并校验 | 🆕 |
+| B-015 | `project.yaml` 写入时只做了 YAML 格式校验，未跑 `_validate_config` | `do_PUT /api/config/raw?project=X` 写前做完整合并校验 | ✅ `9c73903` |
 | B-016 | `config.yaml` 里 `deepseek-v4-flash` 可能是无效模型名（AGENTS §8.4） | 确认实际可用模型名，更新 config 或加备注 | 🆕 |
 
 ### P2 — 中期
@@ -292,6 +292,11 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `b6b84df` | test: progress.py unit tests (12 tests) |
+| `23e30e5` | test: log.py and cut.py unit tests (38 tests) |
+| `a2a5d66` | test: comprehensive utils.py unit tests (34 tests) |
+| `66613cc` | test: comprehensive config.py unit tests (34 tests) |
+| `9ade769` | test: add test infrastructure and GitHub Actions CI |
 | `80e83ec` | fix(ui): fall back to global config when project has no project.yaml |
 | `41ba068` | fix: address review findings - gemini cleanup scope + project config validation |
 | `d785643` | chore: add local state files to .gitignore |

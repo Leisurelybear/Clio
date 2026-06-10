@@ -16,7 +16,7 @@
 - **google-genai**（Gemini 2.5 Flash 的视频 File API）
 - **httpx**（DeepSeek / OpenAI 兼容调用）
 - **PyYAML**（config 解析）
-- 没有写测试，靠手动 `python main.py check` 和跑通一个真实素材目录验证
+- **pytest**（单元测试，CI 自动跑；核心纯函数已覆盖 128 个测试用例）
 
 依赖列表在 `requirements.txt`，`setup.ps1` 一键建 venv + 装 ffmpeg + 拷 `.env`。
 
@@ -52,11 +52,16 @@ vlog-video-analysis/
 ├── config.example.yaml        # 提交到 git 的配置模板
 ├── .env.example               # 提交到 git 的环境变量模板
 ├── config.yaml / .env         # 用户本地真实配置，gitignore
-├── logs/                      # 运行日志（gitignore；按小时切：YYYY-MM-DD-HH.log）
-├── setup.ps1                  # 一键环境
-├── README.md / README.en.md   # 用户文档（双语）
-├── ROADMAP.md                 # 需求追踪（sub-task 粒度）
-└── AGENTS.md                  # 本文件
+├── requirements.txt           # 开发期宽松依赖
+├── requirements-locked.txt    # 可重现构建锁定版本
+├── .github/workflows/test.yml # GitHub Actions CI（pushes + PRs）
+├── vlog_tool/tests/           # 单元测试（pytest，128 用例）
+│   ├── conftest.py            #   共享 fixtures
+│   ├── test_config.py         #   34 tests - config 加载/合并/校验
+│   ├── test_utils.py          #   34 tests - extract_json/mask_key/sanitize/find_videos
+│   ├── test_cut.py            #   25 tests - 时间解析/文件名生成
+│   ├── test_log.py            #   13 tests - TeeWriter/size&duration 格式化
+│   └── test_progress.py       #   12 tests - ProgressTracker read/write/init
 ```
 
 ## 4. 关键约定
@@ -167,7 +172,10 @@ ai:
 
 ## 7. 项目当前状态
 
-最后更新：2026-06-10（全面 review + ROADMAP 同步）。
+最后更新：2026-06-10（全面 review + ROADMAP 同步）。添加了测试基础设施：
+- GitHub Actions CI（Ubuntu，Python 3.11/3.12）
+- 128 个 pytest 用例：config(34) / utils(34) / cut(25) + log(13) + progress(12)
+- 依赖版本锁定 `requirements-locked.txt`
 最近做的 commit 顺序：
 1. `chore: scaffold initial Vlog editing helper project`
 2. `fix(compress): escape comma in scale expression`  ← Windows ffmpeg filter 逗号转义
@@ -219,6 +227,11 @@ ai:
 48. `fix: address review findings - gemini upload cleanup scope and project config validation`  ← 上传移入 try + PUT project.yaml 校验修正
 49. `fix(ui): fall back to global config when project has no project.yaml`  ← 无 project.yaml 时回退到 config.yaml 而非返回空
 50. `docs(roadmap): record comprehensive code review findings`  ← B-012~B-020 + D-001~D-004 + A-001~A-005
+51. `test: add test infrastructure and GitHub Actions CI`  ← pytest 框架 + CI yml
+52. `test: comprehensive config.py unit tests (34 tests)`  ← 配置加载/合并/校验
+53. `test: comprehensive utils.py unit tests (34 tests)`  ← extract_json/mask_key/sanitize/find_videos
+54. `test: log.py and cut.py unit tests (38 tests)`  ← TeeWriter/cut 时间解析
+55. `test: progress.py unit tests (12 tests)`  ← ProgressTracker read/write/init
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。

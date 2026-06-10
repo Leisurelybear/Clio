@@ -10,3 +10,4 @@ __pycache__/
 projects.json
 projects.json.bak
 .opencode/
+opencode_session_import.json
