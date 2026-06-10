@@ -756,8 +756,12 @@ async function loadBrowseDir(path) {
     if (r.error) { pathEl.textContent = '错误: ' + r.error; return; }
     pathEl.textContent = r.path || '(选择驱动器)';
     selectBtn.disabled = r.is_drive_list;
-    upBtn.style.display = r.parent && !r.is_drive_list ? '' : 'none';
-    upBtn.onclick = () => loadBrowseDir(r.parent);
+    if (r.is_drive_list) {
+      upBtn.style.display = 'none';
+    } else {
+      upBtn.style.display = '';
+      upBtn.onclick = () => loadBrowseDir(r.parent || '');
+    }
     if (r.is_drive_list) {
       listEl.innerHTML = r.dirs.map(d =>
         `<div class="browse-item" data-path="${d}">📁 ${d}</div>`
