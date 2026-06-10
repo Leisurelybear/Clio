@@ -978,6 +978,7 @@ async function pollRunStatus() {
   if (!prog) return;  // not on run tab
   try {
     const s = await api('GET', '/api/run/status');
+    if (s.rerun) return;
     if (s.status === 'idle' || s.status === 'unknown') {
       if (btn) { btn.disabled = false; btn.textContent = '▶ 运行选中步骤'; }
       if (!s.running) {
