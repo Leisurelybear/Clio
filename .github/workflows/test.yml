@@ -100,45 +100,13 @@ jobs:
       with:
         python-version: ${{ matrix.python-version }}
 
-    - name: Create setup.sh (Linux placeholder)
+    - name: Check setup.sh syntax
       run: |
         if [ -f setup.sh ]; then
           bash -n setup.sh
           echo "setup.sh syntax OK"
         else
-          echo "No setup.sh yet — creating placeholder"
-          cat > setup.sh << 'SETUPEOF'
-#!/usr/bin/env bash
-set -euo pipefail
-ROOT="$(cd "$(dirname "$0")" && pwd)"
-cd "$ROOT"
-echo "=== Vlog Editing Tool — Environment Setup ==="
-if [ ! -d .venv/bin ]; then
-  echo "[1/4] Creating virtual environment..."
-  python3 -m venv .venv
-fi
-echo "[2/4] Installing Python dependencies..."
-.venv/bin/pip install --upgrade pip -q
-.venv/bin/pip install -r requirements.txt -q
-if ! command -v ffmpeg &>/dev/null; then
-  echo "[3/4] Installing ffmpeg..."
-  if command -v apt-get &>/dev/null; then
-    sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
-  elif command -v brew &>/dev/null; then
-    brew install ffmpeg
-  else
-    echo "WARNING: install ffmpeg manually"
-  fi
-fi
-if [ ! -f .env ]; then
-  [ -f .env.example ] && cp .env.example .env
-  echo "[4/4] .env created — edit to add GEMINI_API_KEY"
-fi
-echo "=== Setup complete ==="
-SETUPEOF
-          chmod +x setup.sh
-          bash -n setup.sh
-          echo "setup.sh placeholder created and validated"
+          echo "setup.sh not found -- skipping"
         fi
 
     - name: Validate config.example.yaml
