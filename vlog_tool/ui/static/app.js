@@ -197,14 +197,34 @@ function renderVideoList() {
   const ul = $('video-list');
   ul.innerHTML = '';
   if (!state.videos.length) {
-    ul.innerHTML = `
-      <li class="empty-state">
-        <span class="icon">📁</span>
-        <h4>暂无视频素材</h4>
-        <p>请将视频文件（.mp4/.mov/.mkv等）放入素材目录</p>
-        <p class="hint">素材目录: ${state.config?.input_dir || '未知'}</p>
-      </li>
-    `;
+    // Detect if in compressed view and no videos exist — check if original has videos
+    const isCompressedEmpty = state.source === 'compressed';
+    if (isCompressedEmpty) {
+      // Switch to original view briefly to see if there are original videos
+      ul.innerHTML = `
+        <li class="empty-state">
+          <span class="icon">📁</span>
+          <h4>暂无压缩视频</h4>
+          <p>未找到压缩后的视频文件（output/compressed/）</p>
+          <p class="hint">请先压缩原视频，或切换到「原视频」视图查看素材</p>
+          <p style="margin-top:10px">
+            <button class="sidebar-btn" onclick="switchToOriginalThenCompress()" style="background:#4a9eff;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer">切换到原视频视图</button>
+            &nbsp;
+            <button class="sidebar-btn" onclick="goToRunTab()" title="运行流水线中的压缩步骤">去压缩视频</button>
+          </p>
+          <p class="hint" style="margin-top:8px">素材目录: ${escapeHtml(state.config?.input_dir || '未知')}</p>
+        </li>
+      `;
+    } else {
+      ul.innerHTML = `
+        <li class="empty-state">
+          <span class="icon">📁</span>
+          <h4>暂无视频素材</h4>
+          <p>请将视频文件（.mp4/.mov/.mkv等）放入素材目录</p>
+          <p class="hint">素材目录: ${escapeHtml(state.config?.input_dir || '未知')}</p>
+        </li>
+      `;
+    }
     return;
   }
   for (const v of state.videos) {
@@ -231,9 +251,9 @@ function renderVideoList() {
       <div class="video-actions">
         <button class="menu-btn" title="操作">⋮</button>
         <div class="menu-dropdown">
-          <button class="menu-item" data-action="texts">重跑 texts</button>
-          <button class="menu-item" data-action="voiceover">重跑 voiceover</button>
-          <button class="menu-item" data-action="all">重跑全部</button>
+          <button class="menu-item" data-action="texts" title="调用 AI 重新分析视频内容，生成分段描述、高光时刻等">重跑文字分析</button>
+          <button class="menu-item" data-action="voiceover" title="基于分析结果，重新用 AI 生成口播解说文案">重跑口播文案</button>
+          <button class="menu-item" data-action="all" title="依次重跑文字分析 + 口播文案">重跑全部</button>
         </div>
       </div>
     `;
@@ -265,6 +285,7 @@ function renderVideoList() {
             video: file,
             task: task,
             source: state.source,
+            index: v.index || undefined,
           });
           if (r.ok) {
             setStatus(r.message || `${task} 已启动`, 'ok');
@@ -279,6 +300,22 @@ function renderVideoList() {
     });
     ul.appendChild(li);
   }
+}
+
+// ── Empty-state helpers ──
+function switchToOriginalThenCompress() {
+  const btns = document.querySelectorAll('.source-toggle button');
+  for (const btn of btns) {
+    if (btn.dataset.source === 'original') {
+      btn.click();
+      break;
+    }
+  }
+}
+
+function goToRunTab() {
+  state.currentEntity = 'run';
+  updateEntityUI();
 }
 
 async function selectVideo(file) {
@@ -708,8 +745,8 @@ function showRerunProgress(task, file) {
 
   // Start polling
   if (_rerunPollTimer) clearInterval(_rerunPollTimer);
-  _rerunPollTimer = setInterval(() => pollRerunStatus(), 1500);
-  pollRerunStatus();
+  _rerunPollTimer = setInterval(() => pollRerunStatus(task, file), 1500);
+  pollRerunStatus(task, file);
 }
 
 function hideRerunProgress() {
@@ -723,7 +760,7 @@ function hideRerunProgress() {
   }
 }
 
-async function pollRerunStatus() {
+async function pollRerunStatus(task, file) {
   const overlay = $('rerun-overlay');
   if (!overlay || overlay.dataset.active !== 'true') return;
 
@@ -765,7 +802,7 @@ async function pollRerunStatus() {
       setStatus('重跑完成', 'ok');
       setTimeout(() => {
         hideRerunProgress();
-        refreshAfterRerun();
+        refreshAfterRerun(task, file);
       }, 2000);
     } else if (s.status === 'error') {
       overlay.dataset.active = 'false';
@@ -784,23 +821,28 @@ async function pollRerunStatus() {
   }
 }
 
-async function refreshAfterRerun() {
+async function refreshAfterRerun(task, file) {
+  // Reload videos list to pick up new sidecar files
   await loadVideos();
-  // Refresh current video data if still selected
-  if (state.currentVideo) {
-    const v = state.videos.find(x => x.file === state.currentVideo);
+
+  // If the rerun's video is still the current selection, reload its data
+  if (file && state.currentVideo === file) {
+    const v = state.videos.find(x => x.file === file);
     if (!v) return;
     try {
-      if (v.text_json) {
+      if ((task === 'texts' || task === 'all') && v.text_json) {
         state.texts = await api('GET', `/api/texts?file=${encodeURIComponent(v.text_json)}`);
       }
-      if (v.script_json) {
+      if ((task === 'voiceover' || task === 'all') && v.script_json) {
         state.voiceover = await api('GET', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`);
       }
       renderActiveTab();
       updateEntityUI();
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      // content may not exist yet, ignore
+    }
   }
+
   renderSteps();
 }
 
