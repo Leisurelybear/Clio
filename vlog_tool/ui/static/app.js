@@ -268,6 +268,7 @@ function renderVideoList() {
           });
           if (r.ok) {
             setStatus(r.message || `${task} 已启动`, 'ok');
+            showRerunProgress(task, file);
           } else {
             throw new Error(r.error || '重跑失败');
           }
@@ -687,6 +688,127 @@ async function executeCut() {
     btn.textContent = '执行裁剪';
   }
 }
+
+/* ── Rerun progress overlay (single-video rerun) ── */
+let _rerunPollTimer = null;
+
+function showRerunProgress(task, file) {
+  const overlay = $('rerun-overlay');
+  if (!overlay) return;
+  overlay.classList.add('active');
+  overlay.style.display = 'block';
+  overlay.dataset.active = 'true';
+
+  // Reset display
+  overlay.querySelector('.rerun-title').textContent = `重跑 ${task}`;
+  overlay.querySelector('.rerun-file').textContent = file;
+  overlay.querySelector('.rerun-status').textContent = '启动中...';
+  overlay.querySelector('.rerun-progress-fill').style.width = '0%';
+  overlay.querySelector('.rerun-logs').innerHTML = '<div class="rerun-log-line">连接中...</div>';
+
+  // Start polling
+  if (_rerunPollTimer) clearInterval(_rerunPollTimer);
+  _rerunPollTimer = setInterval(() => pollRerunStatus(), 1500);
+  pollRerunStatus();
+}
+
+function hideRerunProgress() {
+  const overlay = $('rerun-overlay');
+  if (!overlay) return;
+  overlay.classList.remove('active');
+  overlay.style.display = 'none';
+  if (_rerunPollTimer) {
+    clearInterval(_rerunPollTimer);
+    _rerunPollTimer = null;
+  }
+}
+
+async function pollRerunStatus() {
+  const overlay = $('rerun-overlay');
+  if (!overlay || overlay.dataset.active !== 'true') return;
+
+  try {
+    const s = await api('GET', '/api/run/status');
+    if (s.status === 'idle' || s.status === 'unknown') return;
+
+    const fill = overlay.querySelector('.rerun-progress-fill');
+    const statusEl = overlay.querySelector('.rerun-status');
+    const logsEl = overlay.querySelector('.rerun-logs');
+
+    // Update progress bar
+    if (fill && s.total > 0) {
+      const pct = Math.round(s.current / s.total * 100);
+      fill.style.width = Math.min(pct, 100) + '%';
+    }
+
+    // Update status text
+    if (statusEl) {
+      statusEl.textContent = s.message || s.phase || '运行中...';
+    }
+
+    // Update log lines
+    if (logsEl && s.logs && s.logs.length) {
+      logsEl.innerHTML = s.logs.map(line =>
+        `<div class="rerun-log-line">${escapeHtml(line)}</div>`
+      ).join('');
+      logsEl.scrollTop = logsEl.scrollHeight;
+    }
+
+    // Terminal states
+    if (s.status === 'done') {
+      overlay.dataset.active = 'false';
+      if (_rerunPollTimer) {
+        clearInterval(_rerunPollTimer);
+        _rerunPollTimer = null;
+      }
+      if (statusEl) statusEl.innerHTML = '<span class="ok">✓ 完成</span>';
+      setStatus('重跑完成', 'ok');
+      setTimeout(() => {
+        hideRerunProgress();
+        refreshAfterRerun();
+      }, 2000);
+    } else if (s.status === 'error') {
+      overlay.dataset.active = 'false';
+      if (_rerunPollTimer) {
+        clearInterval(_rerunPollTimer);
+        _rerunPollTimer = null;
+      }
+      if (statusEl) statusEl.innerHTML = '<span class="err">✗ 出错</span>';
+      setStatus('重跑出错', 'err');
+      setTimeout(() => {
+        hideRerunProgress();
+      }, 8000);
+    }
+  } catch (e) {
+    // poll error, ignore
+  }
+}
+
+async function refreshAfterRerun() {
+  await loadVideos();
+  // Refresh current video data if still selected
+  if (state.currentVideo) {
+    const v = state.videos.find(x => x.file === state.currentVideo);
+    if (!v) return;
+    try {
+      if (v.text_json) {
+        state.texts = await api('GET', `/api/texts?file=${encodeURIComponent(v.text_json)}`);
+      }
+      if (v.script_json) {
+        state.voiceover = await api('GET', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`);
+      }
+      renderActiveTab();
+      updateEntityUI();
+    } catch (e) { /* ignore */ }
+  }
+  renderSteps();
+}
+
+// Close button for the overlay
+document.addEventListener('DOMContentLoaded', () => {
+  const btn = $('rerun-close');
+  if (btn) btn.onclick = hideRerunProgress;
+});
 
 /* ── Directory browser ── */
 let _browseResolve = null;  // callback(path) when user selects
