@@ -206,9 +206,9 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - UI：refine tab 加临时 context textarea
 
 **子任务**：
-- [ ] R-003a：审计现有子命令的 `-i` 单文件支持（`compress` / `analyze` / `scripts` / `plan` / `refine`）
-- [ ] R-003b：缺啥补啥（预期缺 `voiceover` 的 `-i` 单 JSON 支持）
-- [ ] R-003c：`refine --context "..."` 参数：临时追加到 prompt，写在 `ai.context` 之后
+- [x] R-003a：审计现有子命令的 `-i` 单文件支持（`compress` / `analyze` / `scripts` / `plan` / `refine`）
+- [x] R-003b：补上 `scripts` 的 `-i` 单 JSON 支持 + `compress`/`analyze` 单文件支持
+- [x] R-003c：`refine --context "..."` 参数：临时追加到 prompt，写在 `ai.context` 之后
 - [ ] R-003d：UI 视频列表每项加 dropdown「重跑 texts / voiceover / 全部 / 标记 refine」
 - [ ] R-003e：UI refine tab 加临时 context textarea
 - [ ] R-003f：后端 `POST /api/rerun` 接受 `{video: <basename>, task: 'texts'|'voiceover'|'all'}`

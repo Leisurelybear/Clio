@@ -318,6 +318,9 @@ cherry-pick manually.
 
 ```powershell
 python main.py compress -i "E:/Videos/Yunnan"
+
+# Single video only
+python main.py compress -i "E:/Videos/Yunnan/GL010683.mp4"
 ```
 
 Writes to `output/<folder>/compressed/`, named `<index>_<original-stem>.mp4`
@@ -331,7 +334,10 @@ Compresses (if needed) and then sends each compressed clip to the
 
 ```powershell
 python main.py analyze -i "E:/Videos/Yunnan"
-python main.py analyze --force     # rerun everything, ignoring skip_existing
+python main.py analyze --force         # rerun everything, ignoring skip_existing
+
+# Single video only
+python main.py analyze -i "E:/Videos/Yunnan/GL010683.mp4"
 ```
 
 Output triple:
@@ -349,6 +355,9 @@ DeepSeek) with `templates/vlog_template.md` to draft a voiceover.
 
 ```powershell
 python main.py scripts
+
+# Single analysis JSON only
+python main.py scripts -i output/Franch/texts/001_CDG_RER.json
 ```
 
 Writes `output/<folder>/scripts/<index>_<title>_voiceover.{json,md}`.
@@ -430,6 +439,20 @@ The `_changelog` field's first entry reads "applied user instruction
 on XXX" for audit purposes. Both modes call the `video_analyze`
 provider (default gemini) for `texts/` and the `voiceover` provider
 (default deepseek) for `scripts/`; results overwrite the original file.
+
+#### 3. Temporary context mode (`--context / -C`)
+
+Append a one-off context instruction on top of `ai.context`, with higher
+priority. Useful for correcting a recurring error without editing `config.yaml`:
+
+```powershell
+python main.py refine --context "All footage was shot in Paris, France — do not misidentify"
+
+# Can be combined with --fix
+python main.py refine -i output/Franch/texts/001_CDG_RER.json `
+    --fix "Change location to Paris CDG" `
+    --context "User just returned from Thailand, do not confuse Bangkok with Paris"
+```
 
 ---
 
