@@ -19,7 +19,7 @@ class ProgressTracker:
       eta_sec      — estimated remaining seconds
     """
 
-    def __init__(self, output_dir: Path):
+    def __init__(self, output_dir: Path, *, rerun: bool = False, rerun_video: str | None = None):
         self._path = output_dir / ".progress.json"
         self._lock = threading.Lock()
         self._start = time.monotonic()
@@ -31,6 +31,9 @@ class ProgressTracker:
             "status": "running",
             "started_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
             "eta_sec": None,
+            "rerun": rerun,
+            "rerun_video": rerun_video,
+            "logs": [],
         }
         self._flush()
 
@@ -75,8 +78,18 @@ class ProgressTracker:
                 self._data["eta_sec"] = round(remaining / rate) if rate > 0 else None
             self._flush()
 
+    def log(self, line: str) -> None:
+        """Append a log line (shown in UI log view)."""
+        with self._lock:
+            self._data.setdefault("logs", []).append(line)
+            if len(self._data["logs"]) > 100:
+                self._data["logs"] = self._data["logs"][-100:]
+            self._flush()
+
     def done(self, message: str = "") -> None:
         self.update(phase="done", current=0, total=0, message=message or "完成", status="done")
+        self.log("✓ " + (message or "完成"))
 
     def error(self, message: str) -> None:
         self.update(status="error", message=message)
+        self.log("✗ " + message)
