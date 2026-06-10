@@ -18,13 +18,18 @@ from vlog_tool.prompts import (
 from vlog_tool.utils import extract_json
 
 
-def _wrap_with_context(prompt: str, config: AppConfig) -> str:
-    """如果有 trip 上下文/规范，附加在 prompt 前面。"""
-    if not config.ai.context:
+def _wrap_with_context(prompt: str, config: AppConfig, context_override: str | None = None) -> str:
+    """如果有 trip 上下文/规范，附加在 prompt 前面。context_override 优先级高于 ai.context。"""
+    parts = []
+    if config.ai.context:
+        parts.append(config.ai.context)
+    if context_override:
+        parts.append(context_override)
+    if not parts:
         return prompt
     return (
         "## 背景与规范（请严格遵守）\n\n"
-        f"{config.ai.context}\n\n"
+        f"{chr(10).join(parts)}\n\n"
         "---\n\n"
         f"{prompt}"
     )
@@ -90,7 +95,7 @@ def plan_daily_vlog(clips: list[dict], config: AppConfig, day_label: str = "day1
     return extract_json(text)
 
 
-def refine_text(analysis: dict, config: AppConfig, fix: str | None = None) -> dict:
+def refine_text(analysis: dict, config: AppConfig, fix: str | None = None, context_override: str | None = None) -> dict:
     """审阅并修正现有的素材分析。
 
     fix 非空时切换为「按用户意见定向修正」模式（仅改用户提到的字段，
@@ -108,7 +113,7 @@ def refine_text(analysis: dict, config: AppConfig, fix: str | None = None) -> di
             existing_json=json.dumps(analysis, ensure_ascii=False, indent=2),
         )
         label = "AI refine 素材"
-    prompt = _wrap_with_context(base, config)
+    prompt = _wrap_with_context(base, config, context_override=context_override)
     text = _call_ai(
         label, provider.provider_id, model, prompt,
         lambda: provider.generate_text(prompt, model),
@@ -116,7 +121,7 @@ def refine_text(analysis: dict, config: AppConfig, fix: str | None = None) -> di
     return extract_json(text)
 
 
-def refine_script(script: dict, analysis: dict | None, config: AppConfig, fix: str | None = None) -> dict:
+def refine_script(script: dict, analysis: dict | None, config: AppConfig, fix: str | None = None, context_override: str | None = None) -> dict:
     """审阅并修正现有的口播文案。
 
     复用 refine_text 任务的 provider/model 配置 —— texts 和 scripts 审阅
@@ -141,7 +146,7 @@ def refine_script(script: dict, analysis: dict | None, config: AppConfig, fix: s
             existing_json=existing_json,
         )
         label = "AI refine 脚本"
-    prompt = _wrap_with_context(base, config)
+    prompt = _wrap_with_context(base, config, context_override=context_override)
     text = _call_ai(
         label, provider.provider_id, model, prompt,
         lambda: provider.generate_text(prompt, model),
