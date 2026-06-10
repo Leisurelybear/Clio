@@ -203,13 +203,20 @@ def run_compress_all(config: AppConfig, single_file: Path | None = None) -> list
     return records
 
 
-def run_analyze_all(config: AppConfig, tracker: ProgressTracker | None = None) -> list[ClipRecord]:
-    videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
+def run_analyze_all(config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None) -> list[ClipRecord]:
+    if single_file:
+        videos = [single_file]
+    else:
+        videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
     config.compressed_dir.mkdir(parents=True, exist_ok=True)
     config.texts_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"素材目录: {config.paths.input_dir}（{len(videos)} 个视频）")
+    print(f"素材目录: {config.paths.input_dir}（{'1 个视频' if single_file else f'{len(videos)} 个视频'}）")
     records: list[ClipRecord] = []
+
+    index_offset = 0
+    if single_file:
+        index_offset = _next_index(config.texts_dir, config.naming.index_width) - 1
 
     if tracker:
         tracker.update(phase="compress", total=len(videos), message=f"压缩 {len(videos)} 个视频...")
@@ -218,7 +225,8 @@ def run_analyze_all(config: AppConfig, tracker: ProgressTracker | None = None) -
         completed = 0
         elapsed_total = 0.0
         for i, video in enumerate(videos, start=1):
-            idx = format_index(i, config.naming.index_width)
+            idx_val = i + index_offset
+            idx = format_index(idx_val, config.naming.index_width)
             compressed = config.compressed_dir / f"{idx}_{video.stem}.mp4"
 
             if not compressed.exists():
@@ -238,7 +246,7 @@ def run_analyze_all(config: AppConfig, tracker: ProgressTracker | None = None) -
                 analysis = json.loads(json_path.read_text(encoding="utf-8"))
                 print(f"[跳过分析] {video.name} (已存在: {json_path.name})")
                 records.append(ClipRecord(
-                    index=i, stem=json_path.stem, source_path=video,
+                    index=idx_val, stem=json_path.stem, source_path=video,
                     compressed_path=compressed, text_path=text_path, analysis=analysis,
                 ))
                 continue
@@ -250,10 +258,10 @@ def run_analyze_all(config: AppConfig, tracker: ProgressTracker | None = None) -
             analysis = analyze_video(str(compressed), config)
             elapsed_total += time.monotonic() - t0
             completed += 1
-            analysis["index"] = idx
+            analysis["index"] = idx_val
             analysis["source_file"] = video.name
 
-            stem = _build_stem(i, analysis.get("title", video.stem), config)
+            stem = _build_stem(idx_val, analysis.get("title", video.stem), config)
             final_text = config.texts_dir / f"{stem}.txt"
             json_path = config.texts_dir / f"{stem}.json"
 
@@ -261,7 +269,7 @@ def run_analyze_all(config: AppConfig, tracker: ProgressTracker | None = None) -
             json_path.write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
 
             records.append(ClipRecord(
-                index=i, stem=stem, source_path=video,
+                index=idx_val, stem=stem, source_path=video,
                 compressed_path=compressed, text_path=final_text, analysis=analysis,
             ))
             print(f"  -> {final_text.name}")
