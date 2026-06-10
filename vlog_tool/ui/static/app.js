@@ -141,25 +141,6 @@ async function loadPlans() {
 function updateSidebarDay() {
   const el = document.querySelector('.project-item[data-entity="plan"] .muted');
   if (el) el.textContent = state.currentDay;
-  const sel = $('plan-day-select-sidebar');
-  if (!sel) return;
-  const cur = sel.value;
-  sel.innerHTML = state.availablePlans.map(p =>
-    `<option value="${escapeHtml(p.day_label)}">${escapeHtml(p.day_label)}</option>`
-  ).join('');
-  sel.value = state.currentDay;
-  sel.onchange = async () => {
-    const day = sel.value;
-    if (day === state.currentDay) return;
-    if (state.dirty && !confirm('切换分集将丢弃当前修改，确定吗？')) { sel.value = state.currentDay; return; }
-    state.currentDay = day;
-    state.plan = null;  // 总是清空，保证下次点 plan tab 时重新拉取
-    state.dirty = false;
-    saveProject();
-    if (state.currentEntity === 'plan') {
-      await selectPlan();
-    }
-  };
 }
 
 async function loadVideos() {
@@ -600,6 +581,15 @@ function renderPlan() {
   }
   pane.innerHTML = `
     <h3>日 vlog 元信息</h3>
+    ${state.availablePlans.length >= 1 ? `
+    <label>分集
+      <select id="plan-day-select">
+        ${state.availablePlans.map(dp =>
+          `<option value="${dp.day_label}" ${dp.day_label === state.currentDay ? 'selected' : ''}>${dp.day_label}</option>`
+        ).join('')}
+      </select>
+    </label>
+    ` : ''}
     <label>主题 <input data-field="theme"></label>
     <label>开场提示 <textarea data-field="opening_tip" rows="2"></textarea></label>
     <label>收尾提示 <textarea data-field="ending_tip" rows="2"></textarea></label>
@@ -607,6 +597,20 @@ function renderPlan() {
     <p class="hint">点击 segment 跳到对应视频</p>
     <ol id="plan-list"></ol>
   `;
+  const daySelect = pane.querySelector('#plan-day-select');
+  if (daySelect) {
+    daySelect.onchange = async () => {
+      const day = daySelect.value;
+      if (day === state.currentDay) return;
+      if (state.dirty && !confirm('切换分集将丢弃当前修改，确定吗？')) { daySelect.value = state.currentDay; return; }
+      state.currentDay = day;
+      state.plan = null;
+      state.dirty = false;
+      updateSidebarDay();
+      saveProject();
+      await selectPlan();
+    };
+  }
   for (const k of ['theme', 'opening_tip', 'ending_tip']) {
     const el = pane.querySelector(`[data-field="${k}"]`);
     el.value = p[k] || '';
