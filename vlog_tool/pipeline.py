@@ -398,7 +398,9 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
     clips = []
     for json_file in sorted(config.texts_dir.glob("*.json")):
         data = json.loads(json_file.read_text(encoding="utf-8"))
-        raw_idx = data.get("index", 0)
+        raw_idx = data.get("index")
+        if raw_idx is None:
+            raw_idx = json_file.stem[:3]  # fallback: 从文件名取前缀 "001"
         clips.append({
             "index": format_index(int(raw_idx), config.naming.index_width),
             "title": data.get("title", ""),
@@ -552,14 +554,16 @@ def run_refine_scripts(config: AppConfig, path: Path | None = None, fix: str | N
 
 def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:
     config.paths.output_dir.mkdir(parents=True, exist_ok=True)
-    with timed("=== 1/4 压缩原视频 ==="):
+    with timed("=== 1/5 压缩原视频 ==="):
         run_compress_all(config)
-    with timed("=== 2/4 AI 分析素材 ==="):
+    with timed("=== 2/5 AI 分析素材 ==="):
         run_analyze_all(config)
-    with timed("=== 3/4 生成口播文案 ==="):
+    with timed("=== 3/5 生成口播文案 ==="):
         run_generate_scripts(config)
-    with timed("=== 4/4 日 vlog 剪辑规划 ==="):
+    with timed("=== 4/5 日 vlog 剪辑规划 ==="):
         run_plan_vlog(config, day_label)
+    with timed("=== 5/5 烧录序号标注 ==="):
+        run_label_videos(config)
     print("\n完成！输出目录:", config.paths.output_dir)
 
 
