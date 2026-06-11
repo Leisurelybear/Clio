@@ -1207,6 +1207,33 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
     return Handler
 
 
+def _resolve_last_project_config(config: AppConfig, config_path: Path | None) -> AppConfig:
+    """如果 registry 中有 last_project，尝试加载它的配置替代默认 config。"""
+    if not config_path:
+        return config
+    reg_file = config_path.parent / "projects.json"
+    if not reg_file.is_file():
+        return config
+    try:
+        reg = json.loads(reg_file.read_text(encoding="utf-8"))
+        last_name = reg.get("last_project")
+        if not last_name:
+            return config
+        # 从注册路径中找匹配的项目
+        for p_str in reg.get("projects", []):
+            p = Path(p_str)
+            proj_file = p / "project.json"
+            if not proj_file.is_file():
+                continue
+            data = json.loads(proj_file.read_text(encoding="utf-8"))
+            if data.get("name") == last_name:
+                cfg = load_config(config_path, project_dir=p)
+                return cfg
+        return config
+    except Exception:
+        return config
+
+
 def run(
     config: AppConfig,
     config_path: Path | None = None,
@@ -1214,12 +1241,14 @@ def run(
     port: int = 8765,
     open_browser: bool = True,
 ) -> int:
-    handler = make_handler(config, config_path)
+    # 尝试加载上次使用的项目配置
+    active_config = _resolve_last_project_config(config, config_path)
+    handler = make_handler(active_config, config_path)
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
     print(f"  UI 启动: {url}")
-    print(f"  项目目录: {config.paths.input_dir}")
-    print(f"  输出目录: {config.paths.output_dir}")
+    print(f"  项目目录: {active_config.paths.input_dir}")
+    print(f"  输出目录: {active_config.paths.output_dir}")
     print("  Ctrl+C 退出")
     if open_browser:
         threading.Timer(0.5, lambda: webbrowser.open(url)).start()
