@@ -151,20 +151,25 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [x] R-009c：核心纯函数单元测试（pytest，128 用例，CI 自动跑）
 - [ ] R-009d：venv 检测跨平台修复（B-007）
 
-## 需求 R-010：AI 输出质量
+## 需求 R-010：AI 输出质量与 Prompt 管理
 
 **背景**：AI 分析结果偶尔有误（地点误判、时间轴不准、遗漏亮点），
-且用户无法干预 prompt 细节。支持外部 prompt 覆盖 + 置信度评分 + 多模型对比。
+且用户无法干预 prompt 细节。支持外部 prompt 覆盖 + 置信度评分 + 多模型对比 + UI 编辑 prompt。
 
 **验收**：
-- 支持外部 prompt 文件覆盖系统默认 prompt（`templates/prompts/` 目录下同名文件）
+- 支持外部 prompt 文件覆盖系统默认 prompt（`templates/prompts/` 目录下同名文件，改 prompt 无需改代码）
+- UI 设置 tab 增加「Prompt 管理」面板：列出所有系统 prompt（analyze / voiceover / plan / refine 等）
+- 每个 prompt 可在线编辑、恢复默认、保存到项目级 `project.yaml` 或全局覆盖
+- 保存后下次 AI 调用自动使用修改后的 prompt
 - analyze/texts 输出增加 `_confidence` 字段（AI 自评置信度）
 - CLI 支持对同一视频用多个模型分析并对比结果
 
 **子任务**：
-- [ ] R-010a：外部 prompt 文件覆盖机制
+- [ ] R-010a：外部 prompt 文件覆盖机制（`templates/prompts/` 同名文件优先）
 - [ ] R-010b：置信度评分（修改 prompts 让 AI 输出 `_confidence`）
 - [ ] R-010c：多模型对比 CLI
+- [ ] R-010d：后端 `GET /api/prompts` 返回所有可用 prompt；`PUT /api/prompts/{name}` 保存覆盖
+- [ ] R-010e：UI 设置 tab 内嵌 Prompt 管理面板（列表 + 编辑器 + 恢复默认）
 
 ## 需求 R-002：一键剪辑（从 plan 切出所有片段）
 
