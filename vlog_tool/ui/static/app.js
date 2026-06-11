@@ -16,6 +16,7 @@ const state = {
   projects: [],
   currentProject: null,
   currentProjectName: null,
+  lastProject: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -105,6 +106,7 @@ async function loadProjects() {
   try {
     const r = await api('GET', '/api/projects');
     state.projects = r.projects || [];
+    state.lastProject = r.last_project || null;
     state.currentProject = state.projects.find(p => p.is_current) || null;
     if (state.currentProject && !state.currentProjectName) {
       state.currentProjectName = state.currentProject.name;
@@ -114,6 +116,7 @@ async function loadProjects() {
     state.projects = [];
     state.currentProject = null;
     state.currentProjectName = null;
+    state.lastProject = null;
     updateProjectSidebar();
   }
 }
@@ -1167,6 +1170,11 @@ async function init() {
 
   try {
     await loadProjects();
+    // 如果 URL 没有指定项目，但有上次使用的项目，自动跳转
+    if (!urlProject && state.lastProject && state.lastProject !== state.currentProject?.name) {
+      window.location.search = `?project=${encodeURIComponent(state.lastProject)}`;
+      return;
+    }
     // 如果 URL 指定了项目，但当前不是该项目，需要重载
     if (urlProject && (!state.currentProject || state.currentProject.name !== urlProject)) {
       state.currentProjectName = urlProject;

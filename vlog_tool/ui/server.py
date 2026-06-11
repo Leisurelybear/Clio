@@ -260,17 +260,34 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
     def _add_to_registry(dir_path: str) -> None:
         registry_file = _registry_path()
         paths: list[str] = []
+        last_project = None
+        if registry_file.is_file():
+            try:
+                reg = json.loads(registry_file.read_text(encoding="utf-8"))
+                paths = reg.get("projects", [])
+                last_project = reg.get("last_project")
+            except (json.JSONDecodeError, OSError):
+                paths = []
+        normalized = str(Path(dir_path).resolve())
+        if normalized not in paths:
+            paths.append(normalized)
+        data = {"projects": paths}
+        if last_project:
+            data["last_project"] = last_project
+        _save_atomic(registry_file, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
+
+    def _save_last_project(name: str) -> None:
+        """持久化当前激活的项目名，用于下次启动时自动加载。"""
+        registry_file = _registry_path()
+        paths: list[str] = []
         if registry_file.is_file():
             try:
                 reg = json.loads(registry_file.read_text(encoding="utf-8"))
                 paths = reg.get("projects", [])
             except (json.JSONDecodeError, OSError):
                 paths = []
-        normalized = str(Path(dir_path).resolve())
-        if normalized not in paths:
-            paths.append(normalized)
-        data = json.dumps({"projects": paths}, ensure_ascii=False, indent=2).encode("utf-8")
-        _save_atomic(registry_file, data)
+        data = {"projects": paths, "last_project": name}
+        _save_atomic(registry_file, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
 
     def _list_projects(current_project_name: str | None = None) -> list[dict]:
         """列出所有可用项目。"""
@@ -645,6 +662,10 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                         data = json.loads(proj_file.read_text(encoding="utf-8"))
                     except (json.JSONDecodeError, OSError):
                         data = {}
+                # 记录本次为最近使用的项目
+                qs_project = qs.get("project", [None])[0]
+                if qs_project:
+                    _save_last_project(qs_project)
                 merged = {**DEFAULT_PROJECT, **data}
                 proj_out = _project_output_dir(proj_input)
                 merged["steps"] = _detect_steps(proj_out)
@@ -652,7 +673,15 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
             if path == "/api/projects":
                 req_project = qs.get("project", [None])[0]
-                return self._send_json({"projects": _list_projects(req_project)})
+                reg_file = _registry_path()
+                last_project = None
+                if reg_file.is_file():
+                    try:
+                        reg = json.loads(reg_file.read_text(encoding="utf-8"))
+                        last_project = reg.get("last_project")
+                    except (json.JSONDecodeError, OSError):
+                        pass
+                return self._send_json({"projects": _list_projects(req_project), "last_project": last_project})
 
             if path == "/api/videos":
                 proj_input = self._resolve_project_input(qs)
@@ -904,6 +933,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     json.dumps(merged, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
+                _save_last_project(merged.get("name") or proj_input.name)
                 return self._send_json({"ok": True})
 
             if path == "/api/texts":
