@@ -305,13 +305,14 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 ## 架构改进（来自 review，与设计文档 Phase 1 对齐）
 
-| ID | 问题 | 说明 |
-| --- | --- | --- |
-| A-001 | server.py → 989 行单一闭包 | 拆 routes/ + services.py（设计文档 Phase 1b） |
-| A-002 | app.js → 1076 行全局函数 | 拆 state.js / api.js / viewer.js（设计文档 Phase 1c） |
-| A-003 | `_write_text_file` / `_rewrite_text_file` 80% 重复 | 提取公共函数 |
-| A-004 | `updateEntityUI` 四个几乎相同的分支 | 用一个 selector 统一处理 |
-| A-005 | `project.json` output_dir 和 `project.yaml` paths.output_dir 不同步 | 两份配置来源不一致，应统一或互相感知
+| ID | 问题 | 说明 | 状态 |
+| --- | --- | --- | --- |
+| A-001 | server.py → 1261 行单一闭包 | 拆 routes/ + services/（Phase 1c 完成，454 行） | ✅ |
+| A-002 | app.js → 1509 行全局函数 | 拆 src/ ES 模块（Phase 1d 完成，8 个模块） | ✅ |
+| A-003 | pipeline.py → 789 行堆叠 | 拆 tasks/ 包（Phase 1b 完成，96 行） | ✅ |
+| A-004 | `_write_text_file` / `_rewrite_text_file` 80% 重复 | 提取公共函数（Phase 1b 已移入 _helpers.py） | ✅ |
+| A-005 | `project.json` vs `project.yaml` 不同步 | 两份配置来源不一致，应统一或互相感知 | 🔴 |
+| A-006 | 前端 ES module 动态 import 循环引用 | viewer/editor/runner 三方存在动态 import，长期可重构 | 🟡 |
 
 ## 已知问题（Bug Tracker）
 
@@ -369,6 +370,11 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | Commit | 简述 |
 | --- | --- |
 | `2d2b7d3` | feat(config): auto-create project configs and fix directory browser hang |
+| `b3935ba` | fix: deduplicate VIDEO_EXTS in file_service.py (B-019) |
+| `b0da41a` | refactor: split app.js into ES modules (Phase 1d) |
+| `0918da0` | refactor: split server.py into routes/ and services/ (Phase 1c) |
+| `cac4d67` | refactor: split pipeline.py into tasks/ package (Phase 1b) |
+| `5e8d376` | refactor: extract global constants to _constants.py (Phase 1a) |
 | `75b2ffd` | feat(plan): add preview playback + speed control (R-011) |
 | `b3c0edc` | fix(ui): restore day selector in run tab for pipeline plan step |
 | `1912012` | refactor(ui): rename '日 vlog 规划' → 'vlog 剪辑规划', move day to plan tab |

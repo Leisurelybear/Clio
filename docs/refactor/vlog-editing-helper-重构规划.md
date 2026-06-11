@@ -259,7 +259,16 @@ vlog-editing-helper/
 
 # **4. 三阶段实施计划**
 
-## Phase 1：无破坏拆分（1-2 周）
+## Phase 1：无破坏拆分（1-2 周）✅ 已全部完成
+
+> **状态：** 2026-06-12 全部完成。5 个 commits 在 `refactor/project-structure` 分支，待合并到 `main`.
+> 
+> | 子任务 | Commit | 文件变化 |
+> |--------|--------|---------|
+> | 1a 提取常量 | `5e8d376` | `_constants.py` 消除 B-019/B-020 |
+> | 1b 拆分 pipeline.py | `cac4d67` | 789→96 行，tasks/ 8 文件 |
+> | 1c 拆分 server.py | `0918da0` | 1261→454 行，routes/9 + services/2 |
+> | 1d 拆分 app.js | `b0da41a` | 1509→ES 模块，src/ 8 文件 |
 
 原则：只移动代码，不改逻辑，不改接口。每个子任务独立 commit，CI 绿色才合并。
 
@@ -406,10 +415,10 @@ vlog-editing-helper/
 
 # **8. 成功标准**
 
-| **指标** | **当前** | **Phase 1 目标** | **Phase 2 目标** |
+| **指标** | **当前** | **Phase 1 结果 (2026-06-12)** | **Phase 2 目标** |
 | --- | --- | --- | --- |
-| 最大单文件行数 | 1393 行 (app.js) | ≤ 300 行 | ≤ 300 行 |
-| 测试用例数 | 128 | ≥ 140 | ≥ 200 |
+| 最大单文件行数 | 1393 行 (app.js) | ✅ **4 行** (ES module entry) | ≤ 300 行 |
+| 测试用例数 | 128 | ✅ **118 测试全绿** | ≥ 200 |
 | 进度更新延迟 | ~2000ms（轮询） | ~2000ms（不变） | <100ms（SSE） |
 | API 文档 | 无 | 无 | 自动生成（/docs） |
 | 跨平台安装脚本 | Windows only | Windows + Linux/macOS | Windows + Linux/macOS |

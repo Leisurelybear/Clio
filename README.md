@@ -566,18 +566,30 @@ vlog-video-analysis/
 │   ├── vlog_template.md  # 口播风格模板
 │   └── trip_context.md   # 旅行背景与 AI 规范
 └── vlog_tool/
+    ├── _constants.py     # 全局常量
     ├── ai/               # AI 厂家抽象（gemini / openai 兼容）
-    ├── compress.py
-    ├── analyze.py
-    ├── pipeline.py
-    ├── progress.py       # 进度追踪（供 UI 轮询）
-    ├── cut.py            # 视频裁剪
-    ├── utils.py          # 通用工具
-    ├── log.py            # 日志系统
     ├── config.py         # 配置解析
-    └── ui/               # 本地 Web UI
-        ├── server.py
-        └── static/       # HTML/CSS/JS
+    ├── compress.py       # ffmpeg 压缩
+    ├── analyze.py        # AI 分析调用
+    ├── cut.py            # 视频裁剪
+    ├── log.py            # 日志系统
+    ├── progress.py       # 进度追踪
+    ├── prompts.py        # AI Prompt 模板
+    ├── utils.py          # 通用工具
+    ├── tasks/            # 流水线步骤（拆分自 pipeline.py）
+    │   ├── compress.py / analyze.py / scripts.py
+    │   ├── plan.py / label.py / cut.py / refine.py
+    │   └── _helpers.py
+    ├── pipeline.py       # 编排层（~96 行）
+    ├── tests/            # 单元测试（118 用例）
+    └── ui/               # 本地 Web UI（拆分自 server.py）
+        ├── server.py     # 分发层（~454 行）
+        ├── routes/       # 路由处理（videos / projects / texts / plan / config / run / fs）
+        ├── services/     # 业务服务（file_service / project_service）
+        └── static/       # 前端
+            ├── index.html / style.css
+            ├── app.js    # ES module entry
+            └── src/      # ES 模块（state / utils / api / viewer / editor / runner / sidebar / main）
 ```
 
 ---
