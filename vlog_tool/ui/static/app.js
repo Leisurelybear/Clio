@@ -28,6 +28,32 @@ function escapeHtml(s) {
   }[c]));
 }
 
+// SVG icons (Lucide-style, zero external deps)
+function icon(name, size = 18) {
+  const icons = {
+    play: '<polygon points="5 3 19 12 5 21 5 3"/>',
+    folder: '<path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/>',
+    file: '<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>',
+    check: '<polyline points="20 6 9 17 4 12"/>',
+    circle: '<circle cx="12" cy="12" r="10"/>',
+    x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
+    plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
+    refresh: '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>',
+    settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>',
+    clipboard: '<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/>',
+    music: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>',
+    video: '<polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2" ry="2"/>',
+    save: '<path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/>',
+    cut: '<circle cx="6" cy="6" r="3"/><circle cx="18" cy="18" r="3"/><line x1="8.12" y1="8.12" x2="15.88" y2="15.88"/><line x1="15.88" y1="8.12" x2="8.12" y2="15.88"/>',
+    search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
+    chevron_right: '<polyline points="9 18 15 12 9 6"/>',
+    stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+  };
+  const d = icons[name] || icons.file;
+  const cls = size < 18 ? 'icon icon-sm' : 'icon';
+  return `<span class="${cls}"><svg viewBox="0 0 24 24">${d}</svg></span>`;
+}
+
 function setStatus(msg, kind = '') {
   const el = $('status');
   el.textContent = msg || '';
@@ -179,7 +205,7 @@ function renderSteps() {
     const done = state.steps[key];
     const li = document.createElement('li');
     li.className = 'step-item' + (done ? ' done' : '');
-    li.innerHTML = `<span class="step-icon">${done ? '✓' : '○'}</span><span class="step-label">${label}</span>`;
+    li.innerHTML = `<span class="step-icon">${icon(done ? 'check' : 'circle', 14)}</span><span class="step-label">${label}</span>`;
     ul.appendChild(li);
   }
 }
@@ -206,14 +232,13 @@ function renderVideoList() {
       // Switch to original view briefly to see if there are original videos
       ul.innerHTML = `
         <li class="empty-state">
-          <span class="icon">📁</span>
+          ${icon('folder', 36)}
           <h4>暂无压缩视频</h4>
           <p>未找到压缩后的视频文件（output/compressed/）</p>
           <p class="hint">请先压缩原视频，或切换到「原视频」视图查看素材</p>
-          <p style="margin-top:10px">
-            <button class="sidebar-btn" onclick="switchToOriginalThenCompress()" style="background:#4a9eff;color:#fff;border:none;padding:6px 12px;border-radius:3px;cursor:pointer">切换到原视频视图</button>
-            &nbsp;
-            <button class="sidebar-btn" onclick="goToRunTab()" title="运行流水线中的压缩步骤">去压缩视频</button>
+          <p style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="sidebar-btn" onclick="switchToOriginalThenCompress()" style="background:var(--accent);color:#fff;border:none;padding:7px 14px;border-radius:var(--radius-sm);cursor:pointer;font:inherit;font-size:var(--text-sm)">${icon('folder', 14)} 切换到原视频</button>
+            <button class="sidebar-btn" onclick="goToRunTab()" title="运行流水线中的压缩步骤" style="background:var(--bg-surface-2);color:var(--text-primary);border:1px solid var(--border);padding:7px 14px;border-radius:var(--radius-sm);cursor:pointer;font:inherit;font-size:var(--text-sm)">${icon('play', 14)} 去压缩视频</button>
           </p>
           <p class="hint" style="margin-top:8px">素材目录: ${escapeHtml(state.config?.input_dir || '未知')}</p>
         </li>
@@ -221,7 +246,7 @@ function renderVideoList() {
     } else {
       ul.innerHTML = `
         <li class="empty-state">
-          <span class="icon">📁</span>
+          ${icon('video', 36)}
           <h4>暂无视频素材</h4>
           <p>请将视频文件（.mp4/.mov/.mkv等）放入素材目录</p>
           <p class="hint">素材目录: ${escapeHtml(state.config?.input_dir || '未知')}</p>
@@ -238,8 +263,8 @@ function renderVideoList() {
     const display = v.file.replace(/^\d+_/, '');
     const tCls = v.text_json ? 'has' : 'miss';
     const sCls = v.script_json ? 'has' : 'miss';
-    const tLabel = v.text_json ? '✓ texts' : '· texts';
-    const sLabel = v.script_json ? '✓ voiceover' : '· voiceover';
+    const tLabel = v.text_json ? `${icon('check', 12)} texts` : '· texts';
+    const sLabel = v.script_json ? `${icon('check', 12)} voiceover` : '· voiceover';
     const counterpartLabel = state.source === 'compressed' ? '原' : '压';
     const matchBadge = v.match
       ? `<span class="match-badge" title="${escapeHtml(v.match.file)}">→ ${counterpartLabel}: ${escapeHtml(v.match.file)}</span>`
@@ -681,7 +706,7 @@ function renderPlan() {
     <label><input type="checkbox" id="cut-reencode"> 重新编码 (默认 -c copy 快速)</label>
     <label>输出目录 (留空则 output/cuts/&lt;day&gt;)
       <span class="input-with-browse"><input id="cut-outdir" placeholder="例如 E:/剪辑素材/第一天"><button class="browse-btn" data-target="cut-outdir" type="button">浏览</button></span></label>
-    <button id="btn-cut-exec" class="primary">执行裁剪</button>
+    <button id="btn-cut-exec" class="btn-primary">${icon('cut', 16)} 执行裁剪</button>
     <div id="cut-result" style="margin-top:12px"></div>
   `;
   pane.appendChild(cutSection);
@@ -934,7 +959,7 @@ function renderRun() {
     <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
     <label>分集 <input id="run-day" value="${escapeHtml(state.currentDay)}"></label>
     <div class="run-step-list">${stepChecks}</div>
-    <button id="btn-run-start" class="primary">▶ 运行选中步骤</button>
+    <button id="btn-run-start" class="btn-primary">${icon('play', 16)} 运行选中步骤</button>
     <div id="run-progress" style="margin-top:12px">
       <p class="muted">尚未运行</p>
     </div>
@@ -973,7 +998,7 @@ async function startRun() {
     prog.innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
     setStatus('启动失败: ' + e.message, 'err');
     btn.disabled = false;
-    btn.textContent = '▶ 运行选中步骤';
+    btn.innerHTML = `${icon('play', 16)} 运行选中步骤`;
   }
 }
 
@@ -985,7 +1010,7 @@ async function pollRunStatus() {
     const s = await api('GET', '/api/run/status');
     if (s.rerun) return;
     if (s.status === 'idle' || s.status === 'unknown') {
-      if (btn) { btn.disabled = false; btn.textContent = '▶ 运行选中步骤'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       if (!s.running) {
         prog.innerHTML = '<p class="muted">尚未运行</p>';
       }
@@ -1005,7 +1030,7 @@ async function pollRunStatus() {
       `;
     } else if (s.status === 'done') {
       _stopRunPoll();
-      if (btn) { btn.disabled = false; btn.textContent = '▶ 运行选中步骤'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       prog.innerHTML = `<p class="ok">✓ 流水线完成</p><p>${escapeHtml(s.message || '')}</p>`;
       setStatus('流水线完成', 'ok');
       state.currentDay = _lastRunDay;
@@ -1019,7 +1044,7 @@ async function pollRunStatus() {
       if (state.currentEntity === 'plan') selectPlan();
     } else if (s.status === 'error') {
       _stopRunPoll();
-      if (btn) { btn.disabled = false; btn.textContent = '▶ 运行选中步骤'; }
+      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       prog.innerHTML = `<p class="err">✗ 流水线出错</p><p>${escapeHtml(s.message || '')}</p>`;
       setStatus('流水线出错', 'err');
     }
@@ -1085,7 +1110,7 @@ function renderConfig() {
       <h3>项目配置初始化</h3>
       <p class="muted">该项目还没有专属配置文件。</p>
       <p class="hint">创建后将以当前全局配置为模板，后续修改只影响本项目。</p>
-      <button id="btn-config-init" class="primary" style="margin-top:12px;padding:10px 20px;width:100%;">为该项目创建配置文件</button>
+      <button id="btn-config-init" class="btn-primary" style="margin-top:12px">${icon('settings', 16)} 为该项目创建配置文件</button>
     `;
     const btn = $('btn-config-init');
     if (btn) btn.onclick = initProjectConfig;
