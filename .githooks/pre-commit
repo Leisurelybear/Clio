@@ -3,12 +3,16 @@
 
 set -e
 
-# Try ruff directly, then via python -m ruff (venv)
-if command -v ruff >/dev/null 2>&1; then
-    RUFF="ruff"
-elif python -m ruff --version >/dev/null 2>&1; then
-    RUFF="python -m ruff"
-else
+# Find a Python interpreter that has ruff installed
+RUFF=""
+for py in ".venv/Scripts/python.exe" ".venv/bin/python" "venv/Scripts/python.exe" "venv/bin/python" "python3" "python"; do
+    if $py -m ruff --version >/dev/null 2>&1; then
+        RUFF="$py -m ruff"
+        break
+    fi
+done
+
+if [ -z "$RUFF" ]; then
     echo "pre-commit: ruff not found, skipping format"
     exit 0
 fi
