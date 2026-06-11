@@ -19,7 +19,7 @@ from typing import Any
 
 import yaml
 
-VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm"}
+from vlog_tool._constants import VIDEO_EXTS
 
 
 def _is_safe_basename(name: str) -> bool:

@@ -5,8 +5,8 @@ from __future__ import annotations
 from http import HTTPStatus
 from typing import TYPE_CHECKING
 
+from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.ui.services.file_service import (
-    VIDEO_EXTS,
     _find_compressed_for_original,
     _find_original_for_compressed,
     _find_texts_dirs,
