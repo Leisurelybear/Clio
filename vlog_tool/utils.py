@@ -10,7 +10,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TypeVar
 
-VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
+from vlog_tool._constants import VIDEO_EXTENSIONS
 
 T = TypeVar("T")
 

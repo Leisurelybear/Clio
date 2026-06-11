@@ -28,12 +28,12 @@ from urllib.parse import parse_qs, urlparse
 
 import yaml
 
+from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.config import AppConfig, deep_merge, load_config
 from vlog_tool.pipeline import run_analyze_all, run_cut_all, run_generate_scripts, run_pipeline_steps
 from vlog_tool.progress import ProgressTracker
 
 STATIC_DIR = Path(__file__).parent / "static"
-VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm"}
 
 
 def _is_safe_basename(name: str) -> bool:

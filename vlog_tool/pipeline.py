@@ -160,7 +160,7 @@ def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None
             info = probe_video_info(rec.source_path, ffprobe) if rec.source_path.exists() else {}
             writer.writerow(
                 {
-                    "index": format_index(rec.index, 3),
+                    "index": format_index(rec.index, config.naming.index_width),
                     "stem": rec.stem,
                     "title": a.get("title", ""),
                     "summary": a.get("summary", ""),
@@ -679,7 +679,7 @@ def run_cut_all(
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
     comp_dir = config.compressed_dir
     input_dir = config.paths.input_dir
-    VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm"}
+    from vlog_tool._constants import VIDEO_EXTS
 
     print(f"[cut] 计划: {plan_path.name} ({len(seq)} 段)")
     print(f"[cut] 输出: {out_root}")
