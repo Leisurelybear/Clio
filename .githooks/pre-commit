@@ -1,0 +1,16 @@
+#!/bin/sh
+# Pre-commit hook: auto-format Python files with ruff, then re-stage them.
+
+set -e
+
+# Bail out if ruff is not installed
+if ! command -v ruff >/dev/null 2>&1; then
+    echo "pre-commit: ruff not found, skipping format"
+    exit 0
+fi
+
+# Format all files (ruff only touches .py/.pyi files by default)
+ruff format .
+
+# Re-stage any files that ruff modified
+git diff --name-only --diff-filter=M | xargs -r git add

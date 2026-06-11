@@ -614,6 +614,17 @@ python -m pytest vlog_tool/tests/ -v
 python -m pytest vlog_tool/tests/test_utils.py -v
 ```
 
+### 代码格式化
+
+本项目使用 `ruff` 做 lint 和格式化。项目包含 pre-commit hook，提交前自动格式化：
+
+```bash
+# 启用 hook（首次克隆后执行一次即可）
+git config core.hooksPath .githooks
+```
+
+Hook 会在每次 `git commit` 前自动运行 `ruff format` 并重新 stage 格式化后的文件。
+
 ### 依赖版本锁定
 
 `requirements-locked.txt` 记录了精确版本号，用于 CI 和可重现构建。
