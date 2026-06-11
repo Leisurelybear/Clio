@@ -94,7 +94,7 @@ def plan_daily_vlog(clips: list[dict], config: AppConfig, day_label: str = "day1
     )
     prompt = _wrap_with_context(f"日 vlog 标签: {day_label}\n\n{base}", config)
     text = _call_ai(
-        "AI 剪辑编排",
+        "AI vlog 剪辑规划",
         provider.provider_id,
         model,
         prompt,
