@@ -172,7 +172,7 @@ def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None
             })
 
 
-def run_compress_all(config: AppConfig, single_file: Path | None = None) -> list[ClipRecord]:
+def run_compress_all(config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None) -> list[ClipRecord]:
     if single_file:
         videos = [single_file]
     else:
@@ -188,6 +188,8 @@ def run_compress_all(config: AppConfig, single_file: Path | None = None) -> list
         completed = 0
         elapsed_total = 0.0
         for i, video in enumerate(videos, start=1):
+            if tracker:
+                tracker.update(phase="compress", current=i, total=len(videos), message=f"压缩 {video.name}...")
             idx_val = i + index_offset
             idx = format_index(idx_val, config.naming.index_width)
             out = config.compressed_dir / f"{idx}_{video.stem}.mp4"
