@@ -234,6 +234,21 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [x] R-011c：startPreview / stopPreview / _playPreviewSegment 控制逻辑
 - [x] R-011d：player.ontimeupdate + onended 接入预览自动推进
 
+## 需求 R-012：预览进度条与交互控制
+
+**背景**：R-011 实现了 segment 自动跳转播放，但用户无法看到整体进度，也无法手动跳到某个 segment。
+
+**验收**：
+- 预览模式下在视频播放器下方显示进度条（表示整个 sequence），显示当前 segment 位置
+- 进度条可点击拖动跳到对应 segment
+- 预览控制栏显示：上一步 / 播放暂停 / 下一步 / 当前 segment 名称
+- 手动拖动播放器进度条时暂时不触发自动推进（防止误拖导致跳段）
+
+**子任务**：
+- [ ] R-012a：预览控制栏 UI（上一步 / 暂停 / 下一步 + segment 名称 + 整体进度条）
+- [ ] R-012b：进度条点击/拖动切换到对应 segment
+- [ ] R-012c：手动拖动播放器进度时不触发自动推进
+
 ## 暂存 / WIP
 
 - （暂无）
@@ -313,6 +328,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | Commit | 简述 |
 | --- | --- |
 | `2d2b7d3` | feat(config): auto-create project configs and fix directory browser hang |
+| `75b2ffd` | feat(plan): add preview playback + speed control (R-011) |
 | `b3c0edc` | fix(ui): restore day selector in run tab for pipeline plan step |
 | `1912012` | refactor(ui): rename '日 vlog 规划' → 'vlog 剪辑规划', move day to plan tab |
 | `e530e22` | style: apply ruff format across the codebase |
