@@ -96,11 +96,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         _run_lock = threading.Lock()
         _run_thread: threading.Thread | None = None
         _config_cache: dict[str, AppConfig] = {}
-
-        # -- closure variables exposed as class attrs for route modules --
-        DEFAULT_PROJECT = DEFAULT_PROJECT
-        input_dir = input_dir
-        output_dir = output_dir
+        DEFAULT_PROJECT: dict = {}
         server: Any  # set by HTTPServer
 
         def _get_config(self, project_input: Path | None = None) -> AppConfig:
@@ -393,6 +389,10 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
+    # Expose closure variables as class attrs so route modules can access them
+    Handler.DEFAULT_PROJECT = DEFAULT_PROJECT
+    Handler.input_dir = input_dir
+    Handler.output_dir = output_dir
     return Handler
 
 
