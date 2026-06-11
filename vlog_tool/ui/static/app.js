@@ -316,6 +316,7 @@ function switchToOriginalThenCompress() {
 function goToRunTab() {
   state.currentEntity = 'run';
   updateEntityUI();
+  renderActiveTab();
 }
 
 async function selectVideo(file) {
@@ -909,7 +910,8 @@ let _runPollTimer = null;
 let _lastRunDay = 'day1';
 
 const RUN_STEPS = [
-  { key: 'analyze', label: '压缩 + AI 分析', hint: '将原片压缩为 640p，提交 Gemini 分析' },
+  { key: 'compress', label: '压缩原视频', hint: '将原片压缩为 640p，为 AI 分析做准备' },
+  { key: 'analyze', label: 'AI 分析', hint: '提交 Gemini 分析压缩后的视频内容' },
   { key: 'voiceover', label: '生成口播文案', hint: '基于分析结果生成每段的口播脚本' },
   { key: 'plan', label: '日 vlog 规划', hint: '根据所有素材生成剪辑顺序和时间轴' },
   { key: 'label', label: '烧录序号', hint: '在压缩视频左上角标上序号便于剪映对照' },

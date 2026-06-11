@@ -204,72 +204,86 @@ def run_compress_all(config: AppConfig, single_file: Path | None = None) -> list
 
 
 def run_analyze_all(config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None) -> list[ClipRecord]:
-    if single_file:
-        videos = [single_file]
-    else:
-        videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
-    config.compressed_dir.mkdir(parents=True, exist_ok=True)
-    config.texts_dir.mkdir(parents=True, exist_ok=True)
+    """Analyze already-compressed videos using AI (compress step must precede this).
 
-    print(f"素材目录: {config.paths.input_dir}（{'1 个视频' if single_file else f'{len(videos)} 个视频'}）")
+    Scans compressed_dir for existing *.mp4 files and analyzes each.
+    For single_file (an original video), finds the matching compressed file first.
+    """
+    config.texts_dir.mkdir(parents=True, exist_ok=True)
     records: list[ClipRecord] = []
 
-    index_offset = 0
     if single_file:
-        index_offset = _next_index(config.texts_dir, config.naming.index_width) - 1
+        items: list[tuple[Path, Path, str]] = []
+        candidates = sorted(config.compressed_dir.glob(f"*_{single_file.stem}.mp4"))
+        if not candidates:
+            print(f"[错误] 未找到 {single_file.name} 对应的压缩文件，请先运行压缩步骤")
+            return []
+        compressed = candidates[0]
+        idx_str = compressed.stem.split("_", 1)[0]
+        items.append((compressed, single_file, idx_str))
+    else:
+        items = []
+        for p in sorted(config.compressed_dir.glob("*.mp4")):
+            parts = p.stem.split("_", 1)
+            if len(parts) != 2 or not parts[0].isdigit():
+                continue
+            idx_str, orig_stem = parts
+            orig_path = config.paths.input_dir / f"{orig_stem}.mp4"
+            if not orig_path.is_file():
+                for ext in (".mov", ".mkv", ".avi", ".mts", ".m2ts"):
+                    alt = config.paths.input_dir / f"{orig_stem}{ext}"
+                    if alt.is_file():
+                        orig_path = alt
+                        break
+                else:
+                    print(f"[警告] 找不到 {p.name} 对应的原始视频，跳过")
+                    continue
+            items.append((p, orig_path, idx_str))
 
-    if tracker:
-        tracker.update(phase="compress", total=len(videos), message=f"压缩 {len(videos)} 个视频...")
+    if not items:
+        print(f"[错误] 压缩目录为空或无法匹配: {config.compressed_dir}，请先运行压缩步骤")
+        return []
 
-    with timed(f"run_analyze_all（{len(videos)} 个）"):
+    total = len(items)
+    print(f"待分析视频: {total} 个（压缩目录: {config.compressed_dir}）")
+
+    with timed(f"run_analyze_all（{total} 个）"):
         completed = 0
         elapsed_total = 0.0
-        for i, video in enumerate(videos, start=1):
-            idx_val = i + index_offset
-            idx = format_index(idx_val, config.naming.index_width)
-            compressed = config.compressed_dir / f"{idx}_{video.stem}.mp4"
+        for i, (compressed, original, idx_str) in enumerate(items, start=1):
+            idx_val = int(idx_str)
 
-            if not compressed.exists():
-                print(f"[压缩] {video.name}")
-                if tracker:
-                    tracker.next(message=f"压缩 {video.name}")
-                compress_video(video, compressed, config)
-            else:
-                print(f"[跳过压缩] {video.name} (已存在)")
-                if tracker:
-                    tracker.next(message=f"跳过压缩 {video.name}")
-
-            existing = sorted(config.texts_dir.glob(f"{idx}_*.json"))
+            existing = sorted(config.texts_dir.glob(f"{idx_str}_*.json"))
             if config.analyze.skip_existing and existing:
                 json_path = existing[0]
                 text_path = json_path.with_suffix(".txt")
                 analysis = json.loads(json_path.read_text(encoding="utf-8"))
-                print(f"[跳过分析] {video.name} (已存在: {json_path.name})")
+                print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
                 records.append(ClipRecord(
-                    index=idx_val, stem=json_path.stem, source_path=video,
+                    index=idx_val, stem=json_path.stem, source_path=original,
                     compressed_path=compressed, text_path=text_path, analysis=analysis,
                 ))
                 continue
 
-            print(_eta_line("分析", i, len(videos), video.name, completed, elapsed_total))
+            print(_eta_line("分析", i, total, compressed.name, completed, elapsed_total))
             if tracker:
-                tracker.update(phase="analyze", current=i, message=f"分析 {video.name}...")
+                tracker.update(phase="analyze", current=i, message=f"分析 {compressed.name}...")
             t0 = time.monotonic()
             analysis = analyze_video(str(compressed), config)
             elapsed_total += time.monotonic() - t0
             completed += 1
             analysis["index"] = idx_val
-            analysis["source_file"] = video.name
+            analysis["source_file"] = original.name
 
-            stem = _build_stem(idx_val, analysis.get("title", video.stem), config)
+            stem = _build_stem(idx_val, analysis.get("title", original.stem), config)
             final_text = config.texts_dir / f"{stem}.txt"
             json_path = config.texts_dir / f"{stem}.json"
 
-            _write_text_file(final_text, analysis, video, compressed)
+            _write_text_file(final_text, analysis, original, compressed)
             json_path.write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
 
             records.append(ClipRecord(
-                index=idx_val, stem=stem, source_path=video,
+                index=idx_val, stem=stem, source_path=original,
                 compressed_path=compressed, text_path=final_text, analysis=analysis,
             ))
             print(f"  -> {final_text.name}")
@@ -535,25 +549,27 @@ def run_refine_scripts(config: AppConfig, path: Path | None = None, fix: str | N
 
 def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:
     config.paths.output_dir.mkdir(parents=True, exist_ok=True)
-    with timed("=== 1/4 分析素材（含压缩） ==="):
+    with timed("=== 1/4 压缩原视频 ==="):
+        run_compress_all(config)
+    with timed("=== 2/4 AI 分析素材 ==="):
         run_analyze_all(config)
-    with timed("=== 2/4 生成口播文案 ==="):
+    with timed("=== 3/4 生成口播文案 ==="):
         run_generate_scripts(config)
-    with timed("=== 3/4 日 vlog 剪辑规划 ==="):
+    with timed("=== 4/4 日 vlog 剪辑规划 ==="):
         run_plan_vlog(config, day_label)
-    with timed("=== 4/4 烧录序号标注 ==="):
-        run_label_videos(config)
     print("\n完成！输出目录:", config.paths.output_dir)
 
 
 _STEP_LABELS = {
-    "analyze": "分析素材（含压缩）",
+    "compress": "压缩原视频",
+    "analyze": "AI 分析素材",
     "voiceover": "生成口播文案",
     "plan": "日 vlog 剪辑规划",
     "label": "烧录序号标注",
 }
 
 _STEP_FUNCS = {
+    "compress": run_compress_all,
     "analyze": run_analyze_all,
     "voiceover": run_generate_scripts,
     "plan": run_plan_vlog,
