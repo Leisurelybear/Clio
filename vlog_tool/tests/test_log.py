@@ -1,10 +1,7 @@
 """Tests for vlog_tool/log.py — pure formatting functions."""
 from __future__ import annotations
 
-import pytest
-
 from vlog_tool.log import format_duration, format_size
-
 
 # ── format_size ─────────────────────────────────────────────────────
 

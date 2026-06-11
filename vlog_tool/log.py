@@ -189,7 +189,7 @@ class timed:
         self._label = label
         self._t0 = 0.0
 
-    def __enter__(self) -> "timed":
+    def __enter__(self) -> timed:
         self._t0 = time.monotonic()
         print(f"[{self._label}] 起始 {datetime.now().strftime('%H:%M:%S')}")
         return self

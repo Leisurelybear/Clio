@@ -6,10 +6,9 @@ import re
 import shutil
 import subprocess
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable, TypeVar
-
-from vlog_tool.config import AppConfig
+from typing import TypeVar
 
 VIDEO_EXTENSIONS = {".mp4", ".mov", ".avi", ".mkv", ".m4v", ".webm"}
 

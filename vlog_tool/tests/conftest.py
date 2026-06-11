@@ -1,7 +1,6 @@
 """Shared pytest fixtures for all test modules."""
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import pytest

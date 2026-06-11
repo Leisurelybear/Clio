@@ -13,7 +13,6 @@ from vlog_tool.utils import (
     sanitize_name,
 )
 
-
 # ── extract_json ────────────────────────────────────────────────────
 
 class TestExtractJson:

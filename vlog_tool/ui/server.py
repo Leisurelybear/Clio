@@ -585,10 +585,10 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     if not proj_yaml.is_file():
                         return self._send_json({"needs_init": True})
                 # 返回合并后的有效配置
-                with open(config_path, "r", encoding="utf-8") as f:
+                with open(config_path, encoding="utf-8") as f:
                     raw = yaml.safe_load(f) or {}
                 if proj_input != input_dir:
-                    with open(proj_yaml, "r", encoding="utf-8") as f:
+                    with open(proj_yaml, encoding="utf-8") as f:
                         project_raw = yaml.safe_load(f) or {}
                     raw = deep_merge(raw, project_raw)
                 return self._send_json(raw)
@@ -810,7 +810,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     return self._send_json({"ok": True, "path": str(target_path)})
                 # 全局 config.yaml 写入（原有逻辑）
                 try:
-                    with open(config_path, "r", encoding="utf-8") as f:
+                    with open(config_path, encoding="utf-8") as f:
                         ref_raw = yaml.safe_load(f) or {}
                 except Exception as e:
                     return self._send_json({"ok": False, "error": f"无法读取当前配置: {e}"}, 500)
@@ -925,7 +925,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 if target_path.is_file():
                     return self._send_json({"ok": False, "error": "project.yaml 已存在"}, 409)
                 try:
-                    with open(config_path, "r", encoding="utf-8") as f:
+                    with open(config_path, encoding="utf-8") as f:
                         raw = yaml.safe_load(f) or {}
                     # 修正 paths 为当前项目的实际路径
                     paths = raw.get("paths", {})

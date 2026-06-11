@@ -310,8 +310,6 @@ def run_label_videos(config: AppConfig, tracker: ProgressTracker | None = None) 
         for i, json_file in enumerate(files, start=1):
             data = json.loads(json_file.read_text(encoding="utf-8"))
             idx = data.get("index", json_file.stem[:3])
-            title = data.get("title", json_file.stem)
-            source_name = data.get("source_file", "")
             compressed = None
             for f in config.compressed_dir.glob(f"{idx}_*"):
                 compressed = f

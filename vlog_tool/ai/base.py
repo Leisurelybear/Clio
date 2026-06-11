@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 from typing import Protocol
 
 
-class TaskName(str, Enum):
+class TaskName(StrEnum):
     VIDEO_ANALYZE = "video_analyze"
     VOICEOVER = "voiceover"
     VLOG_PLAN = "vlog_plan"

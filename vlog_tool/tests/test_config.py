@@ -1,22 +1,23 @@
 """Tests for vlog_tool/config.py — pure functions and config loading."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
-import yaml
 
 from vlog_tool.config import (
     AppConfig,
-    deep_merge,
-    load_config,
     _load_context,
     _path,
     _resolve_api_key,
     _validate_config,
+    deep_merge,
+    load_config,
 )
 
+if TYPE_CHECKING:
+    from vlog_tool.config import AIConfig, PathsConfig
 
 # ── deep_merge ──────────────────────────────────────────────────────
 
@@ -256,7 +257,7 @@ class TestLoadConfig:
 
 # ── Helpers ─────────────────────────────────────────────────────────
 
-def create_paths(**kwargs) -> "PathsConfig":
+def create_paths(**kwargs) -> PathsConfig:
     """Helper to build a PathsConfig with defaults."""
     from vlog_tool.config import PathsConfig
     defaults = {"input_dir": Path("."), "output_dir": Path("./output")}
@@ -267,7 +268,7 @@ def create_ai(
     providers: dict[str, str] | None = None,
     tasks: dict[str, tuple[str, str]] | None = None,
     context: str = "",
-) -> "AIConfig":
+) -> AIConfig:
     """Helper to build an AIConfig with provider/task data class objects."""
     from vlog_tool.config import AIConfig, ProviderConfig, TaskConfig
     ai = AIConfig(context=context)

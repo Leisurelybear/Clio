@@ -3,8 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from vlog_tool.cut import parse_time_range, _to_seconds
-
+from vlog_tool.cut import _to_seconds, parse_time_range
 
 # ── _to_seconds ─────────────────────────────────────────────────────
 

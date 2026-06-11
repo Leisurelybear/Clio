@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from vlog_tool.log import format_duration, timed
-from vlog_tool.utils import resolve_binary, run_ffmpeg
+from vlog_tool.utils import run_ffmpeg
 
 
 def parse_time_range(range_str: str) -> tuple[float, float]:
