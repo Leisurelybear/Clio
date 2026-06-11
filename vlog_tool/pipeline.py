@@ -398,8 +398,9 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
     clips = []
     for json_file in sorted(config.texts_dir.glob("*.json")):
         data = json.loads(json_file.read_text(encoding="utf-8"))
+        raw_idx = data.get("index", 0)
         clips.append({
-            "index": data.get("index", json_file.stem[:3]),
+            "index": format_index(int(raw_idx), config.naming.index_width),
             "title": data.get("title", ""),
             "summary": data.get("summary", ""),
             "location": data.get("location", ""),

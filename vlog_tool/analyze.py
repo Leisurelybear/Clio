@@ -82,17 +82,48 @@ def generate_voiceover(clip_data: dict, template: str, config: AppConfig) -> dic
 def plan_daily_vlog(clips: list[dict], config: AppConfig, day_label: str = "day1") -> dict:
     provider, model = get_task_provider(config, TaskName.VLOG_PLAN)
 
+    # 取第一个 clip 的 index 作为 prompt 示例，确保格式一致
+    first_idx = clips[0].get("index", "001") if clips else "001"
+
     base = PLAN_PROMPT.format(
         clips_json=json.dumps(clips, ensure_ascii=False, indent=2),
         max_clips=config.plan.max_clips_per_day,
         target_duration_sec=config.plan.target_duration_sec,
+        example_index=first_idx,
     )
     prompt = _wrap_with_context(f"日 vlog 标签: {day_label}\n\n{base}", config)
     text = _call_ai(
         "AI 日 vlog 规划", provider.provider_id, model, prompt,
         lambda: provider.generate_text(prompt, model),
     )
-    return extract_json(text)
+    result = extract_json(text)
+
+    # 后处理：过滤掉 segment 中引用不存在的 index 的项
+    # 用整数比较（去零填充），兼容 "001"、"1"、1 等不同格式
+    valid_ints = set()
+    for c in clips:
+        idx = c.get("index")
+        try:
+            valid_ints.add(int(str(idx).strip()))
+        except (ValueError, TypeError):
+            valid_ints.add(str(idx))
+    if "sequence" in result:
+        original_count = len(result["sequence"])
+        filtered = []
+        for s in result["sequence"]:
+            sidx = s.get("index")
+            try:
+                match = int(str(sidx).strip()) in valid_ints
+            except (ValueError, TypeError):
+                match = str(sidx) in valid_ints
+            if match:
+                filtered.append(s)
+        result["sequence"] = filtered
+        if len(result["sequence"]) < original_count:
+            dropped = original_count - len(result["sequence"])
+            print(f"[规划] 已过滤 {dropped} 个引用无效 index 的 segment")
+
+    return result
 
 
 def refine_text(analysis: dict, config: AppConfig, fix: str | None = None, context_override: str | None = None) -> dict:
