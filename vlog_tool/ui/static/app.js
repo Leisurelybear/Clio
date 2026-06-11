@@ -50,8 +50,7 @@ function icon(name, size = 18) {
     stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
   };
   const d = icons[name] || icons.file;
-  const cls = size < 18 ? 'icon icon-sm' : 'icon';
-  return `<span class="${cls}"><svg viewBox="0 0 24 24">${d}</svg></span>`;
+  return `<span class="icon"><svg viewBox="0 0 24 24">${d}</svg></span>`;
 }
 
 function setStatus(msg, kind = '') {
