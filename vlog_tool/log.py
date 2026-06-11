@@ -103,6 +103,7 @@ _initialized = False
 
 def _install_excepthook(logger: logging.Logger) -> None:
     """把未捕获异常整成一条 ERROR 日志（避免 traceback 每行都污染）。"""
+
     def hook(exc_type, exc_value, exc_tb):
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc_value, exc_tb)
@@ -114,6 +115,7 @@ def _install_excepthook(logger: logging.Logger) -> None:
         except Exception:
             pass
         logger.error(tb_text.rstrip())
+
     sys.excepthook = hook
 
 

@@ -32,11 +32,16 @@ def compress_video(
     if cfg.target_size_mb > 0:
         target_bits = cfg.target_size_mb * 8 * 1024 * 1024
         video_bitrate = max(int(target_bits / duration * 0.92), 100_000)
-        args.extend([
-            "-b:v", str(video_bitrate),
-            "-maxrate", str(video_bitrate),
-            "-bufsize", str(video_bitrate * 2),
-        ])
+        args.extend(
+            [
+                "-b:v",
+                str(video_bitrate),
+                "-maxrate",
+                str(video_bitrate),
+                "-bufsize",
+                str(video_bitrate * 2),
+            ]
+        )
     else:
         args.extend(["-crf", str(cfg.crf)])
 

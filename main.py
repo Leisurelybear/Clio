@@ -28,12 +28,14 @@ PLACEHOLDER_KEYS = {"your_api_key_here", "YOUR_API_KEY", ""}
 
 def _add_io_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
-        "-i", "--input",
+        "-i",
+        "--input",
         type=Path,
         help="素材文件夹（覆盖 config.yaml 中的 input_dir）",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         help="输出文件夹（默认 output/<素材文件夹名>）",
     )
@@ -107,7 +109,8 @@ def main(argv: list[str] | None = None) -> int:
         description="Vlog 剪辑辅助工具：文件夹输入 → 压缩 → AI 分析 → 口播 → 规划",
     )
     parser.add_argument(
-        "-c", "--config",
+        "-c",
+        "--config",
         default="config.yaml",
         help="配置文件路径（默认 config.yaml）",
     )
@@ -164,27 +167,30 @@ def main(argv: list[str] | None = None) -> int:
 
     p_refine = sub.add_parser("refine", help="用 AI + trip 上下文 审阅并修正已有分析/口播")
     p_refine.add_argument(
-        "--target", "-t",
+        "--target",
+        "-t",
         choices=["texts", "scripts", "all"],
         default="all",
         help="要 refine 的目标（默认 all）",
     )
     p_refine.add_argument(
-        "-i", "--input",
+        "-i",
+        "--input",
         type=Path,
         help="指定单个 .json 文件或目录；省略则处理整个 texts/ 或 scripts/",
     )
     p_refine.add_argument(
-        "--fix", "-f",
+        "--fix",
+        "-f",
         type=str,
         default="",
         help=(
-            "指定具体修改意见（必须配合 -i 单文件使用）。"
-            "例: --fix '把 location 从曼谷素万那普机场改成巴黎戴高乐机场'"
+            "指定具体修改意见（必须配合 -i 单文件使用）。例: --fix '把 location 从曼谷素万那普机场改成巴黎戴高乐机场'"
         ),
     )
     p_refine.add_argument(
-        "--context", "-C",
+        "--context",
+        "-C",
         type=str,
         default="",
         help="临时上下文说明，附加到 ai.context 之后（仅本次 refine 生效）",

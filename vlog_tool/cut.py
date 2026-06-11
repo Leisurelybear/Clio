@@ -44,9 +44,12 @@ def cut_one(
     label = f"裁剪 {video_path.name} ({format_duration(start_sec)}-{format_duration(end_sec)})"
 
     args = [
-        "-ss", str(start_sec),
-        "-i", str(video_path),
-        "-to", str(duration_sec),
+        "-ss",
+        str(start_sec),
+        "-i",
+        str(video_path),
+        "-to",
+        str(duration_sec),
     ]
     if reencode:
         args.extend(["-c:v", "libx264", "-crf", "23"])

@@ -27,12 +27,7 @@ def _wrap_with_context(prompt: str, config: AppConfig, context_override: str | N
         parts.append(context_override)
     if not parts:
         return prompt
-    return (
-        "## 背景与规范（请严格遵守）\n\n"
-        f"{chr(10).join(parts)}\n\n"
-        "---\n\n"
-        f"{prompt}"
-    )
+    return f"## 背景与规范（请严格遵守）\n\n{chr(10).join(parts)}\n\n---\n\n{prompt}"
 
 
 def _call_ai(label: str, provider_id: str, model: str, prompt: str, fn) -> str:
@@ -49,7 +44,10 @@ def analyze_video(video_path: str, config: AppConfig) -> dict:
     provider, model = get_video_provider(config, TaskName.VIDEO_ANALYZE)
     prompt = _wrap_with_context(ANALYZE_PROMPT, config)
     text = _call_ai(
-        "AI 视频分析", provider.provider_id, model, prompt,
+        "AI 视频分析",
+        provider.provider_id,
+        model,
+        prompt,
         lambda: provider.analyze_video(video_path, prompt, model),
     )
     return extract_json(text)
@@ -73,7 +71,10 @@ def generate_voiceover(clip_data: dict, template: str, config: AppConfig) -> dic
     )
     prompt = _wrap_with_context(base, config)
     text = _call_ai(
-        "AI 口播", provider.provider_id, model, prompt,
+        "AI 口播",
+        provider.provider_id,
+        model,
+        prompt,
         lambda: provider.generate_text(prompt, model),
     )
     return extract_json(text)
@@ -93,7 +94,10 @@ def plan_daily_vlog(clips: list[dict], config: AppConfig, day_label: str = "day1
     )
     prompt = _wrap_with_context(f"日 vlog 标签: {day_label}\n\n{base}", config)
     text = _call_ai(
-        "AI 日 vlog 规划", provider.provider_id, model, prompt,
+        "AI 日 vlog 规划",
+        provider.provider_id,
+        model,
+        prompt,
         lambda: provider.generate_text(prompt, model),
     )
     result = extract_json(text)
@@ -146,13 +150,18 @@ def refine_text(analysis: dict, config: AppConfig, fix: str | None = None, conte
         label = "AI refine 素材"
     prompt = _wrap_with_context(base, config, context_override=context_override)
     text = _call_ai(
-        label, provider.provider_id, model, prompt,
+        label,
+        provider.provider_id,
+        model,
+        prompt,
         lambda: provider.generate_text(prompt, model),
     )
     return extract_json(text)
 
 
-def refine_script(script: dict, analysis: dict | None, config: AppConfig, fix: str | None = None, context_override: str | None = None) -> dict:
+def refine_script(
+    script: dict, analysis: dict | None, config: AppConfig, fix: str | None = None, context_override: str | None = None
+) -> dict:
     """审阅并修正现有的口播文案。
 
     复用 refine_text 任务的 provider/model 配置 —— texts 和 scripts 审阅
@@ -160,9 +169,7 @@ def refine_script(script: dict, analysis: dict | None, config: AppConfig, fix: s
     fix 非空时切换为定向修正模式（同 refine_text）。
     """
     provider, model = get_task_provider(config, TaskName.REFINE_TEXT)
-    analysis_json = (
-        json.dumps(analysis, ensure_ascii=False, indent=2) if analysis else "（无）"
-    )
+    analysis_json = json.dumps(analysis, ensure_ascii=False, indent=2) if analysis else "（无）"
     existing_json = json.dumps(script, ensure_ascii=False, indent=2)
     if fix:
         base = REFINE_SCRIPT_FIX_PROMPT.format(
@@ -179,7 +186,10 @@ def refine_script(script: dict, analysis: dict | None, config: AppConfig, fix: s
         label = "AI refine 脚本"
     prompt = _wrap_with_context(base, config, context_override=context_override)
     text = _call_ai(
-        label, provider.provider_id, model, prompt,
+        label,
+        provider.provider_id,
+        model,
+        prompt,
         lambda: provider.generate_text(prompt, model),
     )
     return extract_json(text)

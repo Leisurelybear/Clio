@@ -231,9 +231,7 @@ def _validate_config(config: AppConfig) -> None:
     """早期校验：让拼写错误和明显遗漏在 load 时就 fail，不要等到运行时。"""
     if config.proxy.enabled and not config.proxy.url:
         raise ValueError(
-            "proxy.enabled=true 但 proxy.url 为空。"
-            "请填写 url（如 socks5://127.0.0.1:1080），"
-            "或把 enabled 改成 false。"
+            "proxy.enabled=true 但 proxy.url 为空。请填写 url（如 socks5://127.0.0.1:1080），或把 enabled 改成 false。"
         )
     provider_names = set(config.ai.providers)
     for task_name, task_cfg in config.ai.tasks.items():

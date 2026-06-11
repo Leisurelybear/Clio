@@ -18,10 +18,7 @@ def _build_provider(config: AppConfig, provider_name: str):
         raise ValueError(f"未定义的 AI 厂家: {provider_name}")
     cls = _PROVIDER_TYPES.get(provider_cfg.type)
     if not cls:
-        raise ValueError(
-            f"不支持的厂家类型 '{provider_cfg.type}'，"
-            f"可选: {', '.join(_PROVIDER_TYPES)}"
-        )
+        raise ValueError(f"不支持的厂家类型 '{provider_cfg.type}'，可选: {', '.join(_PROVIDER_TYPES)}")
     return cls(provider_cfg, config.proxy)
 
 

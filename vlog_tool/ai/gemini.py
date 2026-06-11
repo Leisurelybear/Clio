@@ -11,6 +11,7 @@ from vlog_tool.utils import mask_if_looks_like_key, with_retry
 
 try:
     from google.genai import errors as _genai_errors
+
     _RETRY_ON: tuple[type[BaseException], ...] = (_genai_errors.ServerError, OSError)
 except ImportError:
     _RETRY_ON = (OSError,)

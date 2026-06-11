@@ -1,4 +1,5 @@
 """Tests for vlog_tool/progress.py — ProgressTracker."""
+
 from __future__ import annotations
 
 import json

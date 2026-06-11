@@ -1,4 +1,5 @@
 """Tests for vlog_tool/cut.py — time parsing and cutting logic."""
+
 from __future__ import annotations
 
 import pytest
@@ -6,6 +7,7 @@ import pytest
 from vlog_tool.cut import _to_seconds, parse_time_range
 
 # ── _to_seconds ─────────────────────────────────────────────────────
+
 
 class TestToSeconds:
     def test_empty_string(self):
@@ -17,23 +19,29 @@ class TestToSeconds:
     def test_just_seconds_float(self):
         assert _to_seconds("30.5") == 30.5
 
-    @pytest.mark.parametrize("input,expected", [
-        ("00:00", 0.0),
-        ("00:15", 15.0),
-        ("01:00", 60.0),
-        ("01:30", 90.0),
-        ("10:00", 600.0),
-    ])
+    @pytest.mark.parametrize(
+        "input,expected",
+        [
+            ("00:00", 0.0),
+            ("00:15", 15.0),
+            ("01:00", 60.0),
+            ("01:30", 90.0),
+            ("10:00", 600.0),
+        ],
+    )
     def test_mm_ss(self, input, expected):
         assert _to_seconds(input) == expected
 
-    @pytest.mark.parametrize("input,expected", [
-        ("00:00:00", 0.0),
-        ("00:01:30", 90.0),
-        ("01:00:00", 3600.0),
-        ("01:02:03", 3723.0),
-        ("10:00:00", 36000.0),
-    ])
+    @pytest.mark.parametrize(
+        "input,expected",
+        [
+            ("00:00:00", 0.0),
+            ("00:01:30", 90.0),
+            ("01:00:00", 3600.0),
+            ("01:02:03", 3723.0),
+            ("10:00:00", 36000.0),
+        ],
+    )
     def test_hh_mm_ss(self, input, expected):
         assert _to_seconds(input) == expected
 
@@ -46,6 +54,7 @@ class TestToSeconds:
 
 
 # ── parse_time_range ────────────────────────────────────────────────
+
 
 class TestParseTimeRange:
     def test_basic(self):

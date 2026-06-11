@@ -43,16 +43,10 @@ def with_retry(
         except retry_on as e:
             last_exc = e
             if i + 1 >= attempts:
-                print(
-                    f"  [重试] {what} 失败 {attempts} 次，放弃: "
-                    f"{type(e).__name__}: {e}"
-                )
+                print(f"  [重试] {what} 失败 {attempts} 次，放弃: {type(e).__name__}: {e}")
                 break
-            delay = base_delay * (2 ** i)
-            print(
-                f"  [重试] {what} 失败 ({type(e).__name__}: {str(e)[:80]})，"
-                f"{delay:.1f}s 后重试 ({i + 2}/{attempts})"
-            )
+            delay = base_delay * (2**i)
+            print(f"  [重试] {what} 失败 ({type(e).__name__}: {str(e)[:80]})，{delay:.1f}s 后重试 ({i + 2}/{attempts})")
             time.sleep(delay)
     assert last_exc is not None
     raise last_exc
@@ -118,33 +112,28 @@ def resolve_binary(configured: str, fallback: str) -> str:
     found = discover_ffmpeg_bin(fallback)
     if found:
         return found
-    raise FileNotFoundError(
-        f"找不到 {fallback}。请运行 setup.ps1 安装，或在 config.yaml 的 paths 中填写路径。"
-    )
+    raise FileNotFoundError(f"找不到 {fallback}。请运行 setup.ps1 安装，或在 config.yaml 的 paths 中填写路径。")
 
 
 def find_videos(directory: Path, recursive: bool = False) -> list[Path]:
     if not directory.is_dir():
         raise NotADirectoryError(f"素材目录不存在: {directory}")
     if recursive:
-        files = [
-            p for p in sorted(directory.rglob("*"))
-            if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS
-        ]
+        files = [p for p in sorted(directory.rglob("*")) if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS]
     else:
-        files = [
-            p for p in sorted(directory.iterdir())
-            if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS
-        ]
+        files = [p for p in sorted(directory.iterdir()) if p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS]
     return files
 
 
 def get_duration_sec(video_path: Path, ffprobe: str) -> float:
     cmd = [
         ffprobe,
-        "-v", "error",
-        "-show_entries", "format=duration",
-        "-of", "default=noprint_wrappers=1:nokey=1",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "default=noprint_wrappers=1:nokey=1",
         str(video_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -171,6 +160,4 @@ def run_ffmpeg(args: list[str], ffmpeg: str) -> None:
     cmd = [ffmpeg, *args]
     result = subprocess.run(cmd, capture_output=True, text=True)
     if result.returncode != 0:
-        raise RuntimeError(
-            f"ffmpeg 执行失败:\n{' '.join(cmd)}\n{result.stderr}"
-        )
+        raise RuntimeError(f"ffmpeg 执行失败:\n{' '.join(cmd)}\n{result.stderr}")

@@ -1,9 +1,11 @@
 """Tests for vlog_tool/log.py — pure formatting functions."""
+
 from __future__ import annotations
 
 from vlog_tool.log import format_duration, format_size
 
 # ── format_size ─────────────────────────────────────────────────────
+
 
 class TestFormatSize:
     def test_zero_bytes(self):
@@ -32,6 +34,7 @@ class TestFormatSize:
 
 
 # ── format_duration ─────────────────────────────────────────────────
+
 
 class TestFormatDuration:
     def test_zero_seconds(self):

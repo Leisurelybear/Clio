@@ -35,6 +35,7 @@ from vlog_tool.progress import ProgressTracker
 STATIC_DIR = Path(__file__).parent / "static"
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".webm"}
 
+
 def _is_safe_basename(name: str) -> bool:
     if not name or len(name) > 200:
         return False
@@ -131,8 +132,8 @@ def _coerce_config_types(new_val: Any, ref_val: Any) -> Any:
 
 
 def make_handler(config: AppConfig, config_path: Path | None = None) -> type[BaseHTTPRequestHandler]:
-    output_dir = config.paths.output_dir   # 默认输出目录（来自 config.yaml）
-    input_dir = config.paths.input_dir       # 项目根目录（素材目录）
+    output_dir = config.paths.output_dir  # 默认输出目录（来自 config.yaml）
+    input_dir = config.paths.input_dir  # 项目根目录（素材目录）
     static_dir = STATIC_DIR
     project_path = input_dir / "project.json"
 
@@ -259,21 +260,21 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             name = data.get("name") or p.name
             proj_out = _project_output_dir(p)
             seen_dirs.add(str(p.resolve()))
-            projects.append({
-                "name": name,
-                "input_dir": str(p),
-                "output_dir": str(proj_out),
-                "currentDay": data.get("currentDay", "day1"),
-                "source": data.get("source", "compressed"),
-                "steps": _detect_steps(proj_out),
-                "createdAt": data.get("createdAt"),
-                "updatedAt": data.get("updatedAt"),
-                "is_current": (
-                    name == current_project_name
-                    if current_project_name
-                    else p.resolve() == input_dir.resolve()
-                ),
-            })
+            projects.append(
+                {
+                    "name": name,
+                    "input_dir": str(p),
+                    "output_dir": str(proj_out),
+                    "currentDay": data.get("currentDay", "day1"),
+                    "source": data.get("source", "compressed"),
+                    "steps": _detect_steps(proj_out),
+                    "createdAt": data.get("createdAt"),
+                    "updatedAt": data.get("updatedAt"),
+                    "is_current": (
+                        name == current_project_name if current_project_name else p.resolve() == input_dir.resolve()
+                    ),
+                }
+            )
 
         # 2. 扫描 input_dir 的相邻目录（自动发现）
         projects_root = input_dir.parent
@@ -293,21 +294,21 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     data = {}
                 name = data.get("name") or p.name
                 proj_out = _project_output_dir(p)
-                projects.append({
-                    "name": name,
-                    "input_dir": str(p),
-                    "output_dir": str(proj_out),
-                    "currentDay": data.get("currentDay", "day1"),
-                    "source": data.get("source", "compressed"),
-                    "steps": _detect_steps(proj_out),
-                    "createdAt": data.get("createdAt"),
-                    "updatedAt": data.get("updatedAt"),
-                    "is_current": (
-                        name == current_project_name
-                        if current_project_name
-                        else p.resolve() == input_dir.resolve()
-                    ),
-                })
+                projects.append(
+                    {
+                        "name": name,
+                        "input_dir": str(p),
+                        "output_dir": str(proj_out),
+                        "currentDay": data.get("currentDay", "day1"),
+                        "source": data.get("source", "compressed"),
+                        "steps": _detect_steps(proj_out),
+                        "createdAt": data.get("createdAt"),
+                        "updatedAt": data.get("updatedAt"),
+                        "is_current": (
+                            name == current_project_name if current_project_name else p.resolve() == input_dir.resolve()
+                        ),
+                    }
+                )
 
         # 3. 始终包含当前 input_dir（兜底）
         cur_resolved = str(input_dir.resolve())
@@ -322,17 +323,19 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 data = {}
             name = data.get("name") or input_dir.name
             proj_out = _project_output_dir(input_dir)
-            projects.append({
-                "name": name,
-                "input_dir": str(input_dir),
-                "output_dir": str(proj_out),
-                "currentDay": data.get("currentDay", "day1"),
-                "source": data.get("source", "compressed"),
-                "steps": _detect_steps(proj_out),
-                "createdAt": data.get("createdAt"),
-                "updatedAt": data.get("updatedAt"),
-                "is_current": name == current_project_name if current_project_name else True,
-            })
+            projects.append(
+                {
+                    "name": name,
+                    "input_dir": str(input_dir),
+                    "output_dir": str(proj_out),
+                    "currentDay": data.get("currentDay", "day1"),
+                    "source": data.get("source", "compressed"),
+                    "steps": _detect_steps(proj_out),
+                    "createdAt": data.get("createdAt"),
+                    "updatedAt": data.get("updatedAt"),
+                    "is_current": name == current_project_name if current_project_name else True,
+                }
+            )
 
         return projects
 
@@ -422,7 +425,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 if p.name == project_name:
                     s += 10  # 目录名与项目名完全一致
                 if p.resolve() == input_dir.resolve():
-                    s += 5   # 当前正在使用的项目
+                    s += 5  # 当前正在使用的项目
                 return s
 
             # 1. 注册表优先（用户手动添加的顺序）
@@ -556,7 +559,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 self.wfile.write(svg.encode("utf-8"))
                 return
             if path.startswith("/static/"):
-                rel = path[len("/static/"):]
+                rel = path[len("/static/") :]
                 if ".." in rel or rel.startswith("/"):
                     return self.send_error(HTTPStatus.FORBIDDEN)
                 return self._send_static(rel)
@@ -566,14 +569,16 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 proj_out = self._get_project_output(proj_input)
                 comp = proj_out / "compressed"
                 texts = _find_texts_dirs(proj_out)
-                return self._send_json({
-                    "input_dir": str(proj_input),
-                    "output_dir": str(proj_out),
-                    "compressed_dir": str(comp),
-                    "texts_dirs": [str(d) for d in texts],
-                    "scripts_dir": str(proj_out / "scripts"),
-                    "plans_dir": str(proj_out / "plans"),
-                })
+                return self._send_json(
+                    {
+                        "input_dir": str(proj_input),
+                        "output_dir": str(proj_out),
+                        "compressed_dir": str(comp),
+                        "texts_dirs": [str(d) for d in texts],
+                        "scripts_dir": str(proj_out / "scripts"),
+                        "plans_dir": str(proj_out / "plans"),
+                    }
+                )
 
             if path == "/api/config/raw":
                 if not config_path or not config_path.is_file():
@@ -616,9 +621,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 proj_out = self._get_project_output(proj_input)
                 source = qs.get("source", ["compressed"])[0]
                 if source not in ("compressed", "original"):
-                    return self._send_json(
-                        {"ok": False, "error": "source must be compressed|original"}, 400
-                    )
+                    return self._send_json({"ok": False, "error": "source must be compressed|original"}, 400)
                 comp_dir = proj_out / "compressed"
                 # texts/scripts sidecars are keyed by the compressed index in both views
                 text_sidecars: dict[str, list[str]] = {}
@@ -645,14 +648,16 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                             stem = p.stem
                             idx = stem.split("_", 1)[0] if "_" in stem else ""
                             orig = _find_original_for_compressed(stem, proj_input)
-                            videos.append({
-                                "file": p.name,
-                                "source": "compressed",
-                                "index": idx,
-                                "text_json": (text_sidecars.get(idx) or [None])[0],
-                                "script_json": (script_sidecars.get(idx) or [None])[0],
-                                "match": ({"source": "original", "file": orig} if orig else None),
-                            })
+                            videos.append(
+                                {
+                                    "file": p.name,
+                                    "source": "compressed",
+                                    "index": idx,
+                                    "text_json": (text_sidecars.get(idx) or [None])[0],
+                                    "script_json": (script_sidecars.get(idx) or [None])[0],
+                                    "match": ({"source": "original", "file": orig} if orig else None),
+                                }
+                            )
                 else:  # original
                     if proj_input.is_dir():
                         for p in sorted(proj_input.iterdir()):
@@ -660,17 +665,18 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                                 continue
                             comp = _find_compressed_for_original(p.stem, comp_dir)
                             idx = comp[1] if comp else None
-                            videos.append({
-                                "file": p.name,
-                                "source": "original",
-                                "index": idx,
-                                "text_json": (text_sidecars.get(idx) or [None])[0] if idx else None,
-                                "script_json": (script_sidecars.get(idx) or [None])[0] if idx else None,
-                                "match": (
-                                    {"source": "compressed", "file": comp[0], "index": comp[1]}
-                                    if comp else None
-                                ),
-                            })
+                            videos.append(
+                                {
+                                    "file": p.name,
+                                    "source": "original",
+                                    "index": idx,
+                                    "text_json": (text_sidecars.get(idx) or [None])[0] if idx else None,
+                                    "script_json": (script_sidecars.get(idx) or [None])[0] if idx else None,
+                                    "match": (
+                                        {"source": "compressed", "file": comp[0], "index": comp[1]} if comp else None
+                                    ),
+                                }
+                            )
                 return self._send_json({"videos": videos, "source": source})
 
             if path == "/api/video":
@@ -758,10 +764,14 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                         pass
                     dirs.sort(key=lambda x: Path(x).name.lower())
                     parent = str(p.parent) if p.parent != p else None
-                    return self._send_json({
-                        "path": str(p), "dirs": dirs,
-                        "parent": parent, "is_drive_list": False,
-                    })
+                    return self._send_json(
+                        {
+                            "path": str(p),
+                            "dirs": dirs,
+                            "parent": parent,
+                            "is_drive_list": False,
+                        }
+                    )
                 except PermissionError:
                     return self._send_json({"error": "access denied"}, 403)
                 except OSError as e:
@@ -821,7 +831,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     return self._send_json({"ok": False, "error": f"YAML 序列化失败: {e}"}, 400)
                 tmp_path: Path | None = None
                 try:
-                    with tempfile.NamedTemporaryFile(mode="wb", suffix=".yaml", delete=False, dir=str(config_path.parent)) as tmp:
+                    with tempfile.NamedTemporaryFile(
+                        mode="wb", suffix=".yaml", delete=False, dir=str(config_path.parent)
+                    ) as tmp:
                         tmp.write(yml.encode("utf-8"))
                         tmp_path = Path(tmp.name)
                     load_config(tmp_path)
@@ -836,6 +848,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
             if path == "/api/project":
                 import datetime
+
                 proj_input = self._resolve_project_input(qs)
                 proj_file = proj_input / "project.json"
                 data = {}
@@ -907,11 +920,13 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 steps = obj.get("steps")
                 proj_input = self._resolve_project_input(qs)
                 cfg = self._get_config(proj_input)
+
                 def _run():
                     try:
                         run_pipeline_steps(cfg, day_label, steps)
                     except Exception:
                         traceback.print_exc()
+
                 self._run_thread = threading.Thread(target=_run, daemon=True)
                 self._run_thread.start()
                 label = "+".join(steps) if steps else "全部"
@@ -964,14 +979,17 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     return self._send_json({"ok": False, "error": str(e)}, 500)
 
                 actual_out = str(out_path or (output_dir / "cuts" / day_label))
-                return self._send_json({
-                    "ok": True,
-                    "output_dir": actual_out,
-                    "day_label": day_label,
-                })
+                return self._send_json(
+                    {
+                        "ok": True,
+                        "output_dir": actual_out,
+                        "day_label": day_label,
+                    }
+                )
 
             if path == "/api/project/create":
                 import datetime
+
                 name = (obj.get("name") or "").strip()
                 input_dir_raw = (obj.get("input_dir") or "").strip()
                 output_dir_raw = (obj.get("output_dir") or "").strip()
@@ -1003,7 +1021,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     encoding="utf-8",
                 )
                 _add_to_registry(str(input_path))
-                return self._send_json({"ok": True, "project": {"name": name, "input_dir": str(input_path), "output_dir": str(proj_out)}})
+                return self._send_json(
+                    {"ok": True, "project": {"name": name, "input_dir": str(input_path), "output_dir": str(proj_out)}}
+                )
 
             if path == "/api/project/add":
                 input_dir_raw = (obj.get("input_dir") or "").strip()
@@ -1029,7 +1049,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 video_basename = (obj.get("video") or "").strip()
                 task = (obj.get("task") or "").strip()
                 if not video_basename or task not in ("texts", "voiceover", "all"):
-                    return self._send_json({"ok": False, "error": "需要 video (文件名) 和 task (texts|voiceover|all)"}, 400)
+                    return self._send_json(
+                        {"ok": False, "error": "需要 video (文件名) 和 task (texts|voiceover|all)"}, 400
+                    )
                 if self._run_thread is not None and self._run_thread.is_alive():
                     return self._send_json({"ok": False, "error": "已有任务正在运行"}, 409)
 
@@ -1060,15 +1082,22 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     if texts_json is None:
                         return self._send_json({"ok": False, "error": f"找不到 {stem} 对应的分析结果"}, 404)
 
-                def _rerun_worker(cfg=cfg, task=task, video_basename=video_basename,
-                                  original_video=original_video, texts_json=texts_json):
+                def _rerun_worker(
+                    cfg=cfg,
+                    task=task,
+                    video_basename=video_basename,
+                    original_video=original_video,
+                    texts_json=texts_json,
+                ):
                     # 深度拷贝 config，强制不跳过已有文件（用户主动点重跑就是要重新生成）
                     cfg = copy.deepcopy(cfg)
                     cfg.analyze.skip_existing = False
                     tracker = ProgressTracker(cfg.paths.output_dir, rerun=True, rerun_video=video_basename)
+
                     def _log(msg: str) -> None:
                         print(f"  [rerun] {msg}")
                         tracker.log(msg)
+
                     try:
                         _log(f"▶ 开始重跑 {task} — {video_basename}")
                         if task in ("texts", "all"):

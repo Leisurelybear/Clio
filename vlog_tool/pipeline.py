@@ -64,10 +64,7 @@ def _eta_line(label: str, i: int, total: int, name: str, completed: int, elapsed
     if completed > 0:
         avg = elapsed_total / completed
         remaining = avg * (total - i)
-        return (
-            f"[{label} {i}/{total}] {name}"
-            f"（平均 {format_duration(avg)}，剩余 ~{format_duration(remaining)}）"
-        )
+        return f"[{label} {i}/{total}] {name}（平均 {format_duration(avg)}，剩余 ~{format_duration(remaining)}）"
     return f"[{label} 1/{total}] {name}"
 
 
@@ -88,9 +85,7 @@ def _write_text_file(path: Path, analysis: dict, source: Path, compressed: Path)
         "## 时间轴",
     ]
     for item in analysis.get("timeline", []):
-        lines.append(
-            f"- [{item.get('start', '?')} - {item.get('end', '?')}] {item.get('description', '')}"
-        )
+        lines.append(f"- [{item.get('start', '?')} - {item.get('end', '?')}] {item.get('description', '')}")
     lines.extend(["", "## 亮点"])
     for h in analysis.get("highlights", []):
         lines.append(f"- {h}")
@@ -116,9 +111,7 @@ def _rewrite_text_file(path: Path, analysis: dict) -> None:
         "## 时间轴",
     ]
     for item in analysis.get("timeline", []):
-        lines.append(
-            f"- [{item.get('start', '?')} - {item.get('end', '?')}] {item.get('description', '')}"
-        )
+        lines.append(f"- [{item.get('start', '?')} - {item.get('end', '?')}] {item.get('description', '')}")
     lines.extend(["", "## 亮点"])
     for h in analysis.get("highlights", []):
         lines.append(f"- {h}")
@@ -146,9 +139,18 @@ def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None
     path.parent.mkdir(parents=True, exist_ok=True)
     ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
     fieldnames = [
-        "index", "stem", "title", "summary", "location", "mood",
-        "suggested_use", "source_file", "compressed_file", "text_file",
-        "duration_sec", "source_size_mb",
+        "index",
+        "stem",
+        "title",
+        "summary",
+        "location",
+        "mood",
+        "suggested_use",
+        "source_file",
+        "compressed_file",
+        "text_file",
+        "duration_sec",
+        "source_size_mb",
     ]
     with path.open("w", newline="", encoding="utf-8-sig") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
@@ -156,23 +158,27 @@ def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None
         for rec in records:
             a = rec.analysis or {}
             info = probe_video_info(rec.source_path, ffprobe) if rec.source_path.exists() else {}
-            writer.writerow({
-                "index": format_index(rec.index, 3),
-                "stem": rec.stem,
-                "title": a.get("title", ""),
-                "summary": a.get("summary", ""),
-                "location": a.get("location", ""),
-                "mood": a.get("mood", ""),
-                "suggested_use": a.get("suggested_use", ""),
-                "source_file": str(rec.source_path),
-                "compressed_file": str(rec.compressed_path) if rec.compressed_path else "",
-                "text_file": str(rec.text_path) if rec.text_path else "",
-                "duration_sec": info.get("duration_sec", ""),
-                "source_size_mb": info.get("size_mb", ""),
-            })
+            writer.writerow(
+                {
+                    "index": format_index(rec.index, 3),
+                    "stem": rec.stem,
+                    "title": a.get("title", ""),
+                    "summary": a.get("summary", ""),
+                    "location": a.get("location", ""),
+                    "mood": a.get("mood", ""),
+                    "suggested_use": a.get("suggested_use", ""),
+                    "source_file": str(rec.source_path),
+                    "compressed_file": str(rec.compressed_path) if rec.compressed_path else "",
+                    "text_file": str(rec.text_path) if rec.text_path else "",
+                    "duration_sec": info.get("duration_sec", ""),
+                    "source_size_mb": info.get("size_mb", ""),
+                }
+            )
 
 
-def run_compress_all(config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None) -> list[ClipRecord]:
+def run_compress_all(
+    config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None
+) -> list[ClipRecord]:
     if single_file:
         videos = [single_file]
     else:
@@ -205,7 +211,9 @@ def run_compress_all(config: AppConfig, tracker: ProgressTracker | None = None, 
     return records
 
 
-def run_analyze_all(config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None) -> list[ClipRecord]:
+def run_analyze_all(
+    config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None
+) -> list[ClipRecord]:
     """Analyze already-compressed videos using AI (compress step must precede this).
 
     Scans compressed_dir for existing *.mp4 files and analyzes each.
@@ -261,10 +269,16 @@ def run_analyze_all(config: AppConfig, tracker: ProgressTracker | None = None, s
                 text_path = json_path.with_suffix(".txt")
                 analysis = json.loads(json_path.read_text(encoding="utf-8"))
                 print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
-                records.append(ClipRecord(
-                    index=idx_val, stem=json_path.stem, source_path=original,
-                    compressed_path=compressed, text_path=text_path, analysis=analysis,
-                ))
+                records.append(
+                    ClipRecord(
+                        index=idx_val,
+                        stem=json_path.stem,
+                        source_path=original,
+                        compressed_path=compressed,
+                        text_path=text_path,
+                        analysis=analysis,
+                    )
+                )
                 continue
 
             print(_eta_line("分析", i, total, compressed.name, completed, elapsed_total))
@@ -284,10 +298,16 @@ def run_analyze_all(config: AppConfig, tracker: ProgressTracker | None = None, s
             _write_text_file(final_text, analysis, original, compressed)
             json_path.write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
 
-            records.append(ClipRecord(
-                index=idx_val, stem=stem, source_path=original,
-                compressed_path=compressed, text_path=final_text, analysis=analysis,
-            ))
+            records.append(
+                ClipRecord(
+                    index=idx_val,
+                    stem=stem,
+                    source_path=original,
+                    compressed_path=compressed,
+                    text_path=final_text,
+                    analysis=analysis,
+                )
+            )
             print(f"  -> {final_text.name}")
 
     _write_csv(config.summary_csv, records, config)
@@ -332,17 +352,16 @@ def run_label_videos(config: AppConfig, tracker: ProgressTracker | None = None) 
                 tracker.next(message=f"标注 {json_file.stem}")
             t0 = time.monotonic()
             label = idx.replace("'", "")
-            vf = (
-                f"drawtext=text='{label}':fontsize=36:fontcolor=white:"
-                f"box=1:boxcolor=black@0.5:boxborderw=8:x=20:y=20"
-            )
+            vf = f"drawtext=text='{label}':fontsize=36:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=8:x=20:y=20"
             run_ffmpeg(["-i", str(compressed), "-vf", vf, "-an", "-y", str(out)], ffmpeg)
             elapsed_total += time.monotonic() - t0
             completed += 1
             print(f"  -> {out.name}")
 
 
-def run_generate_scripts(config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None) -> None:
+def run_generate_scripts(
+    config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None
+) -> None:
     config.scripts_dir.mkdir(parents=True, exist_ok=True)
     template = config.script.template_file.read_text(encoding="utf-8") if config.script.template_file.exists() else ""
 
@@ -399,15 +418,17 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
         raw_idx = data.get("index")
         if raw_idx is None:
             raw_idx = json_file.stem[:3]  # fallback: 从文件名取前缀 "001"
-        clips.append({
-            "index": format_index(int(raw_idx), config.naming.index_width),
-            "title": data.get("title", ""),
-            "summary": data.get("summary", ""),
-            "location": data.get("location", ""),
-            "timeline": data.get("timeline", []),
-            "highlights": data.get("highlights", []),
-            "suggested_use": data.get("suggested_use", ""),
-        })
+        clips.append(
+            {
+                "index": format_index(int(raw_idx), config.naming.index_width),
+                "title": data.get("title", ""),
+                "summary": data.get("summary", ""),
+                "location": data.get("location", ""),
+                "timeline": data.get("timeline", []),
+                "highlights": data.get("highlights", []),
+                "suggested_use": data.get("suggested_use", ""),
+            }
+        )
 
     if not clips:
         print("没有可用的分析结果，请先运行 analyze")
@@ -429,17 +450,24 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
         "## 推荐剪辑顺序",
     ]
     for item in plan.get("sequence", []):
-        lines.extend([
-            f"### {item.get('index', '?')} {item.get('title', '')}",
-            f"- **理由**: {item.get('reason', '')}",
-            f"- **使用片段**: {item.get('use_timeline', '')}",
-            f"- **口播方向**: {item.get('voiceover_hint', '')}",
+        lines.extend(
+            [
+                f"### {item.get('index', '?')} {item.get('title', '')}",
+                f"- **理由**: {item.get('reason', '')}",
+                f"- **使用片段**: {item.get('use_timeline', '')}",
+                f"- **口播方向**: {item.get('voiceover_hint', '')}",
+                "",
+            ]
+        )
+    lines.extend(
+        [
+            "## 开场建议",
+            plan.get("opening_tip", ""),
             "",
-        ])
-    lines.extend([
-        "## 开场建议", plan.get("opening_tip", ""),
-        "", "## 结尾建议", plan.get("ending_tip", ""),
-    ])
+            "## 结尾建议",
+            plan.get("ending_tip", ""),
+        ]
+    )
     out_md.write_text("\n".join(lines), encoding="utf-8")
     print(f"  -> {out_md.name}")
 
@@ -469,7 +497,9 @@ def _load_analysis_for_script(script_path: Path, texts_dir: Path) -> dict | None
     return None
 
 
-def run_refine_texts(config: AppConfig, path: Path | None = None, fix: str | None = None, context_override: str | None = None) -> int:
+def run_refine_texts(
+    config: AppConfig, path: Path | None = None, fix: str | None = None, context_override: str | None = None
+) -> int:
     """审阅并修正 texts/*.json；同步重写同名 .txt。返回处理条数。
 
     fix 非空时：仅处理 -i 指定的单文件，prompt 切换为「按用户意见定向修正」。
@@ -509,7 +539,9 @@ def run_refine_texts(config: AppConfig, path: Path | None = None, fix: str | Non
     return len(files)
 
 
-def run_refine_scripts(config: AppConfig, path: Path | None = None, fix: str | None = None, context_override: str | None = None) -> int:
+def run_refine_scripts(
+    config: AppConfig, path: Path | None = None, fix: str | None = None, context_override: str | None = None
+) -> int:
     """审阅并修正 scripts/*_voiceover.json；同步重写同名 .md。
 
     fix 非空时：仅处理 -i 指定的单文件。
@@ -682,7 +714,9 @@ def run_cut_all(
 
             video_path = _resolve_video_path(idx)
             if video_path is None:
-                print(f"  [跳过] 找不到 index={idx} 的视频（{'compressed' if source == 'original' else 'video_dir'}）: {seg.get('title','')}")
+                print(
+                    f"  [跳过] 找不到 index={idx} 的视频（{'compressed' if source == 'original' else 'video_dir'}）: {seg.get('title', '')}"
+                )
                 continue
 
             try:
@@ -717,17 +751,19 @@ def run_cut_all(
                 text_json = dst.name
                 print(f"  -> texts: {dst.name}")
 
-            clips.append({
-                "seg_index": i,
-                "video_index": idx,
-                "title": title,
-                "timeline": timeline,
-                "start_sec": round(start, 2),
-                "end_sec": round(end, 2),
-                "duration_sec": round(end - start, 2),
-                "output_file": clip_path.name,
-                "text_file": text_json or "",
-            })
+            clips.append(
+                {
+                    "seg_index": i,
+                    "video_index": idx,
+                    "title": title,
+                    "timeline": timeline,
+                    "start_sec": round(start, 2),
+                    "end_sec": round(end, 2),
+                    "duration_sec": round(end - start, 2),
+                    "output_file": clip_path.name,
+                    "text_file": text_json or "",
+                }
+            )
 
     manifest_path = out_root / "manifest.md"
     lines = [

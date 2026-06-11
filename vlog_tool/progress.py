@@ -43,9 +43,15 @@ class ProgressTracker:
         tmp.write_text(json.dumps(self._data, ensure_ascii=False), encoding="utf-8")
         tmp.replace(self._path)
 
-    def update(self, *, phase: str | None = None, current: int | None = None,
-               total: int | None = None, message: str | None = None,
-               status: str | None = None) -> None:
+    def update(
+        self,
+        *,
+        phase: str | None = None,
+        current: int | None = None,
+        total: int | None = None,
+        message: str | None = None,
+        status: str | None = None,
+    ) -> None:
         with self._lock:
             if phase is not None:
                 self._data["phase"] = phase

@@ -1,4 +1,5 @@
 """Tests for vlog_tool/utils.py — pure utility functions."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -15,12 +16,13 @@ from vlog_tool.utils import (
 
 # ── extract_json ────────────────────────────────────────────────────
 
+
 class TestExtractJson:
     def test_plain_json_object(self):
         assert extract_json('{"a": 1}') == {"a": 1}
 
     def test_json_with_surrounding_text(self):
-        text = "Some prefix\n```json\n{\"a\": 1}\n```\nsuffix"
+        text = 'Some prefix\n```json\n{"a": 1}\n```\nsuffix'
         assert extract_json(text) == {"a": 1}
 
     def test_nested_json(self):
@@ -48,6 +50,7 @@ class TestExtractJson:
 
 # ── mask_if_looks_like_key ──────────────────────────────────────────
 
+
 class TestMaskIfLooksLikeKey:
     def test_empty_string(self):
         assert mask_if_looks_like_key("") == ""
@@ -71,20 +74,23 @@ class TestMaskIfLooksLikeKey:
 
     def test_long_string_without_prefix(self):
         result = mask_if_looks_like_key("a" * 40)
-        assert result == f"{'a'*6}***{'a'*4}"
+        assert result == f"{'a' * 6}***{'a' * 4}"
 
     def test_short_string_without_prefix(self):
         assert mask_if_looks_like_key("hello") == "hello"
 
     def test_short_string_with_spaces(self):
-        assert mask_if_looks_like_key("a normal sentence without key patterns") == "a normal sentence without key patterns"
+        assert (
+            mask_if_looks_like_key("a normal sentence without key patterns") == "a normal sentence without key patterns"
+        )
 
 
 # ── sanitize_name ───────────────────────────────────────────────────
 
+
 class TestSanitizeName:
     def test_removes_special_chars(self):
-        assert sanitize_name('file:name test') == "filename_test"
+        assert sanitize_name("file:name test") == "filename_test"
 
     def test_replaces_whitespace(self):
         assert sanitize_name("my clip name") == "my_clip_name"
@@ -107,6 +113,7 @@ class TestSanitizeName:
 
 # ── format_index ────────────────────────────────────────────────────
 
+
 class TestFormatIndex:
     def test_basic(self):
         assert format_index(1, 3) == "001"
@@ -122,6 +129,7 @@ class TestFormatIndex:
 
 
 # ── find_videos ─────────────────────────────────────────────────────
+
 
 class TestFindVideos:
     def test_empty_directory(self, tmp_path):

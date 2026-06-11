@@ -1,4 +1,5 @@
 """Tests for vlog_tool/config.py — pure functions and config loading."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from vlog_tool.config import AIConfig, PathsConfig
 
 # ── deep_merge ──────────────────────────────────────────────────────
+
 
 class TestDeepMerge:
     def test_basic_override(self):
@@ -76,6 +78,7 @@ class TestDeepMerge:
 
 # ── _path ───────────────────────────────────────────────────────────
 
+
 class TestPath:
     def test_none_returns_dot(self):
         # _path(None) returns unresolved Path(".")
@@ -100,6 +103,7 @@ class TestPath:
 
 # ── _resolve_api_key ───────────────────────────────────────────────
 
+
 class TestResolveApiKey:
     def test_env_var_takes_priority(self, monkeypatch):
         monkeypatch.setenv("MY_KEY", "env_value")
@@ -120,6 +124,7 @@ class TestResolveApiKey:
 
 
 # ── _load_context ──────────────────────────────────────────────────
+
 
 class TestLoadContext:
     def test_inline_takes_priority(self, tmp_path):
@@ -162,6 +167,7 @@ class TestLoadContext:
 
 # ── _validate_config ────────────────────────────────────────────────
 
+
 class TestValidateConfig:
     def test_valid_config_passes(self):
         cfg = AppConfig(
@@ -172,6 +178,7 @@ class TestValidateConfig:
 
     def test_proxy_enabled_no_url_raises(self):
         from vlog_tool.config import ProxyConfig
+
         cfg = AppConfig(
             paths=create_paths(),
             ai=create_ai(),
@@ -205,6 +212,7 @@ class TestValidateConfig:
 
 # ── load_config ─────────────────────────────────────────────────────
 
+
 class TestLoadConfig:
     def test_minimal_config(self, tmp_config):
         cfg = load_config(tmp_config / "config.yaml")
@@ -232,7 +240,7 @@ class TestLoadConfig:
         proj_yaml.write_text("compress:\n  fps: 30\n", encoding="utf-8")
 
         cfg = load_config(cfg_path, project_dir=tmp_path)
-        assert cfg.compress.fps == 30       # overridden
+        assert cfg.compress.fps == 30  # overridden
         assert cfg.compress.target_size_mb == 5  # inherited
 
     def test_project_context_file_resolved_correctly(self, tmp_path):
@@ -247,9 +255,7 @@ class TestLoadConfig:
         proj_dir = tmp_path / "project"
         proj_dir.mkdir()
         (proj_dir / "ctx.md").write_text("project specific", encoding="utf-8")
-        (proj_dir / "project.yaml").write_text(
-            "ai:\n  context_file: ctx.md\n", encoding="utf-8"
-        )
+        (proj_dir / "project.yaml").write_text("ai:\n  context_file: ctx.md\n", encoding="utf-8")
 
         cfg = load_config(cfg_path, project_dir=proj_dir)
         assert cfg.ai.context == "project specific"
@@ -257,9 +263,11 @@ class TestLoadConfig:
 
 # ── Helpers ─────────────────────────────────────────────────────────
 
+
 def create_paths(**kwargs) -> PathsConfig:
     """Helper to build a PathsConfig with defaults."""
     from vlog_tool.config import PathsConfig
+
     defaults = {"input_dir": Path("."), "output_dir": Path("./output")}
     return PathsConfig(**{**defaults, **kwargs})
 
@@ -271,6 +279,7 @@ def create_ai(
 ) -> AIConfig:
     """Helper to build an AIConfig with provider/task data class objects."""
     from vlog_tool.config import AIConfig, ProviderConfig, TaskConfig
+
     ai = AIConfig(context=context)
     if providers:
         for name, ptype in providers.items():
