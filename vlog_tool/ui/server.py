@@ -514,7 +514,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                             break
                         self.wfile.write(buf)
                         remaining -= len(buf)
-                except (ConnectionResetError, BrokenPipeError):
+                except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
                     pass  # 客户端断开连接，忽略
 
         def _resolve_texts(self, basename: str, proj_out: Path | None = None) -> Path | None:
