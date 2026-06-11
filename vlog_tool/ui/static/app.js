@@ -1174,6 +1174,21 @@ async function init() {
     await loadConfig();
     await loadProject();
     renderSteps();
+    // 检查项目是否缺少 project.yaml，提示用户创建
+    (async () => {
+      if (!state.currentProjectName) return;
+      try {
+        const check = await api('GET', '/api/config/raw');
+        if (check.needs_init) {
+          // 在状态栏显示可操作的提示
+          const el = $('status');
+          el.innerHTML = `该项目无专属配置，<button onclick="initProjectConfig()" style="background:none;border:1px solid currentColor;border-radius:3px;padding:2px 8px;cursor:pointer;color:inherit;font:inherit">立即创建 project.yaml</button>`;
+          el.className = 'status warn';
+        }
+      } catch {
+        // 静默忽略
+      }
+    })();
     await loadPlans();
     // 自动选择第一个可用 plan（如果有）
     if (state.availablePlans.length) {

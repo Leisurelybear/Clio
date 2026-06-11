@@ -62,6 +62,44 @@ def _save_atomic(path: Path, data: bytes) -> None:
     os.replace(tmp, path)
 
 
+def _create_project_yaml(proj_input: Path, config_path: Path | None, proj_out: Path) -> Path | None:
+    """Create project.yaml from global config template, with paths adjusted to the project.
+
+    Returns the project.yaml path, or None if no global config is available.
+    """
+    if not config_path or not config_path.is_file():
+        return None
+    target = proj_input / "project.yaml"
+    if target.is_file():
+        return target  # already exists
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+        paths = raw.get("paths", {})
+        paths["input_dir"] = str(proj_input.resolve())
+        paths["output_dir"] = str(proj_out.resolve())
+        raw["paths"] = paths
+        yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
+        _save_atomic(target, yml.encode("utf-8"))
+        return target
+    except Exception:
+        return None
+
+
+def _list_drives() -> list[str]:
+    """快速列出 Windows 可用盘符（避免 Path.is_dir() 在网络驱动器上超时）。"""
+    if sys.platform != "win32":
+        return []
+    try:
+        import ctypes
+
+        bitmask = ctypes.windll.kernel32.GetLogicalDrives()
+        return [f"{d}:\\" for d in string.ascii_uppercase if bitmask & (1 << (ord(d) - ord("A")))]
+    except Exception:
+        # fallback: 传统方式
+        return [f"{d}:\\" for d in string.ascii_uppercase if Path(f"{d}:\\").is_dir()]
+
+
 def _find_original_for_compressed(stem: str, input_dir: Path) -> str | None:
     """For a compressed stem like '001_GL010695', find the matching original basename
     in input_dir. Match is case-insensitive on the GoPro-style suffix (everything
@@ -747,7 +785,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 dir_path = qs.get("path", [""])[0]
                 if not dir_path:
                     if sys.platform == "win32":
-                        drives = [f"{d}:\\" for d in string.ascii_uppercase if Path(f"{d}:\\").is_dir()]
+                        drives = _list_drives()
                         return self._send_json({"path": "", "dirs": drives, "parent": None, "is_drive_list": True})
                     return self._send_json({"path": "/", "dirs": ["/"], "parent": None, "is_drive_list": True})
                 try:
@@ -936,23 +974,14 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 proj_input = self._resolve_project_input(qs)
                 if proj_input == input_dir:
                     return self._send_json({"ok": False, "error": "默认项目已有 config.yaml，无需初始化"}, 400)
-                target_path = proj_input / "project.yaml"
-                if target_path.is_file():
-                    return self._send_json({"ok": False, "error": "project.yaml 已存在"}, 409)
-                try:
-                    with open(config_path, encoding="utf-8") as f:
-                        raw = yaml.safe_load(f) or {}
-                    # 修正 paths 为当前项目的实际路径
-                    paths = raw.get("paths", {})
-                    paths["input_dir"] = str(proj_input.resolve())
-                    paths["output_dir"] = str(_project_output_dir(proj_input).resolve())
-                    raw["paths"] = paths
-                    yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
-                    _save_atomic(target_path, yml.encode("utf-8"))
-                    self.__class__._config_cache.pop(str(proj_input.resolve()), None)
-                    return self._send_json({"ok": True, "path": str(target_path)})
-                except Exception as e:
-                    return self._send_json({"ok": False, "error": str(e)}, 500)
+                proj_out = _project_output_dir(proj_input)
+                result = _create_project_yaml(proj_input, config_path, proj_out)
+                if result is None:
+                    return self._send_json(
+                        {"ok": False, "error": "创建 project.yaml 失败（全局 config.yaml 不可用）"}, 500
+                    )
+                self.__class__._config_cache.pop(str(proj_input.resolve()), None)
+                return self._send_json({"ok": True, "path": str(result)})
 
             if path == "/api/cut":
                 day_label = obj.get("day_label", "day1")
@@ -1020,6 +1049,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     json.dumps(proj_data, ensure_ascii=False, indent=2),
                     encoding="utf-8",
                 )
+                # 自动创建 project.yaml（静默失败也没关系）
+                _create_project_yaml(input_path, config_path, proj_out)
+                self.__class__._config_cache.pop(str(input_path.resolve()), None)
                 _add_to_registry(str(input_path))
                 return self._send_json(
                     {"ok": True, "project": {"name": name, "input_dir": str(input_path), "output_dir": str(proj_out)}}
@@ -1030,14 +1062,35 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 if not input_dir_raw:
                     return self._send_json({"ok": False, "error": "input_dir is required"}, 400)
                 input_path = Path(input_dir_raw)
+                if not input_path.is_dir():
+                    return self._send_json({"ok": False, "error": f"目录不存在: {input_dir_raw}"}, 400)
                 proj_file = input_path / "project.json"
                 if not proj_file.is_file():
-                    return self._send_json({"ok": False, "error": f"指定目录下没有 project.json: {input_dir_raw}"}, 400)
-                try:
-                    data = json.loads(proj_file.read_text(encoding="utf-8"))
-                except (json.JSONDecodeError, OSError) as e:
-                    return self._send_json({"ok": False, "error": f"无法读取 project.json: {e}"}, 400)
-                name = data.get("name") or input_path.name
+                    # 自动 project.json + project.yaml（类似新建项目）
+                    import datetime
+
+                    proj_out = input_path / "output"
+                    now = datetime.datetime.now().isoformat(timespec="seconds")
+                    proj_data = {
+                        "name": input_path.name,
+                        "output_dir": str(proj_out),
+                        "currentDay": "day1",
+                        "source": "compressed",
+                        "lastEntity": None,
+                        "lastVideo": None,
+                        "createdAt": now,
+                        "updatedAt": now,
+                    }
+                    proj_file.write_text(json.dumps(proj_data, ensure_ascii=False, indent=2), encoding="utf-8")
+                    _create_project_yaml(input_path, config_path, proj_out)
+                    self.__class__._config_cache.pop(str(input_path.resolve()), None)
+                    name = input_path.name
+                else:
+                    try:
+                        data = json.loads(proj_file.read_text(encoding="utf-8"))
+                        name = data.get("name") or input_path.name
+                    except (json.JSONDecodeError, OSError) as e:
+                        return self._send_json({"ok": False, "error": f"无法读取 project.json: {e}"}, 400)
                 _add_to_registry(str(input_path))
                 return self._send_json({"ok": True, "project": {"name": name, "input_dir": str(input_path)}})
 
