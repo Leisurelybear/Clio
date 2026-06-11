@@ -214,6 +214,26 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [ ] R-003e：UI refine tab 加临时 context textarea（延后单独做）
 - [ ] R-003g：pipeline `run_rerun_single`（已有单文件支持，无需独立函数）
 
+## 需求 R-011：规划面板预览播放
+
+**背景**：当前规划面板只能看到 segment 列表，点击单个 segment 跳到对应时间。
+无法快速预览整个编排方案的连贯播放效果。
+
+**验收**：
+- 规划面板新增「▶ 预览播放」按钮
+- 点击后遍历 sequence[] 依次播放每个 segment
+- 每个 segment 按 `use_timeline` 的 start 时间跳转，播到 end 时间后自动推进到下一个
+- 当前播放的 segment 在列表中高亮
+- 面板显示播放进度（Segment 3/11）
+- 支持「■ 停止预览」随时终止
+- 预览结束后自动停止，播放器停在最后一个 segment
+
+**子任务**：
+- [ ] R-011a：前端 state 加 previewActive / previewIndex / _previewEndTime
+- [ ] R-011b：renderPlan 加预览按钮 + 高亮当前 segment
+- [ ] R-011c：startPreview / stopPreview / _advancePreview 控制逻辑
+- [ ] R-011d：player.ontimeupdate 接入预览自动推进
+
 ## 暂存 / WIP
 
 - （暂无）
@@ -292,6 +312,15 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `b3c0edc` | fix(ui): restore day selector in run tab for pipeline plan step |
+| `1912012` | refactor(ui): rename '日 vlog 规划' → '剪辑编排', move day to plan tab |
+| `e530e22` | style: apply ruff format across the codebase |
+| `250a35c` | style(lint): fix all ruff CI lint errors |
+| `1eb37dd` | fix(pipeline): restore run_label_videos and robust fallback |
+| `9c6e0fd` | fix(plan): prevent AI from generating segments with invalid clip indices |
+| `43950e8` | fix(pipeline): add tracker param to run_compress_all |
+| `9cd4c2c` | refactor(pipeline): split compress and analyze into separate pipeline steps |
+| `b1566a4` | fix(server): handle ConnectionAbortedError in video range send |
 | `b6b84df` | test: progress.py unit tests (12 tests) |
 | `23e30e5` | test: log.py and cut.py unit tests (38 tests) |
 | `a2a5d66` | test: comprehensive utils.py unit tests (34 tests) |
