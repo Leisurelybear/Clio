@@ -232,8 +232,15 @@ aside, section { overflow-y: auto; }
   padding: var(--space-2) var(--space-1);
   font-family: var(--font-mono); font-size: var(--text-sm);
 }
-#player-name { color: var(--text-secondary); word-break: break-all; max-width: 70%; }
+#player-name { color: var(--text-secondary); word-break: break-all; max-width: 50%; }
 #player-time { color: var(--accent); font-weight: 500; }
+#playback-speed {
+  background: var(--bg-surface-2); color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 2px 4px; font: inherit; font-size: var(--text-xs);
+  cursor: pointer;
+}
+#playback-speed:focus { outline: none; border-color: var(--border-focus); }
 .player-tip { color: var(--text-muted); font-size: var(--text-xs); padding: var(--space-1); }
 
 /* ── Editor ────────────────────────────────────────────────── */

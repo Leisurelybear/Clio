@@ -17,6 +17,10 @@ const state = {
   currentProject: null,
   currentProjectName: null,
   lastProject: null,
+  // preview playback
+  previewActive: false,
+  previewIndex: -1,
+  _previewEndTime: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -350,6 +354,7 @@ async function selectVideo(file) {
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换视频吗？')) return;
   }
+  if (state.previewActive) stopPreview();
   state.currentEntity = 'video';
   state.currentVideo = file;
   state.dirty = false;
@@ -404,6 +409,7 @@ async function selectRun() {
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换到运行吗？')) return;
   }
+  if (state.previewActive) stopPreview();
   state.currentEntity = 'run';
   state.dirty = false;
   updateEntityUI();
@@ -414,6 +420,7 @@ async function selectConfig() {
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换到设置吗？')) return;
   }
+  if (state.previewActive) stopPreview();
   state.currentEntity = 'config';
   state.dirty = false;
   try {
@@ -489,11 +496,65 @@ function playVideoSegment(file, seekTo) {
   }
 }
 
+// ── Preview playback ─────────────────────────────────────────
+function startPreview() {
+  const p = state.plan;
+  if (!p || !p.sequence || !p.sequence.length) return;
+  // 如果已在预览，先停止
+  if (state.previewActive) stopPreview();
+  state.previewActive = true;
+  state.previewIndex = 0;
+  setStatus(`预览播放`, 'ok');
+  renderPlan();
+  _playPreviewSegment();
+}
+
+function stopPreview() {
+  state.previewActive = false;
+  state.previewIndex = -1;
+  state._previewEndTime = null;
+  const player = $('player');
+  player.pause();
+  renderPlan();
+  setStatus('预览已停止', '');
+}
+
+function _playPreviewSegment() {
+  const p = state.plan;
+  if (!state.previewActive || !p || state.previewIndex >= p.sequence.length) {
+    stopPreview();
+    setStatus('预览播放完毕', 'ok');
+    return;
+  }
+  const seg = p.sequence[state.previewIndex];
+  const v = state.videos.find(x => x.index === seg.index);
+  if (!v) {
+    setStatus(`跳过视频 [${seg.index}]，找不到对应文件`, 'warn');
+    state.previewIndex++;
+    _playPreviewSegment();
+    return;
+  }
+  const parts = (seg.use_timeline || '').split('-');
+  const seekTo = parseTimecode(parts[0].trim());
+  const endTime = parts[1] ? parseTimecode(parts[1].trim()) : null;
+
+  playVideoSegment(v.file, seekTo);
+  state._previewEndTime = endTime;
+
+  setStatus(`预览 [${state.previewIndex + 1}/${p.sequence.length}] ${seg.title || seg.index}`, 'ok');
+
+  // 更新高亮
+  document.querySelectorAll('.plan-seg').forEach(el => {
+    el.classList.toggle('preview-active', parseInt(el.dataset.previewIndex) === state.previewIndex);
+  });
+}
+
 async function setSource(source) {
   if (source === state.source) return;
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换源吗？')) return;
   }
+  if (state.previewActive) stopPreview();
   state.source = source;
   state.currentVideo = null;
   state.texts = null;
@@ -642,6 +703,13 @@ function renderPlan() {
     <label>开场提示 <textarea data-field="opening_tip" rows="2"></textarea></label>
     <label>收尾提示 <textarea data-field="ending_tip" rows="2"></textarea></label>
     <h3>顺序 (sequence) — ${(p.sequence || []).length} 项</h3>
+    <div style="display:flex;gap:6px;margin-bottom:8px;">
+      ${state.previewActive
+        ? `<button id="btn-stop-preview" class="btn-primary" style="flex:1">${icon('stop', 16)} 停止预览</button>
+           <span class="hint" style="display:flex;align-items:center;color:var(--accent);font-weight:500;">${state.previewIndex + 1}/${(p.sequence || []).length}</span>`
+        : `<button id="btn-start-preview" class="btn-primary" style="flex:1">${icon('play', 16)} 预览播放</button>`
+      }
+    </div>
     <p class="hint">点击 segment 跳到对应视频</p>
     <ol id="plan-list"></ol>
   `;
@@ -659,6 +727,12 @@ function renderPlan() {
       await selectPlan();
     };
   }
+  // Preview buttons
+  const startBtn = $('btn-start-preview');
+  if (startBtn) startBtn.onclick = startPreview;
+  const stopBtn = $('btn-stop-preview');
+  if (stopBtn) stopBtn.onclick = stopPreview;
+
   for (const k of ['theme', 'opening_tip', 'ending_tip']) {
     const el = pane.querySelector(`[data-field="${k}"]`);
     el.value = p[k] || '';
@@ -667,7 +741,8 @@ function renderPlan() {
   const ol = pane.querySelector('#plan-list');
   (p.sequence || []).forEach((seg, i) => {
     const li = document.createElement('li');
-    li.className = 'plan-seg';
+    li.className = 'plan-seg' + (state.previewActive && state.previewIndex === i ? ' preview-active' : '');
+    li.dataset.previewIndex = i;
     li.innerHTML = `
       <div class="seg-time">${escapeHtml(seg.use_timeline || '')} <span class="muted">视频 [${escapeHtml(seg.index || '?')}]</span></div>
       <div class="seg-title">${escapeHtml(seg.title || '')}</div>
@@ -1301,11 +1376,28 @@ async function init() {
   $$('.tab').forEach(t => t.onclick = () => { state.currentTab = t.dataset.tab; renderActiveTab(); });
 
   const player = $('player');
+  // 播放速度控制
+  const speedSel = $('playback-speed');
+  if (speedSel) {
+    speedSel.onchange = () => { player.playbackRate = parseFloat(speedSel.value); };
+  }
+
   player.ontimeupdate = () => {
     $('player-time').textContent = `${fmtTime(player.currentTime)} / ${fmtTime(player.duration)}`;
+    // 预览模式：到达结束时间自动推进
+    if (state.previewActive && state._previewEndTime !== null && player.currentTime >= state._previewEndTime) {
+      state.previewIndex++;
+      _playPreviewSegment();
+    }
   };
   player.onloadedmetadata = () => {
     $('player-time').textContent = `${fmtTime(0)} / ${fmtTime(player.duration)}`;
+  };
+  player.onended = () => {
+    if (state.previewActive) {
+      state.previewIndex++;
+      _playPreviewSegment();
+    }
   };
   player.onerror = () => setStatus('视频加载失败', 'err');
 

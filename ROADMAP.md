@@ -214,7 +214,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [ ] R-003e：UI refine tab 加临时 context textarea（延后单独做）
 - [ ] R-003g：pipeline `run_rerun_single`（已有单文件支持，无需独立函数）
 
-## 需求 R-011：规划面板预览播放
+## ✅ 需求 R-011：规划面板预览播放
 
 **背景**：当前规划面板只能看到 segment 列表，点击单个 segment 跳到对应时间。
 无法快速预览整个编排方案的连贯播放效果。
@@ -229,10 +229,10 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - 预览结束后自动停止，播放器停在最后一个 segment
 
 **子任务**：
-- [ ] R-011a：前端 state 加 previewActive / previewIndex / _previewEndTime
-- [ ] R-011b：renderPlan 加预览按钮 + 高亮当前 segment
-- [ ] R-011c：startPreview / stopPreview / _advancePreview 控制逻辑
-- [ ] R-011d：player.ontimeupdate 接入预览自动推进
+- [x] R-011a：前端 state 加 previewActive / previewIndex / _previewEndTime
+- [x] R-011b：renderPlan 加预览按钮 + 高亮当前 segment
+- [x] R-011c：startPreview / stopPreview / _playPreviewSegment 控制逻辑
+- [x] R-011d：player.ontimeupdate + onended 接入预览自动推进
 
 ## 暂存 / WIP
 
