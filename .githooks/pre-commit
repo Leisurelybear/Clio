@@ -3,14 +3,18 @@
 
 set -e
 
-# Bail out if ruff is not installed
-if ! command -v ruff >/dev/null 2>&1; then
+# Try ruff directly, then via python -m ruff (venv)
+if command -v ruff >/dev/null 2>&1; then
+    RUFF="ruff"
+elif python -m ruff --version >/dev/null 2>&1; then
+    RUFF="python -m ruff"
+else
     echo "pre-commit: ruff not found, skipping format"
     exit 0
 fi
 
 # Format all files (ruff only touches .py/.pyi files by default)
-ruff format .
+$RUFF format .
 
 # Re-stage any files that ruff modified
 git diff --name-only --diff-filter=M | xargs -r git add
