@@ -590,7 +590,7 @@ def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:
         run_analyze_all(config)
     with timed("=== 3/5 生成口播文案 ==="):
         run_generate_scripts(config)
-    with timed("=== 4/5 日 vlog 剪辑规划 ==="):
+    with timed("=== 4/5 剪辑编排 ==="):
         run_plan_vlog(config, day_label)
     with timed("=== 5/5 烧录序号标注 ==="):
         run_label_videos(config)
@@ -601,7 +601,7 @@ _STEP_LABELS = {
     "compress": "压缩原视频",
     "analyze": "AI 分析素材",
     "voiceover": "生成口播文案",
-    "plan": "日 vlog 剪辑规划",
+    "plan": "剪辑编排",
     "label": "烧录序号标注",
 }
 

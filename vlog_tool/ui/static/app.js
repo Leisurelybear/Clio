@@ -594,14 +594,14 @@ function renderPlan() {
   const pane = $('tab-plan');
   if (!p) {
     pane.innerHTML = `
-      <h3>日 vlog 规划</h3>
-      <p class="muted">当前项目没有规划文件。</p>
-      <p class="hint">请先通过 CLI 运行 <code>python main.py plan</code> 生成规划。</p>
+      <h3>剪辑编排</h3>
+      <p class="muted">当前项目没有编排文件。</p>
+      <p class="hint">请先运行流水线中的「剪辑编排」步骤，或在 CLI 执行 <code>python main.py plan</code>。</p>
     `;
     return;
   }
   pane.innerHTML = `
-    <h3>日 vlog 元信息</h3>
+    <h3>编排元信息</h3>
     ${state.availablePlans.length >= 1 ? `
     <label>分集
       <select id="plan-day-select">
@@ -913,7 +913,7 @@ const RUN_STEPS = [
   { key: 'compress', label: '压缩原视频', hint: '将原片压缩为 640p，为 AI 分析做准备' },
   { key: 'analyze', label: 'AI 分析', hint: '提交 Gemini 分析压缩后的视频内容' },
   { key: 'voiceover', label: '生成口播文案', hint: '基于分析结果生成每段的口播脚本' },
-  { key: 'plan', label: '日 vlog 规划', hint: '根据所有素材生成剪辑顺序和时间轴' },
+  { key: 'plan', label: '剪辑编排', hint: '根据所有素材生成剪辑顺序和时间轴' },
   { key: 'label', label: '烧录序号', hint: '在压缩视频左上角标上序号便于剪映对照' },
 ];
 
@@ -929,7 +929,6 @@ function renderRun() {
   pane.innerHTML = `
     <h3>运行流水线</h3>
     <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
-    <label>分集 <input id="run-day" value="${escapeHtml(state.currentDay)}"></label>
     <div class="run-step-list">${stepChecks}</div>
     <button id="btn-run-start" class="primary">▶ 运行选中步骤</button>
     <div id="run-progress" style="margin-top:12px">
@@ -950,7 +949,7 @@ async function startRun() {
     setStatus('请至少选择一个步骤', 'warn');
     return;
   }
-  _lastRunDay = $('run-day').value.trim() || state.currentDay;
+  _lastRunDay = state.currentDay;
   if (_runPollTimer) clearInterval(_runPollTimer);
   btn.disabled = true;
   btn.textContent = '启动中...';
