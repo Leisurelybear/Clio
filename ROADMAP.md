@@ -249,6 +249,42 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [ ] R-012b：进度条点击/拖动切换到对应 segment
 - [ ] R-012c：手动拖动播放器进度时不触发自动推进
 
+## 需求 R-013：语音识别（语音 → 文本 → 口播参考）
+
+**背景**：当前口播文案完全基于视频画面分析生成（地点、动作、时间轴），但无法知道视频中的人物说了什么。如果 AI 能先识别视频中的语音生成字幕/对话文本，再作为上下文传给口播生成步骤，口播文案会更准确、更贴合视频实际内容。
+
+**验收**：
+- 新增 pipeline 步骤 `transcribe`（介于 `analyze` 和 `scripts` 之间）
+- 调用支持语音识别的 AI 模型（如 Gemini 的音频理解能力）提取视频中的语音文本
+- 将识别结果以 `transcript` 字段存入 texts JSON
+- 口播生成（`scripts` 步骤）自动读取 `transcript` 作为上下文参考
+- CLI 支持 `main.py transcribe` 子命令
+- UI 侧栏流水线状态增加 `transcribe` 步骤
+
+**子任务**：
+- [ ] R-013a：Gemini / 其他 provider 接入音频/语音识别能力
+- [ ] R-013b：pipeline 新增 `run_transcribe_all` 步骤，存入 `transcript` 字段
+- [ ] R-013c：修改口播 prompt，加入 `{transcript}` 上下文参数
+- [ ] R-013d：CLI 子命令 `transcribe`
+- [ ] R-013e：UI 各处的步骤列表加入 `transcribe` 项
+
+## 需求 R-014：AI 模型 Token 用量统计（项目级别）
+
+**背景**：目前所有 AI 调用只打印 prompt 大小和响应大小（字节），没有按 token 统计。用户不知道每个项目消耗了多少 token，也无法对比不同模型的成本。项目级别的 token 统计有助于优化模型选择和成本控制。
+
+**验收**：
+- 每次 AI 调用后记录 token 用量（prompt_tokens / completion_tokens / total_tokens），写入 `output/.token_usage.json`
+- 如果模型 API 未返回 token 数，使用 tiktoken 估算
+- 按项目归总：记录每个项目下各模型的累计 token 数
+- UI 设置 tab 或新 tab 显示 token 统计（项目总览 / 各模型占比 / 按时间）
+- CLI 支持 `main.py tokens` 查看统计
+
+**子任务**：
+- [ ] R-014a：后端 AI 调用统一封装 token 记录（不论 provider 都返回 token 数）
+- [ ] R-014b：写入 `output/.token_usage.json`，按项目/模型/日期聚合
+- [ ] R-014c：UI 显示 token 统计面板
+- [ ] R-014d：CLI `tokens` 子命令
+
 ## 暂存 / WIP
 
 - （暂无）
