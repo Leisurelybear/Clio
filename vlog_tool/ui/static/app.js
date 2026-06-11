@@ -929,6 +929,7 @@ function renderRun() {
   pane.innerHTML = `
     <h3>运行流水线</h3>
     <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
+    <label>分集 <input id="run-day" value="${escapeHtml(state.currentDay)}"></label>
     <div class="run-step-list">${stepChecks}</div>
     <button id="btn-run-start" class="primary">▶ 运行选中步骤</button>
     <div id="run-progress" style="margin-top:12px">
@@ -949,7 +950,7 @@ async function startRun() {
     setStatus('请至少选择一个步骤', 'warn');
     return;
   }
-  _lastRunDay = state.currentDay;
+  _lastRunDay = ($('run-day')?.value.trim() || state.currentDay);
   if (_runPollTimer) clearInterval(_runPollTimer);
   btn.disabled = true;
   btn.textContent = '启动中...';
