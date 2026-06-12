@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import threading
 import time
 import traceback
 from datetime import datetime
@@ -99,6 +100,9 @@ class _TeeWriter:
 
 
 _initialized = False
+_init_lock = threading.Lock()
+_original_stdout: TextIO | None = None
+_original_stderr: TextIO | None = None
 
 
 def _install_excepthook(logger: logging.Logger) -> None:
@@ -127,24 +131,45 @@ def setup_logging(logs_dir: Path, level: int = logging.INFO) -> logging.Logger:
     - 文件创建失败时退化为只在控制台输出
     - 注册 sys.excepthook：未捕获异常整成一条 ERROR 日志
     """
-    global _initialized
+    global _initialized, _original_stdout, _original_stderr
     logger = logging.getLogger(_LOGGER_NAME)
     logger.setLevel(level)
 
-    if _initialized:
-        return logger
+    with _init_lock:
+        if _initialized:
+            return logger
 
-    try:
-        logger.addHandler(_HourlyFileHandler(logs_dir))
-    except Exception as e:
-        sys.stderr.write(f"[vlog_tool] 无法创建日志文件: {e}\n")
+        try:
+            logger.addHandler(_HourlyFileHandler(logs_dir))
+        except Exception as e:
+            sys.stderr.write(f"[vlog_tool] 无法创建日志文件: {e}\n")
 
-    sys.stdout = _TeeWriter(sys.stdout, logger, logging.INFO)
-    sys.stderr = _TeeWriter(sys.stderr, logger, logging.WARNING)
-    _install_excepthook(logger)
+        _original_stdout = sys.stdout
+        _original_stderr = sys.stderr
+        sys.stdout = _TeeWriter(sys.stdout, logger, logging.INFO)
+        sys.stderr = _TeeWriter(sys.stderr, logger, logging.WARNING)
+        _install_excepthook(logger)
+        _initialized = True
 
-    _initialized = True
     return logger
+
+
+def teardown_logging() -> None:
+    """恢复 sys.stdout/stderr 到原始流，重置初始化标志。
+
+    供 pytest 清理用（capsys 需要原始 stream）。
+    """
+    global _initialized, _original_stdout, _original_stderr
+    with _init_lock:
+        if not _initialized:
+            return
+        if _original_stdout is not None:
+            sys.stdout = _original_stdout
+            _original_stdout = None
+        if _original_stderr is not None:
+            sys.stderr = _original_stderr
+            _original_stderr = None
+        _initialized = False
 
 
 def format_size(num_bytes: float) -> str:
