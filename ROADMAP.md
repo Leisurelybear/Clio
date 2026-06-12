@@ -358,15 +358,15 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-008 | 函数隐式修改入参（如 `analyze_video` 等修改传入的 dict 字段） | 入参 `deepcopy()` 避免副作用 | |
 | B-017 | `_find_texts_dirs` 匹配 `texts*` 太宽 — `texts_backup` 也会匹配 | 用更精确的 glob 或加排除规则 | 🆕 |
 | B-018 | `_config_cache` 只增不减（仅在 PUT config 时 pop） | 项目列表刷新时清理失效缓存 | 🆕 |
-| B-032 | `tasks/label.py:29-31` glob 时 idx 可能是整数 1 而非 `"001"`，导致文件匹配失败跳过处理 | `format_index(int(idx), config.naming.index_width)` 统一格式化后再 glob | 🆕 |
-| B-033 | `tasks/analyze.py:96` 批量 AI 分析失败直接中断整个批次；`run_refine_texts` 有 try/except/continue 容错而此处没有，行为不一致 | 给 `analyze_video()` 调用加 `try/except` + `continue`，记录失败继续下一个 | 🆕 |
-| B-034 | `routes/run.py` rerun 进度文件路径从 `cfg.paths.output_dir` 取，但 `GET /api/run/status` 从 `_project_output_dir()` 取，两个 output_dir 可能不一致导致前端轮询读不到进度 | 统一进度路径来源 | 🆕 |
-| B-035 | `sidebar.js:448` `pollRerunStatus` 在 `idle/running` 状态提前 return 无超时兜底，任务失败时进度 overlay 永久卡死 | 加 polling 超时（如 60s 无更新→显示错误并清理 overlay） | 🆕 |
-| B-036 | `compress.py:33-34` 目标码率 `8 * 1024 * 1024 * target_size_mb / duration * 0.92` 未扣音频流，有音频时输出文件超过 `target_size_mb` | `target_bits` 先扣音频估计值（如 128kbps），或仅在 `remove_audio` 时走 bitrate 模式 | 🆕 |
-| B-037 | `utils.py:139-140` `get_duration_sec` 不处理 ffprobe 输出 `"N/A"`，某些视频格式下 ValueError 无上下文 | 加 `try/except`，报错时附上文件路径 | 🆕 |
-| B-039 | `openai_compat.py:28` `httpx.Client` 在 `__init__` 创建后无 `close()`，长服务连接泄漏 | 在类中加 `__del__` 或显式 `close()` 方法 | 🆕 |
-| B-040 | `config.py:119` `_path()` 值为空时静默返回 `.`，忘记配置路径时对当前目录执行读写 | 值为空时 raise `ValueError` 而非返回 `.` | 🆕 |
-| B-041 | `file_service.py:46` `_save_atomic` 的 `.tmp` 文件名固定，多线程下两请求同时写同一文件互相覆盖 | 用 `tempfile.mkstemp` 或加进程 PID/随机后缀 | 🆕 |
+| B-032 | `tasks/label.py:29-31` glob 时 idx 可能是整数 1 而非 `"001"`，导致文件匹配失败跳过处理 | `format_index(int(idx), config.naming.index_width)` 统一格式化后再 glob | ✅ |
+| B-033 | `tasks/analyze.py:96` 批量 AI 分析失败直接中断整个批次；`run_refine_texts` 有 try/except/continue 容错而此处没有，行为不一致 | 给 `analyze_video()` 调用加 `try/except` + `continue`，记录失败继续下一个 | ✅ |
+| B-034 | `routes/run.py` rerun 进度文件路径从 `cfg.paths.output_dir` 取，但 `GET /api/run/status` 从 `_project_output_dir()` 取，两个 output_dir 可能不一致导致前端轮询读不到进度 | 统一用 `proj_out`（来自 `_project_output_dir`） | ✅ |
+| B-035 | `sidebar.js:448` `pollRerunStatus` 在 `idle/running` 状态提前 return 无超时兜底，任务失败时进度 overlay 永久卡死 | 加 polling 超时（120s）+ 10s idle 检测 + `_rerunPollError()` | ✅ |
+| B-036 | `compress.py:33-34` 目标码率 `8 * 1024 * 1024 * target_size_mb / duration * 0.92` 未扣音频流，有音频时输出文件超过 `target_size_mb` | `target_bits` 先扣 128kbps 音频估计值 | ✅ |
+| B-037 | `utils.py:139-140` `get_duration_sec` 不处理 ffprobe 输出 `"N/A"`，某些视频格式下 ValueError 无上下文 | 加 `try/except`，报错时附上文件路径 | ✅ |
+| B-039 | `openai_compat.py:28` `httpx.Client` 在 `__init__` 创建后无 `close()`，长服务连接泄漏 | 添加 `close()` 方法 | ✅ |
+| B-040 | `config.py:119` `_path()` 值为空时静默返回 `.`，忘记配置路径时对当前目录执行读写 | 值为空时 raise `ValueError` | ✅ |
+| B-041 | `file_service.py:46` `_save_atomic` 的 `.tmp` 文件名固定，多线程下两请求同时写同一文件互相覆盖 | 加 `os.urandom(4).hex()` 随机后缀 | ✅ |
 
 ### P3 — 长期
 
