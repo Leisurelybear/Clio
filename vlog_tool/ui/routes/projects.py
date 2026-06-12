@@ -7,7 +7,7 @@ import json
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from vlog_tool.ui.services.file_service import _create_project_yaml
+from vlog_tool.ui.services.file_service import _create_project_yaml, _save_atomic
 from vlog_tool.ui.services.project_service import (
     _add_to_registry,
     _detect_steps,
@@ -73,10 +73,7 @@ def handle_put_project(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> 
     if not proj_file.is_file():
         merged["createdAt"] = merged["updatedAt"]
     proj_input.mkdir(parents=True, exist_ok=True)
-    proj_file.write_text(
-        json.dumps(merged, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    _save_atomic(proj_file, json.dumps(merged, ensure_ascii=False, indent=2).encode("utf-8"))
     config_path = handler.server.config_path if hasattr(handler.server, "config_path") else None
     _save_last_project(merged.get("name") or proj_input.name, config_path)
     handler._send_json({"ok": True})
@@ -112,10 +109,7 @@ def handle_post_project_create(handler: BaseHTTPRequestHandler, obj: dict) -> No
         "updatedAt": now,
     }
     proj_file = input_path / "project.json"
-    proj_file.write_text(
-        json.dumps(proj_data, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    _save_atomic(proj_file, json.dumps(proj_data, ensure_ascii=False, indent=2).encode("utf-8"))
     # Auto-create project.yaml (silent failure is fine)
     _create_project_yaml(input_path, config_path, proj_out)
     handler.__class__._config_cache.pop(str(input_path.resolve()), None)
@@ -150,7 +144,7 @@ def handle_post_project_add(handler: BaseHTTPRequestHandler, obj: dict) -> None:
             "createdAt": now,
             "updatedAt": now,
         }
-        proj_file.write_text(json.dumps(proj_data, ensure_ascii=False, indent=2), encoding="utf-8")
+        _save_atomic(proj_file, json.dumps(proj_data, ensure_ascii=False, indent=2).encode("utf-8"))
         _create_project_yaml(input_path, config_path, proj_out)
         handler.__class__._config_cache.pop(str(input_path.resolve()), None)
         name = input_path.name
