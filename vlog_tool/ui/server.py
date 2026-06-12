@@ -393,6 +393,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
     Handler.DEFAULT_PROJECT = DEFAULT_PROJECT
     Handler.input_dir = input_dir
     Handler.output_dir = output_dir
+    Handler.config_path = config_path
     return Handler
 
 
