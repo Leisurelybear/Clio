@@ -154,10 +154,16 @@ function renderVideoList() {
       <div class="video-actions">
         <button class="menu-btn" title="操作">⋮</button>
         <div class="menu-dropdown">
-          <button class="menu-item" data-action="compress" title="用 ffmpeg 重新压缩原视频为 640p">压缩视频</button>
-          <button class="menu-item" data-action="analyze" title="调用 AI 重新分析视频内容，生成分段描述、高光时刻等">AI分析视频</button>
-          <button class="menu-item" data-action="voiceover" title="基于分析结果，重新用 AI 生成口播解说文案">重跑口播文案</button>
-          <button class="menu-item" data-action="all" title="依次执行压缩视频 + AI 分析 + 口播文案">重跑全部</button>
+          ${state.source === 'original'
+            ? `<button class="menu-item" data-action="compress" title="用 ffmpeg 将原视频压缩为 640p">压缩视频</button>
+               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">AI分析视频</button>
+               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑口播文案</button>
+               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑全部</button>`
+            : `<button class="menu-item" data-action="compress" disabled style="opacity:0.4" title="视频已压缩">压缩视频</button>
+               <button class="menu-item" data-action="analyze" title="调用 AI 重新分析视频内容">AI分析视频</button>
+               <button class="menu-item" data-action="voiceover" title="基于分析结果，重新用 AI 生成口播解说文案">重跑口播文案</button>
+               <button class="menu-item" data-action="all" title="依次执行 AI 分析 + 口播文案">重跑全部</button>`
+          }
         </div>
       </div>
     `;
@@ -165,62 +171,45 @@ function renderVideoList() {
       if (e.target.closest('.video-actions')) return;
       selectVideo(v.file);
     };
-    // ── Dot-menu toggle ──
+    // ── Dot-menu toggle (portal 方案：移到 body 下逃逸侧栏) ──
     const menuBtn = li.querySelector('.menu-btn');
     const dropdown = li.querySelector('.menu-dropdown');
     menuBtn.onclick = (e) => {
       e.stopPropagation();
-      // close all other dropdowns first
-      document.querySelectorAll('.menu-dropdown.open').forEach(d => { if (d !== dropdown) { d.classList.remove('open'); d.style.position = ''; d.style.top = ''; d.style.right = ''; d.style.left = ''; } });
-      const wasOpen = dropdown.classList.contains('open');
-      dropdown.classList.toggle('open');
-      if (dropdown.classList.contains('open') && !wasOpen) {
-        // 用 position:fixed 逃逸侧栏 overflow 裁剪
-        const rect = menuBtn.getBoundingClientRect();
-        dropdown.style.position = 'fixed';
-        dropdown.style.top = (rect.bottom + 4) + 'px';
-        dropdown.style.right = 'auto';
-        dropdown.style.zIndex = '1000';
-        dropdown.style.left = Math.max(4, rect.right - dropdown.offsetWidth) + 'px';
-      } else {
-        _resetDropdownPosition(dropdown);
-      }
-    };
-    // close on click outside
-    const closeDropdownFn = () => {
-      if (dropdown.classList.contains('open')) {
-        dropdown.classList.remove('open');
-        _resetDropdownPosition(dropdown);
-      }
-    };
-    document.addEventListener('click', closeDropdownFn, { once: true });
-    // ── Menu item click ──
-    dropdown.querySelectorAll('.menu-item').forEach(item => {
-      item.onclick = async (e) => {
-        e.stopPropagation();
-        dropdown.classList.remove('open');
-        _resetDropdownPosition(dropdown);
-        const task = item.dataset.action;
-        const file = v.file;
-        setStatus(`正在重跑 ${task} (${file})...`, 'ok');
-        try {
-          const r = await api('POST', '/api/rerun', {
-            video: file,
-            task: task,
-            source: state.source,
-            index: v.index || undefined,
-          });
-          if (r.ok) {
-            setStatus(r.message || `${task} 已启动`, 'ok');
-            showRerunProgress(task, file);
-          } else {
-            throw new Error(r.error || '重跑失败');
+      // 关闭旧的 portal（如果有）
+      if (_portalDropdown) { _portalDropdown.remove(); _portalDropdown = null; }
+      const rect = menuBtn.getBoundingClientRect();
+      const clone = dropdown.cloneNode(true);
+      clone.classList.add('open');
+      clone.style.cssText = 'position:fixed;top:' + (rect.bottom + 4) + 'px;right:auto;left:' + Math.max(4, rect.right - 160) + 'px;z-index:10000;min-width:160px;width:auto;';
+      document.body.appendChild(clone);
+      _portalDropdown = clone;
+      clone.querySelectorAll('.menu-item').forEach(item => {
+        item.onclick = async (ev) => {
+          ev.stopPropagation(); if (item.disabled) return;
+          clone.remove(); _portalDropdown = null;
+          const task = item.dataset.action;
+          const file = v.file;
+          setStatus(`正在重跑 ${task} (${file})...`, 'ok');
+          try {
+            const r = await api('POST', '/api/rerun', {
+              video: file, task: task, source: state.source, index: v.index || undefined,
+            });
+            if (r.ok) { setStatus(r.message || `${task} 已启动`, 'ok'); showRerunProgress(task, file); }
+            else { throw new Error(r.error || '重跑失败'); }
+          } catch (e) { setStatus('重跑失败: ' + e.message, 'err'); }
+        };
+      });
+      // 点外部关闭（延迟绑定避免当前点击直接触发）
+      setTimeout(() => {
+        document.addEventListener('click', function closePortal(ev) {
+          if (_portalDropdown && !_portalDropdown.contains(ev.target) && ev.target !== menuBtn) {
+            _portalDropdown.remove(); _portalDropdown = null;
+            document.removeEventListener('click', closePortal);
           }
-        } catch (e) {
-          setStatus('重跑失败: ' + e.message, 'err');
-        }
-      };
-    });
+        });
+      }, 0);
+    };
     ul.appendChild(li);
   }
 }
@@ -433,6 +422,9 @@ async function loadBrowseDir(path) {
     pathEl.textContent = '加载失败: ' + e.message;
   }
 }
+
+/* ── Dropdown portal ── */
+let _portalDropdown = null;
 
 /* ── Rerun progress overlay (single-video rerun) ── */
 let _rerunPollTimer = null;
