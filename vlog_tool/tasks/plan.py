@@ -26,9 +26,14 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
         raw_idx = data.get("index")
         if raw_idx is None:
             raw_idx = json_file.stem[:3]  # fallback: 从文件名取前缀 "001"
+        try:
+            idx = int(raw_idx)
+        except (ValueError, TypeError):
+            print(f"  [跳过] 无效 index '{raw_idx}' 在 {json_file.name}")
+            continue
         clips.append(
             {
-                "index": format_index(int(raw_idx), config.naming.index_width),
+                "index": format_index(idx, config.naming.index_width),
                 "title": data.get("title", ""),
                 "summary": data.get("summary", ""),
                 "location": data.get("location", ""),
