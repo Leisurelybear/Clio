@@ -11,7 +11,13 @@ def parse_time_range(range_str: str) -> tuple[float, float]:
     parts = range_str.split("-", 1)
     if len(parts) != 2:
         raise ValueError(f"无法解析时间范围: {range_str}")
-    return _to_seconds(parts[0].strip()), _to_seconds(parts[1].strip())
+    start = _to_seconds(parts[0].strip())
+    end = _to_seconds(parts[1].strip())
+    if end <= start:
+        raise ValueError(
+            f"end ({parts[1].strip()}) 必须大于 start ({parts[0].strip()})"
+        )
+    return start, end
 
 
 def _to_seconds(s: str) -> float:
