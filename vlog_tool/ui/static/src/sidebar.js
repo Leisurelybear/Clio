@@ -253,6 +253,8 @@ async function selectPlan(dayOverride) {
   state.currentEntity = 'plan';
   state.dirty = false;
   if (dayOverride) state.currentDay = dayOverride;
+  // 停止运行轮询，防止其完成回调清空 state.plan
+  import('./runner.js').then(mod => mod._stopRunPoll());
   try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); }
   catch (e) { state.plan = null; }
   updateSidebarDay();
