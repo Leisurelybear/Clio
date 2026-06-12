@@ -360,6 +360,7 @@ function _renderConfigForm(obj, path) {
   if (typeof obj === 'object') {
     let html = `<fieldset class="config-fieldset"><legend>${labelFromPath(path) || '配置'}</legend>`;
     for (const [key, val] of Object.entries(obj)) {
+      if (key === 'context_file') continue; // context 已替代，隐藏避免混淆
       html += _renderConfigForm(val, path ? `${path}.${key}` : key);
     }
     html += '</fieldset>';
