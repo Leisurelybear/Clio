@@ -27,6 +27,9 @@ class OpenAICompatProvider:
             client_kwargs["proxy"] = proxy.url
         self._client = httpx.Client(**client_kwargs)
 
+    def close(self) -> None:
+        self._client.close()
+
     def generate_text(self, prompt: str, model: str) -> str:
         def _do() -> str:
             response = self._client.post(
