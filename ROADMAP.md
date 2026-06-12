@@ -328,9 +328,9 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-012 | `_run()` 静默吞异常 — pipeline 失败 UI 无感知 | `except Exception: pass` → 写 progress.json error 状态 + 打印日志 | ✅ `9c73903` |
 | B-013 | `apply_run_paths` 直接修改入参 config 对象 | 返回新 config 或 `copy.deepcopy()` 再修改 | ✅ `9c73903` |
 | B-014 | `requirements.txt` 无版本号 — breaking change 风险 | `pip freeze` 锁版本，参考 R-009a | ✅ `requirements-locked.txt` |
-| B-021 | `cut.py:51` ffmpeg 用了 `-to` 语义上应为 `-t`（指定时长） | 改 `-to duration_sec` → `-t duration_sec` | 🆕 |
-| B-022 | `project_service.py:52` `_detect_steps` 中 `any(t.iterdir() for t in texts)` — iterdir() 生成器永远为 truthy，空目录也被判为 analyze 已完成 | 把 `any(t.iterdir() for t in texts)` 改成 `any(any(True for _ in t.iterdir()) for t in texts)` 即 `any(list(t.iterdir()))` | 🆕 |
-| B-023 | `routes/projects.py` 创建/写入 project.json 用 `write_text()` 绕过 `_save_atomic`，崩溃留损坏文件 | 改用 `_save_atomic` | 🆕 |
+| B-021 | `cut.py:51` ffmpeg 用了 `-to` 语义上应为 `-t`（指定时长） | 改 `-to duration_sec` → `-t duration_sec` | ✅ `fix/B-021-cut-to-to-t` |
+| B-022 | `project_service.py:52` `_detect_steps` 中 `any(t.iterdir() for t in texts)` — iterdir() 生成器永远为 truthy，空目录也被判为 analyze 已完成 | 改成 `any(any(True for _ in t.iterdir()) for t in texts)` | ✅ `fix/B-022-detect-steps-empty-dir` |
+| B-023 | `routes/projects.py` 创建/写入 project.json 用 `write_text()` 绕过 `_save_atomic`，崩溃留损坏文件 | 改用 `_save_atomic` | ✅ `fix/B-023-project-json-atomic` |
 
 ### P1 — 近期
 
@@ -340,14 +340,15 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-007 | venv 跨平台检测只认 Windows `Scripts/`，Linux 是 `bin/` | 同时兼容 `bin/` 和 `Scripts/` | |
 | B-015 | `project.yaml` 写入时只做了 YAML 格式校验，未跑 `_validate_config` | `do_PUT /api/config/raw?project=X` 写前做完整合并校验 | ✅ `9c73903` |
 | B-016 | `config.yaml` 里 `deepseek-v4-flash` 可能是无效模型名（AGENTS §8.4） | 确认实际可用模型名，更新 config 或加备注 | 🆕 |
-| B-024 | `cut.py:9` `parse_time_range` 不校验 end > start，AI 生成反向区间时 ffmpeg 静默出坏文件 | 解析后加 `if end <= start: raise ValueError(...)` | 🆕 |
-| B-025 | `tasks/cut.py:80-82` 找不到视频时的报错信息里 source 标签取反（说 compressed 实际找的是 original，反之亦然） | 修复三目运算：`'original' if source == 'original' else 'compressed'` | 🆕 |
-| B-026 | `tasks/plan.py:31` `int(raw_idx)` 无保护，文件名前缀非数字时抛未捕获 ValueError | 加 `try/except` 或 `isdigit()` 守卫 | 🆕 |
-| B-027 | `prompts.py:38-70` `PLAN_PROMPT` 用 `str.format()` 拼接含 `{...}` 的 JSON，AI 输出含 `{key}` 字段时 KeyError 崩溃 | 用 `.replace('{','{{').replace('}','}}')` 转义 clips_json，或改用 `string.Template` | 🆕 |
-| B-028 | `progress.py:42` `.with_suffix(".progress.tmp")` 在 `.progress.json` 上生成 `.progress.progress.tmp`，文件名错误 | 用 `Path(f"{self._path}.tmp")` 替代 `.with_suffix()` | 🆕 |
-| B-029 | `log.py:101-146` `_initialized` 全局标志无锁；`sys.stdout/stderr` 被替换后不可恢复，pytest 里破坏 capsys | 加 `threading.Lock()` 保护初始化，保存原始 stream 引用提供恢复方法 | 🆕 |
-| B-030 | `pyproject.toml:3` `build-backend` 引用 setuptools 私有 API `_legacy:_Backend`，升级即断 | 改用 `setuptools.backends._legacy:_Backend` → 实际为 `setuptools.build_meta:__legacy__` 或升级至 `setuptools>=64` 用标准后端 | 🆕 |
-| B-031 | `server.py:107-109` `_config_cache` 多线程无锁，两个线程同时取同一个未缓存 key 会同时 `load_config` | 加 `threading.Lock()` 保护，或用 `dict.setdefault` + 预计算 | 🆕 |
+| B-024 | `cut.py:9` `parse_time_range` 不校验 end > start，AI 生成反向区间时 ffmpeg 静默出坏文件 | 解析后加 `if end <= start: raise ValueError(...)` | ✅ `fix/B-024-parse-time-range-validate` |
+| B-025 | `tasks/cut.py:80-82` 找不到视频时的报错信息里 source 标签取反 | 修复三目运算 | ✅ `fix/B-025-cut-source-label` |
+| B-026 | `tasks/plan.py:31` `int(raw_idx)` 无保护，文件名前缀非数字时抛未捕获 ValueError | 加 `try/except` 守卫跳过 | ✅ `fix/B-026-plan-int-raw-idx` |
+| B-027 | `prompts.py:38-70` `PLAN_PROMPT` 用 `str.format()` 拼接含 `{...}` 的 JSON | ⚠️ 经测试 `str.format()` 不会处理替换值中的花括号，非真实 crash | ❌ 不可复现 |
+| B-028 | `progress.py:42` `.with_suffix(".progress.tmp")` 生成 `.progress.progress.tmp` | 改用 `parent/name + ".tmp"` | ✅ `fix/B-028-progress-tmp-name` |
+| B-029 | `log.py:101-146` `_initialized` 无锁；`sys.stdout/stderr` 不可恢复 | 加锁 + 保存原始 stream + `teardown_logging()` | ✅ `fix/B-029-log-init-lock` |
+| B-030 | `pyproject.toml:3` `build-backend` 私有 API | 改用 `setuptools.build_meta:__legacy__` | ✅ `fix/B-030-pyproject-backend` |
+| B-031 | `server.py:107-109` `_config_cache` 多线程无锁 | 加 `_config_cache_lock` | ✅ `fix/B-031-config-cache-lock` |
+| B-038 | `server.py:393-395` Phase 1c 重构遗漏 `config_path` 类属性暴露 | 添加 `Handler.config_path = config_path` | ✅ `fix/B-031-config-path-exposure` |
 
 ### P2 — 中期
 
