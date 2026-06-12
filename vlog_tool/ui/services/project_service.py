@@ -49,7 +49,7 @@ def _detect_steps(proj_output_dir: Path) -> dict[str, bool]:
         steps["compress"] = False
     texts = [d for d in proj_output_dir.iterdir() if d.is_dir() and d.name.startswith("texts")]
     try:
-        steps["analyze"] = any(t.iterdir() for t in texts)
+        steps["analyze"] = any(any(True for _ in t.iterdir()) for t in texts)
     except (PermissionError, OSError):
         steps["analyze"] = False
     scripts_dir = proj_output_dir / "scripts"
