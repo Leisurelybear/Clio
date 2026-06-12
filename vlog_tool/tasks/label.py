@@ -28,7 +28,9 @@ def run_label_videos(config: AppConfig, tracker: ProgressTracker | None = None) 
             data = json.loads(json_file.read_text(encoding="utf-8"))
             raw_idx = data.get("index")
             try:
-                idx = format_index(int(raw_idx), config.naming.index_width) if raw_idx is not None else json_file.stem[:3]
+                idx = (
+                    format_index(int(raw_idx), config.naming.index_width) if raw_idx is not None else json_file.stem[:3]
+                )
             except (ValueError, TypeError):
                 idx = json_file.stem[:3]
             compressed = None

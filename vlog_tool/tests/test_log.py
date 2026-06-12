@@ -1,8 +1,11 @@
-"""Tests for vlog_tool/log.py — pure formatting functions."""
+"""Tests for vlog_tool/log.py — pure formatting functions and TeeWriter."""
 
 from __future__ import annotations
 
-from vlog_tool.log import format_duration, format_size
+import io
+import logging
+
+from vlog_tool.log import _TeeWriter, format_duration, format_size, setup_logging, teardown_logging
 
 # ── format_size ─────────────────────────────────────────────────────
 
@@ -60,3 +63,77 @@ class TestFormatDuration:
 
     def test_large_duration(self):
         assert format_duration(10000) == "2h46m40s"
+
+
+# ── _TeeWriter ─────────────────────────────────────────────────
+
+
+class TestTeeWriter:
+    def test_writes_to_original(self):
+        buf = io.StringIO()
+        logger = logging.getLogger("test_tee_w")
+        logger.setLevel(logging.INFO)
+        tw = _TeeWriter(buf, logger, logging.INFO)
+        tw.write("hello")
+        tw.flush()
+        assert buf.getvalue() == "hello"
+
+    def test_skip_empty_message(self):
+        buf = io.StringIO()
+        logger = logging.getLogger("test_tee_empty")
+        logger.setLevel(logging.INFO)
+        tw = _TeeWriter(buf, logger, logging.INFO)
+        assert tw.write("") == 0
+
+    def test_isatty_delegates(self):
+        buf = io.StringIO()
+        logger = logging.getLogger("test_tee_tty")
+        logger.setLevel(logging.INFO)
+        tw = _TeeWriter(buf, logger, logging.INFO)
+        assert tw.isatty() is False
+
+    def test_flush_delegates(self):
+        buf = io.StringIO()
+        logger = logging.getLogger("test_tee_flush")
+        logger.setLevel(logging.INFO)
+        tw = _TeeWriter(buf, logger, logging.INFO)
+        tw.write("data")
+        tw.flush()
+        assert buf.getvalue() == "data"
+
+
+# ── setup_logging / teardown_logging ───────────────────────────
+
+
+class TestSetupLogging:
+    def test_teardown_restores_stdout(self, tmp_path):
+        import sys
+
+        original = sys.stdout
+        try:
+            setup_logging(tmp_path)
+            assert sys.stdout is not original
+        finally:
+            teardown_logging()
+        assert sys.stdout is original
+
+    def test_teardown_restores_stderr(self, tmp_path):
+        import sys
+
+        original = sys.stderr
+        try:
+            setup_logging(tmp_path)
+            assert sys.stderr is not original
+        finally:
+            teardown_logging()
+        assert sys.stderr is original
+
+    def test_setup_is_idempotent(self, tmp_path):
+        setup_logging(tmp_path)
+        logger1 = setup_logging(tmp_path)
+        teardown_logging()
+        assert logger1 is not None
+
+    def test_teardown_before_setup_noop(self):
+        teardown_logging()
+        teardown_logging()

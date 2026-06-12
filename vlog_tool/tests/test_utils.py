@@ -11,7 +11,9 @@ from vlog_tool.utils import (
     find_videos,
     format_index,
     mask_if_looks_like_key,
+    resolve_binary,
     sanitize_name,
+    with_retry,
 )
 
 # ── extract_json ────────────────────────────────────────────────────
@@ -174,3 +176,62 @@ class TestFindVideos:
         for ext in [".mp4", ".mov", ".avi", ".mkv"]:
             (tmp_path / f"file{ext}").write_text("fake")
         assert len(find_videos(tmp_path)) == 4
+
+
+# ── with_retry ──────────────────────────────────────────────────
+
+
+class TestWithRetry:
+    def test_success_first_try(self):
+        assert with_retry(lambda: 42, attempts=3, retry_on=(ValueError,), what="test") == 42
+
+    def test_retry_then_succeed(self):
+        calls = []
+
+        def fn():
+            calls.append(1)
+            if len(calls) < 2:
+                raise ValueError("temporary")
+            return "ok"
+
+        assert with_retry(fn, attempts=3, retry_on=(ValueError,), what="test") == "ok"
+        assert len(calls) == 2
+
+    def test_exhaust_retries(self):
+        with pytest.raises(ValueError, match="fail"):
+            with_retry(
+                lambda: (_ for _ in ()).throw(ValueError("fail")), attempts=2, retry_on=(ValueError,), what="test"
+            )
+
+    def test_non_retryable_exception(self):
+        with pytest.raises(TypeError):
+            with_retry(lambda: (_ for _ in ()).throw(TypeError("bad")), attempts=3, retry_on=(ValueError,), what="test")
+
+    def test_zero_attempts(self):
+        calls = []
+
+        def fn():
+            calls.append(1)
+            raise ValueError("fail")
+
+        with pytest.raises(ValueError):
+            with_retry(fn, attempts=1, retry_on=(ValueError,), what="test")
+        assert len(calls) == 1
+
+
+# ── discover_ffmpeg_bin / resolve_binary ────────────────────────
+
+
+class TestResolveBinary:
+    def test_configured_path_exists(self, tmp_path):
+        exe = tmp_path / "ffmpeg.exe"
+        exe.write_text("fake")
+        assert resolve_binary(str(exe), "ffmpeg") == str(exe)
+
+    def test_configured_path_not_found(self, tmp_path):
+        with pytest.raises(FileNotFoundError):
+            resolve_binary(str(tmp_path / "nonexistent.exe"), "ffmpeg")
+
+    def test_empty_config_falls_back(self):
+        with pytest.raises(FileNotFoundError):
+            resolve_binary("", "ffmpeg_nonexistent_tool_xyz")

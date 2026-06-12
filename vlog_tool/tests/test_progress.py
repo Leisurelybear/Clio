@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-import time
+from unittest import mock
 
 import pytest
 
@@ -56,10 +56,10 @@ class TestProgressTracker:
         assert data["message"] == "something went wrong"
 
     def test_eta_computed(self, tmp_path):
-        t = ProgressTracker(tmp_path)
-        t.update(phase="compress", total=10, current=1)
-        time.sleep(0.05)  # let time pass for rate calculation
-        t.update(current=2)
+        with mock.patch("vlog_tool.progress.time.monotonic", side_effect=[0, 2, 4]):
+            t = ProgressTracker(tmp_path)
+            t.update(phase="compress", total=10, current=1)
+            t.update(current=2)
         data = json.loads(t._path.read_text(encoding="utf-8"))
         assert data["eta_sec"] is not None
         assert data["eta_sec"] >= 0
@@ -69,8 +69,7 @@ class TestProgressTracker:
         t.update(phase="compress", total=10)
         t.next()
         data = json.loads(t._path.read_text(encoding="utf-8"))
-        # eta might still be None if elapsed is 0
-        assert "eta_sec" in data
+        assert data.get("eta_sec") is None
 
     def test_starts_at_zero(self, tmp_path):
         t = ProgressTracker(tmp_path)
@@ -104,3 +103,21 @@ class TestProgressTracker:
         t = ProgressTracker(sub)
         assert sub.is_dir()
         assert t._path.is_file()
+
+    def test_log_appends(self, tmp_path):
+        t = ProgressTracker(tmp_path)
+        t.log("first line")
+        t.log("second line")
+        data = json.loads(t._path.read_text(encoding="utf-8"))
+        assert len(data["logs"]) == 2
+        assert data["logs"][0] == "first line"
+        assert data["logs"][1] == "second line"
+
+    def test_log_truncates_at_100(self, tmp_path):
+        t = ProgressTracker(tmp_path)
+        for i in range(105):
+            t.log(f"line {i}")
+        data = json.loads(t._path.read_text(encoding="utf-8"))
+        assert len(data["logs"]) == 100
+        assert data["logs"][0] == "line 5"  # first 5 were dropped
+        assert data["logs"][-1] == "line 104"

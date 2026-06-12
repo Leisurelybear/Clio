@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from unittest import mock
+
 import pytest
 
-from vlog_tool.cut import _to_seconds, parse_time_range
+from vlog_tool.cut import _to_seconds, cut_one, parse_time_range
 
 # ── _to_seconds ─────────────────────────────────────────────────────
 
@@ -80,3 +82,49 @@ class TestParseTimeRange:
     def test_three_parts_raises(self):
         with pytest.raises(ValueError, match="无法解析"):
             parse_time_range("00:00-00:00-00:00")
+
+
+# ── cut_one ─────────────────────────────────────────────────────
+
+
+class TestCutOne:
+    def test_cut_one_uses_t_duration(self, tmp_path):
+        src = tmp_path / "input.mp4"
+        src.write_text("fake")
+        out = tmp_path / "output.mp4"
+        with mock.patch("vlog_tool.cut.run_ffmpeg") as mock_run:
+            cut_one(src, out, 10.0, 30.0, "ffmpeg", reencode=False)
+        args = mock_run.call_args[0][0]
+        assert "-t" in args
+        assert "-to" not in args
+        assert str(20.0) in args
+
+    def test_cut_one_reencode(self, tmp_path):
+        src = tmp_path / "input.mp4"
+        src.write_text("fake")
+        out = tmp_path / "output.mp4"
+        with mock.patch("vlog_tool.cut.run_ffmpeg") as mock_run:
+            cut_one(src, out, 0, 10, "ffmpeg", reencode=True)
+        args = mock_run.call_args[0][0]
+        assert "-c:v" in args
+        assert "libx264" in args
+
+    def test_cut_one_stream_copy(self, tmp_path):
+        src = tmp_path / "input.mp4"
+        src.write_text("fake")
+        out = tmp_path / "output.mp4"
+        with mock.patch("vlog_tool.cut.run_ffmpeg") as mock_run:
+            cut_one(src, out, 5, 15, "ffmpeg", reencode=False)
+        args = mock_run.call_args[0][0]
+        assert "-c" in args
+        assert "copy" in args
+
+    def test_cut_one_negative_duration_still_passes(self, tmp_path):
+        """cut_one 本身不校验 end>start，校验在 parse_time_range 完成。"""
+        src = tmp_path / "input.mp4"
+        src.write_text("fake")
+        out = tmp_path / "output.mp4"
+        with mock.patch("vlog_tool.cut.run_ffmpeg") as mock_run:
+            cut_one(src, out, 30, 10, "ffmpeg", reencode=False)
+        args = mock_run.call_args[0][0]
+        assert "-t" in args
