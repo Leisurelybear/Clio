@@ -171,16 +171,37 @@ function renderVideoList() {
     menuBtn.onclick = (e) => {
       e.stopPropagation();
       // close all other dropdowns first
-      document.querySelectorAll('.menu-dropdown.open').forEach(d => { if (d !== dropdown) d.classList.remove('open'); });
+      document.querySelectorAll('.menu-dropdown.open').forEach(d => { if (d !== dropdown) { d.classList.remove('open'); d.style.position = ''; d.style.top = ''; d.style.left = ''; } });
+      const wasOpen = dropdown.classList.contains('open');
       dropdown.classList.toggle('open');
+      if (dropdown.classList.contains('open') && !wasOpen) {
+        // 用 position:fixed 逃逸侧栏 overflow 裁剪
+        const rect = menuBtn.getBoundingClientRect();
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = (rect.bottom + 4) + 'px';
+        dropdown.style.left = Math.max(4, rect.right - dropdown.offsetWidth) + 'px';
+      } else {
+        dropdown.style.position = '';
+        dropdown.style.top = '';
+        dropdown.style.left = '';
+      }
     };
     // close on click outside
-    document.addEventListener('click', () => dropdown.classList.remove('open'), { once: true });
+    const closeDropdownFn = () => {
+      if (dropdown.classList.contains('open')) {
+        dropdown.classList.remove('open');
+        dropdown.style.position = '';
+        dropdown.style.top = '';
+        dropdown.style.left = '';
+      }
+    };
+    document.addEventListener('click', closeDropdownFn, { once: true });
     // ── Menu item click ──
     dropdown.querySelectorAll('.menu-item').forEach(item => {
       item.onclick = async (e) => {
         e.stopPropagation();
         dropdown.classList.remove('open');
+        dropdown.style.position = ''; dropdown.style.top = ''; dropdown.style.left = '';
         const task = item.dataset.action;
         const file = v.file;
         setStatus(`正在重跑 ${task} (${file})...`, 'ok');
