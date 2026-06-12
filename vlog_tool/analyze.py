@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from vlog_tool.ai.base import TaskName
 from vlog_tool.ai.factory import get_task_provider, get_video_provider
@@ -19,10 +20,24 @@ from vlog_tool.utils import extract_json
 
 
 def _wrap_with_context(prompt: str, config: AppConfig, context_override: str | None = None) -> str:
-    """如果有 trip 上下文/规范，附加在 prompt 前面。context_override 优先级高于 ai.context。"""
+    """将背景/规范附加在 prompt 前面。
+
+    层级（从上到下叠加）：
+    1. templates/trip_context.md（项目默认模板，不存在则跳过）
+    2. config.ai.context（用户在设置页填写的项目特定内容）
+    3. context_override（临时覆写，如 refine 时的额外说明）
+    """
     parts = []
+    # 1. 默认模板
+    trip_ctx = Path(__file__).parent.parent / "templates" / "trip_context.md"
+    if trip_ctx.is_file():
+        text = trip_ctx.read_text(encoding="utf-8").strip()
+        if text:
+            parts.append(text)
+    # 2. 用户配置的 context
     if config.ai.context:
         parts.append(config.ai.context)
+    # 3. 临时覆写
     if context_override:
         parts.append(context_override)
     if not parts:

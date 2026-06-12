@@ -341,7 +341,7 @@ function _renderConfigForm(obj, path) {
     if (multiline) {
       let hint = '';
       if (path === 'ai.context') {
-        hint = '<br><span class="hint">项目背景信息，AI 将用于生成更贴合的分析结果和口播文案。留空不影响生成，可点击下方按钮一键添加模板。</span>';
+        hint = '<br><span class="hint">项目特定背景（如拍摄地点、行程安排），将追加到默认模板 <code>trip_context.md</code> 之后。留空则仅使用默认模板。</span>';
       }
       return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <textarea data-path="${path}" rows="4">${escapeHtml(obj)}</textarea>${hint}</label>`;
     }
