@@ -337,7 +337,7 @@ function _renderConfigForm(obj, path) {
     return `<label class="config-field config-num"><span class="config-key">${labelFromPath(path)}</span> <input type="number" data-path="${path}" step="${isInt ? '1' : 'any'}" value="${obj}"></label>`;
   }
   if (typeof obj === 'string') {
-    const multiline = obj.length > 80 || obj.includes('\n');
+    const multiline = path === 'ai.context' || obj.length > 80 || obj.includes('\n');
     if (multiline) {
       let hint = '';
       if (path === 'ai.context') {
