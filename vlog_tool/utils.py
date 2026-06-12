@@ -137,7 +137,10 @@ def get_duration_sec(video_path: Path, ffprobe: str) -> float:
         str(video_path),
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-    return float(result.stdout.strip())
+    raw = result.stdout.strip()
+    if raw in ("N/A", "inf", "-inf", ""):
+        raise ValueError(f"ffprobe 返回无效时长 '{raw}' for {video_path}")
+    return float(raw)
 
 
 def sanitize_name(text: str, max_len: int = 40) -> str:
