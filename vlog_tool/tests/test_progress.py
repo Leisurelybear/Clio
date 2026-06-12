@@ -65,11 +65,12 @@ class TestProgressTracker:
         assert data["eta_sec"] >= 0
 
     def test_eta_is_none_when_no_progress(self, tmp_path):
-        t = ProgressTracker(tmp_path)
-        t.update(phase="compress", total=10)
-        t.next()
+        with mock.patch("vlog_tool.progress.time.monotonic", return_value=42.0):
+            t = ProgressTracker(tmp_path)
+            t.update(phase="compress", total=10)
+            t.next()
         data = json.loads(t._path.read_text(encoding="utf-8"))
-        assert data.get("eta_sec") is None
+        assert data.get("eta_sec") is None  # elapsed = 0 → rate = 0 → eta = None
 
     def test_starts_at_zero(self, tmp_path):
         t = ProgressTracker(tmp_path)
