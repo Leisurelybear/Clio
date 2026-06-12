@@ -253,10 +253,8 @@ async function selectPlan(dayOverride) {
   state.currentEntity = 'plan';
   state.dirty = false;
   if (dayOverride) state.currentDay = dayOverride;
-  if (!state.plan) {
-    try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); }
-    catch (e) { state.plan = null; }
-  }
+  try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); }
+  catch (e) { state.plan = null; }
   updateSidebarDay();
   updateEntityUI();
   import('./editor.js').then(mod => mod.renderActiveTab());
