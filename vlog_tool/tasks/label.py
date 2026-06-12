@@ -9,7 +9,7 @@ from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.tasks._helpers import _eta_line
-from vlog_tool.utils import resolve_binary, run_ffmpeg
+from vlog_tool.utils import format_index, resolve_binary, run_ffmpeg
 
 
 def run_label_videos(config: AppConfig, tracker: ProgressTracker | None = None) -> None:
@@ -26,7 +26,11 @@ def run_label_videos(config: AppConfig, tracker: ProgressTracker | None = None) 
         elapsed_total = 0.0
         for i, json_file in enumerate(files, start=1):
             data = json.loads(json_file.read_text(encoding="utf-8"))
-            idx = data.get("index", json_file.stem[:3])
+            raw_idx = data.get("index")
+            try:
+                idx = format_index(int(raw_idx), config.naming.index_width) if raw_idx is not None else json_file.stem[:3]
+            except (ValueError, TypeError):
+                idx = json_file.stem[:3]
             compressed = None
             for f in config.compressed_dir.glob(f"{idx}_*"):
                 compressed = f
