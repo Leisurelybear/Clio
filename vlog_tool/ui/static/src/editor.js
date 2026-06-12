@@ -381,7 +381,15 @@ function renderConfig() {
     pane.innerHTML = '<p class="muted">配置数据不可用</p>';
     return;
   }
-  pane.innerHTML = `<div class="config-form">${_renderConfigForm(state.configRaw, '')}</div>`;
+  const isFallback = state.configRaw._config_source === 'global_fallback';
+  // 排除 meta 字段
+  const { _config_source, _needsConfigInit, ...configData } = state.configRaw;
+  pane.innerHTML = (isFallback ? `
+    <div class="config-fallback-warn" style="background:var(--warning-bg,#fff3cd);border:1px solid var(--warning-border,#ffc107);border-radius:6px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:flex-start;gap:8px;font-size:var(--text-sm);color:var(--text-primary)">
+      <span style="font-size:18px;line-height:1">⚠️</span>
+      <span>当前显示的是全局配置（回退）。该项目没有专属 <code>project.yaml</code>，修改将影响所有项目。建议<a href="#" onclick="initProjectConfig();return false" style="text-decoration:underline;color:var(--accent)">创建专属配置</a>。</span>
+    </div>
+  ` : '') + `<div class="config-form">${_renderConfigForm(configData, '')}</div>`;
   // bind change handlers
   pane.querySelectorAll('[data-path]').forEach(el => {
     const onchange = () => {

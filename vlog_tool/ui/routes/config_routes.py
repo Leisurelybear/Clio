@@ -50,18 +50,23 @@ def handle_get_config_raw(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     if not config_path or not config_path.is_file():
         return handler._send_json({"error": "config file not available"}, 500)
     proj_input = handler._resolve_project_input(qs)
-    # Non-default project lacking project.yaml => needs init
-    if proj_input != input_dir:
-        proj_yaml = proj_input / "project.yaml"
-        if not proj_yaml.is_file():
+    # Always try to load project.yaml if it exists (proj_input may equal default dir)
+    proj_yaml = proj_input / "project.yaml"
+    if not proj_yaml.is_file():
+        # Non-default project without project.yaml => needs init
+        if proj_input != input_dir:
             return handler._send_json({"needs_init": True})
+        proj_yaml = None
     # Return the merged effective config
     with open(config_path, encoding="utf-8") as f:
         raw = yaml.safe_load(f) or {}
-    if proj_input != input_dir:
+    if proj_yaml:
         with open(proj_yaml, encoding="utf-8") as f:
             project_raw = yaml.safe_load(f) or {}
         raw = deep_merge(raw, project_raw)
+        raw["_config_source"] = "project"
+    else:
+        raw["_config_source"] = "global_fallback"
     handler._send_json(raw)
 
 
@@ -76,13 +81,14 @@ def handle_put_config_raw(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
         return handler._send_json({"ok": False, "error": "config_path not available"}, 500)
     # Support ?project=X writing project-specific config
     proj_input = handler._resolve_project_input(qs)
-    if proj_input != input_dir:
-        target_path = proj_input / "project.yaml"
+    # 写 project.yaml（如果项目有专属配置、或在非默认目录下）
+    proj_yaml = proj_input / "project.yaml"
+    if proj_yaml.is_file() or proj_input != input_dir:
+        target_path = proj_yaml
         try:
             yml = yaml.dump(obj, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
         except Exception as e:
             return handler._send_json({"ok": False, "error": f"YAML serialization failed: {e}"}, 400)
-        # Full validation: write, load merged config, revert on failure
         orig_backup = target_path.read_bytes() if target_path.is_file() else None
         try:
             _save_atomic(target_path, yml.encode("utf-8"))
@@ -93,7 +99,6 @@ def handle_put_config_raw(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
             else:
                 target_path.unlink(missing_ok=True)
             return handler._send_json({"ok": False, "error": f"config validation failed: {e}"}, 400)
-        # Clear config cache for this project
         handler.__class__._config_cache.pop(str(proj_input.resolve()), None)
         return handler._send_json({"ok": True, "path": str(target_path)})
     # Global config.yaml write (original logic)
