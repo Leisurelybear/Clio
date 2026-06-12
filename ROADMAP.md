@@ -364,11 +364,18 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-035 | `sidebar.js:448` `pollRerunStatus` 在 `idle/running` 状态提前 return 无超时兜底，任务失败时进度 overlay 永久卡死 | 加 polling 超时（如 60s 无更新→显示错误并清理 overlay） | 🆕 |
 | B-036 | `compress.py:33-34` 目标码率 `8 * 1024 * 1024 * target_size_mb / duration * 0.92` 未扣音频流，有音频时输出文件超过 `target_size_mb` | `target_bits` 先扣音频估计值（如 128kbps），或仅在 `remove_audio` 时走 bitrate 模式 | 🆕 |
 | B-037 | `utils.py:139-140` `get_duration_sec` 不处理 ffprobe 输出 `"N/A"`，某些视频格式下 ValueError 无上下文 | 加 `try/except`，报错时附上文件路径 | 🆕 |
+| B-039 | `openai_compat.py:28` `httpx.Client` 在 `__init__` 创建后无 `close()`，长服务连接泄漏 | 在类中加 `__del__` 或显式 `close()` 方法 | 🆕 |
+| B-040 | `config.py:119` `_path()` 值为空时静默返回 `.`，忘记配置路径时对当前目录执行读写 | 值为空时 raise `ValueError` 而非返回 `.` | 🆕 |
+| B-041 | `file_service.py:46` `_save_atomic` 的 `.tmp` 文件名固定，多线程下两请求同时写同一文件互相覆盖 | 用 `tempfile.mkstemp` 或加进程 PID/随机后缀 | 🆕 |
 
 ### P3 — 长期
 
 | ID | 问题 | 修复思路 | 状态 |
 | --- | --- | --- | --- |
+| B-042 | `gemini.py:41` `_wait_for_file` 无超时，文件处理卡住时永久阻塞 | 加 `timeout` 参数与 `time.monotonic()` 超时检查 | 🆕 |
+| B-043 | `.githooks/pre-commit:21` `git add` 会误 stage 用户未打算提交的工作区修改 | 只 stage ruff 格式化的文件：`$RUFF format . && git diff --name-only --diff-filter=M` 前检查是否是 ruff 改的 | 🆕 |
+| B-044 | `_helpers.py:51` `_eta_line` `completed=0` 时固定显示 `1/total`，实际可能是第 3、4 条 | 用 `i` 替换硬编码的 `1` | 🆕 |
+| B-045 | `sidebar.js:177` 视频列表每次渲染都在 `document` 上堆积 `{ once: true }` click 监听器，关闭 dropdown 逻辑失效 | 改用事件委托 + 持久 handler，或渲染前 `removeEventListener` | 🆕 |
 | B-009 | AI 偶尔输出非纯 JSON，`extract_json` 解析失败 | 更精准提取合法 JSON（递归剥离 markdown） | |
 | B-011 | 新用户 `python main.py check` 误判失败（提示不够友好） | 优化 check 步骤提示信息 | |
 | B-010 | （待进一步确认） | — | |
