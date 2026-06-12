@@ -328,6 +328,9 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-012 | `_run()` 静默吞异常 — pipeline 失败 UI 无感知 | `except Exception: pass` → 写 progress.json error 状态 + 打印日志 | ✅ `9c73903` |
 | B-013 | `apply_run_paths` 直接修改入参 config 对象 | 返回新 config 或 `copy.deepcopy()` 再修改 | ✅ `9c73903` |
 | B-014 | `requirements.txt` 无版本号 — breaking change 风险 | `pip freeze` 锁版本，参考 R-009a | ✅ `requirements-locked.txt` |
+| B-021 | `cut.py:51` ffmpeg 用了 `-to` 语义上应为 `-t`（指定时长） | 改 `-to duration_sec` → `-t duration_sec` | 🆕 |
+| B-022 | `project_service.py:52` `_detect_steps` 中 `any(t.iterdir() for t in texts)` — iterdir() 生成器永远为 truthy，空目录也被判为 analyze 已完成 | 把 `any(t.iterdir() for t in texts)` 改成 `any(any(True for _ in t.iterdir()) for t in texts)` 即 `any(list(t.iterdir()))` | 🆕 |
+| B-023 | `routes/projects.py` 创建/写入 project.json 用 `write_text()` 绕过 `_save_atomic`，崩溃留损坏文件 | 改用 `_save_atomic` | 🆕 |
 
 ### P1 — 近期
 
@@ -337,6 +340,14 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-007 | venv 跨平台检测只认 Windows `Scripts/`，Linux 是 `bin/` | 同时兼容 `bin/` 和 `Scripts/` | |
 | B-015 | `project.yaml` 写入时只做了 YAML 格式校验，未跑 `_validate_config` | `do_PUT /api/config/raw?project=X` 写前做完整合并校验 | ✅ `9c73903` |
 | B-016 | `config.yaml` 里 `deepseek-v4-flash` 可能是无效模型名（AGENTS §8.4） | 确认实际可用模型名，更新 config 或加备注 | 🆕 |
+| B-024 | `cut.py:9` `parse_time_range` 不校验 end > start，AI 生成反向区间时 ffmpeg 静默出坏文件 | 解析后加 `if end <= start: raise ValueError(...)` | 🆕 |
+| B-025 | `tasks/cut.py:80-82` 找不到视频时的报错信息里 source 标签取反（说 compressed 实际找的是 original，反之亦然） | 修复三目运算：`'original' if source == 'original' else 'compressed'` | 🆕 |
+| B-026 | `tasks/plan.py:31` `int(raw_idx)` 无保护，文件名前缀非数字时抛未捕获 ValueError | 加 `try/except` 或 `isdigit()` 守卫 | 🆕 |
+| B-027 | `prompts.py:38-70` `PLAN_PROMPT` 用 `str.format()` 拼接含 `{...}` 的 JSON，AI 输出含 `{key}` 字段时 KeyError 崩溃 | 用 `.replace('{','{{').replace('}','}}')` 转义 clips_json，或改用 `string.Template` | 🆕 |
+| B-028 | `progress.py:42` `.with_suffix(".progress.tmp")` 在 `.progress.json` 上生成 `.progress.progress.tmp`，文件名错误 | 用 `Path(f"{self._path}.tmp")` 替代 `.with_suffix()` | 🆕 |
+| B-029 | `log.py:101-146` `_initialized` 全局标志无锁；`sys.stdout/stderr` 被替换后不可恢复，pytest 里破坏 capsys | 加 `threading.Lock()` 保护初始化，保存原始 stream 引用提供恢复方法 | 🆕 |
+| B-030 | `pyproject.toml:3` `build-backend` 引用 setuptools 私有 API `_legacy:_Backend`，升级即断 | 改用 `setuptools.backends._legacy:_Backend` → 实际为 `setuptools.build_meta:__legacy__` 或升级至 `setuptools>=64` 用标准后端 | 🆕 |
+| B-031 | `server.py:107-109` `_config_cache` 多线程无锁，两个线程同时取同一个未缓存 key 会同时 `load_config` | 加 `threading.Lock()` 保护，或用 `dict.setdefault` + 预计算 | 🆕 |
 
 ### P2 — 中期
 
@@ -346,6 +357,12 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-008 | 函数隐式修改入参（如 `analyze_video` 等修改传入的 dict 字段） | 入参 `deepcopy()` 避免副作用 | |
 | B-017 | `_find_texts_dirs` 匹配 `texts*` 太宽 — `texts_backup` 也会匹配 | 用更精确的 glob 或加排除规则 | 🆕 |
 | B-018 | `_config_cache` 只增不减（仅在 PUT config 时 pop） | 项目列表刷新时清理失效缓存 | 🆕 |
+| B-032 | `tasks/label.py:29-31` glob 时 idx 可能是整数 1 而非 `"001"`，导致文件匹配失败跳过处理 | `format_index(int(idx), config.naming.index_width)` 统一格式化后再 glob | 🆕 |
+| B-033 | `tasks/analyze.py:96` 批量 AI 分析失败直接中断整个批次；`run_refine_texts` 有 try/except/continue 容错而此处没有，行为不一致 | 给 `analyze_video()` 调用加 `try/except` + `continue`，记录失败继续下一个 | 🆕 |
+| B-034 | `routes/run.py` rerun 进度文件路径从 `cfg.paths.output_dir` 取，但 `GET /api/run/status` 从 `_project_output_dir()` 取，两个 output_dir 可能不一致导致前端轮询读不到进度 | 统一进度路径来源 | 🆕 |
+| B-035 | `sidebar.js:448` `pollRerunStatus` 在 `idle/running` 状态提前 return 无超时兜底，任务失败时进度 overlay 永久卡死 | 加 polling 超时（如 60s 无更新→显示错误并清理 overlay） | 🆕 |
+| B-036 | `compress.py:33-34` 目标码率 `8 * 1024 * 1024 * target_size_mb / duration * 0.92` 未扣音频流，有音频时输出文件超过 `target_size_mb` | `target_bits` 先扣音频估计值（如 128kbps），或仅在 `remove_audio` 时走 bitrate 模式 | 🆕 |
+| B-037 | `utils.py:139-140` `get_duration_sec` 不处理 ffprobe 输出 `"N/A"`，某些视频格式下 ValueError 无上下文 | 加 `try/except`，报错时附上文件路径 | 🆕 |
 
 ### P3 — 长期
 

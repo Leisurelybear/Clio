@@ -48,9 +48,7 @@ def _save_atomic(path: Path, data: bytes) -> None:
     os.replace(tmp, path)
 
 
-def _create_project_yaml(
-    proj_input: Path, config_path: Path | None, proj_out: Path
-) -> Path | None:
+def _create_project_yaml(proj_input: Path, config_path: Path | None, proj_out: Path) -> Path | None:
     """Create project.yaml from global config template, with paths adjusted to the project.
 
     Returns the project.yaml path, or None if no global config is available.
@@ -67,9 +65,7 @@ def _create_project_yaml(
         paths["input_dir"] = str(proj_input.resolve())
         paths["output_dir"] = str(proj_out.resolve())
         raw["paths"] = paths
-        yml = yaml.dump(
-            raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2
-        )
+        yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
         _save_atomic(target, yml.encode("utf-8"))
         return target
     except Exception:
@@ -84,11 +80,7 @@ def _list_drives() -> list[str]:
         import ctypes
 
         bitmask = ctypes.windll.kernel32.GetLogicalDrives()
-        return [
-            f"{d}:\\"
-            for d in string.ascii_uppercase
-            if bitmask & (1 << (ord(d) - ord("A")))
-        ]
+        return [f"{d}:\\" for d in string.ascii_uppercase if bitmask & (1 << (ord(d) - ord("A")))]
     except Exception:
         # fallback: traditional approach
         return [f"{d}:\\" for d in string.ascii_uppercase if Path(f"{d}:\\").is_dir()]
@@ -108,9 +100,7 @@ def _find_original_for_compressed(stem: str, input_dir: Path) -> str | None:
     return None
 
 
-def _find_compressed_for_original(
-    stem: str, comp_dir: Path
-) -> tuple[str, str] | None:
+def _find_compressed_for_original(stem: str, comp_dir: Path) -> tuple[str, str] | None:
     """For an original stem like 'GL010695', find the matching compressed file and
     its index. Returns (compressed_basename, index) or None if not found.
     """

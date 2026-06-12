@@ -1,5 +1,6 @@
 """Pipeline orchestration — imports all task functions from vlog_tool/tasks/.
-   All public symbols are re-exported for backward compatibility."""
+All public symbols are re-exported for backward compatibility."""
+
 from __future__ import annotations
 
 # Keep these orchestration-specific items in pipeline.py

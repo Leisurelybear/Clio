@@ -63,15 +63,11 @@ def _detect_steps(proj_output_dir: Path) -> dict[str, bool]:
     except (PermissionError, OSError):
         steps["plan"] = False
     try:
-        steps["label"] = (proj_output_dir / "labeled").is_dir() and any(
-            (proj_output_dir / "labeled").iterdir()
-        )
+        steps["label"] = (proj_output_dir / "labeled").is_dir() and any((proj_output_dir / "labeled").iterdir())
     except (PermissionError, OSError):
         steps["label"] = False
     try:
-        steps["cut"] = (proj_output_dir / "cuts").is_dir() and any(
-            (proj_output_dir / "cuts").iterdir()
-        )
+        steps["cut"] = (proj_output_dir / "cuts").is_dir() and any((proj_output_dir / "cuts").iterdir())
     except (PermissionError, OSError):
         steps["cut"] = False
     return steps

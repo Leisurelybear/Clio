@@ -77,9 +77,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                         "index": idx,
                         "text_json": (text_sidecars.get(idx) or [None])[0] if idx else None,
                         "script_json": (script_sidecars.get(idx) or [None])[0] if idx else None,
-                        "match": (
-                            {"source": "compressed", "file": comp[0], "index": comp[1]} if comp else None
-                        ),
+                        "match": ({"source": "compressed", "file": comp[0], "index": comp[1]} if comp else None),
                     }
                 )
     handler._send_json({"videos": videos, "source": source})

@@ -305,7 +305,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             if path == "/favicon.ico":
                 return handle_favicon(self)
             if path.startswith("/static/"):
-                rel = path[len("/static/"):]
+                rel = path[len("/static/") :]
                 return handle_static(self, rel)
 
             if path == "/api/config":
@@ -451,4 +451,5 @@ def run(
 
 def _open_browser(url: str) -> None:
     import webbrowser
+
     webbrowser.open(url)

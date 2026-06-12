@@ -42,7 +42,9 @@ def handle_get_config(handler: BaseHTTPRequestHandler, qs: dict) -> None:
 def handle_get_config_raw(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     """Handle GET /api/config/raw."""
 
-    config_path = handler.server.config_path if hasattr(handler.server, "config_path") else getattr(handler, "config_path", None)
+    config_path = (
+        handler.server.config_path if hasattr(handler.server, "config_path") else getattr(handler, "config_path", None)
+    )
     input_dir = handler.server.input_dir if hasattr(handler.server, "input_dir") else handler.input_dir
 
     if not config_path or not config_path.is_file():
@@ -65,7 +67,9 @@ def handle_get_config_raw(handler: BaseHTTPRequestHandler, qs: dict) -> None:
 
 def handle_put_config_raw(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
     """Handle PUT /api/config/raw."""
-    config_path = handler.server.config_path if hasattr(handler.server, "config_path") else getattr(handler, "config_path", None)
+    config_path = (
+        handler.server.config_path if hasattr(handler.server, "config_path") else getattr(handler, "config_path", None)
+    )
     input_dir = handler.server.input_dir if hasattr(handler.server, "input_dir") else handler.input_dir
 
     if not config_path:
@@ -105,9 +109,7 @@ def handle_put_config_raw(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
         return handler._send_json({"ok": False, "error": f"YAML serialization failed: {e}"}, 400)
     tmp_path: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(
-            mode="wb", suffix=".yaml", delete=False, dir=str(config_path.parent)
-        ) as tmp:
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".yaml", delete=False, dir=str(config_path.parent)) as tmp:
             tmp.write(yml.encode("utf-8"))
             tmp_path = Path(tmp.name)
         load_config(tmp_path)
@@ -123,12 +125,16 @@ def handle_put_config_raw(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
 
 def handle_post_config_init(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
     """Handle POST /api/config/init."""
-    config_path = handler.server.config_path if hasattr(handler.server, "config_path") else getattr(handler, "config_path", None)
+    config_path = (
+        handler.server.config_path if hasattr(handler.server, "config_path") else getattr(handler, "config_path", None)
+    )
     input_dir = handler.server.input_dir if hasattr(handler.server, "input_dir") else handler.input_dir
 
     proj_input = handler._resolve_project_input(qs)
     if proj_input == input_dir:
-        return handler._send_json({"ok": False, "error": "default project already has config.yaml, no init needed"}, 400)
+        return handler._send_json(
+            {"ok": False, "error": "default project already has config.yaml, no init needed"}, 400
+        )
     proj_out = _project_output_dir(proj_input)
     result = _create_project_yaml(proj_input, config_path, proj_out)
     if result is None:
