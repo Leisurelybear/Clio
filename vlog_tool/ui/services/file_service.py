@@ -65,7 +65,7 @@ def _create_project_yaml(proj_input: Path, config_path: Path | None, proj_out: P
         paths["input_dir"] = str(proj_input.resolve())
         paths["output_dir"] = str(proj_out.resolve())
         raw["paths"] = paths
-        # 确保 ai.context 字段存在（默认空字符串，不影响 AI 输出）
+        # 默认项目背景模板（不含特定内容，用户可编辑，留空也不影响生成）
         raw.setdefault("ai", {})
         raw["ai"].setdefault("context", "")
         yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
