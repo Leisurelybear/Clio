@@ -96,6 +96,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         _run_lock = threading.Lock()
         _run_thread: threading.Thread | None = None
         _config_cache: dict[str, AppConfig] = {}
+        _config_cache_lock = threading.Lock()
         DEFAULT_PROJECT: dict = {}
         server: Any  # set by HTTPServer
 
@@ -104,10 +105,11 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             if project_input is None:
                 return config
             key = str(project_input.resolve())
-            cache = self.__class__._config_cache
-            if key not in cache:
-                cache[key] = load_config(config_path, project_dir=project_input)
-            return cache[key]
+            with self.__class__._config_cache_lock:
+                cache = self.__class__._config_cache
+                if key not in cache:
+                    cache[key] = load_config(config_path, project_dir=project_input)
+                return cache[key]
 
         def log_message(self, fmt, *args):
             print(f"  [serve] {self.address_string()} - {fmt % args}")
