@@ -376,6 +376,18 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-043 | `.githooks/pre-commit:21` `git add` 会误 stage 用户未打算提交的工作区修改 | 只 stage ruff 格式化的文件：`$RUFF format . && git diff --name-only --diff-filter=M` 前检查是否是 ruff 改的 | 🆕 |
 | B-044 | `_helpers.py:51` `_eta_line` `completed=0` 时固定显示 `1/total`，实际可能是第 3、4 条 | 用 `i` 替换硬编码的 `1` | 🆕 |
 | B-045 | `sidebar.js:177` 视频列表每次渲染都在 `document` 上堆积 `{ once: true }` click 监听器，关闭 dropdown 逻辑失效 | 改用事件委托 + 持久 handler，或渲染前 `removeEventListener` | 🆕 |
+
+## 测试覆盖盲区
+
+| ID | 优先级 | 问题 | 说明 | 状态 |
+| --- | --- | --- | --- | --- |
+| B-046 | 高 | `with_retry`（AI 重试核心路径）完全无测试 | `utils.py` 核心重试逻辑无任何测试覆盖 | 🆕 |
+| B-047 | 高 | `cut_one`（ffmpeg 包装主体）完全无测试；AGENTS.md 声称已测试 | AGENTS.md 说 38 tests "cut_one" 实际只有 `parse_time_range` / `_to_seconds` | 🆕 |
+| B-048 | 高 | `_TeeWriter` / `setup_logging` 无测试；AGENTS.md 声称已测试 | AGENTS.md 说 test_log.py 含 TeeWriter，实际 16 个 test 全是 format_size/format_duration | 🆕 |
+| B-049 | 中 | `ProgressTracker.log()` 方法及 logs 截断逻辑无测试 | log()/日志截断等核心方法零覆盖 | 🆕 |
+| B-050 | 中 | `discover_ffmpeg_bin` / `resolve_binary` 无测试 | 跨平台路径发现逻辑零覆盖 | 🆕 |
+| B-051 | 中 | `test_progress.py` ETA 测试依赖 `time.sleep(0.05)` | CI 高负载下不稳定，应改用 mock 或注入时间 | 🆕 |
+| B-052 | 中 | `test_progress.py:67` ETA 断言只检查 key 存在，不验证值为 None | 意图完全没被验证，`assert data.get("eta_sec") is None` 更准确 | 🆕 |
 | B-009 | AI 偶尔输出非纯 JSON，`extract_json` 解析失败 | 更精准提取合法 JSON（递归剥离 markdown） | |
 | B-011 | 新用户 `python main.py check` 误判失败（提示不够友好） | 优化 check 步骤提示信息 | |
 | B-010 | （待进一步确认） | — | |
