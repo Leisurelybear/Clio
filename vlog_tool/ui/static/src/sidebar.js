@@ -154,7 +154,8 @@ function renderVideoList() {
       <div class="video-actions">
         <button class="menu-btn" title="操作">⋮</button>
         <div class="menu-dropdown">
-          <button class="menu-item" data-action="texts" title="调用 AI 重新分析视频内容，生成分段描述、高光时刻等">重跑文字分析</button>
+          <button class="menu-item" data-action="compress" title="用 ffmpeg 重新压缩原视频为 640p">压缩视频</button>
+          <button class="menu-item" data-action="analyze" title="调用 AI 重新分析视频内容，生成分段描述、高光时刻等">AI分析视频</button>
           <button class="menu-item" data-action="voiceover" title="基于分析结果，重新用 AI 生成口播解说文案">重跑口播文案</button>
           <button class="menu-item" data-action="all" title="依次重跑文字分析 + 口播文案">重跑全部</button>
         </div>

@@ -397,6 +397,9 @@ aside, section { overflow-y: auto; }
 .run-step input[type="checkbox"] { width: auto !important; margin-top: 3px !important; accent-color: var(--accent); }
 .run-step-label { font-weight: 500; color: var(--text-primary); min-width: 110px; font-size: var(--text-sm); }
 .run-step-hint { font-size: var(--text-xs); color: var(--text-tertiary); }
+.run-step-disabled { opacity: 0.45; cursor: not-allowed; }
+.run-step-disabled:hover { background: transparent; border-color: var(--border); }
+.run-step-disabled .run-step-label { color: var(--text-muted); }
 
 /* ── Cut Section ───────────────────────────────────────────── */
 .cut-section { margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border); }

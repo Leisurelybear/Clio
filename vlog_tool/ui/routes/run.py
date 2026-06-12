@@ -9,7 +9,7 @@ import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from vlog_tool.pipeline import run_analyze_all, run_generate_scripts, run_pipeline_steps
+from vlog_tool.pipeline import run_analyze_all, run_compress_all, run_generate_scripts, run_pipeline_steps
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.ui.services.file_service import _find_original_for_compressed, _find_texts_dirs
 from vlog_tool.ui.services.project_service import _project_output_dir
@@ -61,10 +61,13 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
 
     video_basename = (obj.get("video") or "").strip()
     task = (obj.get("task") or "").strip()
-    if not video_basename or task not in ("texts", "voiceover", "all"):
+    if not video_basename or task not in ("compress", "analyze", "texts", "voiceover", "all"):
         return handler._send_json(
-            {"ok": False, "error": "requires video (filename) and task (texts|voiceover|all)"}, 400
+            {"ok": False, "error": "requires video (filename) and task (compress|analyze|texts|voiceover|all)"}, 400
         )
+    # 向后兼容
+    if task == "texts":
+        task = "analyze"
     if handler._run_thread is not None and handler._run_thread.is_alive():
         return handler._send_json({"ok": False, "error": "a task is already running"}, 409)
 
@@ -113,12 +116,16 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
 
         try:
             _log(f"▶ Starting rerun {task} — {video_basename}")
-            if task in ("texts", "all"):
-                _log("Step 1/2: analyzing video...")
+            if task in ("compress", "all"):
+                _log("Step: compressing video...")
+                run_compress_all(cfg, tracker=tracker, single_file=original_video)
+                _log("✓ compression complete")
+            if task in ("analyze", "all"):
+                _log("Step: AI analyzing video...")
                 run_analyze_all(cfg, tracker=tracker, single_file=original_video)
                 _log("✓ analysis complete")
             if task in ("voiceover", "all"):
-                _log("Step 2/2: generating voiceover script...")
+                _log("Step: generating voiceover script...")
                 run_generate_scripts(cfg, tracker=tracker, single_file=texts_json)
                 _log("✓ voiceover generation complete")
             tracker.done(f"{task} → {video_basename} complete")
