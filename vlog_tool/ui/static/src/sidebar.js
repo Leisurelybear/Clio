@@ -180,6 +180,7 @@ function renderVideoList() {
         dropdown.style.position = 'fixed';
         dropdown.style.top = (rect.bottom + 4) + 'px';
         dropdown.style.right = 'auto';
+        dropdown.style.zIndex = '1000';
         dropdown.style.left = Math.max(4, rect.right - dropdown.offsetWidth) + 'px';
       } else {
         _resetDropdownPosition(dropdown);
@@ -229,6 +230,7 @@ function _resetDropdownPosition(dropdown) {
   dropdown.style.top = '';
   dropdown.style.right = '';
   dropdown.style.left = '';
+  dropdown.style.zIndex = '';
 }
 
 // ── Selection ──────────────────────────────────────────────────
