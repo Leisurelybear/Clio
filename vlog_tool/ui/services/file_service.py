@@ -43,7 +43,7 @@ def _save_atomic(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists() and not path.with_suffix(path.suffix + ".bak").exists():
         shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
-    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp = path.with_suffix(path.suffix + f".tmp.{os.urandom(4).hex()}")
     tmp.write_bytes(data)
     os.replace(tmp, path)
 
