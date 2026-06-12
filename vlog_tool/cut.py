@@ -48,7 +48,7 @@ def cut_one(
         str(start_sec),
         "-i",
         str(video_path),
-        "-to",
+        "-t",
         str(duration_sec),
     ]
     if reencode:
