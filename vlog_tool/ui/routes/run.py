@@ -100,11 +100,12 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
         video_basename=video_basename,
         original_video=original_video,
         texts_json=texts_json,
+        proj_out=proj_out,
     ):
         # Deep-copy config, force redo (user clicked rerun => regenerate everything)
         cfg = copy.deepcopy(cfg)
         cfg.analyze.skip_existing = False
-        tracker = ProgressTracker(cfg.paths.output_dir, rerun=True, rerun_video=video_basename)
+        tracker = ProgressTracker(proj_out, rerun=True, rerun_video=video_basename)
 
         def _log(msg: str) -> None:
             print(f"  [rerun] {msg}")
