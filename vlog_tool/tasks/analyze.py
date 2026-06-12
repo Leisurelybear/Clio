@@ -93,7 +93,13 @@ def run_analyze_all(
             if tracker:
                 tracker.update(phase="analyze", current=i, message=f"分析 {compressed.name}...")
             t0 = time.monotonic()
-            analysis = analyze_video(str(compressed), config)
+            try:
+                analysis = analyze_video(str(compressed), config)
+            except Exception as e:
+                print(f"  [错误] 分析 {compressed.name} 失败: {e}")
+                if tracker:
+                    tracker.log(f"分析 {compressed.name} 失败: {e}")
+                continue
             elapsed_total += time.monotonic() - t0
             completed += 1
             analysis["index"] = idx_val
