@@ -78,7 +78,7 @@ def run_cut_all(
             video_path = _resolve_video_path(idx)
             if video_path is None:
                 print(
-                    f"  [跳过] 找不到 index={idx} 的视频（{'compressed' if source == 'original' else 'video_dir'}）: {seg.get('title', '')}"
+                    f"  [跳过] 找不到 index={idx} 的视频（{'original' if source == 'original' else 'compressed'}）: {seg.get('title', '')}"
                 )
                 continue
 
