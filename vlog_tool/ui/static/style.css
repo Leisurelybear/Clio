@@ -369,9 +369,11 @@ aside, section { overflow-y: auto; }
 }
 .config-form input:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-bg); }
 .config-form input[type="checkbox"] { margin: 0; width: 16px; height: 16px; accent-color: var(--accent); }
+.config-form .config-field:has(textarea) { flex-direction: column; align-items: stretch; }
+.config-form .config-field:has(textarea) .config-key { margin-bottom: 4px; }
 .config-form textarea {
-  flex: 1; background: var(--bg-surface); color: var(--text-primary);
-  border: 1px solid var(--border); padding: 4px 8px;
+  width: 100%; min-height: 60px; background: var(--bg-surface); color: var(--text-primary);
+  border: 1px solid var(--border); padding: 6px 8px;
   border-radius: var(--radius-sm); font: inherit; font-size: var(--text-base);
   resize: vertical; line-height: 1.5; transition: border-color var(--transition-fast);
 }
