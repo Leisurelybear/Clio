@@ -31,7 +31,9 @@ def compress_video(
 
     if cfg.target_size_mb > 0:
         target_bits = cfg.target_size_mb * 8 * 1024 * 1024
-        video_bitrate = max(int(target_bits / duration * 0.92), 100_000)
+        if not cfg.remove_audio:
+            target_bits -= int(128_000 * duration * 1.05)  # 预留 128kbps 音频 + 5% 余量
+        video_bitrate = max(int(target_bits / duration * 0.95), 100_000)
         args.extend(
             [
                 "-b:v",
