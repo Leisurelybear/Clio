@@ -407,6 +407,8 @@ async function loadBrowseDir(path) {
 
 /* ── Rerun progress overlay (single-video rerun) ── */
 let _rerunPollTimer = null;
+let _rerunPollStart = 0;
+const RERUN_POLL_TIMEOUT = 120_000; // 120s without terminal state = give up
 
 function showRerunProgress(task, file) {
   const overlay = $('rerun-overlay');
@@ -424,6 +426,7 @@ function showRerunProgress(task, file) {
 
   // Start polling
   if (_rerunPollTimer) clearInterval(_rerunPollTimer);
+  _rerunPollStart = Date.now();
   _rerunPollTimer = setInterval(() => pollRerunStatus(task, file), 1500);
   pollRerunStatus(task, file);
 }
@@ -439,13 +442,35 @@ function hideRerunProgress() {
   }
 }
 
+function _rerunPollError(statusEl, label, msg) {
+  const overlay = $('rerun-overlay');
+  if (!overlay) return;
+  overlay.dataset.active = 'false';
+  if (_rerunPollTimer) { clearInterval(_rerunPollTimer); _rerunPollTimer = null; }
+  if (statusEl) statusEl.innerHTML = `<span class="err">✗ ${escapeHtml(label)}</span>`;
+  setStatus(msg, 'err');
+  setTimeout(hideRerunProgress, 8000);
+}
+
 async function pollRerunStatus(task, file) {
   const overlay = $('rerun-overlay');
   if (!overlay || overlay.dataset.active !== 'true') return;
 
   try {
     const s = await api('GET', '/api/run/status');
-    if (s.status === 'idle' || s.status === 'unknown') return;
+
+    // Timeout: no terminal state within RERUN_POLL_TIMEOUT
+    if (Date.now() - _rerunPollStart > RERUN_POLL_TIMEOUT) {
+      return _rerunPollError(statusEl, '超时', '重跑超时，请检查后端状态');
+    }
+
+    // Idle before first progress: task may have failed to start
+    if (s.status === 'idle' || s.status === 'unknown') {
+      if (Date.now() - _rerunPollStart > 10_000) {
+        return _rerunPollError(statusEl, '未启动', '重跑任务未启动');
+      }
+      return;
+    }
 
     const fill = overlay.querySelector('.rerun-progress-fill');
     const statusEl = overlay.querySelector('.rerun-status');
