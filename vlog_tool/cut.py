@@ -14,9 +14,7 @@ def parse_time_range(range_str: str) -> tuple[float, float]:
     start = _to_seconds(parts[0].strip())
     end = _to_seconds(parts[1].strip())
     if end <= start:
-        raise ValueError(
-            f"end ({parts[1].strip()}) 必须大于 start ({parts[0].strip()})"
-        )
+        raise ValueError(f"end ({parts[1].strip()}) 必须大于 start ({parts[0].strip()})")
     return start, end
 
 
