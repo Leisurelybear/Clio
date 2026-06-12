@@ -39,7 +39,7 @@ class ProgressTracker:
 
     def _flush(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self._path.with_suffix(".progress.tmp")
+        tmp = self._path.parent / (self._path.name + ".tmp")
         tmp.write_text(json.dumps(self._data, ensure_ascii=False), encoding="utf-8")
         tmp.replace(self._path)
 
