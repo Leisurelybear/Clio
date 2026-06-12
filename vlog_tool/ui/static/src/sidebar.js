@@ -171,7 +171,7 @@ function renderVideoList() {
     menuBtn.onclick = (e) => {
       e.stopPropagation();
       // close all other dropdowns first
-      document.querySelectorAll('.menu-dropdown.open').forEach(d => { if (d !== dropdown) { d.classList.remove('open'); d.style.position = ''; d.style.top = ''; d.style.left = ''; } });
+      document.querySelectorAll('.menu-dropdown.open').forEach(d => { if (d !== dropdown) { d.classList.remove('open'); d.style.position = ''; d.style.top = ''; d.style.right = ''; d.style.left = ''; } });
       const wasOpen = dropdown.classList.contains('open');
       dropdown.classList.toggle('open');
       if (dropdown.classList.contains('open') && !wasOpen) {
@@ -179,20 +179,17 @@ function renderVideoList() {
         const rect = menuBtn.getBoundingClientRect();
         dropdown.style.position = 'fixed';
         dropdown.style.top = (rect.bottom + 4) + 'px';
+        dropdown.style.right = 'auto';
         dropdown.style.left = Math.max(4, rect.right - dropdown.offsetWidth) + 'px';
       } else {
-        dropdown.style.position = '';
-        dropdown.style.top = '';
-        dropdown.style.left = '';
+        _resetDropdownPosition(dropdown);
       }
     };
     // close on click outside
     const closeDropdownFn = () => {
       if (dropdown.classList.contains('open')) {
         dropdown.classList.remove('open');
-        dropdown.style.position = '';
-        dropdown.style.top = '';
-        dropdown.style.left = '';
+        _resetDropdownPosition(dropdown);
       }
     };
     document.addEventListener('click', closeDropdownFn, { once: true });
@@ -201,7 +198,7 @@ function renderVideoList() {
       item.onclick = async (e) => {
         e.stopPropagation();
         dropdown.classList.remove('open');
-        dropdown.style.position = ''; dropdown.style.top = ''; dropdown.style.left = '';
+        _resetDropdownPosition(dropdown);
         const task = item.dataset.action;
         const file = v.file;
         setStatus(`正在重跑 ${task} (${file})...`, 'ok');
@@ -225,6 +222,13 @@ function renderVideoList() {
     });
     ul.appendChild(li);
   }
+}
+
+function _resetDropdownPosition(dropdown) {
+  dropdown.style.position = '';
+  dropdown.style.top = '';
+  dropdown.style.right = '';
+  dropdown.style.left = '';
 }
 
 // ── Selection ──────────────────────────────────────────────────
