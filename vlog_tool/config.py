@@ -118,7 +118,7 @@ class AppConfig:
 
 def _path(value: str | None, base: Path | None = None) -> Path:
     if not value:
-        return Path(".")
+        raise ValueError("路径不能为空")
     path = Path(value)
     if base and not path.is_absolute():
         return (base / path).resolve()

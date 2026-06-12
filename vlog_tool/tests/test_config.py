@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+
+import pytest
 from typing import TYPE_CHECKING
 
 import pytest
@@ -80,12 +82,13 @@ class TestDeepMerge:
 
 
 class TestPath:
-    def test_none_returns_dot(self):
-        # _path(None) returns unresolved Path(".")
-        assert str(_path(None)) == "."
+    def test_none_raises(self):
+        with pytest.raises(ValueError, match="路径不能为空"):
+            _path(None)
 
-    def test_empty_returns_dot(self):
-        assert str(_path("")) == "."
+    def test_empty_raises(self):
+        with pytest.raises(ValueError, match="路径不能为空"):
+            _path("")
 
     def test_absolute_path(self):
         result = _path("/some/absolute/path")
