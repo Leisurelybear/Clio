@@ -340,12 +340,10 @@ function _renderConfigForm(obj, path) {
     const multiline = obj.length > 80 || obj.includes('\n');
     if (multiline) {
       let hint = '';
-      let placeholder = '';
       if (path === 'ai.context') {
-        hint = '<br><span class="hint">项目背景描述（如拍摄地点、行程安排、人物关系），AI 将用于生成更贴合内容的分析结果和口播文案。留空不影响生成。</span>';
-        placeholder = ' placeholder="在此填写项目背景信息，留空则 AI 仅根据视频画面分析..."';
+        hint = '<br><span class="hint">项目背景信息，AI 将用于生成更贴合的分析结果和口播文案。留空不影响生成，可点击下方按钮一键添加模板。</span>';
       }
-      return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <textarea data-path="${path}" rows="4"${placeholder}>${escapeHtml(obj)}</textarea>${hint}</label>`;
+      return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <textarea data-path="${path}" rows="4">${escapeHtml(obj)}</textarea>${hint}</label>`;
     }
     const isPwd = path.endsWith('api_key') || path.endsWith('api_key_env');
     return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <input type="${isPwd ? 'password' : 'text'}" data-path="${path}" value="${escapeHtml(obj)}"></label>`;
@@ -396,6 +394,23 @@ function renderConfig() {
       <span>当前显示的是全局配置（回退）。该项目没有专属 <code>project.yaml</code>，修改将影响所有项目。建议<a href="#" onclick="initProjectConfig();return false" style="text-decoration:underline;color:var(--accent)">创建专属配置</a>。</span>
     </div>
   ` : '') + `<div class="config-form">${_renderConfigForm(configData, '')}</div>`;
+  // ai.context 空时显示"添加默认模板"按钮
+  const ctxTextarea = pane.querySelector('textarea[data-path="ai.context"]');
+  if (ctxTextarea && !ctxTextarea.value.trim()) {
+    const btn = document.createElement('button');
+    btn.className = 'btn-primary';
+    btn.style.cssText = 'margin-top:6px;font-size:var(--text-sm);padding:5px 12px;';
+    btn.innerHTML = `${icon('plus', 14)} 添加默认模板`;
+    btn.onclick = () => {
+      const template = '## 项目背景\n- 拍摄地点：[填写拍摄地点]\n- 行程安排：[填写行程安排]\n- 人物/事件：[填写人物或事件]\n- 注意事项：[填写注意事项]\n\n请根据以上信息调整 AI 的分析和口播生成方向。';
+      ctxTextarea.value = template;
+      setDeep(state.configRaw, 'ai.context', template);
+      markDirty();
+      btn.remove();
+    };
+    ctxTextarea.parentNode.appendChild(btn);
+  }
+
   // bind change handlers
   pane.querySelectorAll('[data-path]').forEach(el => {
     const onchange = () => {
