@@ -339,8 +339,13 @@ function _renderConfigForm(obj, path) {
   if (typeof obj === 'string') {
     const multiline = obj.length > 80 || obj.includes('\n');
     if (multiline) {
-      const hint = path === 'ai.context' ? '<br><span class="hint">项目背景描述，AI 将基于此内容生成更贴合的分析结果和口播文案</span>' : '';
-      return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <textarea data-path="${path}" rows="4">${escapeHtml(obj)}</textarea>${hint}</label>`;
+      let hint = '';
+      let placeholder = '';
+      if (path === 'ai.context') {
+        hint = '<br><span class="hint">项目背景描述（如拍摄地点、行程安排、人物关系），AI 将用于生成更贴合内容的分析结果和口播文案。留空不影响生成。</span>';
+        placeholder = ' placeholder="在此填写项目背景信息，留空则 AI 仅根据视频画面分析..."';
+      }
+      return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <textarea data-path="${path}" rows="4"${placeholder}>${escapeHtml(obj)}</textarea>${hint}</label>`;
     }
     const isPwd = path.endsWith('api_key') || path.endsWith('api_key_env');
     return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <input type="${isPwd ? 'password' : 'text'}" data-path="${path}" value="${escapeHtml(obj)}"></label>`;
