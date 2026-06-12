@@ -67,6 +67,9 @@ def handle_get_config_raw(handler: BaseHTTPRequestHandler, qs: dict) -> None:
         raw["_config_source"] = "project"
     else:
         raw["_config_source"] = "global_fallback"
+    # 确保 ai.context 始终存在（前端需要该字段渲染编辑框）
+    raw.setdefault("ai", {})
+    raw["ai"].setdefault("context", "")
     handler._send_json(raw)
 
 
