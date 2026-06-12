@@ -65,6 +65,13 @@ def _create_project_yaml(proj_input: Path, config_path: Path | None, proj_out: P
         paths["input_dir"] = str(proj_input.resolve())
         paths["output_dir"] = str(proj_out.resolve())
         raw["paths"] = paths
+        # 自动添加默认 ai.context（如果没有）
+        if "ai" not in raw or "context" not in raw.get("ai", {}):
+            raw.setdefault("ai", {})["context"] = (
+                "## 项目背景\n"
+                "请在此处填写项目的背景信息，例如：拍摄地点、行程安排、人物关系等。\n"
+                "AI 将基于此背景信息生成更贴合项目的分析结果和口播文案。\n"
+            )
         yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
         _save_atomic(target, yml.encode("utf-8"))
         return target
