@@ -19,6 +19,8 @@ const RUN_STEPS = [
 ];
 
 function renderRun() {
+  // 从 state 同步当前分集（避免残留 done 处理器把 day 覆写成硬编码默认值）
+  _lastRunDay = state.currentDay || 'day1';
   const pane = $('tab-run');
   const stepChecks = RUN_STEPS.map(s => `
     <label class="run-step">
