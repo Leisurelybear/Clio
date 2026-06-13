@@ -50,6 +50,7 @@ async function loadPlans() {
 async function loadVideos() {
   const r = await api('GET', `/api/videos?source=${state.source}`);
   state.videos = r.videos;
+  state.groups = r.groups || {};
   $('video-count').textContent = `(${state.videos.length})`;
   renderVideoList();
 }
@@ -97,14 +98,101 @@ function renderSteps() {
   }
 }
 
+function renderVideoItem(v) {
+  const li = document.createElement('li');
+  li.className = 'video-item';
+  if (state.currentVideo === v.file) li.classList.add('active');
+  if (!v.match) li.classList.add('no-match');
+
+  let display = v.file.replace(/^\d+_/, '');
+  if (v.segment_label) {
+    display = display.replace(/_seg\d+$/i, '') + ` [seg ${v.segment_label}]`;
+  }
+
+  const tCls = v.text_json ? 'has' : 'miss';
+  const sCls = v.script_json ? 'has' : 'miss';
+  const tLabel = v.text_json ? `${icon('check', 12)} texts` : '· texts';
+  const sLabel = v.script_json ? `${icon('check', 12)} voiceover` : '· voiceover';
+  const counterpartLabel = state.source === 'compressed' ? '原' : '压';
+  const matchBadge = v.match
+    ? `<span class="match-badge" title="${escapeHtml(v.match.file)}">→ ${counterpartLabel}: ${escapeHtml(v.match.file)}</span>`
+    : `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
+  li.innerHTML = `
+    <div class="video-name">${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)} ${matchBadge}</div>
+    <div class="video-meta">
+      <span class="${tCls}">${tLabel}</span>
+      &nbsp;
+      <span class="${sCls}">${sLabel}</span>
+    </div>
+    <div class="video-actions">
+      <button class="menu-btn" title="操作">⋮</button>
+      <div class="menu-dropdown">
+        ${state.source === 'original'
+          ? `<button class="menu-item" data-action="compress" title="用 ffmpeg 将原视频压缩为 640p">压缩视频</button>
+             <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">AI分析视频</button>
+             <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑口播文案</button>
+             <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑全部</button>`
+          : `<button class="menu-item" data-action="compress" disabled style="opacity:0.4" title="视频已压缩">压缩视频</button>
+             <button class="menu-item" data-action="analyze" title="调用 AI 重新分析视频内容">AI分析视频</button>
+             <button class="menu-item" data-action="voiceover" title="基于分析结果，重新用 AI 生成口播解说文案">重跑口播文案</button>
+             <button class="menu-item" data-action="all" title="依次执行 AI 分析 + 口播文案">重跑全部</button>`
+        }
+      </div>
+    </div>
+  `;
+
+  li.onclick = (e) => {
+    if (e.target.closest('.video-actions')) return;
+    selectVideo(v.file);
+  };
+
+  // ── Dot-menu toggle (portal 方案：移到 body 下逃逸侧栏) ──
+  const menuBtn = li.querySelector('.menu-btn');
+  const dropdown = li.querySelector('.menu-dropdown');
+  menuBtn.onclick = (e) => {
+    e.stopPropagation();
+    if (_portalDropdown) { _portalDropdown.remove(); _portalDropdown = null; }
+    const rect = menuBtn.getBoundingClientRect();
+    const clone = dropdown.cloneNode(true);
+    clone.classList.add('open');
+    clone.style.cssText = 'position:fixed;top:' + (rect.bottom + 4) + 'px;right:auto;left:' + Math.max(4, rect.right - 160) + 'px;z-index:10000;min-width:160px;width:auto;';
+    document.body.appendChild(clone);
+    _portalDropdown = clone;
+    clone.querySelectorAll('.menu-item').forEach(item => {
+      item.onclick = async (ev) => {
+        ev.stopPropagation(); if (item.disabled) return;
+        clone.remove(); _portalDropdown = null;
+        const task = item.dataset.action;
+        const file = v.file;
+        setStatus(`正在重跑 ${task} (${file})...`, 'ok');
+        try {
+          const r = await api('POST', '/api/rerun', {
+            video: file, task: task, source: state.source, index: v.index || undefined,
+          });
+          if (r.ok) { setStatus(r.message || `${task} 已启动`, 'ok'); showRerunProgress(task, file); }
+          else { throw new Error(r.error || '重跑失败'); }
+        } catch (e) { setStatus('重跑失败: ' + e.message, 'err'); }
+      };
+    });
+    setTimeout(() => {
+      document.addEventListener('click', function closePortal(ev) {
+        if (_portalDropdown && !_portalDropdown.contains(ev.target) && ev.target !== menuBtn) {
+          _portalDropdown.remove(); _portalDropdown = null;
+          document.removeEventListener('click', closePortal);
+        }
+      });
+    }, 0);
+  };
+
+  return li;
+}
+
 function renderVideoList() {
   const ul = $('video-list');
   ul.innerHTML = '';
   if (!state.videos.length) {
-    // Detect if in compressed view and no videos exist — check if original has videos
     const isCompressedEmpty = state.source === 'compressed';
     if (isCompressedEmpty) {
-      // Switch to original view briefly to see if there are original videos
       ul.innerHTML = `
         <li class="empty-state">
           ${icon('folder', 36)}
@@ -130,87 +218,49 @@ function renderVideoList() {
     }
     return;
   }
-  for (const v of state.videos) {
-    const li = document.createElement('li');
-    li.className = 'video-item';
-    if (state.currentVideo === v.file) li.classList.add('active');
-    if (!v.match) li.classList.add('no-match');
-    const display = v.file.replace(/^\d+_/, '');
-    const tCls = v.text_json ? 'has' : 'miss';
-    const sCls = v.script_json ? 'has' : 'miss';
-    const tLabel = v.text_json ? `${icon('check', 12)} texts` : '· texts';
-    const sLabel = v.script_json ? `${icon('check', 12)} voiceover` : '· voiceover';
-    const counterpartLabel = state.source === 'compressed' ? '原' : '压';
-    const matchBadge = v.match
-      ? `<span class="match-badge" title="${escapeHtml(v.match.file)}">→ ${counterpartLabel}: ${escapeHtml(v.match.file)}</span>`
-      : `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
-    li.innerHTML = `
-      <div class="video-name">${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)} ${matchBadge}</div>
-      <div class="video-meta">
-        <span class="${tCls}">${tLabel}</span>
-        &nbsp;
-        <span class="${sCls}">${sLabel}</span>
-      </div>
-      <div class="video-actions">
-        <button class="menu-btn" title="操作">⋮</button>
-        <div class="menu-dropdown">
-          ${state.source === 'original'
-            ? `<button class="menu-item" data-action="compress" title="用 ffmpeg 将原视频压缩为 640p">压缩视频</button>
-               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">AI分析视频</button>
-               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑口播文案</button>
-               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑全部</button>`
-            : `<button class="menu-item" data-action="compress" disabled style="opacity:0.4" title="视频已压缩">压缩视频</button>
-               <button class="menu-item" data-action="analyze" title="调用 AI 重新分析视频内容">AI分析视频</button>
-               <button class="menu-item" data-action="voiceover" title="基于分析结果，重新用 AI 生成口播解说文案">重跑口播文案</button>
-               <button class="menu-item" data-action="all" title="依次执行 AI 分析 + 口播文案">重跑全部</button>`
-          }
-        </div>
-      </div>
+
+  // Split into grouped vs ungrouped
+  const grouped = state.videos.filter(v => v.group_key);
+  const ungrouped = state.videos.filter(v => !v.group_key);
+
+  // --- Grouped section ---
+  const groups = {};
+  for (const v of grouped) {
+    (groups[v.group_key] ??= []).push(v);
+  }
+
+  for (const [key, items] of Object.entries(groups)) {
+    const header = document.createElement('li');
+    header.className = 'video-group-header';
+    const isExpanded = state.expandedGroups[key] !== false;
+    header.innerHTML = `
+      <span class="group-toggle">${isExpanded ? '▼' : '▶'}</span>
+      <span class="group-name">${escapeHtml(key)}</span>
+      <span class="group-count-badge">(${items.length} 段)</span>
     `;
-    li.onclick = (e) => {
-      if (e.target.closest('.video-actions')) return;
-      selectVideo(v.file);
-    };
-    // ── Dot-menu toggle (portal 方案：移到 body 下逃逸侧栏) ──
-    const menuBtn = li.querySelector('.menu-btn');
-    const dropdown = li.querySelector('.menu-dropdown');
-    menuBtn.onclick = (e) => {
+    header.onclick = (e) => {
       e.stopPropagation();
-      // 关闭旧的 portal（如果有）
-      if (_portalDropdown) { _portalDropdown.remove(); _portalDropdown = null; }
-      const rect = menuBtn.getBoundingClientRect();
-      const clone = dropdown.cloneNode(true);
-      clone.classList.add('open');
-      clone.style.cssText = 'position:fixed;top:' + (rect.bottom + 4) + 'px;right:auto;left:' + Math.max(4, rect.right - 160) + 'px;z-index:10000;min-width:160px;width:auto;';
-      document.body.appendChild(clone);
-      _portalDropdown = clone;
-      clone.querySelectorAll('.menu-item').forEach(item => {
-        item.onclick = async (ev) => {
-          ev.stopPropagation(); if (item.disabled) return;
-          clone.remove(); _portalDropdown = null;
-          const task = item.dataset.action;
-          const file = v.file;
-          setStatus(`正在重跑 ${task} (${file})...`, 'ok');
-          try {
-            const r = await api('POST', '/api/rerun', {
-              video: file, task: task, source: state.source, index: v.index || undefined,
-            });
-            if (r.ok) { setStatus(r.message || `${task} 已启动`, 'ok'); showRerunProgress(task, file); }
-            else { throw new Error(r.error || '重跑失败'); }
-          } catch (e) { setStatus('重跑失败: ' + e.message, 'err'); }
-        };
-      });
-      // 点外部关闭（延迟绑定避免当前点击直接触发）
-      setTimeout(() => {
-        document.addEventListener('click', function closePortal(ev) {
-          if (_portalDropdown && !_portalDropdown.contains(ev.target) && ev.target !== menuBtn) {
-            _portalDropdown.remove(); _portalDropdown = null;
-            document.removeEventListener('click', closePortal);
-          }
-        });
-      }, 0);
+      state.expandedGroups[key] = !state.expandedGroups[key];
+      const childUl = header.nextElementSibling;
+      if (childUl) {
+        childUl.style.display = state.expandedGroups[key] ? '' : 'none';
+        header.querySelector('.group-toggle').textContent = state.expandedGroups[key] ? '▼' : '▶';
+      }
     };
-    ul.appendChild(li);
+    ul.appendChild(header);
+
+    const childUl = document.createElement('ul');
+    childUl.className = 'video-group-children';
+    childUl.style.display = isExpanded ? '' : 'none';
+    for (const v of items) {
+      childUl.appendChild(renderVideoItem(v));
+    }
+    ul.appendChild(childUl);
+  }
+
+  // --- Ungrouped section ---
+  for (const v of ungrouped) {
+    ul.appendChild(renderVideoItem(v));
   }
 }
 

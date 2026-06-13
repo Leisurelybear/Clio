@@ -18,6 +18,8 @@ const state = {
   currentProject: null,
   currentProjectName: null,
   lastProject: null,
+  groups: {},
+  expandedGroups: {},
   // preview playback
   previewActive: false,
   previewIndex: -1,
