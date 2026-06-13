@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import os
-import shutil
 from pathlib import Path
 
-import pytest
 import yaml
 
 from vlog_tool.ui.services.file_service import (
@@ -18,7 +15,6 @@ from vlog_tool.ui.services.file_service import (
     _is_safe_basename,
     _save_atomic,
 )
-
 
 # ===================== _is_safe_basename =====================
 

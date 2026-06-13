@@ -109,7 +109,7 @@ class TestCompressVideo:
         monkeypatch.setattr("vlog_tool.compress.run_ffmpeg", _mock_ffmpeg(ffmpeg_calls))
         cfg = _default_config()
         cfg.compress.target_size_mb = 1
-        result = compress_video(src, out, cfg)
+        compress_video(src, out, cfg)
         args = ffmpeg_calls[0]
         bv_idx = args.index("-b:v")
         assert int(args[bv_idx + 1]) >= 100_000

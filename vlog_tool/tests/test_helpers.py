@@ -5,9 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from types import SimpleNamespace
 
-import pytest
-
 from vlog_tool.tasks._helpers import (
+    ClipRecord,
     _build_stem,
     _eta_line,
     _next_index,
@@ -15,7 +14,6 @@ from vlog_tool.tasks._helpers import (
     _rewrite_text_file,
     _write_csv,
     _write_text_file,
-    ClipRecord,
 )
 
 

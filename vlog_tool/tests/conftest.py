@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 
 import pytest
+
 from vlog_tool.config import AppConfig, ProviderConfig, ProxyConfig, load_config
 
 

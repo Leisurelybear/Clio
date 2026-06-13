@@ -56,8 +56,6 @@ class TestWrapWithContext:
 
     def test_config_context_and_trip_context_both(self, monkeypatch):
         """Both trip_context.md and config.ai.context should appear."""
-        import vlog_tool.analyze as analyze_mod
-
         orig_is_file = Path.is_file
         orig_read_text = Path.read_text
 
