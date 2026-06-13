@@ -254,6 +254,7 @@ ai:
 75. `c59880d` `feat(analyze): add progress_callback for per-file upload/wait/AI/disk granularity`  ← 同时修复原视频视图下 split 段 index 丢失导致 plan 播放 404
 76. `e72ba10` `fix(ui): create per-segment entries in original video view for plan segment playback`  ← split 段独立条目
 77. `e6e068c` `feat(ui): show AI analysis title below filename in sidebar video list`  ← 视频列表展示 AI 标题
+78. `3fb8263` `fix(ui): update plan preview counter and unique video identity for split segments in original view`  ← 预览计数器动态刷新 + 原视图 split 段独立标识
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。

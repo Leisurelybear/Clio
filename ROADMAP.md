@@ -434,6 +434,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `3fb8263` | fix(ui): update plan preview counter and unique video identity for split segments |
 | `e6e068c` | feat(ui): show AI analysis title below filename in sidebar video list |
 | `e72ba10` | fix(ui): create per-segment entries in original video view for plan segment playback |
 | `c59880d` | feat(analyze): add progress_callback for per-file upload/wait/AI/disk granularity |
