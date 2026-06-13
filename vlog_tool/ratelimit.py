@@ -13,13 +13,19 @@ class RateLimiter:
         self._interval = 60.0 / requests_per_minute
         self._lock = threading.Lock()
         self._next_at = 0.0
+        self._logged = False
 
     def __enter__(self) -> None:
         with self._lock:
             now = time.monotonic()
             if now < self._next_at:
-                time.sleep(self._next_at - now)
+                wait = self._next_at - now
+                if not self._logged:
+                    print(f"  [限流] 等待 {wait:.1f}s（每 {self._interval:.1f}s 一次）")
+                    self._logged = True
+                time.sleep(wait)
             self._next_at = time.monotonic() + self._interval
+            self._logged = False
 
     def __exit__(self, *exc_info) -> None:
         pass
