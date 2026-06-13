@@ -530,6 +530,9 @@ async function pollRerunStatus(task, file) {
 
   try {
     const s = await api('GET', '/api/run/status');
+    const fill = overlay.querySelector('.rerun-progress-fill');
+    const statusEl = overlay.querySelector('.rerun-status');
+    const logsEl = overlay.querySelector('.rerun-logs');
 
     // Timeout: no terminal state within RERUN_POLL_TIMEOUT
     if (Date.now() - _rerunPollStart > RERUN_POLL_TIMEOUT) {
@@ -543,10 +546,6 @@ async function pollRerunStatus(task, file) {
       }
       return;
     }
-
-    const fill = overlay.querySelector('.rerun-progress-fill');
-    const statusEl = overlay.querySelector('.rerun-status');
-    const logsEl = overlay.querySelector('.rerun-logs');
 
     // Update progress bar
     if (fill && s.total > 0) {
