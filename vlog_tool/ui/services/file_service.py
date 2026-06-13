@@ -42,8 +42,11 @@ def _find_texts_dirs(output_dir: Path) -> list[Path]:
 
 def _save_atomic(path: Path, data: bytes) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    if path.exists() and not path.with_suffix(path.suffix + ".bak").exists():
-        shutil.copy2(path, path.with_suffix(path.suffix + ".bak"))
+    bak = path.with_suffix(path.suffix + ".bak")
+    if path.exists():
+        shutil.copy2(path, bak)
+    elif bak.exists():
+        bak.unlink()
     tmp = path.with_suffix(path.suffix + f".tmp.{os.urandom(4).hex()}")
     tmp.write_bytes(data)
     os.replace(tmp, path)
