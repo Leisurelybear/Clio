@@ -28,6 +28,8 @@ ai:
       poll_interval_sec: 5
       # 免费额度下建议 5-8，付费可降到 3（重试间隔 ~2s 指数退避）
       retry_attempts: 5
+      # 每分钟最多调用次数，0 = 不限流
+      requests_per_minute: 0
 
     openai:
       type: openai

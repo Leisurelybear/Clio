@@ -34,6 +34,7 @@ class ProviderConfig:
     base_url: str = ""
     poll_interval_sec: int = 5
     retry_attempts: int = 5
+    requests_per_minute: int = 0
 
 
 @dataclass

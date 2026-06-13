@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
+
 import httpx
 
 from vlog_tool.config import ProviderConfig, ProxyConfig
+from vlog_tool.ratelimit import make_rate_limiter
 from vlog_tool.utils import mask_if_looks_like_key, with_retry
 
 
@@ -26,23 +29,27 @@ class OpenAICompatProvider:
         if proxy.enabled and proxy.url:
             client_kwargs["proxy"] = proxy.url
         self._client = httpx.Client(**client_kwargs)
+        self._rl = make_rate_limiter(cfg.requests_per_minute)
 
     def close(self) -> None:
         self._client.close()
 
     def generate_text(self, prompt: str, model: str) -> str:
+        rl_ctx = self._rl or nullcontext()
+
         def _do() -> str:
-            response = self._client.post(
-                f"{self._base_url}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self._api_key}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": model,
-                    "messages": [{"role": "user", "content": prompt}],
-                },
-            )
+            with rl_ctx:
+                response = self._client.post(
+                    f"{self._base_url}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {self._api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": model,
+                        "messages": [{"role": "user", "content": prompt}],
+                    },
+                )
             sc = response.status_code
             if sc == 429 or sc >= 500:
                 raise httpx.HTTPStatusError(f"status {sc}", request=response.request, response=response)

@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import time
+from contextlib import nullcontext
 
 import httpx
 from google import genai
 from google.genai import types
 
 from vlog_tool.config import ProviderConfig, ProxyConfig
+from vlog_tool.ratelimit import make_rate_limiter
 from vlog_tool.utils import mask_if_looks_like_key, with_retry
 
 try:
@@ -36,6 +38,7 @@ class GeminiProvider:
                 async_client_args={"transport": httpx.AsyncHTTPTransport(proxy=proxy.url)},
             )
         self._client = genai.Client(api_key=cfg.api_key, http_options=http_options)
+        self._rl = make_rate_limiter(cfg.requests_per_minute)
         self._poll_interval = cfg.poll_interval_sec
         self._retry_attempts = cfg.retry_attempts
 
@@ -95,23 +98,29 @@ class GeminiProvider:
         return uploaded
 
     def generate_text(self, prompt: str, model: str) -> str:
+        rl_ctx = self._rl or nullcontext()
+
         def _do() -> str:
-            response = self._client.models.generate_content(model=model, contents=prompt)
+            with rl_ctx:
+                response = self._client.models.generate_content(model=model, contents=prompt)
             return response.text or ""
 
         return self._call_with_retry(_do, model, model)
 
     def analyze_video(self, video_path: str, prompt: str, model: str) -> str:
         uploaded = None
+        rl_ctx = self._rl or nullcontext()
         try:
-            uploaded = self._client.files.upload(file=video_path)
+            with rl_ctx:
+                uploaded = self._client.files.upload(file=video_path)
             uploaded = self._wait_for_file(uploaded)
 
             def _do() -> str:
-                response = self._client.models.generate_content(
-                    model=model,
-                    contents=[uploaded, prompt],
-                )
+                with rl_ctx:
+                    response = self._client.models.generate_content(
+                        model=model,
+                        contents=[uploaded, prompt],
+                    )
                 return response.text or ""
 
             return self._call_with_retry(_do, f"视频 {model}", model)
