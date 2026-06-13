@@ -11,6 +11,7 @@ Module-level helpers extracted from server.py:
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import string
 import sys
@@ -92,7 +93,8 @@ def _list_drives() -> list[str]:
 def _find_original_for_compressed(stem: str, input_dir: Path) -> str | None:
     """For a compressed stem like '001_GL010695', find the matching original basename
     in input_dir. Match is case-insensitive on the GoPro-style suffix (everything
-    after the first '_'). Returns the original filename or None if not found.
+    after the first '_'). Falls back to stripping '_segNN' suffix for split videos.
+    Returns the original filename or None if not found.
     """
     if "_" not in stem or not input_dir.is_dir():
         return None
@@ -100,23 +102,36 @@ def _find_original_for_compressed(stem: str, input_dir: Path) -> str | None:
     for p in input_dir.iterdir():
         if p.is_file() and p.stem.lower() == suffix:
             return p.name
+    m = re.match(r"^(.+)_seg\d+$", suffix)
+    if m:
+        base = m.group(1)
+        for p in input_dir.iterdir():
+            if p.is_file() and p.stem.lower() == base:
+                return p.name
     return None
 
 
-def _find_compressed_for_original(stem: str, comp_dir: Path) -> tuple[str, str] | None:
-    """For an original stem like 'GL010695', find the matching compressed file and
-    its index. Returns (compressed_basename, index) or None if not found.
+def _find_compressed_for_original(stem: str, comp_dir: Path) -> list[tuple[str, str]] | None:
+    """For an original stem like 'GL010695', find matching compressed file(s) and
+    their indices. Returns a sorted list of (compressed_basename, index) tuples,
+    or None if not found. For split videos, returns all segments sorted by index.
     """
     if not comp_dir.is_dir():
         return None
     needle = stem.lower()
+    matches: list[tuple[str, str]] = []
     for p in comp_dir.iterdir():
         if p.suffix.lower() not in VIDEO_EXTS or "_" not in p.stem:
             continue
         idx, rest = p.stem.split("_", 1)
         if rest.lower() == needle:
-            return (p.name, idx)
-    return None
+            return [(p.name, idx)]
+        if rest.lower().startswith(needle + "_seg"):
+            matches.append((p.name, idx))
+    if not matches:
+        return None
+    matches.sort(key=lambda m: m[1])
+    return matches
 
 
 def _coerce_config_types(new_val: Any, ref_val: Any) -> Any:

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from http import HTTPStatus
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.ui.services.file_service import (
@@ -69,17 +69,19 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                 if p.suffix.lower() not in VIDEO_EXTS:
                     continue
                 comp = _find_compressed_for_original(p.stem, comp_dir)
-                idx = comp[1] if comp else None
-                videos.append(
-                    {
-                        "file": p.name,
-                        "source": "original",
-                        "index": idx,
-                        "text_json": (text_sidecars.get(idx) or [None])[0] if idx else None,
-                        "script_json": (script_sidecars.get(idx) or [None])[0] if idx else None,
-                        "match": ({"source": "compressed", "file": comp[0], "index": comp[1]} if comp else None),
-                    }
-                )
+                first = comp[0] if comp else None
+                idx = first[1] if first else None
+                v: dict[str, Any] = {
+                    "file": p.name,
+                    "source": "original",
+                    "index": idx,
+                    "text_json": (text_sidecars.get(idx) or [None])[0] if idx else None,
+                    "script_json": (script_sidecars.get(idx) or [None])[0] if idx else None,
+                    "match": ({"source": "compressed", "file": first[0], "index": first[1]} if first else None),
+                }
+                if comp and len(comp) > 1:
+                    v["segment_matches"] = [{"file": f, "index": i} for f, i in comp]
+                videos.append(v)
     handler._send_json({"videos": videos, "source": source})
 
 
