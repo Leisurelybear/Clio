@@ -174,6 +174,7 @@ def _list_projects(
             res = p.resolve()
             if str(res) in seen_dirs:
                 continue
+            seen_dirs.add(str(res))
             try:
                 data = json.loads(proj_file.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
