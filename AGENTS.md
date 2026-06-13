@@ -232,6 +232,13 @@ ai:
 53. `test: comprehensive utils.py unit tests (34 tests)`  ← extract_json/mask_key/sanitize/find_videos
 54. `test: log.py and cut.py unit tests (38 tests)`  ← TeeWriter/cut 时间解析
 55. `test: progress.py unit tests (12 tests)`  ← ProgressTracker read/write/init
+56. `feat(split): add video splitting and long-video duration gate`  ← split.py + config + Phase 1/2 + duration gate
+57. `feat(ai): retry Gemini ClientError 429 with should_retry callback`  ← utils.with_retry + gemini._call_with_retry
+58. `docs: update note in segment grouping spec (split already implemented)`  ← spec 同步
+59. `feat(ui): add _segNN matching for compressed-original lookup (方案A)`  ← file_service.py seg 回溯
+60. `feat(ui): add group_key/segment_label/groups to /api/videos response (方案B backend)`  ← routes/videos.py 两遍 pass
+61. `feat(ui): add CSS for video group tree (方案B CSS)`  ← style.css 4 个 group class
+62. `feat(ui): add group tree rendering to sidebar (方案B frontend)`  ← sidebar.js renderVideoItem + 树状 renderVideoList
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
@@ -240,6 +247,8 @@ ai:
 - `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010 + Bug 跟踪（B-001~B-020）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-005）
 - B-001/B-002/B-003 已修复；仍有多项 P0~P3 Bug 待修
 - per-project 配置已实现：每个项目目录下可选 `project.yaml`，deep-merge 覆盖全局 config.yaml
+- 视频分段压缩已实现（split.py + compress Phase 1/2），默认 15 分钟分割阈值
+- UI compressed view 已支持 `_segNN` 分组树：segment 文件按原文件名分组显示，可折叠/展开
 
 ## 8. Gotchas（踩过的坑）
 
