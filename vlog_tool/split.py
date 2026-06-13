@@ -46,7 +46,9 @@ def split_video(
             "-c",
             "copy",
             "-map",
-            "0",
+            "0:v:0",
+            "-map",
+            "0:a:0?",
             "-y",
             str(seg_path),
         ]
