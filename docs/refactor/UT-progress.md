@@ -149,6 +149,34 @@
 
 ---
 
+### 9. `vlog_tool/tasks/compress.py` — run_compress_all 编排（3 测试）
+
+**文件**: `test_tasks_compress.py`
+
+| 测试类 | 测试数 | 覆盖内容 |
+|--------|--------|----------|
+| `TestRunCompressAll` | 3 | compress_single_file / skip_existing / single_file_param |
+
+**mock 方式**: `monkeypatch.setattr` mock `compress_video` / `split_video` / `_next_index` / `resolve_binary`，避免实际 ffmpeg 调用。
+
+**潜在问题**: 无
+
+---
+
+### 10. `vlog_tool/tasks/analyze.py` — run_analyze_all 编排（6 测试）
+
+**文件**: `test_tasks_analyze.py`
+
+| 测试类 | 测试数 | 覆盖内容 |
+|--------|--------|----------|
+| `TestRunAnalyzeAll` | 6 | 单文件 / skip_existing / 时长门控超长跳过 / 时长门控正常 / 无原始文件跳过 / 空目录 |
+
+**mock 方式**: `monkeypatch.setattr` mock `resolve_binary`（analyze + _helpers 双模块）/ `probe_video_info` / `get_duration_sec` / `analyze_video` / `_build_stem` / `_write_text_file`。
+
+**潜在问题**: 无
+
+---
+
 ## 汇总
 
 | 模块 | 新测试 | mock 内容 | 潜在问题 |
@@ -161,13 +189,12 @@
 | `routes/videos.py` | 16 | `MagicMock` handler | 无 |
 | `routes/plan.py` | 8 | `MagicMock` handler | 无 |
 | `routes/config_routes.py` | 6 | `MagicMock` handler | 无 |
-| **总计** | **154** | | |
+| `tasks/compress.py` | 3 | resolve_binary, compress_video, split_video | 无 |
+| `tasks/analyze.py` | 6 | resolve_binary, get_duration_sec, analyze_video | 无 |
+| **总计** | **163** | | |
 
 ## 后续优先项
 
-- `tasks/compress.py` — Phase 1/2 split→compress 编排逻辑（需 mock ffmpeg）
-- `tasks/analyze.py::run_analyze_all` — 编排逻辑 + duration gate（需 mock ffmpeg + AI）
 - `tasks/cut.py::run_cut_all` — cut 编排（需 mock ffmpeg）
 - `tasks/refine.py` / `tasks/scripts.py` / `tasks/plan.py` / `tasks/label.py` — AI 编排
-- `vlog_tool/pipeline.py` — 高层流水线函数
-- `vlog_tool/split.py` — ffmpeg 分段逻辑
+- `vlog_tool/pipeline.py` — 高层流水线函数（`run_analyze_all` 等已完成）
