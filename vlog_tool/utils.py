@@ -20,12 +20,14 @@ def with_retry(
     *,
     attempts: int = 3,
     base_delay: float = 1.0,
-    retry_on: tuple[type[BaseException], ...],
+    retry_on: tuple[type[BaseException], ...] = (),
     what: str = "operation",
+    should_retry: Callable[[BaseException], bool] | None = None,
 ) -> T:
     """调用 fn()，按指数退避（1s/2s/4s）重试最多 attempts 次。
 
     只对 retry_on 列出的异常类型重试；其它异常（如 ValueError）立即抛出。
+    如果提供了 should_retry 函数，在异常类型匹配后额外调用该函数判断是否应重试。
     每次重试会打印一行（控制台 + 日志都看得到），最后一次失败时也打印。
 
     用法::
@@ -40,7 +42,11 @@ def with_retry(
     for i in range(attempts):
         try:
             return fn()
-        except retry_on as e:
+        except BaseException as e:
+            if not isinstance(e, retry_on):
+                raise
+            if should_retry is not None and not should_retry(e):
+                raise
             last_exc = e
             if i + 1 >= attempts:
                 print(f"  [重试] {what} 失败 {attempts} 次，放弃: {type(e).__name__}: {e}")

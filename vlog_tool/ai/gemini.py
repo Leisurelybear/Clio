@@ -12,9 +12,9 @@ from vlog_tool.utils import mask_if_looks_like_key, with_retry
 try:
     from google.genai import errors as _genai_errors
 
-    _RETRY_ON: tuple[type[BaseException], ...] = (_genai_errors.ServerError, OSError)
+    _HAS_GENAI_ERRORS = True
 except ImportError:
-    _RETRY_ON = (OSError,)
+    _HAS_GENAI_ERRORS = False
 
 
 class GeminiProvider:
@@ -37,6 +37,53 @@ class GeminiProvider:
             )
         self._client = genai.Client(api_key=cfg.api_key, http_options=http_options)
         self._poll_interval = cfg.poll_interval_sec
+        self._retry_attempts = cfg.retry_attempts
+
+    def _is_retryable(self, exc: BaseException) -> bool:
+        """判断异常是否应该重试。"""
+        if isinstance(exc, OSError):
+            return True
+        if _HAS_GENAI_ERRORS:
+            if isinstance(exc, _genai_errors.ServerError):
+                return True
+            if isinstance(exc, _genai_errors.ClientError):
+                code = getattr(exc, "code", None)
+                if code == 429:
+                    return True
+                status = getattr(exc, "status", "") or ""
+                if "RATE_LIMIT" in status.upper() or "RESOURCE_EXHAUSTED" in status.upper():
+                    return True
+                return False
+        return False
+
+    def _retryable_types(self):
+        """返回 with_retry 需要的异常类型元组。"""
+        types_list = [OSError]
+        if _HAS_GENAI_ERRORS:
+            types_list.append(_genai_errors.ClientError)
+            types_list.append(_genai_errors.ServerError)
+        return tuple(types_list)
+
+    def _call_with_retry(self, fn, what, model):
+        """统一的重试入口：将非重试 ClientError 转成 RuntimeError 避免误重试。"""
+
+        def _wrapped():
+            try:
+                return fn()
+            except BaseException as e:
+                if self._is_retryable(e):
+                    raise
+                raise RuntimeError(f"Gemini API 不可重试错误: {e}") from e
+
+        return with_retry(
+            _wrapped,
+            attempts=self._retry_attempts,
+            base_delay=2.0,
+            retry_on=self._retryable_types(),
+            what=f"Gemini {what}",
+            # 用 should_retry 进一步过滤：只有 _is_retryable 为 True 才重试
+            should_retry=lambda e: self._is_retryable(e),
+        )
 
     def _wait_for_file(self, uploaded):
         while uploaded.state == types.FileState.PROCESSING:
@@ -52,16 +99,9 @@ class GeminiProvider:
             response = self._client.models.generate_content(model=model, contents=prompt)
             return response.text or ""
 
-        return with_retry(
-            _do,
-            attempts=3,
-            base_delay=1.0,
-            retry_on=_RETRY_ON,
-            what=f"Gemini {model}",
-        )
+        return self._call_with_retry(_do, model, model)
 
     def analyze_video(self, video_path: str, prompt: str, model: str) -> str:
-        # Upload once outside retry — B-002: avoid re-upload on transient errors
         uploaded = None
         try:
             uploaded = self._client.files.upload(file=video_path)
@@ -74,15 +114,8 @@ class GeminiProvider:
                 )
                 return response.text or ""
 
-            return with_retry(
-                _do,
-                attempts=3,
-                base_delay=1.0,
-                retry_on=_RETRY_ON,
-                what=f"Gemini 视频 {model}",
-            )
+            return self._call_with_retry(_do, f"视频 {model}", model)
         finally:
-            # B-001: always clean up uploaded files to avoid quota exhaustion
             if uploaded is not None:
                 try:
                     self._client.files.delete(name=uploaded.name)
