@@ -90,6 +90,7 @@ def run_analyze_all(
 
     with timed(f"run_analyze_all（{total} 个）"):
         completed = 0
+        failed = 0
         elapsed_total = 0.0
         for i, (compressed, original, idx_str) in enumerate(items, start=1):
             idx_val = int(idx_str)
@@ -135,6 +136,7 @@ def run_analyze_all(
                 analysis = analyze_video(str(compressed), config)
             except Exception as e:
                 print(f"  [错误] 分析 {compressed.name} 失败: {e}")
+                failed += 1
                 if tracker:
                     tracker.log(f"分析 {compressed.name} 失败: {e}")
                 continue
@@ -164,4 +166,7 @@ def run_analyze_all(
 
     _write_csv(config.summary_csv, records, config)
     print(f"\nCSV 已保存: {config.summary_csv}")
+
+    if completed == 0 and failed > 0:
+        raise RuntimeError(f"AI 分析全部失败（{failed} 个失败），请检查 API Key 和网络连接")
     return records
