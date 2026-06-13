@@ -207,6 +207,26 @@ aside, section { overflow-y: auto; }
 .video-meta .has { color: var(--success); display: inline-flex; align-items: center; gap: 3px; }
 .video-meta .miss { opacity: 0.35; display: inline-flex; align-items: center; gap: 3px; }
 
+/* ── Video Group Tree ───────────────────────────────────────── */
+.video-group-header {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 8px; cursor: pointer;
+  font-weight: 500; font-size: var(--text-xs);
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+.video-group-header:hover { background: var(--bg-hover); }
+.group-toggle {
+  font-size: 10px; width: 14px; text-align: center;
+  flex-shrink: 0; color: var(--text-tertiary);
+}
+.video-group-children { list-style: none; margin: 0; padding: 0; }
+.video-group-children .video-item { padding-left: 22px; }
+.group-count-badge {
+  font-size: var(--text-xs); color: var(--text-tertiary); margin: 0 2px;
+}
+
 /* ── Step Pipeline List ────────────────────────────────────── */
 .step-list { list-style: none; padding: var(--space-1) var(--space-3); margin: 0; }
 .step-item {
