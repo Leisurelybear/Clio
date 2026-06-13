@@ -47,6 +47,15 @@ if (-not (Test-Path "config.yaml") -and (Test-Path "config.example.yaml")) {
     Write-Host "[*] 已创建 config.yaml，请按需修改 paths / proxy"
 }
 
+# 5. Git hooks
+$hooksPath = git config core.hooksPath
+if ($hooksPath -ne ".githooks") {
+    Write-Host "[5/5] 设置 git hooks 路径为 .githooks..."
+    git config core.hooksPath .githooks
+} else {
+    Write-Host "[5/5] git hooks 路径已配置为 .githooks"
+}
+
 Write-Host ""
 Write-Host "=== 环境检查 ===" -ForegroundColor Cyan
 .\.venv\Scripts\python.exe main.py check

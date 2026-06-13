@@ -246,12 +246,16 @@ ai:
 67. `c283bb9` `fix(ui): hoist statusEl/fill/logsEl before early return`  ← 解决 pollRerunStatus 中 statusEl 声明前使用的 ReferenceError
 68. `dc01300` `fix(run): serialize _run_thread check-and-set under _run_lock`  ← TOCTOU 竞态，加锁保护
 69. `93eb4f1` `fix(ui): wrap _config_cache.pop with _config_cache_lock to fix data race`  ← 修复 config 缓存 pop 的无锁数据竞争
+70. `a276225` `fix: batch low-priority bug fixes and config injection`  ← B-005/B-017/B-018/B-042/B-044/B-045/B-059
+71. `e3f87a1` `feat(config): add migrate-config subcommand to inject provider defaults into existing project.yaml`  ← `_inject_provider_defaults` + `_migrate_project_configs`
+72. `2f1d56c` `docs: add config hot-reload audit spec (R-015) and update ROADMAP`  ← 热更新调研 + ROADMAP 更新
+73. `4d146d0` `style: ruff format vlog_tool/ui/services/file_service.py and project_service.py`  ← CI format 修复
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
 
 项目文档状态：
-- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010 + Bug 跟踪（B-001~B-058）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-005）
+- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012/ R-013/ R-014/ R-015 + Bug 跟踪（B-001~B-059）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）
 - B-001/B-002/B-003 已修复；仍有多项 P0~P3 Bug 待修
 - per-project 配置已实现：每个项目目录下可选 `project.yaml`，deep-merge 覆盖全局 config.yaml
 - 视频分段压缩已实现（split.py + compress Phase 1/2），默认 15 分钟分割阈值
@@ -318,6 +322,13 @@ ai:
 - `Path.iterdir()` 在 Windows 上按文件系统顺序（近似创建时间），Linux 上不保证顺序
 - 这会导致 `index` 分配在不同系统上不一致
 - 修复：总是用 `sorted(Path.iterdir())` 保证统一顺序
+
+### 8.11 Pre-commit hook
+
+- 项目在 `.githooks/pre-commit` 提供了一个 Python 脚本，自动对暂存的 `.py` 文件执行 `ruff format` 后重新 stage
+- `setup.ps1` 会自动设置 `git config core.hooksPath .githooks`
+- 手动配置：`git config core.hooksPath .githooks`
+- hook 依赖 `.venv` 中的 ruff，找不到时静默跳过（不阻塞 commit）
 
 ## 9. 验证流程
 
