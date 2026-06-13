@@ -105,9 +105,10 @@ async function init() {
     };
   });
 
-  // Browse buttons
-  document.querySelectorAll('.browse-btn').forEach(btn => {
-    btn.onclick = () => openBrowseDir(btn.dataset.target);
+  // Browse buttons — 事件委托以覆盖动态创建的按钮
+  document.body.addEventListener('click', e => {
+    const btn = e.target.closest('.browse-btn');
+    if (btn) openBrowseDir(btn.dataset.target);
   });
   const browseSelect = $('browse-select');
   if (browseSelect) {
