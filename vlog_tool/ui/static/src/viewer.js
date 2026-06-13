@@ -78,6 +78,9 @@ function _playPreviewSegment() {
   document.querySelectorAll('.plan-seg').forEach(el => {
     el.classList.toggle('preview-active', parseInt(el.dataset.previewIndex) === state.previewIndex);
   });
+  // 更新预览计数器
+  const counterEl = document.querySelector('#btn-stop-preview + span');
+  if (counterEl) counterEl.textContent = `${state.previewIndex + 1}/${p.sequence.length}`;
 }
 
 function setupPlayer() {

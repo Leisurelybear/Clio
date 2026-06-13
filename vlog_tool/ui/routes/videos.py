@@ -129,7 +129,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                 for c_file, c_idx in comp:
                     videos.append(
                         {
-                            "file": p.name,
+                            "file": f"{c_idx}_{p.name}",
                             "source": "original",
                             "index": c_idx,
                             "title": text_titles.get(c_idx, ""),
@@ -151,7 +151,9 @@ def handle_get_video(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     if not _is_safe_basename(fname):
         return handler.send_error(HTTPStatus.FORBIDDEN)
     if source == "original":
-        vp = proj_input / fname
+        parts = fname.split("_", 1)
+        actual_fname = parts[1] if len(parts) == 2 and parts[0].isdigit() else fname
+        vp = proj_input / actual_fname
     else:
         vp = proj_out / "compressed" / fname
     if not vp.is_file() or vp.suffix.lower() not in VIDEO_EXTS:
