@@ -37,7 +37,9 @@ def _find_texts_dirs(output_dir: Path) -> list[Path]:
     """Return all texts* subdirectories (texts, texts - Paris, ...)."""
     if not output_dir or not output_dir.is_dir():
         return []
-    return [d for d in sorted(output_dir.iterdir()) if d.is_dir() and (d.name == "texts" or d.name.startswith("texts - "))]
+    return [
+        d for d in sorted(output_dir.iterdir()) if d.is_dir() and (d.name == "texts" or d.name.startswith("texts - "))
+    ]
 
 
 def _save_atomic(path: Path, data: bytes) -> None:
