@@ -34,8 +34,6 @@ def handle_get_run_status(handler: BaseHTTPRequestHandler, qs: dict) -> None:
 
 def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
     """Handle POST /api/run/start."""
-    if handler._run_thread is not None and handler._run_thread.is_alive():
-        return handler._send_json({"ok": False, "error": "pipeline is already running"}, 409)
     day_label = obj.get("day_label", "day1")
     steps = obj.get("steps")
     proj_input = handler._resolve_project_input(qs)
@@ -47,8 +45,11 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
         except Exception:
             traceback.print_exc()
 
-    handler._run_thread = threading.Thread(target=_run, daemon=True)
-    handler._run_thread.start()
+    with handler.__class__._run_lock:
+        if handler._run_thread is not None and handler._run_thread.is_alive():
+            return handler._send_json({"ok": False, "error": "pipeline is already running"}, 409)
+        handler._run_thread = threading.Thread(target=_run, daemon=True)
+        handler._run_thread.start()
     label = "+".join(steps) if steps else "all"
     handler._send_json({"ok": True, "message": f"pipeline started ({label})"})
 
@@ -68,8 +69,6 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
     # 向后兼容
     if task == "texts":
         task = "analyze"
-    if handler._run_thread is not None and handler._run_thread.is_alive():
-        return handler._send_json({"ok": False, "error": "a task is already running"}, 409)
 
     stem = Path(video_basename).stem
 
@@ -135,6 +134,9 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
             tracker.error(f"rerun failed: {e}")
             traceback.print_exc()
 
-    handler._run_thread = threading.Thread(target=_rerun_worker, daemon=True)
-    handler._run_thread.start()
+    with handler.__class__._run_lock:
+        if handler._run_thread is not None and handler._run_thread.is_alive():
+            return handler._send_json({"ok": False, "error": "a task is already running"}, 409)
+        handler._run_thread = threading.Thread(target=_rerun_worker, daemon=True)
+        handler._run_thread.start()
     handler._send_json({"ok": True, "message": f"started rerun {task} ({video_basename})"})
