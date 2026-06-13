@@ -15,7 +15,7 @@
 
 | 步骤 | 功能 | 命令 |
 |------|------|------|
-| 1 | 长视频压缩（去声音、控体积，供 AI 分析） | `compress` |
+| 1 | 长视频分割 + 压缩（去声音、控体积，供 AI 分析） | `compress` |
 | 2 | AI 视频分析（简介 + 时间轴，厂家可配） | `analyze -i 文件夹` |
 | 3 | 序号命名 + 文本文件 + CSV 汇总 | `analyze` 自动完成 |
 | 4 | 按模板生成口播文案 | `scripts` |
@@ -200,6 +200,7 @@ Get-Content (Get-ChildItem logs/*.log | Sort-Object LastWriteTime -Descending | 
 ```
 output/
 ├── compressed/          # 压缩版视频（给 AI 用，已去声音）
+├── splits/              # 长视频分割后的分段（默认 15 分钟以上分割）
 ├── texts/
 │   ├── 001_丽江古城.txt    # 人类可读：简介 + 时间轴
 │   └── 001_丽江古城.json   # 机器可读，供后续步骤使用
@@ -222,8 +223,13 @@ output/
 ```
 原始素材 (input_dir)
     │
-    ▼ compress + analyze
-压缩视频 + 文本/CSV
+    ├── 长视频（>15分）→ split ───► splits/_segNN 分段
+    │
+    ▼ compress
+640p 压缩视频 (compressed/)
+    │
+    ▼ analyze (Gemini)
+文本分析 (texts/)
     │
     ├──► scripts ──► 口播文案（每条素材一份）
     │
@@ -312,6 +318,10 @@ python main.py check -i "E:/Videos/云南"     # 同时验证指定素材目录
 把素材文件夹中的视频用 ffmpeg 压成 640p / 5MB / 去声音的 mp4 备用。
 **不**调 AI。适合想先批量压缩、再人工筛选的场景。
 
+分两个阶段：
+1. **分割（Phase 1）**：长视频（默认 > 15 分钟）先按关键帧切割成 `_segNN` 段，存到 `splits/`
+2. **压缩（Phase 2）**：对每个分割段（以及无需分割的短视频）逐条压缩到 `compressed/`
+
 ```powershell
 python main.py compress -i "E:/Videos/云南"
 
@@ -320,11 +330,13 @@ python main.py compress -i "E:/Videos/云南/GL010683.mp4"
 ```
 
 输出到 `output/<素材文件夹名>/compressed/`，命名格式 `<序号>_<原文件名>.mp4`（如 `001_GL010683.mp4`）。
+分段视频会按原文件名分组显示，格式如 `001_GL010683.mp4`（含 `001_GL010683_seg00.mp4` 等子项）。
 已经存在的压缩文件会自动跳过（`skip_existing: true` 时）。
 
 ### `analyze` — 压缩 + AI 分析（最常用）
 
 先压缩（如果还没压缩），再对每条压缩视频调 `ai.tasks.video_analyze` 配置的厂家（默认 Gemini）做内容分析。
+超过 `max_analyze_duration_min`（默认 30 分钟）的视频会**跳过**（AI 通不过配额限制）。
 
 ```powershell
 python main.py analyze -i "E:/Videos/云南"
@@ -577,6 +589,7 @@ vlog-video-analysis/
     ├── ai/               # AI 厂家抽象（gemini / openai 兼容）
     ├── config.py         # 配置解析
     ├── compress.py       # ffmpeg 压缩
+    ├── split.py          # 视频分段切割
     ├── analyze.py        # AI 分析调用
     ├── cut.py            # 视频裁剪
     ├── log.py            # 日志系统
@@ -663,7 +676,15 @@ Hook 会在每次 `git commit` 前自动运行 `ruff format` 并重新 stage 格
 
 ## 后续可扩展
 
+- [x] 视频分段：长视频自动分割后再压缩（默认 15 分钟阈值）
+- [x] Web UI 侧栏分层：项目 / 视频两级层级（R-006）
+- [x] 多项目切换：侧栏下拉切换项目，URL 参数持久化（R-007）
+- [x] 流水线进度：运行 tab + ProgressTracker 实时进度轮询（R-005）
+- [x] 裁剪：按规划一键裁剪视频片段（R-002，含 CLI + UI）
+- [x] 分布式改进：server.py / app.js 拆模块（Phase 1a~1d）
 - [ ] 按文件夹/日期自动分组多天 vlog
 - [ ] 剪映草稿导出格式
-- [ ] Web UI 预览时间轴
-- [ ] 支持 Whisper 本地语音转写（有口播的素材）
+- [ ] Web UI 预览时间轴（R-012）
+- [ ] Web UI 单步执行：选目录 → 选文件 → 跑步骤 → 进度 → 自动刷新（R-008）
+- [ ] 支持 Whisper 本地语音转写（有口播的素材）（R-013）
+- [ ] AI token 用量统计面板（R-014）
