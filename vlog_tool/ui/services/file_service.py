@@ -37,7 +37,7 @@ def _find_texts_dirs(output_dir: Path) -> list[Path]:
     """Return all texts* subdirectories (texts, texts - Paris, ...)."""
     if not output_dir or not output_dir.is_dir():
         return []
-    return [d for d in output_dir.iterdir() if d.is_dir() and d.name.startswith("texts")]
+    return [d for d in sorted(output_dir.iterdir()) if d.is_dir() and (d.name == "texts" or d.name.startswith("texts - "))]
 
 
 def _save_atomic(path: Path, data: bytes) -> None:
@@ -72,6 +72,11 @@ def _create_project_yaml(proj_input: Path, config_path: Path | None, proj_out: P
         # 默认项目背景模板（不含特定内容，用户可编辑，留空也不影响生成）
         raw.setdefault("ai", {})
         raw["ai"].setdefault("context", "")
+        providers = raw["ai"].setdefault("providers", {})
+        for pname, pcfg in providers.items():
+            if isinstance(pcfg, dict):
+                pcfg.setdefault("requests_per_minute", 0)
+                pcfg.setdefault("retry_attempts", 2)
         yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
         _save_atomic(target, yml.encode("utf-8"))
         return target
@@ -102,13 +107,13 @@ def _find_original_for_compressed(stem: str, input_dir: Path) -> str | None:
     if "_" not in stem or not input_dir.is_dir():
         return None
     suffix = stem.split("_", 1)[1].lower()
-    for p in input_dir.iterdir():
+    for p in sorted(input_dir.iterdir()):
         if p.is_file() and p.stem.lower() == suffix:
             return p.name
     m = re.match(r"^(.+)_seg\d+$", suffix)
     if m:
         base = m.group(1)
-        for p in input_dir.iterdir():
+        for p in sorted(input_dir.iterdir()):
             if p.is_file() and p.stem.lower() == base:
                 return p.name
     return None
@@ -123,7 +128,7 @@ def _find_compressed_for_original(stem: str, comp_dir: Path) -> list[tuple[str, 
         return None
     needle = stem.lower()
     matches: list[tuple[str, str]] = []
-    for p in comp_dir.iterdir():
+    for p in sorted(comp_dir.iterdir()):
         if p.suffix.lower() not in VIDEO_EXTS or "_" not in p.stem:
             continue
         idx, rest = p.stem.split("_", 1)

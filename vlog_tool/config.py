@@ -33,7 +33,7 @@ class ProviderConfig:
     api_key_env: str = ""
     base_url: str = ""
     poll_interval_sec: int = 5
-    retry_attempts: int = 5
+    retry_attempts: int = 2
     requests_per_minute: int = 0
 
 
@@ -163,7 +163,8 @@ def _parse_providers(raw: dict) -> dict[str, ProviderConfig]:
             api_key_env=cfg.get("api_key_env", ""),
             base_url=cfg.get("base_url", ""),
             poll_interval_sec=cfg.get("poll_interval_sec", 5),
-            retry_attempts=cfg.get("retry_attempts", 5),
+            retry_attempts=cfg.get("retry_attempts", 2),
+            requests_per_minute=cfg.get("requests_per_minute", 0),
         )
     return providers
 

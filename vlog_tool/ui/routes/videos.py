@@ -45,7 +45,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     # texts/scripts sidecars are keyed by the compressed index in both views
     text_sidecars: dict[str, list[str]] = {}
     for td in _find_texts_dirs(proj_out):
-        for f in td.iterdir():
+        for f in sorted(td.iterdir()):
             if f.suffix != ".json" or "_" not in f.stem:
                 continue
             idx = f.stem.split("_", 1)[0]
@@ -53,7 +53,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     script_sidecars: dict[str, list[str]] = {}
     sd = proj_out / "scripts"
     if sd.is_dir():
-        for f in sd.iterdir():
+        for f in sorted(sd.iterdir()):
             if f.suffix != ".json" or "_" not in f.stem:
                 continue
             idx = f.stem.split("_", 1)[0]

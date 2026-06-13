@@ -57,7 +57,7 @@ def run_cut_all(
             if not comp_candidates:
                 return None
             suffix = comp_candidates[0].stem.split("_", 1)[1].lower()
-            for p in input_dir.iterdir():
+            for p in sorted(input_dir.iterdir()):
                 if p.is_file() and p.suffix.lower() in VIDEO_EXTS and p.stem.lower() == suffix:
                     return p
             return None

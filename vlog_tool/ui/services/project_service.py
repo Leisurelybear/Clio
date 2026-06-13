@@ -47,7 +47,7 @@ def _detect_steps(proj_output_dir: Path) -> dict[str, bool]:
         steps["compress"] = comp.is_dir() and any(comp.iterdir())
     except (PermissionError, OSError):
         steps["compress"] = False
-    texts = [d for d in proj_output_dir.iterdir() if d.is_dir() and d.name.startswith("texts")]
+    texts = [d for d in sorted(proj_output_dir.iterdir()) if d.is_dir() and (d.name == "texts" or d.name.startswith("texts - "))]
     try:
         steps["analyze"] = any(any(True for _ in t.iterdir()) for t in texts)
     except (PermissionError, OSError):

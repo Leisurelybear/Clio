@@ -114,11 +114,20 @@ function renderVideoItem(v) {
   const tLabel = v.text_json ? `${icon('check', 12)} texts` : '· texts';
   const sLabel = v.script_json ? `${icon('check', 12)} voiceover` : '· voiceover';
   const counterpartLabel = state.source === 'compressed' ? '原' : '压';
-  const matchBadge = v.match
-    ? `<span class="match-badge" title="${escapeHtml(v.match.file)}">→ ${counterpartLabel}: ${escapeHtml(v.match.file)}</span>`
-    : `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
+  let matchBadge;
+  if (v.match) {
+    if (v.segment_matches && v.segment_matches.length > 1) {
+      const segList = v.segment_matches.map(m => m.file).join(', ');
+      matchBadge = `<span class="match-badge" title="${escapeHtml(segList)}">→ ${counterpartLabel}: ${v.segment_matches.length} 段</span>`;
+    } else {
+      matchBadge = `<span class="match-badge" title="${escapeHtml(v.match.file)}">→ ${counterpartLabel}: ${escapeHtml(v.match.file)}</span>`;
+    }
+  } else {
+    matchBadge = `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
+  }
   li.innerHTML = `
-    <div class="video-name">${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)} ${matchBadge}</div>
+    <div class="video-name">${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)}</div>
+    <div class="video-match">${matchBadge}</div>
     <div class="video-meta">
       <span class="${tCls}">${tLabel}</span>
       &nbsp;
@@ -174,14 +183,16 @@ function renderVideoItem(v) {
         } catch (e) { setStatus('重跑失败: ' + e.message, 'err'); }
       };
     });
-    setTimeout(() => {
-      document.addEventListener('click', function closePortal(ev) {
-        if (_portalDropdown && !_portalDropdown.contains(ev.target) && ev.target !== menuBtn) {
+    if (!_portalCloseHandler) {
+      _portalCloseHandler = (ev) => {
+        if (_portalDropdown && !_portalDropdown.contains(ev.target) && !ev.target.closest('.menu-btn')) {
           _portalDropdown.remove(); _portalDropdown = null;
-          document.removeEventListener('click', closePortal);
+          document.removeEventListener('click', _portalCloseHandler);
+          _portalCloseHandler = null;
         }
-      });
-    }, 0);
+      };
+      setTimeout(() => document.addEventListener('click', _portalCloseHandler), 0);
+    }
   };
 
   return li;
@@ -476,6 +487,7 @@ async function loadBrowseDir(path) {
 
 /* ── Dropdown portal ── */
 let _portalDropdown = null;
+let _portalCloseHandler = null;
 
 /* ── Rerun progress overlay (single-video rerun) ── */
 let _rerunPollTimer = null;

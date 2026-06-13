@@ -88,8 +88,11 @@ class GeminiProvider:
             should_retry=lambda e: self._is_retryable(e),
         )
 
-    def _wait_for_file(self, uploaded):
+    def _wait_for_file(self, uploaded, timeout: float = 300):
+        deadline = time.monotonic() + timeout
         while uploaded.state == types.FileState.PROCESSING:
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"视频处理超时（{timeout}s）: {uploaded.name}")
             print("  视频处理中...")
             time.sleep(self._poll_interval)
             uploaded = self._client.files.get(name=uploaded.name)

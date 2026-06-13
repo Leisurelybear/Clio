@@ -71,6 +71,12 @@ class TestFindTextsDirs:
         result = _find_texts_dirs(out)
         assert len(result) == 1
 
+    def test_ignores_texts_backup(self, tmp_path: Path):
+        out = tmp_path / "output"
+        out.mkdir()
+        (out / "texts_backup").mkdir()
+        assert _find_texts_dirs(out) == []
+
     def test_ignores_non_texts_dir(self, tmp_path: Path):
         out = tmp_path / "output"
         out.mkdir()

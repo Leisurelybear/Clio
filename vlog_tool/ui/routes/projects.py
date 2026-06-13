@@ -55,7 +55,14 @@ def handle_get_projects(handler: BaseHTTPRequestHandler, qs: dict) -> None:
             last_project = reg.get("last_project")
         except (json.JSONDecodeError, OSError):
             pass
-    handler._send_json({"projects": _list_projects(config_path, input_dir, req_project), "last_project": last_project})
+    projects = _list_projects(config_path, input_dir, req_project)
+    # Prune stale _config_cache entries for projects that no longer exist
+    valid_dirs = {str(Path(p["input_dir"]).resolve()) for p in projects}
+    with handler.__class__._config_cache_lock:
+        stale = [k for k in handler.__class__._config_cache if k not in valid_dirs]
+        for k in stale:
+            del handler.__class__._config_cache[k]
+    handler._send_json({"projects": projects, "last_project": last_project})
 
 
 def handle_put_project(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:

@@ -50,6 +50,8 @@ class TestHandleGetProjects:
         handler.server.config_path = tmp_path / "config.yaml"
         handler.server.input_dir = tmp_path / "input"
         handler._send_json = MagicMock()
+        handler.__class__._config_cache = {}
+        handler.__class__._config_cache_lock = MagicMock()
 
         handle_get_projects(handler, {})
 

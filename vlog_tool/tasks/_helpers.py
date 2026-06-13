@@ -31,7 +31,7 @@ def _next_index(scan_dir: Path, index_width: int = 3) -> int:
     if not scan_dir.is_dir():
         return 1
     max_idx = 0
-    for p in scan_dir.iterdir():
+    for p in sorted(scan_dir.iterdir()):
         stem = p.stem
         if "_" in stem:
             prefix = stem.split("_", 1)[0]
@@ -48,7 +48,7 @@ def _eta_line(label: str, i: int, total: int, name: str, completed: int, elapsed
         avg = elapsed_total / completed
         remaining = avg * (total - i)
         return f"[{label} {i}/{total}] {name}（平均 {format_duration(avg)}，剩余 ~{format_duration(remaining)}）"
-    return f"[{label} 1/{total}] {name}"
+    return f"[{label} {i}/{total}] {name}"
 
 
 def _write_text_file(path: Path, analysis: dict, source: Path, compressed: Path) -> None:
