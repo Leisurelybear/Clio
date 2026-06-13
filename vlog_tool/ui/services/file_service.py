@@ -92,12 +92,11 @@ def _inject_provider_defaults(raw: dict) -> None:
 def _migrate_project_configs(projects_root: Path) -> tuple[int, list[str]]:
     """Scan for project.yaml files and inject missing provider defaults.
     Returns (count_updated, list of errors)."""
-    import os
     updated = 0
     errors: list[str] = []
     if not projects_root.is_dir():
         return updated, errors
-    for proj_dir in projects_root.iterdir():
+    for proj_dir in sorted(projects_root.iterdir()):
         if not proj_dir.is_dir():
             continue
         proj_yaml = proj_dir / "project.yaml"

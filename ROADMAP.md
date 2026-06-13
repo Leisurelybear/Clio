@@ -290,6 +290,24 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [ ] R-014c：UI 显示 token 统计面板
 - [ ] R-014d：CLI `tokens` 子命令
 
+## 需求 R-015：配置热重载
+
+**背景**：当前 UI 保存 `config.yaml`（全局配置）后缓存未失效，必须重启服务才能生效。
+`project.yaml` 保存时虽然会弹出缓存，但前端始终显示"需重启服务生效"。
+外部（CLI / 文本编辑器）修改配置文件也完全不被检测。调研见 `docs/superpowers/specs/2026-06-13-config-hot-reload-audit.md`。
+
+**验收**：
+- 全局 `config.yaml` 保存后清理 `_config_cache`
+- 项目级保存后区分提示（不再统一显示"需重启服务生效"）
+- `_get_config()` 增加 mtime 检查，文件变更时自动重新读取
+- 限制 `_config_cache` 大小上限
+
+**子任务**：
+- [ ] R-015a：`POST /api/config/raw` 全局保存后调 `_config_cache.clear()`
+- [ ] R-015b：`_get_config()` 加 mtime 缓存失效
+- [ ] R-015c：前端区分项目级 vs 全局保存提示信息
+- [ ] R-015d：`_config_cache` 添加 maxsize 限制
+
 ## 暂存 / WIP
 
 - （暂无）
@@ -359,10 +377,10 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | ID | 问题 | 修复思路 | 状态 |
 | --- | --- | --- | --- |
-| B-005 | Linux 下 `sorted(Path.iterdir())` 顺序不保证（glob 也不保证顺序） | 显式 `sorted()` 后再匹配 | |
+| B-005 | Linux 下 `sorted(Path.iterdir())` 顺序不保证（glob 也不保证顺序） | 显式 `sorted()` 后再匹配 | ✅ `a276225` |
 | B-008 | 函数隐式修改入参（如 `analyze_video` 等修改传入的 dict 字段） | 入参 `deepcopy()` 避免副作用 | |
-| B-017 | `_find_texts_dirs` 匹配 `texts*` 太宽 — `texts_backup` 也会匹配 | 用更精确的 glob 或加排除规则 | 🆕 |
-| B-018 | `_config_cache` 只增不减（仅在 PUT config 时 pop） | 项目列表刷新时清理失效缓存 | 🆕 |
+| B-017 | `_find_texts_dirs` 匹配 `texts*` 太宽 — `texts_backup` 也会匹配 | 用更精确的 glob 或加排除规则 | ✅ `a276225` |
+| B-018 | `_config_cache` 只增不减（仅在 PUT config 时 pop） | 项目列表刷新时清理失效缓存 | ✅ `a276225` |
 | B-032 | `tasks/label.py:29-31` glob 时 idx 可能是整数 1 而非 `"001"`，导致文件匹配失败跳过处理 | `format_index(int(idx), config.naming.index_width)` 统一格式化后再 glob | ✅ |
 | B-033 | `tasks/analyze.py:96` 批量 AI 分析失败直接中断整个批次；`run_refine_texts` 有 try/except/continue 容错而此处没有，行为不一致 | 给 `analyze_video()` 调用加 `try/except` + `continue`，记录失败继续下一个 | ✅ |
 | B-034 | `routes/run.py` rerun 进度文件路径从 `cfg.paths.output_dir` 取，但 `GET /api/run/status` 从 `_project_output_dir()` 取，两个 output_dir 可能不一致导致前端轮询读不到进度 | 统一用 `proj_out`（来自 `_project_output_dir`） | ✅ |
@@ -378,10 +396,11 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | ID | 问题 | 修复思路 | 状态 |
 | --- | --- | --- | --- |
-| B-042 | `gemini.py:41` `_wait_for_file` 无超时，文件处理卡住时永久阻塞 | 加 `timeout` 参数与 `time.monotonic()` 超时检查 | 🆕 |
+| B-042 | `gemini.py:41` `_wait_for_file` 无超时，文件处理卡住时永久阻塞 | 加 `timeout` 参数与 `time.monotonic()` 超时检查 | ✅ `a276225` |
 | B-043 | `.githooks/pre-commit:21` `git add` 会误 stage 用户未打算提交的工作区修改 | 只 stage ruff 格式化的文件：`$RUFF format . && git diff --name-only --diff-filter=M` 前检查是否是 ruff 改的 | 🆕 |
-| B-044 | `_helpers.py:51` `_eta_line` `completed=0` 时固定显示 `1/total`，实际可能是第 3、4 条 | 用 `i` 替换硬编码的 `1` | 🆕 |
-| B-045 | `sidebar.js:177` 视频列表每次渲染都在 `document` 上堆积 `{ once: true }` click 监听器，关闭 dropdown 逻辑失效 | 改用事件委托 + 持久 handler，或渲染前 `removeEventListener` | 🆕 |
+| B-044 | `_helpers.py:51` `_eta_line` `completed=0` 时固定显示 `1/total`，实际可能是第 3、4 条 | 用 `i` 替换硬编码的 `1` | ✅ `a276225` |
+| B-045 | `sidebar.js:177` 视频列表每次渲染都在 `document` 上堆积 `{ once: true }` click 监听器，关闭 dropdown 逻辑失效 | 改用事件委托 + 持久 handler，或渲染前 `removeEventListener` | ✅ `a276225` |
+| B-059 | `_parse_providers` 未读取 `requests_per_minute` 与 `retry_attempts` 从 YAML | `cfg.get("requests_per_minute", 0)` + `retry_attempts` 默认值统一为 2 | ✅ `a276225` |
 
 ## ~~测试覆盖盲区~~ ✅ 全部修复（163 新测试，2026-06-13）
 
@@ -414,6 +433,8 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `e3f87a1` | feat(config): add migrate-config subcommand to inject provider defaults |
+| `a276225` | fix: batch P2/P3 bug fixes (B-005/B-017/B-018/B-042/B-044/B-045/B-059) and config injection |
 | `93eb4f1` | fix(ui): wrap _config_cache.pop with _config_cache_lock |
 | `dc01300` | fix(run): serialize _run_thread check-and-set under _run_lock |
 | `c283bb9` | fix(ui): hoist statusEl/fill/logsEl before early return |
