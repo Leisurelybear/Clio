@@ -22,15 +22,13 @@ function renderRun() {
   // 从 state 同步当前分集（避免残留 done 处理器把 day 覆写成硬编码默认值）
   _lastRunDay = state.currentDay || 'day1';
   const pane = $('tab-run');
-  const stepChecks = RUN_STEPS.map(s => {
-    const disabled = s.key === 'compress';
-    return `
-    <label class="run-step${disabled ? ' run-step-disabled' : ''}">
-      <input type="checkbox" class="run-step-cb" data-step="${s.key}" ${disabled ? 'disabled' : 'checked'}>
+  const stepChecks = RUN_STEPS.map(s => `
+    <label class="run-step">
+      <input type="checkbox" class="run-step-cb" data-step="${s.key}" checked>
       <span class="run-step-label">${s.label}</span>
-      <span class="run-step-hint">${s.hint}${disabled ? '（建议从视频列表单独执行）' : ''}</span>
+      <span class="run-step-hint">${s.hint}</span>
     </label>
-  `}).join('');
+  `).join('');
   pane.innerHTML = `
     <h3>运行流水线</h3>
     <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
