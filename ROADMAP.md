@@ -434,6 +434,8 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `e6e068c` | feat(ui): show AI analysis title below filename in sidebar video list |
+| `e72ba10` | fix(ui): create per-segment entries in original video view for plan segment playback |
 | `c59880d` | feat(analyze): add progress_callback for per-file upload/wait/AI/disk granularity |
 | `6c2ab33` | chore: add pre-commit hook to auto-format staged .py files with ruff |
 | `4d146d0` | style: ruff format vlog_tool/ui/services/file_service.py and project_service.py |

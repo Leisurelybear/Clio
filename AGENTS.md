@@ -252,6 +252,8 @@ ai:
 73. `4d146d0` `style: ruff format vlog_tool/ui/services/file_service.py and project_service.py`  ← CI format 修复
 74. `6c2ab33` `chore: add pre-commit hook to auto-format staged .py files with ruff`  ← `.githooks/pre-commit` + `setup.ps1` 自动配置
 75. `c59880d` `feat(analyze): add progress_callback for per-file upload/wait/AI/disk granularity`  ← 同时修复原视频视图下 split 段 index 丢失导致 plan 播放 404
+76. `e72ba10` `fix(ui): create per-segment entries in original video view for plan segment playback`  ← split 段独立条目
+77. `e6e068c` `feat(ui): show AI analysis title below filename in sidebar video list`  ← 视频列表展示 AI 标题
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
