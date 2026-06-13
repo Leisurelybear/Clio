@@ -14,6 +14,7 @@ from vlog_tool.ui.services.file_service import (
     _find_texts_dirs,
     _is_safe_basename,
 )
+from vlog_tool.utils import get_duration_sec, resolve_binary
 
 if TYPE_CHECKING:
     from http.server import BaseHTTPRequestHandler
@@ -112,6 +113,12 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                             break
     else:  # original
         if proj_input.is_dir():
+            # resolve ffprobe once for segment offset computation
+            try:
+                cfg = handler._get_config(proj_input)
+                _ffprobe = resolve_binary(cfg.paths.ffprobe, "ffprobe")
+            except Exception:
+                _ffprobe = None
             for p in sorted(proj_input.iterdir()):
                 if p.suffix.lower() not in VIDEO_EXTS:
                     continue
@@ -126,6 +133,16 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                         }
                     )
                     continue
+                # Compute per-segment offsets
+                offsets: dict[str, float] = {}
+                if len(comp) > 1 and _ffprobe:
+                    try:
+                        dur = get_duration_sec(p, _ffprobe)
+                        seg_dur = dur / len(comp)
+                        for i, (_, idx) in enumerate(comp):
+                            offsets[idx] = round(i * seg_dur, 1)
+                    except Exception:
+                        pass
                 for c_file, c_idx in comp:
                     videos.append(
                         {
@@ -133,6 +150,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                             "source": "original",
                             "index": c_idx,
                             "title": text_titles.get(c_idx, ""),
+                            "offset_sec": offsets.get(c_idx, 0.0),
                             "text_json": (text_sidecars.get(c_idx) or [None])[0],
                             "script_json": (script_sidecars.get(c_idx) or [None])[0],
                             "match": {"source": "compressed", "file": c_file, "index": c_idx},

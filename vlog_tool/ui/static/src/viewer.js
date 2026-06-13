@@ -66,8 +66,8 @@ function _playPreviewSegment() {
     return;
   }
   const parts = (seg.use_timeline || '').split('-');
-  const seekTo = parseTimecode(parts[0].trim());
-  const endTime = parts[1] ? parseTimecode(parts[1].trim()) : null;
+  const seekTo = parseTimecode(parts[0].trim()) + (v.offset_sec || 0);
+  const endTime = parts[1] ? parseTimecode(parts[1].trim()) + (v.offset_sec || 0) : null;
 
   playVideoSegment(v.file, seekTo);
   state._previewEndTime = endTime;

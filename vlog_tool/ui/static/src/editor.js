@@ -184,7 +184,7 @@ function renderPlan() {
       if (e.target.matches('input, textarea')) return;
       const v = state.videos.find(x => x.index === seg.index);
       if (!v) { setStatus(`找不到视频 [${seg.index}]，请重新生成规划`, 'warn'); return; }
-      const seekTo = parseTimecode((seg.use_timeline || '').split('-')[0].trim());
+      const seekTo = parseTimecode((seg.use_timeline || '').split('-')[0].trim()) + (v.offset_sec || 0);
       playVideoSegment(v.file, seekTo);
     };
     li.querySelectorAll('[data-k]').forEach(inp => {
