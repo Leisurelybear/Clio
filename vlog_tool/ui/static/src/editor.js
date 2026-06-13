@@ -71,7 +71,8 @@ function renderTexts() {
     li.onclick = (e) => {
       if (e.target.tagName === 'TEXTAREA') return;
       const p = $('player');
-      p.currentTime = parseTimecode(seg.start);
+      const curV = state.videos.find(x => x.file === state.currentVideo);
+      p.currentTime = parseTimecode(seg.start) + (curV?.offset_sec || 0);
       p.play().catch(() => {});
     };
     li.querySelector('textarea').oninput = (e) => {
