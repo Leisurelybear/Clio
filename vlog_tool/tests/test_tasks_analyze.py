@@ -60,7 +60,7 @@ class TestRunAnalyzeAll:
         monkeypatch.setattr("vlog_tool.tasks.analyze.get_duration_sec", lambda *a: 60.0)
         monkeypatch.setattr(
             "vlog_tool.tasks.analyze.analyze_video",
-            lambda *a: {"title": "Test Clip", "summary": "A test", "location": "Paris"},
+            lambda *a, **kw: {"title": "Test Clip", "summary": "A test", "location": "Paris"},
         )
 
         records = run_analyze_all(cfg)
@@ -125,7 +125,7 @@ class TestRunAnalyzeAll:
         monkeypatch.setattr("vlog_tool.tasks.analyze.get_duration_sec", lambda *a: 60.0)
         monkeypatch.setattr(
             "vlog_tool.tasks.analyze.analyze_video",
-            lambda *a: {"title": "Short Clip", "summary": "A short test", "location": "Paris"},
+            lambda *a, **kw: {"title": "Short Clip", "summary": "A short test", "location": "Paris"},
         )
 
         cfg.analyze.max_analyze_duration_min = 30

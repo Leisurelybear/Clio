@@ -45,7 +45,7 @@ staged = [f for f in result.stdout.splitlines() if f]
 if not staged:
     sys.exit(0)
 
-print(f"🎨 ruff format: {', '.join(staged)}")
+print(f"ruff format: {', '.join(staged)}")
 
 # Format staged files
 fmt = subprocess.run([*RUFF, "format", *staged], cwd=REPO_ROOT)

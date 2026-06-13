@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
 from contextlib import nullcontext
 
 import httpx
@@ -88,12 +89,15 @@ class GeminiProvider:
             should_retry=lambda e: self._is_retryable(e),
         )
 
-    def _wait_for_file(self, uploaded, timeout: float = 300):
+    def _wait_for_file(self, uploaded, timeout: float = 300, on_progress: Callable[[str], None] | None = None):
         deadline = time.monotonic() + timeout
         while uploaded.state == types.FileState.PROCESSING:
             if time.monotonic() > deadline:
                 raise TimeoutError(f"视频处理超时（{timeout}s）: {uploaded.name}")
-            print("  视频处理中...")
+            waited = int(time.monotonic() - (deadline - timeout))
+            if on_progress:
+                on_progress(f"等待 Gemini 处理（{waited}s）...")
+            print(f"  视频处理中...（{waited}s）")
             time.sleep(self._poll_interval)
             uploaded = self._client.files.get(name=uploaded.name)
         if uploaded.state == types.FileState.FAILED:
@@ -110,13 +114,22 @@ class GeminiProvider:
 
         return self._call_with_retry(_do, model, model)
 
-    def analyze_video(self, video_path: str, prompt: str, model: str) -> str:
+    def analyze_video(
+        self, video_path: str, prompt: str, model: str, progress_callback: Callable[[str], None] | None = None
+    ) -> str:
         uploaded = None
         rl_ctx = self._rl or nullcontext()
         try:
+            if progress_callback:
+                progress_callback("上传视频到 Gemini...")
             with rl_ctx:
                 uploaded = self._client.files.upload(file=video_path)
-            uploaded = self._wait_for_file(uploaded)
+            if progress_callback:
+                progress_callback("等待 Gemini 处理...")
+            uploaded = self._wait_for_file(uploaded, on_progress=progress_callback)
+
+            if progress_callback:
+                progress_callback("AI 分析中...")
 
             def _do() -> str:
                 with rl_ctx:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from enum import StrEnum
 from typing import Protocol
 
@@ -22,4 +23,6 @@ class TextAIProvider(Protocol):
 class VideoAIProvider(TextAIProvider, Protocol):
     """支持视频理解的 AI 能力。"""
 
-    def analyze_video(self, video_path: str, prompt: str, model: str) -> str: ...
+    def analyze_video(
+        self, video_path: str, prompt: str, model: str, progress_callback: Callable[[str], None] | None = None
+    ) -> str: ...

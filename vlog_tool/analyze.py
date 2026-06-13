@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 
 from vlog_tool.ai.base import TaskName
@@ -55,7 +56,7 @@ def _call_ai(label: str, provider_id: str, model: str, prompt: str, fn) -> str:
     return text
 
 
-def analyze_video(video_path: str, config: AppConfig) -> dict:
+def analyze_video(video_path: str, config: AppConfig, progress_callback: Callable[[str], None] | None = None) -> dict:
     provider, model = get_video_provider(config, TaskName.VIDEO_ANALYZE)
     prompt = _wrap_with_context(ANALYZE_PROMPT, config)
     text = _call_ai(
@@ -63,7 +64,7 @@ def analyze_video(video_path: str, config: AppConfig) -> dict:
         provider.provider_id,
         model,
         prompt,
-        lambda: provider.analyze_video(video_path, prompt, model),
+        lambda: provider.analyze_video(video_path, prompt, model, progress_callback=progress_callback),
     )
     return extract_json(text)
 

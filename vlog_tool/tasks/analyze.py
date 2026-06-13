@@ -100,6 +100,8 @@ def run_analyze_all(
                 json_path = existing[0]
                 text_path = json_path.with_suffix(".txt")
                 analysis = json.loads(json_path.read_text(encoding="utf-8"))
+                if tracker:
+                    tracker.update(phase="analyze", current=i, total=total, message=f"跳过 {compressed.name}...")
                 print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
                 records.append(
                     ClipRecord(
@@ -114,8 +116,6 @@ def run_analyze_all(
                 continue
 
             print(_eta_line("分析", i, total, compressed.name, completed, elapsed_total))
-            if tracker:
-                tracker.update(phase="analyze", current=i, message=f"分析 {compressed.name}...")
 
             # Duration gate: skip if compressed video is too long for Gemini
             max_min = config.analyze.max_analyze_duration_min
@@ -126,18 +126,27 @@ def run_analyze_all(
                     if dur_sec > max_min * 60:
                         print(f"  [跳过] {compressed.name} 时长 {format_duration(dur_sec)} 超过限制 {max_min} 分钟")
                         if tracker:
+                            tracker.update(
+                                phase="analyze", current=i, total=total, message=f"跳过 {compressed.name}（超长）"
+                            )
                             tracker.log(f"跳过 {compressed.name}（超长 {format_duration(dur_sec)}）")
                         continue
                 except Exception as e:
                     print(f"  [警告] 无法检查 {compressed.name} 时长: {e}")
 
+            def _on_progress(msg: str) -> None:
+                if tracker:
+                    tracker.update(phase="analyze", current=i, total=total, message=f"{compressed.name}: {msg}")
+
             t0 = time.monotonic()
             try:
-                analysis = analyze_video(str(compressed), config)
+                _on_progress("上传→AI分析...")
+                analysis = analyze_video(str(compressed), config, progress_callback=_on_progress)
             except Exception as e:
                 print(f"  [错误] 分析 {compressed.name} 失败: {e}")
                 failed += 1
                 if tracker:
+                    tracker.update(phase="analyze", current=i, total=total, message=f"失败 {compressed.name}")
                     tracker.log(f"分析 {compressed.name} 失败: {e}")
                 continue
             elapsed_total += time.monotonic() - t0
@@ -149,6 +158,7 @@ def run_analyze_all(
             final_text = config.texts_dir / f"{stem}.txt"
             json_path = config.texts_dir / f"{stem}.json"
 
+            _on_progress("写入磁盘...")
             _write_text_file(final_text, analysis, original, compressed)
             json_path.write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
 
