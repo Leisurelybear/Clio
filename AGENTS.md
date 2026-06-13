@@ -250,16 +250,20 @@ ai:
 71. `e3f87a1` `feat(config): add migrate-config subcommand to inject provider defaults into existing project.yaml`  ← `_inject_provider_defaults` + `_migrate_project_configs`
 72. `2f1d56c` `docs: add config hot-reload audit spec (R-015) and update ROADMAP`  ← 热更新调研 + ROADMAP 更新
 73. `4d146d0` `style: ruff format vlog_tool/ui/services/file_service.py and project_service.py`  ← CI format 修复
+74. `6c2ab33` `chore: add pre-commit hook to auto-format staged .py files with ruff`  ← `.githooks/pre-commit` + `setup.ps1` 自动配置
+75. `c59880d` `feat(analyze): add progress_callback for per-file upload/wait/AI/disk granularity`  ← 同时修复原视频视图下 split 段 index 丢失导致 plan 播放 404
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
 
 项目文档状态：
-- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012/ R-013/ R-014/ R-015 + Bug 跟踪（B-001~B-059）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）
+- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012/ R-013/ R-014/ R-015 + Bug 跟踪（B-001~B-060）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）
 - B-001/B-002/B-003 已修复；仍有多项 P0~P3 Bug 待修
 - per-project 配置已实现：每个项目目录下可选 `project.yaml`，deep-merge 覆盖全局 config.yaml
 - 视频分段压缩已实现（split.py + compress Phase 1/2），默认 15 分钟分割阈值
 - UI compressed view 已支持 `_segNN` 分组树：segment 文件按原文件名分组显示，可折叠/展开
+- 原视频视图下 split 段 index 丢失已修复：每个 split 段创建独立条目，plan 播放 404 不再出现
+- AI 分析进度已细化：`progress_callback` 贯穿 analyze_video → GeminiProvider，UI 进度面板显示上传/等待/AI 分析/写入磁盘各阶段
 
 ## 8. Gotchas（踩过的坑）
 

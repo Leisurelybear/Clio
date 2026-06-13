@@ -107,19 +107,27 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                 if p.suffix.lower() not in VIDEO_EXTS:
                     continue
                 comp = _find_compressed_for_original(p.stem, comp_dir)
-                first = comp[0] if comp else None
-                idx = first[1] if first else None
-                v: dict[str, Any] = {
-                    "file": p.name,
-                    "source": "original",
-                    "index": idx,
-                    "text_json": (text_sidecars.get(idx) or [None])[0] if idx else None,
-                    "script_json": (script_sidecars.get(idx) or [None])[0] if idx else None,
-                    "match": ({"source": "compressed", "file": first[0], "index": first[1]} if first else None),
-                }
-                if comp and len(comp) > 1:
-                    v["segment_matches"] = [{"file": f, "index": i} for f, i in comp]
-                videos.append(v)
+                if not comp:
+                    videos.append(
+                        {
+                            "file": p.name,
+                            "source": "original",
+                            "index": None,
+                            "match": None,
+                        }
+                    )
+                    continue
+                for c_file, c_idx in comp:
+                    videos.append(
+                        {
+                            "file": p.name,
+                            "source": "original",
+                            "index": c_idx,
+                            "text_json": (text_sidecars.get(c_idx) or [None])[0],
+                            "script_json": (script_sidecars.get(c_idx) or [None])[0],
+                            "match": {"source": "compressed", "file": c_file, "index": c_idx},
+                        }
+                    )
     handler._send_json({"videos": videos, "source": source, "groups": groups})
 
 

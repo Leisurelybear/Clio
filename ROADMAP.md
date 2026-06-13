@@ -401,6 +401,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-044 | `_helpers.py:51` `_eta_line` `completed=0` 时固定显示 `1/total`，实际可能是第 3、4 条 | 用 `i` 替换硬编码的 `1` | ✅ `a276225` |
 | B-045 | `sidebar.js:177` 视频列表每次渲染都在 `document` 上堆积 `{ once: true }` click 监听器，关闭 dropdown 逻辑失效 | 改用事件委托 + 持久 handler，或渲染前 `removeEventListener` | ✅ `a276225` |
 | B-059 | `_parse_providers` 未读取 `requests_per_minute` 与 `retry_attempts` 从 YAML | `cfg.get("requests_per_minute", 0)` + `retry_attempts` 默认值统一为 2 | ✅ `a276225` |
+| B-060 | 原视频视图下 split 段 index 丢失 — 每个原文件只取 `comp[0]`，plan 引用 `002`/`003` 时找不到对应条目报 404 | 遍历 `comp` 所有匹配，每个 split 段创建独立 video entry | ✅ `c59880d` |
 
 ## ~~测试覆盖盲区~~ ✅ 全部修复（163 新测试，2026-06-13）
 
@@ -433,6 +434,10 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `c59880d` | feat(analyze): add progress_callback for per-file upload/wait/AI/disk granularity |
+| `6c2ab33` | chore: add pre-commit hook to auto-format staged .py files with ruff |
+| `4d146d0` | style: ruff format vlog_tool/ui/services/file_service.py and project_service.py |
+| `2f1d56c` | docs: add config hot-reload audit spec (R-015) and update ROADMAP |
 | `e3f87a1` | feat(config): add migrate-config subcommand to inject provider defaults |
 | `a276225` | fix: batch P2/P3 bug fixes (B-005/B-017/B-018/B-042/B-044/B-045/B-059) and config injection |
 | `93eb4f1` | fix(ui): wrap _config_cache.pop with _config_cache_lock |
