@@ -126,7 +126,8 @@ def _find_compressed_for_original(stem: str, comp_dir: Path) -> list[tuple[str, 
         idx, rest = p.stem.split("_", 1)
         if rest.lower() == needle:
             return [(p.name, idx)]
-        if rest.lower().startswith(needle + "_seg"):
+        seg_prefix = needle + "_seg"
+        if rest.lower().startswith(seg_prefix) and rest.lower()[len(seg_prefix):].isdigit():
             matches.append((p.name, idx))
     if not matches:
         return None

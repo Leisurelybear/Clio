@@ -240,7 +240,8 @@ function renderVideoList() {
     `;
     header.onclick = (e) => {
       e.stopPropagation();
-      state.expandedGroups[key] = !state.expandedGroups[key];
+      const wasExpanded = state.expandedGroups[key] !== false;
+      state.expandedGroups[key] = !wasExpanded;
       const childUl = header.nextElementSibling;
       if (childUl) {
         childUl.style.display = state.expandedGroups[key] ? '' : 'none';
