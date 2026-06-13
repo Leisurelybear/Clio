@@ -26,6 +26,29 @@ or any editor of your choice.
 
 ---
 
+## Visual Editor UI
+
+The `serve` subcommand starts a local web server, default `http://127.0.0.1:8765/`:
+
+| Pipeline runner view | Vlog plan editor view |
+|:---:|:---:|
+| ![pipeline](docs/screenshots/pipeline.png) | ![plan](docs/screenshots/plan.png) |
+
+- **Left**: video list (scans `output/compressed/`), each row shows whether `texts` / `voiceover` JSON exists
+- **Center**: HTML5 player (drag / seek), clicking a segment on the right auto-seeks
+- **Right**: three tabs
+  - **Analysis (texts)** — edit `title` / `location` / `mood` / `summary`, per-segment timeline descriptions
+  - **Voiceover (scripts)** — edit `voiceover` text / `edit_tip` / `duration_hint_sec`
+  - **Plan (plan)** — edit day theme, opening / ending tips, per-segment `reason` / `voiceover_hint`
+
+Click "Save" or press `Ctrl+S` to write back to the original JSON file (atomic rename, every save overwrites `.bak`).
+
+Zero external dependencies: pure stdlib `http.server`, no Flask / FastAPI needed. Safe by default: binds to `127.0.0.1` only, all file IO is sandboxed inside `output_dir`, basenames reject `..` and path separators.
+
+Full docs: see `vlog_tool/ui/README.md`.
+
+---
+
 ## Quick Start
 
 ### 1. Bootstrap the environment
@@ -473,26 +496,8 @@ python main.py serve --no-browser       # do not auto-open browser (for remote d
 | `--no-browser` | — | if set, do not auto-open the browser |
 
 The opened page: left column lists videos (scans `output/compressed/`), center is the HTML5 video player (with seek + Range request), right column has three tabs: Analysis (texts), Voiceover (scripts), Plan (plan). Clicking a timeline / plan segment seeks the video to that timestamp; `Ctrl+S` saves the current tab.
-
 See `vlog_tool/ui/README.md` for details.
 
-
-## Visual Editor UI
-
-The `serve` subcommand starts a local web server, default `http://127.0.0.1:8765/`:
-
-- **Left**: video list (scans `output/compressed/`), each row shows whether `texts` / `voiceover` JSON exists
-- **Center**: HTML5 player (drag / seek), clicking a segment on the right auto-seeks
-- **Right**: three tabs
-  - **Analysis (texts)** — edit `title` / `location` / `mood` / `summary`, per-segment timeline descriptions
-  - **Voiceover (scripts)** — edit `voiceover` text / `edit_tip` / `duration_hint_sec`
-  - **Plan (plan)** — edit day theme, opening / ending tips, per-segment `reason` / `voiceover_hint`
-
-Click "Save" or press `Ctrl+S` to write back to the original JSON file (atomic rename, first overwrite auto-creates `.bak`).
-
-Zero external dependencies: pure stdlib `http.server`, no Flask / FastAPI needed. Safe by default: binds to `127.0.0.1` only, all file IO is sandboxed inside `output_dir`, basenames reject `..` and path separators.
-
-Full docs: see `vlog_tool/ui/README.md`.
 
 ## FAQ
 
