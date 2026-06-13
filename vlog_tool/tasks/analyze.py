@@ -8,7 +8,7 @@ from pathlib import Path
 
 from vlog_tool.analyze import analyze_video
 from vlog_tool.config import AppConfig
-from vlog_tool.log import timed
+from vlog_tool.log import format_duration, timed
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.tasks._helpers import (
     ClipRecord,
@@ -17,6 +17,34 @@ from vlog_tool.tasks._helpers import (
     _write_csv,
     _write_text_file,
 )
+from vlog_tool.utils import get_duration_sec, resolve_binary
+
+
+def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
+    """Resolve original video path from a compressed file stem.
+
+    Handles:
+    - Direct match: '001_GL010683' → GL010683.mp4
+    - Segment match: '001_GL010683_seg01' → strip _segXX → GL010683.mp4
+    """
+    _, orig_stem = compressed_stem.split("_", 1)
+
+    def _try_find(stem: str) -> Path | None:
+        for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts"):
+            candidate = input_dir / f"{stem}{ext}"
+            if candidate.is_file():
+                return candidate
+        return None
+
+    result = _try_find(orig_stem)
+    if result is not None:
+        return result
+
+    import re
+    m = re.match(r"^(.+)_seg\d+$", orig_stem)
+    if m:
+        return _try_find(m.group(1))
+    return None
 
 
 def run_analyze_all(
@@ -32,7 +60,7 @@ def run_analyze_all(
 
     if single_file:
         items: list[tuple[Path, Path, str]] = []
-        candidates = sorted(config.compressed_dir.glob(f"*_{single_file.stem}.mp4"))
+        candidates = sorted(config.compressed_dir.glob(f"*_{single_file.stem}*.mp4"))
         if not candidates:
             print(f"[错误] 未找到 {single_file.name} 对应的压缩文件，请先运行压缩步骤")
             return []
@@ -45,17 +73,11 @@ def run_analyze_all(
             parts = p.stem.split("_", 1)
             if len(parts) != 2 or not parts[0].isdigit():
                 continue
-            idx_str, orig_stem = parts
-            orig_path = config.paths.input_dir / f"{orig_stem}.mp4"
-            if not orig_path.is_file():
-                for ext in (".mov", ".mkv", ".avi", ".mts", ".m2ts"):
-                    alt = config.paths.input_dir / f"{orig_stem}{ext}"
-                    if alt.is_file():
-                        orig_path = alt
-                        break
-                else:
-                    print(f"[警告] 找不到 {p.name} 对应的原始视频，跳过")
-                    continue
+            orig_path = _resolve_original(config.paths.input_dir, p.stem)
+            if orig_path is None:
+                print(f"[警告] 找不到 {p.name} 对应的原始视频，跳过")
+                continue
+            idx_str = parts[0]
             items.append((p, orig_path, idx_str))
 
     if not items:
@@ -92,6 +114,21 @@ def run_analyze_all(
             print(_eta_line("分析", i, total, compressed.name, completed, elapsed_total))
             if tracker:
                 tracker.update(phase="analyze", current=i, message=f"分析 {compressed.name}...")
+
+            # Duration gate: skip if compressed video is too long for Gemini
+            max_min = config.analyze.max_analyze_duration_min
+            if max_min > 0:
+                try:
+                    ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
+                    dur_sec = get_duration_sec(compressed, ffprobe)
+                    if dur_sec > max_min * 60:
+                        print(f"  [跳过] {compressed.name} 时长 {format_duration(dur_sec)} 超过限制 {max_min} 分钟")
+                        if tracker:
+                            tracker.log(f"跳过 {compressed.name}（超长 {format_duration(dur_sec)}）")
+                        continue
+                except Exception as e:
+                    print(f"  [警告] 无法检查 {compressed.name} 时长: {e}")
+
             t0 = time.monotonic()
             try:
                 analysis = analyze_video(str(compressed), config)

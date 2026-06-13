@@ -33,6 +33,7 @@ class ProviderConfig:
     api_key_env: str = ""
     base_url: str = ""
     poll_interval_sec: int = 5
+    retry_attempts: int = 5
 
 
 @dataclass
@@ -56,6 +57,8 @@ class CompressConfig:
     codec: str = "libx264"
     crf: int = 32
     remove_audio: bool = True
+    split_max_min: int = 15
+    splits_subdir: str = "splits"
 
 
 @dataclass
@@ -63,6 +66,7 @@ class AnalyzeConfig:
     compressed_subdir: str = "compressed"
     texts_subdir: str = "texts"
     skip_existing: bool = True
+    max_analyze_duration_min: int = 30
 
 
 @dataclass
@@ -158,6 +162,7 @@ def _parse_providers(raw: dict) -> dict[str, ProviderConfig]:
             api_key_env=cfg.get("api_key_env", ""),
             base_url=cfg.get("base_url", ""),
             poll_interval_sec=cfg.get("poll_interval_sec", 5),
+            retry_attempts=cfg.get("retry_attempts", 5),
         )
     return providers
 

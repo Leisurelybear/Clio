@@ -26,6 +26,8 @@ ai:
       type: gemini
       api_key_env: GEMINI_API_KEY
       poll_interval_sec: 5
+      # 免费额度下建议 5-8，付费可降到 3（重试间隔 ~2s 指数退避）
+      retry_attempts: 5
 
     openai:
       type: openai
@@ -68,11 +70,19 @@ compress:
   codec: libx264
   crf: 32
   remove_audio: true
+  # 自动分段：超过此时长（分钟）的原视频在压缩前先切成等长段
+  # 每段独立压缩和分析，避免长视频超出 AI 上下文限制
+  # 设为 0 关闭分段；免费额度推荐 15，付费可按需调大
+  split_max_min: 15
+  splits_subdir: splits
 
 analyze:
   compressed_subdir: compressed
   texts_subdir: texts
   skip_existing: true
+  # 压缩视频超过此时长（分钟）则跳过分析，避免浪费 Gemini 配额
+  # 设为 0 表示不限制；免费额度建议 30-45，付费可按需调整
+  max_analyze_duration_min: 45
 
 naming:
   index_width: 3
