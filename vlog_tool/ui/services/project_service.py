@@ -166,7 +166,10 @@ def _list_projects(
             if not p.is_dir():
                 continue
             proj_file = p / "project.json"
-            if not proj_file.is_file():
+            try:
+                if not proj_file.is_file():
+                    continue
+            except (PermissionError, OSError):
                 continue
             res = p.resolve()
             if str(res) in seen_dirs:

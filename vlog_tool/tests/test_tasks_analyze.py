@@ -51,7 +51,7 @@ def _common_mocks(monkeypatch):
 class TestRunAnalyzeAll:
     def test_analyze_single_file(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
-        src = cfg.paths.input_dir / "GL010695.MP4"
+        src = cfg.paths.input_dir / "GL010695.mp4"
         src.write_bytes(b"\x00" * 1000)
         comp = cfg.compressed_dir / "001_GL010695.mp4"
         comp.write_bytes(b"\x00" * 100)
@@ -69,14 +69,12 @@ class TestRunAnalyzeAll:
 
     def test_skip_existing(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
-        src = cfg.paths.input_dir / "GL010695.MP4"
+        src = cfg.paths.input_dir / "GL010695.mp4"
         src.write_bytes(b"\x00" * 1000)
         comp = cfg.compressed_dir / "001_GL010695.mp4"
         comp.write_bytes(b"\x00" * 100)
         existing_json = cfg.texts_dir / "001_Test_Clip.json"
-        existing_json.write_text(
-            json.dumps({"title": "Test Clip", "summary": "A test"}), encoding="utf-8"
-        )
+        existing_json.write_text(json.dumps({"title": "Test Clip", "summary": "A test"}), encoding="utf-8")
 
         _common_mocks(monkeypatch)
         analyze_called = False
@@ -95,7 +93,7 @@ class TestRunAnalyzeAll:
 
     def test_duration_gate_skips_long_video(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
-        src = cfg.paths.input_dir / "GL010695.MP4"
+        src = cfg.paths.input_dir / "GL010695.mp4"
         src.write_bytes(b"\x00" * 1000)
         comp = cfg.compressed_dir / "001_GL010695.mp4"
         comp.write_bytes(b"\x00" * 100)
@@ -118,7 +116,7 @@ class TestRunAnalyzeAll:
 
     def test_duration_gate_allows_short_video(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
-        src = cfg.paths.input_dir / "GL010695.MP4"
+        src = cfg.paths.input_dir / "GL010695.mp4"
         src.write_bytes(b"\x00" * 1000)
         comp = cfg.compressed_dir / "001_GL010695.mp4"
         comp.write_bytes(b"\x00" * 100)

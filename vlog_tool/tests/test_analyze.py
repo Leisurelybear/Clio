@@ -24,14 +24,14 @@ class TestResolveOriginal:
         assert result == tmp_path / "GL010683.mkv"
 
     def test_direct_match_mts(self, tmp_path: Path):
-        (tmp_path / "GL010683.MTS").write_bytes(b"")
+        (tmp_path / "GL010683.mts").write_bytes(b"")
         result = _resolve_original(tmp_path, "001_GL010683")
-        assert result == tmp_path / "GL010683.MTS"
+        assert result == tmp_path / "GL010683.mts"
 
     def test_direct_match_m2ts(self, tmp_path: Path):
-        (tmp_path / "GL010683.M2TS").write_bytes(b"")
+        (tmp_path / "GL010683.m2ts").write_bytes(b"")
         result = _resolve_original(tmp_path, "001_GL010683")
-        assert result == tmp_path / "GL010683.M2TS"
+        assert result == tmp_path / "GL010683.m2ts"
 
     def test_no_match(self, tmp_path: Path):
         result = _resolve_original(tmp_path, "001_NOFILE")

@@ -37,12 +37,18 @@ def split_video(
 
         seg_path = output_dir / f"{video_path.stem}_seg{i + 1:02d}{video_path.suffix}"
         args = [
-            "-ss", str(start),
-            "-i", str(video_path),
-            "-t", str(dur),
-            "-c", "copy",
-            "-map", "0",
-            "-y", str(seg_path),
+            "-ss",
+            str(start),
+            "-i",
+            str(video_path),
+            "-t",
+            str(dur),
+            "-c",
+            "copy",
+            "-map",
+            "0",
+            "-y",
+            str(seg_path),
         ]
         run_ffmpeg(args, ffmpeg)
         segments.append(seg_path)

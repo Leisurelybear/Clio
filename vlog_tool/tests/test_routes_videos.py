@@ -101,9 +101,7 @@ class TestHandleGetVideos:
 
         handle_get_videos(handler, {"source": ["invalid"]})
 
-        handler._send_json.assert_called_once_with(
-            {"ok": False, "error": "source must be compressed|original"}, 400
-        )
+        handler._send_json.assert_called_once_with({"ok": False, "error": "source must be compressed|original"}, 400)
 
     def test_groups_populated_for_segments(self, tmp_path: Path):
         handler = MagicMock()

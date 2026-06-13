@@ -45,11 +45,21 @@ class TestWrapWithContext:
         ctx_file.write_text("## Trip Context\n\nParis 2025", encoding="utf-8")
 
         import vlog_tool.analyze as analyze_mod
+
         # Fake the __file__ to our temp path parent
         orig_file = analyze_mod.__file__
         try:
             # Can't easily change __file__, so mock is_file to control behavior
-            monkeypatch.setattr("pathlib.Path.is_file", lambda self: self == Path(str(orig_file).replace("vlog_tool\\analyze.py", "templates\\trip_context.md")) and ctx_file.is_file() or self.name == "trip_context.md" and ctx_file.is_file() or False)
+            monkeypatch.setattr(
+                "pathlib.Path.is_file",
+                lambda self: (
+                    self == Path(str(orig_file).replace("vlog_tool\\analyze.py", "templates\\trip_context.md"))
+                    and ctx_file.is_file()
+                    or self.name == "trip_context.md"
+                    and ctx_file.is_file()
+                    or False
+                ),
+            )
             # Simpler approach: just monkeypatch the trip_ctx read
         except Exception:
             pass

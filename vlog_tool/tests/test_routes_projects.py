@@ -33,9 +33,7 @@ class TestHandleGetProject:
         handler = MagicMock()
         proj_input = tmp_path / "project"
         proj_input.mkdir()
-        (proj_input / "project.json").write_text(
-            json.dumps({"name": "Tokyo", "currentDay": "day3"}), encoding="utf-8"
-        )
+        (proj_input / "project.json").write_text(json.dumps({"name": "Tokyo", "currentDay": "day3"}), encoding="utf-8")
         handler._resolve_project_input.return_value = proj_input
         handler.DEFAULT_PROJECT = {"name": "Unnamed", "currentDay": "day1", "source": "compressed"}
         handler._send_json = MagicMock()
@@ -47,10 +45,10 @@ class TestHandleGetProject:
 
 
 class TestHandleGetProjects:
-    def test_empty(self):
+    def test_empty(self, tmp_path: Path):
         handler = MagicMock()
-        handler.server.config_path = None
-        handler.server.input_dir = Path("/nonexistent")
+        handler.server.config_path = tmp_path / "config.yaml"
+        handler.server.input_dir = tmp_path / "input"
         handler._send_json = MagicMock()
 
         handle_get_projects(handler, {})
@@ -139,9 +137,7 @@ class TestHandlePostProjectAdd:
         handler = MagicMock()
         proj_input = tmp_path / "existing"
         proj_input.mkdir()
-        (proj_input / "project.json").write_text(
-            json.dumps({"name": "Existing Project"}), encoding="utf-8"
-        )
+        (proj_input / "project.json").write_text(json.dumps({"name": "Existing Project"}), encoding="utf-8")
         handler.server.config_path = tmp_path / "config.yaml"
         handler._send_json = MagicMock()
 

@@ -6,7 +6,18 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import pytest
+
 from vlog_tool.ui.routes.run import handle_get_run_status, handle_post_rerun, handle_post_run_start
+
+
+@pytest.fixture
+def _no_thread(monkeypatch):
+    """Prevent background threads from actually starting — avoids copy.deepcopy leaks on CI."""
+    monkeypatch.setattr(
+        "vlog_tool.ui.routes.run.threading.Thread",
+        lambda *a, **kw: MagicMock(start=lambda: None),
+    )
 
 
 class TestHandleGetRunStatus:
@@ -49,11 +60,9 @@ class TestHandlePostRunStart:
 
         handle_post_run_start(handler, {}, {})
 
-        handler._send_json.assert_called_once_with(
-            {"ok": False, "error": "pipeline is already running"}, 409
-        )
+        handler._send_json.assert_called_once_with({"ok": False, "error": "pipeline is already running"}, 409)
 
-    def test_starts_thread(self, tmp_path: Path):
+    def test_starts_thread(self, tmp_path: Path, _no_thread):
         handler = MagicMock()
         handler._run_thread = None
         handler._resolve_project_input.return_value = tmp_path / "input"
@@ -89,7 +98,7 @@ class TestHandlePostRerun:
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args[0][1] == 400
 
-    def test_starts_rerun(self, tmp_path: Path):
+    def test_starts_rerun(self, tmp_path: Path, _no_thread):
         handler = MagicMock()
         handler._run_thread = None
         proj_input = tmp_path / "input"

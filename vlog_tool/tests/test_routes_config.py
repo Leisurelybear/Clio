@@ -104,9 +104,7 @@ class TestHandlePutConfigRaw:
         handler.server.config_path = None
         handler._send_json = MagicMock()
         handle_put_config_raw(handler, {}, {"test": True})
-        handler._send_json.assert_called_once_with(
-            {"ok": False, "error": "config_path not available"}, 500
-        )
+        handler._send_json.assert_called_once_with({"ok": False, "error": "config_path not available"}, 500)
 
     def test_put_project_config(self, tmp_path: Path):
         """Writing to a non-default project directory stores in project.yaml."""

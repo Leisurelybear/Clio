@@ -28,6 +28,7 @@ def _default_config() -> SimpleNamespace:
 
 def _mock_ffmpeg(ffmpeg_calls: list) -> callable:
     """Create a mock run_ffmpeg that records calls and creates the output file."""
+
     def _run(args, ff):
         ffmpeg_calls.append(args)
         # Create the output file (last arg after -y) so stat() works
@@ -35,6 +36,7 @@ def _mock_ffmpeg(ffmpeg_calls: list) -> callable:
             out_path = Path(args[-1])
             out_path.parent.mkdir(parents=True, exist_ok=True)
             out_path.write_bytes(b"\x00" * 50_000)
+
     return _run
 
 

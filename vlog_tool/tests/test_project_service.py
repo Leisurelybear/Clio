@@ -23,9 +23,10 @@ class TestProjectOutputDir:
 
     def test_from_project_json_absolute(self, tmp_path: Path):
         proj_file = tmp_path / "project.json"
-        proj_file.write_text(json.dumps({"output_dir": "C:\\custom\\out"}), encoding="utf-8")
+        abs_dir = Path("/").resolve() / "custom_out"
+        proj_file.write_text(json.dumps({"output_dir": str(abs_dir)}), encoding="utf-8")
         result = _project_output_dir(tmp_path)
-        assert result == Path("C:\\custom\\out")
+        assert result == abs_dir
 
     def test_from_project_json_relative(self, tmp_path: Path):
         proj_file = tmp_path / "project.json"

@@ -41,6 +41,7 @@ def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
         return result
 
     import re
+
     m = re.match(r"^(.+)_seg\d+$", orig_stem)
     if m:
         return _try_find(m.group(1))

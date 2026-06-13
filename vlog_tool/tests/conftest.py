@@ -105,4 +105,3 @@ def gemini_provider_cfg(loaded_config: AppConfig) -> ProviderConfig:
 def proxy_cfg() -> ProxyConfig:
     """Return a disabled proxy config."""
     return ProxyConfig(enabled=False, url="")
-

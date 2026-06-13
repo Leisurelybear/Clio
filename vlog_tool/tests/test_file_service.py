@@ -333,10 +333,12 @@ class TestCreateProjectYaml:
     def test_creates_yaml_from_template(self, tmp_path: Path):
         config = tmp_path / "config.yaml"
         config.write_text(
-            yaml.dump({
-                "paths": {"input_dir": "/fake/input", "output_dir": "/fake/output"},
-                "compress": {"target_size_mb": 5},
-            }),
+            yaml.dump(
+                {
+                    "paths": {"input_dir": "/fake/input", "output_dir": "/fake/output"},
+                    "compress": {"target_size_mb": 5},
+                }
+            ),
             encoding="utf-8",
         )
         proj_input = tmp_path / "project"

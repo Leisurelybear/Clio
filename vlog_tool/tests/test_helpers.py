@@ -113,7 +113,14 @@ class TestWriteTextFile:
 class TestRewriteTextFile:
     def test_rewrites_without_changelog(self, tmp_path: Path):
         out = tmp_path / "001_test.txt"
-        analysis = {"title": "Updated", "summary": "New summary", "location": "Tokyo", "mood": "calm", "suggested_use": "b-roll", "source_file": "source.mp4"}
+        analysis = {
+            "title": "Updated",
+            "summary": "New summary",
+            "location": "Tokyo",
+            "mood": "calm",
+            "suggested_use": "b-roll",
+            "source_file": "source.mp4",
+        }
         _rewrite_text_file(out, analysis)
         text = out.read_text(encoding="utf-8")
         assert "Updated" in text
@@ -121,9 +128,15 @@ class TestRewriteTextFile:
 
     def test_rewrites_with_changelog(self, tmp_path: Path):
         out = tmp_path / "001_test.txt"
-        analysis = {"title": "Fixed", "summary": "x", "location": "?",
-                     "mood": "", "suggested_use": "", "source_file": "s.mp4",
-                     "_changelog": ["fixed typo", "updated title"]}
+        analysis = {
+            "title": "Fixed",
+            "summary": "x",
+            "location": "?",
+            "mood": "",
+            "suggested_use": "",
+            "source_file": "s.mp4",
+            "_changelog": ["fixed typo", "updated title"],
+        }
         _rewrite_text_file(out, analysis)
         text = out.read_text(encoding="utf-8")
         assert "本次 refine 改动" in text
@@ -143,8 +156,7 @@ class TestRewriteScriptMd:
 
     def test_rewrite_with_changelog(self, tmp_path: Path):
         out = tmp_path / "001_test.md"
-        script = {"title": "Fixed", "voiceover": "Hello", "edit_tip": "tip",
-                   "_changelog": ["corrected date"]}
+        script = {"title": "Fixed", "voiceover": "Hello", "edit_tip": "tip", "_changelog": ["corrected date"]}
         _rewrite_script_md(out, script)
         text = out.read_text(encoding="utf-8")
         assert "本次 refine 改动" in text
@@ -153,15 +165,22 @@ class TestRewriteScriptMd:
 
 class TestWriteCsv:
     def test_writes_csv_with_records(self, tmp_path: Path, monkeypatch):
-        monkeypatch.setattr("vlog_tool.tasks._helpers.probe_video_info",
-                            lambda *a, **kw: {"duration_sec": 120, "size_mb": 50.0})
+        monkeypatch.setattr("vlog_tool.tasks._helpers.resolve_binary", lambda *a: "ffprobe")
+        monkeypatch.setattr(
+            "vlog_tool.tasks._helpers.probe_video_info", lambda *a, **kw: {"duration_sec": 120, "size_mb": 50.0}
+        )
         out = tmp_path / "summary.csv"
         src = tmp_path / "s.mp4"
         src.write_bytes(b"x")
         records = [
-            ClipRecord(index=1, stem="001_test", source_path=src,
-                       compressed_path=tmp_path / "c.mp4", text_path=tmp_path / "t.txt",
-                       analysis={"title": "Test", "summary": "A vid", "location": "Paris"}),
+            ClipRecord(
+                index=1,
+                stem="001_test",
+                source_path=src,
+                compressed_path=tmp_path / "c.mp4",
+                text_path=tmp_path / "t.txt",
+                analysis={"title": "Test", "summary": "A vid", "location": "Paris"},
+            ),
         ]
         _write_csv(out, records, _fake_config())
         assert out.exists()
@@ -170,7 +189,9 @@ class TestWriteCsv:
         assert "Test" in text
         assert "Paris" in text
 
-    def test_empty_records(self, tmp_path: Path):
+    def test_empty_records(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setattr("vlog_tool.tasks._helpers.resolve_binary", lambda *a: "ffprobe")
+        monkeypatch.setattr("vlog_tool.tasks._helpers.probe_video_info", lambda *a, **kw: {})
         out = tmp_path / "empty.csv"
         _write_csv(out, [], _fake_config())
         assert out.exists()
