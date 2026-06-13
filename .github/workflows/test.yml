@@ -75,7 +75,7 @@ jobs:
 
     - name: Run tests with coverage
       run: |
-        python -m pytest vlog_tool/tests/ --cov=vlog_tool --cov-report=term --cov-report=xml
+        python -m pytest vlog_tool/tests/ --cov=vlog_tool --cov-branch --cov-report=term --cov-report=xml
 
     - name: Upload coverage to Codecov
       if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.11'

@@ -1,3 +1,6 @@
+[![CI](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml/badge.svg)](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml)
+[![codecov](https://codecov.io/gh/Leisurelybear/vlog-editing-helper/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/Leisurelybear/vlog-editing-helper)
+
 # Vlog 剪辑辅助工具
 
 旅行 vlog 剪辑前的 AI 预处理流水线：压缩素材 → 生成摘要与时间轴 → 口播文案 → vlog 剪辑规划。
@@ -561,7 +564,7 @@ vlog-video-analysis/
 ├── setup.ps1             # 一键环境配置
 ├── main.py               # CLI 入口
 ├── .github/workflows/    # GitHub Actions CI
-├── vlog_tool/tests/      # 单元测试（118 用例）
+├── vlog_tool/tests/      # 单元测试（343 用例）
 ├── templates/
 │   ├── vlog_template.md  # 口播风格模板
 │   └── trip_context.md   # 旅行背景与 AI 规范
@@ -581,7 +584,7 @@ vlog-video-analysis/
     │   ├── plan.py / label.py / cut.py / refine.py
     │   └── _helpers.py
     ├── pipeline.py       # 编排层（~96 行）
-    ├── tests/            # 单元测试（118 用例）
+    ├── tests/            # 单元测试（343 用例）
     └── ui/               # 本地 Web UI（拆分自 server.py）
         ├── server.py     # 分发层（~454 行）
         ├── routes/       # 路由处理（videos / projects / texts / plan / config / run / fs）
@@ -603,15 +606,25 @@ vlog-video-analysis/
 
 ## 测试
 
-项目包含 **128 个 pytest 单元测试**，覆盖核心纯函数：
+项目包含 **343 个 pytest 单元测试**，覆盖核心纯函数、路由 handler、辅助函数和编排逻辑：
 
 | 模块 | 用例数 | 覆盖内容 |
 |------|--------|----------|
-| `tests/test_config.py` | 34 | 配置加载 / deep-merge / 校验 |
-| `tests/test_utils.py` | 34 | extract_json / mask_if_looks_like_key / sanitize_name / find_videos |
-| `tests/test_cut.py` | 25 | 时间解析 / 文件名生成 |
-| `tests/test_log.py` | 13 | TeeWriter / timed / format_size / format_duration |
-| `tests/test_progress.py` | 12 | ProgressTracker 读写与初始化 |
+| `test_config.py` | 34 | 配置加载 / deep-merge / 校验 |
+| `test_utils.py` | 34 | extract_json / mask_if_looks_like_key / sanitize_name / find_videos |
+| `test_cut.py` | 25 | 时间解析 / 文件名生成 |
+| `test_log.py` | 13 | TeeWriter / timed / format_size / format_duration |
+| `test_progress.py` | 12 | ProgressTracker 读写与初始化 |
+| `test_ai.py` | 12 | factory dispatch / provider 实例化 / TaskName |
+| `test_analyze.py` | 10 | `_resolve_original` 文件匹配 |
+| `test_analyze_funcs.py` | 9 | `_wrap_with_context` / `plan_daily_vlog` 过滤 |
+| `test_split.py` | 7 | `split_video` segment 计算 |
+| `test_compress.py` | 6 | `compress_video` 码率 / 参数 |
+| `test_file_service.py` | 60 | 安全 basename / atomic save / segment 匹配 / config 类型转换 |
+| `test_helpers.py` | 20 | `_next_index` / `_write_csv` / `_rewrite_text_file` |
+| `test_project_service.py` | 22 | output dir / registry / step detection |
+| `test_routes_*.py` | 37 | 视频 / 计划 / 配置 / 运行 / 项目路由 handler |
+| `test_tasks_*.py` | 9 | `run_compress_all` / `run_analyze_all` 编排 |
 
 每次推送到 main 或提 PR 时，GitHub Actions 自动在 Python 3.11 / 3.12 上运行测试。
 
