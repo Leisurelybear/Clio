@@ -119,6 +119,7 @@ class TestHandlePutConfigRaw:
         handler.server.input_dir = tmp_path
         handler._resolve_project_input.return_value = proj_input
         handler.__class__._config_cache = {}
+        handler.__class__._config_cache_lock = MagicMock()
         handler._send_json = MagicMock()
 
         handle_put_config_raw(handler, {}, {"compress": {"target_size_mb": 10}})

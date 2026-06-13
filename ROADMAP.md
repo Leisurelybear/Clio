@@ -331,6 +331,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-021 | `cut.py:51` ffmpeg 用了 `-to` 语义上应为 `-t`（指定时长） | 改 `-to duration_sec` → `-t duration_sec` | ✅ `fix/B-021-cut-to-to-t` |
 | B-022 | `project_service.py:52` `_detect_steps` 中 `any(t.iterdir() for t in texts)` — iterdir() 生成器永远为 truthy，空目录也被判为 analyze 已完成 | 改成 `any(any(True for _ in t.iterdir()) for t in texts)` | ✅ `fix/B-022-detect-steps-empty-dir` |
 | B-023 | `routes/projects.py` 创建/写入 project.json 用 `write_text()` 绕过 `_save_atomic`，崩溃留损坏文件 | 改用 `_save_atomic` | ✅ `fix/B-023-project-json-atomic` |
+| B-053 | `sidebar.js:pollRerunStatus` `statusEl`/`fill`/`logsEl` 在早期 `return` 前未声明，触发 ReferenceError | 变量声明提升到 `return` 之前 | ✅ `c283bb9` |
 
 ### P1 — 近期
 
@@ -349,6 +350,10 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-030 | `pyproject.toml:3` `build-backend` 私有 API | 改用 `setuptools.build_meta:__legacy__` | ✅ `fix/B-030-pyproject-backend` |
 | B-031 | `server.py:107-109` `_config_cache` 多线程无锁 | 加 `_config_cache_lock` | ✅ `fix/B-031-config-cache-lock` |
 | B-038 | `server.py:393-395` Phase 1c 重构遗漏 `config_path` 类属性暴露 | 添加 `Handler.config_path = config_path` | ✅ `fix/B-031-config-path-exposure` |
+| B-054 | `routes/run.py` `_run_thread` check-and-set 未受锁保护，`handle_post_run_start` / `handle_post_rerun` 可并发启动两条流水线 | `handler.__class__._run_lock` 包裹读写 | ✅ `dc01300` |
+| B-055 | `server.py` `_config_cache.pop` 未加锁，并发 PUT config 时数据竞争导致缓存不一致 | 用 `_config_cache_lock` 包裹 `.pop()` | ✅ `93eb4f1` |
+| B-056 | `analyze.py:_resolve_original` 只识别 `.mp4`/`.mov`/`.mkv`/`.mts`/`.m2ts`，漏 `.m4v`/`.webm` | 补全扩展名列表 | ✅ `8608d14` |
+| B-057 | `server.py` 视频响应固定 `Content-Type: video/mp4`，`.mov`/`.webm` 等扩展名返回错误 MIME | 按实际文件扩展名选择 Content-Type | ✅ `18f7358` |
 
 ### P2 — 中期
 
@@ -367,6 +372,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-039 | `openai_compat.py:28` `httpx.Client` 在 `__init__` 创建后无 `close()`，长服务连接泄漏 | 添加 `close()` 方法 | ✅ |
 | B-040 | `config.py:119` `_path()` 值为空时静默返回 `.`，忘记配置路径时对当前目录执行读写 | 值为空时 raise `ValueError` | ✅ |
 | B-041 | `file_service.py:46` `_save_atomic` 的 `.tmp` 文件名固定，多线程下两请求同时写同一文件互相覆盖 | 加 `os.urandom(4).hex()` 随机后缀 | ✅ |
+| B-058 | `file_service.py:_save_atomic` 跳过已有 `.bak` 不覆盖，旧 `.bak` 与最新内容不符，多次保存后 `.bak` 反映的是最早版本 | 改为每次保存都覆盖 `.bak` | ✅ `7868a95` |
 
 ### P3 — 长期
 
@@ -408,6 +414,13 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `93eb4f1` | fix(ui): wrap _config_cache.pop with _config_cache_lock |
+| `dc01300` | fix(run): serialize _run_thread check-and-set under _run_lock |
+| `c283bb9` | fix(ui): hoist statusEl/fill/logsEl before early return |
+| `8608d14` | fix(analyze): add .m4v and .webm to _resolve_original |
+| `18f7358` | fix(ui): serve correct MIME type per video extension |
+| `7868a95` | fix(ui): overwrite stale .bak in _save_atomic instead of skip |
+| `3b69ff0` | fix(ui): prevent duplicate project in _list_projects |
 | `e404042` | docs: add UI screenshots to README preview |
 | `4aa5015` | ci: add --cov-branch, README coverage badge + 343 test table |
 | `51ac8fc` | fix(tests): cross-platform CI failures (MTS case, PermissionError, thread leak) |

@@ -54,6 +54,7 @@ class TestHandleGetRunStatus:
 class TestHandlePostRunStart:
     def test_already_running(self):
         handler = MagicMock()
+        handler.__class__._run_lock = MagicMock()
         handler._run_thread = MagicMock()
         handler._run_thread.is_alive.return_value = True
         handler._send_json = MagicMock()
@@ -64,6 +65,7 @@ class TestHandlePostRunStart:
 
     def test_starts_thread(self, tmp_path: Path, _no_thread):
         handler = MagicMock()
+        handler.__class__._run_lock = MagicMock()
         handler._run_thread = None
         handler._resolve_project_input.return_value = tmp_path / "input"
         handler._get_config.return_value = MagicMock()
@@ -100,6 +102,7 @@ class TestHandlePostRerun:
 
     def test_starts_rerun(self, tmp_path: Path, _no_thread):
         handler = MagicMock()
+        handler.__class__._run_lock = MagicMock()
         handler._run_thread = None
         proj_input = tmp_path / "input"
         proj_input.mkdir()

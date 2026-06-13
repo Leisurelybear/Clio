@@ -172,9 +172,9 @@ ai:
 
 ## 7. 项目当前状态
 
-最后更新：2026-06-10（全面 review + ROADMAP 同步）。添加了测试基础设施：
+最后更新：2026-06-13（HIGH 优先级 bug audit + 343 测试稳定）。已上线：
 - GitHub Actions CI（Ubuntu，Python 3.11/3.12）
-- 128 个 pytest 用例：config(34) / utils(34) / cut(25) + log(13) + progress(12)
+- 343 个 pytest 用例：config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(9) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / file_service_routes(35)
 - 依赖版本锁定 `requirements-locked.txt`
 最近做的 commit 顺序：
 1. `chore: scaffold initial Vlog editing helper project`
@@ -239,12 +239,19 @@ ai:
 60. `feat(ui): add group_key/segment_label/groups to /api/videos response (方案B backend)`  ← routes/videos.py 两遍 pass
 61. `feat(ui): add CSS for video group tree (方案B CSS)`  ← style.css 4 个 group class
 62. `feat(ui): add group tree rendering to sidebar (方案B frontend)`  ← sidebar.js renderVideoItem + 树状 renderVideoList
+63. `3b69ff0` `fix(ui): prevent duplicate project in _list_projects — missing seen_dirs.add in sibling scan`  ← 同级目录扫描漏掉 seen_dirs.add，导致重复项目
+64. `7868a95` `fix(ui): overwrite stale .bak in _save_atomic instead of skip`  ← 每次保存覆盖 .bak，防止无限堆积
+65. `18f7358` `fix(ui): serve correct MIME type per video extension instead of hardcoded video/mp4`  ← 按扩展名选择 Content-Type
+66. `8608d14` `fix(analyze): add .m4v and .webm to _resolve_original extension list`  ← 补齐缺失的扩展名
+67. `c283bb9` `fix(ui): hoist statusEl/fill/logsEl before early return`  ← 解决 pollRerunStatus 中 statusEl 声明前使用的 ReferenceError
+68. `dc01300` `fix(run): serialize _run_thread check-and-set under _run_lock`  ← TOCTOU 竞态，加锁保护
+69. `93eb4f1` `fix(ui): wrap _config_cache.pop with _config_cache_lock to fix data race`  ← 修复 config 缓存 pop 的无锁数据竞争
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
 
 项目文档状态：
-- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010 + Bug 跟踪（B-001~B-020）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-005）
+- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010 + Bug 跟踪（B-001~B-058）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-005）
 - B-001/B-002/B-003 已修复；仍有多项 P0~P3 Bug 待修
 - per-project 配置已实现：每个项目目录下可选 `project.yaml`，deep-merge 覆盖全局 config.yaml
 - 视频分段压缩已实现（split.py + compress Phase 1/2），默认 15 分钟分割阈值

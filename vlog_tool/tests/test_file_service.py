@@ -104,13 +104,13 @@ class TestSaveAtomic:
         bak = target.with_suffix(".txt.bak")
         assert bak.read_bytes() == b"original"
 
-    def test_backup_not_overwritten(self, tmp_path: Path):
+    def test_backup_overwritten_on_subsequent_saves(self, tmp_path: Path):
         target = tmp_path / "test.txt"
         target.write_bytes(b"original")
         _save_atomic(target, b"updated")
         _save_atomic(target, b"final")
         bak = target.with_suffix(".txt.bak")
-        assert bak.read_bytes() == b"original"
+        assert bak.read_bytes() == b"updated"
 
     def test_tmp_file_cleaned(self, tmp_path: Path):
         target = tmp_path / "test.txt"
