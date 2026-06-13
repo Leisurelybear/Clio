@@ -112,7 +112,8 @@ def handle_post_project_create(handler: BaseHTTPRequestHandler, obj: dict) -> No
     _save_atomic(proj_file, json.dumps(proj_data, ensure_ascii=False, indent=2).encode("utf-8"))
     # Auto-create project.yaml (silent failure is fine)
     _create_project_yaml(input_path, config_path, proj_out)
-    handler.__class__._config_cache.pop(str(input_path.resolve()), None)
+    with handler.__class__._config_cache_lock:
+        handler.__class__._config_cache.pop(str(input_path.resolve()), None)
     _add_to_registry(str(input_path), config_path)
     handler._send_json(
         {"ok": True, "project": {"name": name, "input_dir": str(input_path), "output_dir": str(proj_out)}}
@@ -146,7 +147,8 @@ def handle_post_project_add(handler: BaseHTTPRequestHandler, obj: dict) -> None:
         }
         _save_atomic(proj_file, json.dumps(proj_data, ensure_ascii=False, indent=2).encode("utf-8"))
         _create_project_yaml(input_path, config_path, proj_out)
-        handler.__class__._config_cache.pop(str(input_path.resolve()), None)
+        with handler.__class__._config_cache_lock:
+            handler.__class__._config_cache.pop(str(input_path.resolve()), None)
         name = input_path.name
     else:
         try:

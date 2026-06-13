@@ -102,7 +102,8 @@ def handle_put_config_raw(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
             else:
                 target_path.unlink(missing_ok=True)
             return handler._send_json({"ok": False, "error": f"config validation failed: {e}"}, 400)
-        handler.__class__._config_cache.pop(str(proj_input.resolve()), None)
+        with handler.__class__._config_cache_lock:
+            handler.__class__._config_cache.pop(str(proj_input.resolve()), None)
         return handler._send_json({"ok": True, "path": str(target_path)})
     # Global config.yaml write (original logic)
     try:
@@ -149,5 +150,6 @@ def handle_post_config_init(handler: BaseHTTPRequestHandler, qs: dict, obj: dict
         return handler._send_json(
             {"ok": False, "error": "failed to create project.yaml (global config.yaml not available)"}, 500
         )
-    handler.__class__._config_cache.pop(str(proj_input.resolve()), None)
+    with handler.__class__._config_cache_lock:
+        handler.__class__._config_cache.pop(str(proj_input.resolve()), None)
     handler._send_json({"ok": True, "path": str(result)})
