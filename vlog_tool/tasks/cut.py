@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 
@@ -11,7 +12,34 @@ from vlog_tool.config import AppConfig
 from vlog_tool.cut import cut_one, parse_time_range
 from vlog_tool.log import format_duration, timed
 from vlog_tool.tasks._helpers import _eta_line
-from vlog_tool.utils import resolve_binary, sanitize_name
+from vlog_tool.utils import get_duration_sec, resolve_binary, sanitize_name
+
+_SEG_RE = re.compile(r"^(.+)_seg(\d+)$")
+
+
+def _compute_segment_offset(compressed_stem: str, comp_dir: Path, original_path: Path, ffprobe: str) -> float:
+    """For a split segment, compute its start offset in the original video.
+    Returns 0.0 if the file is not a segment or offset cannot be computed.
+    """
+    m = _SEG_RE.match(compressed_stem.split("_", 1)[1] if "_" in compressed_stem else "")
+    if not m:
+        return 0.0
+    prefix = m.group(1).lower()
+    seg_num = int(m.group(2))
+    total = 0
+    for p in sorted(comp_dir.iterdir()):
+        if p.suffix.lower() not in VIDEO_EXTS:
+            continue
+        pm = _SEG_RE.match(p.stem.split("_", 1)[1] if "_" in p.stem else "")
+        if pm and pm.group(1).lower() == prefix:
+            total = max(total, int(pm.group(2)))
+    if total <= 1:
+        return 0.0
+    try:
+        dur = get_duration_sec(original_path, ffprobe)
+    except Exception:
+        return 0.0
+    return round((seg_num - 1) * dur / total, 1)
 
 
 def run_cut_all(
@@ -41,6 +69,7 @@ def run_cut_all(
     out_root = (output_dir or config.paths.output_dir / "cuts" / day_label).resolve()
     out_root.mkdir(parents=True, exist_ok=True)
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
+    ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
     comp_dir = config.compressed_dir
     input_dir = config.paths.input_dir
 
@@ -57,8 +86,11 @@ def run_cut_all(
             if not comp_candidates:
                 return None
             suffix = comp_candidates[0].stem.split("_", 1)[1].lower()
+            # If the compressed file has _segNN, strip it to find the original
+            m = _SEG_RE.match(suffix)
+            orig_stem = m.group(1) if m else suffix
             for p in sorted(input_dir.iterdir()):
-                if p.is_file() and p.suffix.lower() in VIDEO_EXTS and p.stem.lower() == suffix:
+                if p.is_file() and p.suffix.lower() in VIDEO_EXTS and p.stem.lower() == orig_stem:
                     return p
             return None
 
@@ -87,6 +119,17 @@ def run_cut_all(
             except ValueError as e:
                 print(f"  [跳过] 时间格式错误 '{timeline}': {e}")
                 continue
+
+            # Apply segment offset for original source with split videos
+            offset = 0.0
+            if source == "original":
+                comp_candidates = sorted(comp_dir.glob(f"{idx}_*"))
+                if comp_candidates:
+                    stem = comp_candidates[0].stem
+                    offset = _compute_segment_offset(stem, comp_dir, video_path, ffprobe)
+                    if offset:
+                        start += offset
+                        end += offset
 
             clip_stem = f"{idx}_{sanitize_name(title, max_len=30)}_seg_{i:03d}"
             clip_path = out_root / f"{clip_stem}.mp4"
