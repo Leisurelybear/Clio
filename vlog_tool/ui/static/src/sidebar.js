@@ -127,6 +127,7 @@ function renderVideoItem(v) {
   }
   li.innerHTML = `
     <div class="video-name">${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)}</div>
+    ${v.title ? `<div class="video-title">${escapeHtml(v.title)}</div>` : ''}
     <div class="video-match">${matchBadge}</div>
     <div class="video-meta">
       <span class="${tCls}">${tLabel}</span>

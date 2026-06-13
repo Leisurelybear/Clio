@@ -190,6 +190,7 @@ aside, section { overflow-y: auto; }
 .video-item.no-match { opacity: 0.5; }
 
 .video-name { font-weight: 500; word-break: break-all; font-size: var(--text-base); display: flex; align-items: center; gap: 6px; }
+.video-title { font-size: var(--text-xs); color: var(--text-secondary); margin: 0 0 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .video-match { margin: 2px 0 0; font-size: var(--text-xs); line-height: 1.4; }
 .match-badge {
   display: inline-flex; align-items: center; gap: 3px;

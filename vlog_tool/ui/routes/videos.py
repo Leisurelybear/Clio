@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import re
 from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
@@ -44,12 +45,19 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
 
     # texts/scripts sidecars are keyed by the compressed index in both views
     text_sidecars: dict[str, list[str]] = {}
+    text_titles: dict[str, str] = {}
     for td in _find_texts_dirs(proj_out):
         for f in sorted(td.iterdir()):
             if f.suffix != ".json" or "_" not in f.stem:
                 continue
             idx = f.stem.split("_", 1)[0]
             text_sidecars.setdefault(idx, []).append(f.name)
+            if idx not in text_titles:
+                try:
+                    data = json.loads(f.read_text(encoding="utf-8"))
+                    text_titles[idx] = data.get("title", "")
+                except Exception:
+                    text_titles[idx] = ""
     script_sidecars: dict[str, list[str]] = {}
     sd = proj_out / "scripts"
     if sd.is_dir():
@@ -77,6 +85,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                     "file": p.name,
                     "source": "compressed",
                     "index": idx,
+                    "title": text_titles.get(idx, ""),
                     "text_json": (text_sidecars.get(idx) or [None])[0],
                     "script_json": (script_sidecars.get(idx) or [None])[0],
                     "match": ({"source": "original", "file": orig} if orig else None),
@@ -123,6 +132,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                             "file": p.name,
                             "source": "original",
                             "index": c_idx,
+                            "title": text_titles.get(c_idx, ""),
                             "text_json": (text_sidecars.get(c_idx) or [None])[0],
                             "script_json": (script_sidecars.get(c_idx) or [None])[0],
                             "match": {"source": "compressed", "file": c_file, "index": c_idx},
