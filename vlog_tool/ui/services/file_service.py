@@ -69,19 +69,53 @@ def _create_project_yaml(proj_input: Path, config_path: Path | None, proj_out: P
         paths["input_dir"] = str(proj_input.resolve())
         paths["output_dir"] = str(proj_out.resolve())
         raw["paths"] = paths
-        # 默认项目背景模板（不含特定内容，用户可编辑，留空也不影响生成）
         raw.setdefault("ai", {})
         raw["ai"].setdefault("context", "")
-        providers = raw["ai"].setdefault("providers", {})
-        for pname, pcfg in providers.items():
-            if isinstance(pcfg, dict):
-                pcfg.setdefault("requests_per_minute", 0)
-                pcfg.setdefault("retry_attempts", 2)
+        _inject_provider_defaults(raw)
         yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
         _save_atomic(target, yml.encode("utf-8"))
         return target
     except Exception:
         return None
+
+
+def _inject_provider_defaults(raw: dict) -> None:
+    """Inject default provider fields (requests_per_minute, retry_attempts) into
+    the ai.providers section of a config dict. Only touches provider blocks."""
+    providers = raw.get("ai", {}).get("providers", {})
+    for pname, pcfg in providers.items():
+        if isinstance(pcfg, dict):
+            pcfg.setdefault("requests_per_minute", 0)
+            pcfg.setdefault("retry_attempts", 2)
+
+
+def _migrate_project_configs(projects_root: Path) -> tuple[int, list[str]]:
+    """Scan for project.yaml files and inject missing provider defaults.
+    Returns (count_updated, list of errors)."""
+    import os
+    updated = 0
+    errors: list[str] = []
+    if not projects_root.is_dir():
+        return updated, errors
+    for proj_dir in projects_root.iterdir():
+        if not proj_dir.is_dir():
+            continue
+        proj_yaml = proj_dir / "project.yaml"
+        if not proj_yaml.is_file():
+            continue
+        try:
+            with open(proj_yaml, encoding="utf-8") as f:
+                raw = yaml.safe_load(f) or {}
+            before = yaml.dump(raw, allow_unicode=True, sort_keys=False)
+            _inject_provider_defaults(raw)
+            after = yaml.dump(raw, allow_unicode=True, sort_keys=False)
+            if before != after:
+                yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
+                _save_atomic(proj_yaml, yml.encode("utf-8"))
+                updated += 1
+        except Exception as e:
+            errors.append(f"{proj_dir.name}: {e}")
+    return updated, errors
 
 
 def _list_drives() -> list[str]:

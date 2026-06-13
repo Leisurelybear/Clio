@@ -4,8 +4,8 @@ from vlog_tool.ui.services.file_service import (
     _find_compressed_for_original,
     _find_original_for_compressed,
     _find_texts_dirs,
-    _is_safe_basename,
     _list_drives,
+    _migrate_project_configs,
     _save_atomic,
 )
 from vlog_tool.ui.services.project_service import (
@@ -26,6 +26,7 @@ __all__ = [
     "_find_original_for_compressed",
     "_find_compressed_for_original",
     "_coerce_config_types",
+    "_migrate_project_configs",
     "_project_output_dir",
     "_detect_steps",
     "_registry_path",

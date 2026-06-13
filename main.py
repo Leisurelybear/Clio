@@ -21,6 +21,7 @@ from vlog_tool.pipeline import (
     run_refine_texts,
 )
 from vlog_tool.ui import run as run_ui
+from vlog_tool.ui.services.file_service import _migrate_project_configs
 from vlog_tool.utils import discover_ffmpeg_bin, find_videos
 
 PLACEHOLDER_KEYS = {"your_api_key_here", "YOUR_API_KEY", ""}
@@ -196,6 +197,9 @@ def main(argv: list[str] | None = None) -> int:
         help="临时上下文说明，附加到 ai.context 之后（仅本次 refine 生效）",
     )
 
+    p_migrate = sub.add_parser("migrate-config", help="扫描已有项目的 project.yaml，补充缺失的 provider 配置字段")
+    p_migrate.add_argument("--projects-root", type=Path, default=None, help="项目根目录（扫描子目录中的 project.yaml）")
+
     p_serve = sub.add_parser("serve", help="启动本地 web UI（浏览器里可视化编辑 AI 输出）")
     p_serve.add_argument("--host", default="127.0.0.1", help="监听地址（默认 127.0.0.1，不暴露到局域网）")
     p_serve.add_argument("--port", type=int, default=8765, help="端口（默认 8765）")
@@ -274,6 +278,15 @@ def main(argv: list[str] | None = None) -> int:
                 reencode=args.reencode,
                 source=args.source,
             )
+        elif args.command == "migrate-config":
+            root = args.projects_root or config.paths.input_dir.parent
+            updated, errors = _migrate_project_configs(root)
+            print(f"已更新 {updated} 个 project.yaml")
+            if errors:
+                print("错误:")
+                for e in errors:
+                    print(f"  - {e}")
+            return 0
         elif args.command == "serve":
             return run_ui(
                 config,
