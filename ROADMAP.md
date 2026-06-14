@@ -303,10 +303,10 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - 限制 `_config_cache` 大小上限
 
 **子任务**：
-- [ ] R-015a：`POST /api/config/raw` 全局保存后调 `_config_cache.clear()`
+- [x] R-015a：`POST /api/config/raw` 全局保存后调 `_config_cache.clear()` ← `e21373e`
 - [ ] R-015b：`_get_config()` 加 mtime 缓存失效
 - [ ] R-015c：前端区分项目级 vs 全局保存提示信息
-- [ ] R-015d：`_config_cache` 添加 maxsize 限制
+- [x] R-015d：`_config_cache` 添加 maxsize 限制（LRU cap 20） ← `e21373e`
 
 ## 暂存 / WIP
 
@@ -350,6 +350,8 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-022 | `project_service.py:52` `_detect_steps` 中 `any(t.iterdir() for t in texts)` — iterdir() 生成器永远为 truthy，空目录也被判为 analyze 已完成 | 改成 `any(any(True for _ in t.iterdir()) for t in texts)` | ✅ `fix/B-022-detect-steps-empty-dir` |
 | B-023 | `routes/projects.py` 创建/写入 project.json 用 `write_text()` 绕过 `_save_atomic`，崩溃留损坏文件 | 改用 `_save_atomic` | ✅ `fix/B-023-project-json-atomic` |
 | B-053 | `sidebar.js:pollRerunStatus` `statusEl`/`fill`/`logsEl` 在早期 `return` 前未声明，触发 ReferenceError | 变量声明提升到 `return` 之前 | ✅ `c283bb9` |
+| B-061 | `config_routes.py` 全局 config 保存后 `_config_cache` 未失效，新配置无效直到重启 | 写盘后调 `_config_cache.clear()` | ✅ `e21373e` |
+| B-062 | `tasks/analyze.py` `glob("*.mp4")` 仅匹配 `.mp4`，丢失 `.mov`/`.m4v` 等视频格式 | 替换为 `VIDEO_EXTS` 过滤 | ✅ `51f50d7` |
 
 ### P1 — 近期
 
@@ -372,6 +374,10 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-055 | `server.py` `_config_cache.pop` 未加锁，并发 PUT config 时数据竞争导致缓存不一致 | 用 `_config_cache_lock` 包裹 `.pop()` | ✅ `93eb4f1` |
 | B-056 | `analyze.py:_resolve_original` 只识别 `.mp4`/`.mov`/`.mkv`/`.mts`/`.m2ts`，漏 `.m4v`/`.webm` | 补全扩展名列表 | ✅ `8608d14` |
 | B-057 | `server.py` 视频响应固定 `Content-Type: video/mp4`，`.mov`/`.webm` 等扩展名返回错误 MIME | 按实际文件扩展名选择 Content-Type | ✅ `18f7358` |
+| B-063 | `routes/videos.py` `segment_matches` 字段前端用到但后端从未返回 | 返回 `segment_matches` 数组 | ✅ `7f05ee4` |
+| B-064 | `analyze.py` `trip_context.md` 路径硬编码为包目录，多项目场景下定位错误 | 项目级优先查找 + 读缓存 | ✅ `fe57a7f` |
+| B-065 | `routes/config.py`+`routes/projects.py` 8 处 `hasattr(handler.server,...)` 防御代码 | 统一在 `make_handler` 绑定后直接访问 | ✅ `34c0d3b` |
+| B-066 | `server.py` `_config_cache` 无上限，长期运行内存泄漏 | LRU cap 20 条，超限淘汰最旧条目 | ✅ `e21373e` |
 
 ### P2 — 中期
 
@@ -391,6 +397,11 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-040 | `config.py:119` `_path()` 值为空时静默返回 `.`，忘记配置路径时对当前目录执行读写 | 值为空时 raise `ValueError` | ✅ |
 | B-041 | `file_service.py:46` `_save_atomic` 的 `.tmp` 文件名固定，多线程下两请求同时写同一文件互相覆盖 | 加 `os.urandom(4).hex()` 随机后缀 | ✅ |
 | B-058 | `file_service.py:_save_atomic` 跳过已有 `.bak` 不覆盖，旧 `.bak` 与最新内容不符，多次保存后 `.bak` 反映的是最早版本 | 改为每次保存都覆盖 `.bak` | ✅ `7868a95` |
+| B-067 | `tasks/analyze.py:43` lazy `import re` 在热路径中 | 移到文件顶部 | ✅ `51f50d7` |
+| B-068 | `split.py` `-c copy` 按时间切割，非关键帧处片段开头有黑帧，AI 可能误判 | 文档说明；或提供 `--reencode-split` 选项 | 🆕 |
+| B-069 | `progress.py` tmp 文件名固定，多进程下可能冲突 | 改用 `os.urandom(4).hex()` 随机后缀 | ✅ `ea2e79c` |
+| B-070 | `pipeline.py` 未知 step 名导致 `NoneType` 调用崩溃 | 循环前验证 step 名并提前 `raise ValueError` | ✅ `34846df` |
+| B-071 | `server.py` Range 请求 `length=0`（`start=size-1` 时）未保护 | 加 `length <= 0` 边界检查 | ✅ `e21373e` |
 
 ### P3 — 长期
 
@@ -402,6 +413,9 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-045 | `sidebar.js:177` 视频列表每次渲染都在 `document` 上堆积 `{ once: true }` click 监听器，关闭 dropdown 逻辑失效 | 改用事件委托 + 持久 handler，或渲染前 `removeEventListener` | ✅ `a276225` |
 | B-059 | `_parse_providers` 未读取 `requests_per_minute` 与 `retry_attempts` 从 YAML | `cfg.get("requests_per_minute", 0)` + `retry_attempts` 默认值统一为 2 | ✅ `a276225` |
 | B-060 | 原视频视图下 split 段 index 丢失 — 每个原文件只取 `comp[0]`，plan 引用 `002`/`003` 时找不到对应条目报 404 | 遍历 `comp` 所有匹配，每个 split 段创建独立 video entry | ✅ `c59880d` |
+| B-072 | `tasks/compress.py` 损坏的 `.mp4` 会被 `skip_existing` 永久跳过不重试 | 加文件完整性校验或 fallback 重试 | 🆕 |
+| B-073 | `routes/videos.py` `_parse_segment_info` 只识别 `001_GL010683_seg01` 格式 | 放宽命名格式假设，支持用户自定义命名 | 🆕 |
+| B-074 | `analyze.py:_wrap_with_context` 每次 AI 调用都读 `trip_context.md` 磁盘 | 模块级 `_trip_context_cache` 缓存 | ✅ `fe57a7f` |
 
 ## ~~测试覆盖盲区~~ ✅ 全部修复（163 新测试，2026-06-13）
 
@@ -434,6 +448,18 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `34846df` | fix(pipeline): validate step names before execution |
+| `ea2e79c` | fix(progress): random suffix for tmp file to avoid name conflicts |
+| `34c0d3b` | refactor(ui): remove hasattr(handler.server) patterns, use direct attr access |
+| `fe57a7f` | fix(analyze): use project-level trip_context.md with read cache |
+| `7f05ee4` | feat(ui): return segment_matches array for multi-segment original videos |
+| `51f50d7` | fix(analyze): replace *.mp4 glob with VIDEO_EXTS filtering, move import re to top |
+| `e21373e` | fix(config): clear _config_cache on global config write and cap cache at 20 entries |
+| `fad1cc8` | feat: add .lrv (GoPro proxy) video format support |
+| `cb4d8e9` | fix(ui): delegate browse-btn click handler to cover dynamically created buttons |
+| `2cc3451` | fix(cut): resolve original source path and apply segment offset for split videos |
+| `86a281d` | fix(ui): add offset_sec to timeline click seek in texts tab |
+| `c78622f` | fix(ui): compute segment offset_sec for original view |
 | `3fb8263` | fix(ui): update plan preview counter and unique video identity for split segments |
 | `e6e068c` | feat(ui): show AI analysis title below filename in sidebar video list |
 | `e72ba10` | fix(ui): create per-segment entries in original video view for plan segment playback |

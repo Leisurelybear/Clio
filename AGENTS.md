@@ -172,9 +172,9 @@ ai:
 
 ## 7. 项目当前状态
 
-最后更新：2026-06-13（HIGH 优先级 bug audit + 343 测试稳定）。已上线：
+最后更新：2026-06-14（代码审查 P0~P3 14 项修了 12 项 + 344 测试稳定）。已上线：
 - GitHub Actions CI（Ubuntu，Python 3.11/3.12）
-- 343 个 pytest 用例：config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(9) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / file_service_routes(35)
+- 344 个 pytest 用例：config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(9) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / file_service_routes(35)
 - 依赖版本锁定 `requirements-locked.txt`
 最近做的 commit 顺序：
 1. `chore: scaffold initial Vlog editing helper project`
@@ -255,13 +255,25 @@ ai:
 76. `e72ba10` `fix(ui): create per-segment entries in original video view for plan segment playback`  ← split 段独立条目
 77. `e6e068c` `feat(ui): show AI analysis title below filename in sidebar video list`  ← 视频列表展示 AI 标题
 78. `3fb8263` `fix(ui): update plan preview counter and unique video identity for split segments in original view`  ← 预览计数器动态刷新 + 原视图 split 段独立标识
+79. `c78622f` `fix(ui): compute segment offset_sec for original view so plan playback seeks to correct position`  ← split 段 offset 计算
+80. `86a281d` `fix(ui): add offset_sec to timeline click seek in texts tab for split segments in original view`  ← timeline seek 加 offset
+81. `2cc3451` `fix(cut): resolve original source path and apply segment offset for split videos`  ← cut split 段双 bug 修复
+82. `cb4d8e9` `fix(ui): delegate browse-btn click handler to cover dynamically created buttons`  ← 浏览按钮事件委托
+83. `fad1cc8` `feat: add .lrv (GoPro proxy) video format support`  ← GoPro 代理视频格式支持
+84. `e21373e` `fix(config): clear _config_cache on global config write and cap cache at 20 entries`  ← P0-001 + P1-004
+85. `51f50d7` `fix(analyze): replace *.mp4 glob with VIDEO_EXTS filtering, move import re to top`  ← P0-002 + P2-001
+86. `7f05ee4` `feat(ui): return segment_matches array for multi-segment original videos`  ← P1-001
+87. `fe57a7f` `fix(analyze): use project-level trip_context.md with read cache`  ← P1-002 + P3-003
+88. `34c0d3b` `refactor(ui): remove hasattr(handler.server) patterns, use direct attr access`  ← P1-003
+89. `ea2e79c` `fix(progress): random suffix for tmp file to avoid name conflicts`  ← P2-003
+90. `34846df` `fix(pipeline): validate step names before execution`  ← P2-004
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
 
 项目文档状态：
-- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012/ R-013/ R-014/ R-015 + Bug 跟踪（B-001~B-060）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）
-- B-001/B-002/B-003 已修复；仍有多项 P0~P3 Bug 待修
+- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012/ R-013/ R-014/ R-015（a[✓] d[✓]）+ Bug 跟踪（B-001~B-074）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）+ 代码审查 P0~P3（14 项修了 12 项）
+- 2026-06-14 代码审查修复 12/14 项（P0-001/P0-002/P1-001~P1-004/P2-001/P2-003~P2-005/P3-003）；剩余 P2-002（split 黑帧需权衡）/P3-001（损坏 mp4 永久跳过）/P3-002（segment 命名格式过严）
 - per-project 配置已实现：每个项目目录下可选 `project.yaml`，deep-merge 覆盖全局 config.yaml
 - 视频分段压缩已实现（split.py + compress Phase 1/2），默认 15 分钟分割阈值
 - UI compressed view 已支持 `_segNN` 分组树：segment 文件按原文件名分组显示，可折叠/展开
