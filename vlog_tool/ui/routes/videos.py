@@ -143,19 +143,21 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                             offsets[idx] = round(i * seg_dur, 1)
                     except Exception:
                         pass
+                segment_matches = [{"source": "compressed", "file": cf, "index": ci} for cf, ci in comp]
                 for c_file, c_idx in comp:
-                    videos.append(
-                        {
-                            "file": f"{c_idx}_{p.name}",
-                            "source": "original",
-                            "index": c_idx,
-                            "title": text_titles.get(c_idx, ""),
-                            "offset_sec": offsets.get(c_idx, 0.0),
-                            "text_json": (text_sidecars.get(c_idx) or [None])[0],
-                            "script_json": (script_sidecars.get(c_idx) or [None])[0],
-                            "match": {"source": "compressed", "file": c_file, "index": c_idx},
-                        }
-                    )
+                    v: dict[str, Any] = {
+                        "file": f"{c_idx}_{p.name}",
+                        "source": "original",
+                        "index": c_idx,
+                        "title": text_titles.get(c_idx, ""),
+                        "offset_sec": offsets.get(c_idx, 0.0),
+                        "text_json": (text_sidecars.get(c_idx) or [None])[0],
+                        "script_json": (script_sidecars.get(c_idx) or [None])[0],
+                        "match": {"source": "compressed", "file": c_file, "index": c_idx},
+                    }
+                    if len(segment_matches) > 1:
+                        v["segment_matches"] = segment_matches
+                    videos.append(v)
     handler._send_json({"videos": videos, "source": source, "groups": groups})
 
 
