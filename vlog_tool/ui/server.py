@@ -52,7 +52,12 @@ from vlog_tool.ui.routes.texts import (
     handle_put_texts,
     handle_put_voiceover,
 )
+from vlog_tool.ui.routes.transcripts import (
+    handle_get_transcripts,
+    handle_put_transcripts,
+)
 from vlog_tool.ui.routes.videos import handle_get_video, handle_get_videos
+from vlog_tool.ui.routes.whisper_routes import handle_get_whisper_check
 from vlog_tool.ui.services.file_service import _find_texts_dirs, _is_safe_basename
 from vlog_tool.ui.services.project_service import _project_output_dir, _registry_path
 
@@ -350,6 +355,10 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_get_plan(self, qs)
             if path == "/api/fs/dirs":
                 return handle_get_fs_dirs(self, qs)
+            if path == "/api/transcripts":
+                return handle_get_transcripts(self, qs)
+            if path == "/api/whisper/check":
+                return handle_get_whisper_check(self)
 
             return self.send_error(HTTPStatus.NOT_FOUND)
 
@@ -376,6 +385,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_put_voiceover(self, qs, obj)
             if path == "/api/plan":
                 return handle_put_plan(self, qs, obj)
+            if path == "/api/transcripts":
+                return handle_put_transcripts(self, qs, obj)
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
