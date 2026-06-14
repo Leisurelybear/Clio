@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import json
+import re
 import time
 from pathlib import Path
 
+from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.analyze import analyze_video
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_duration, timed
@@ -40,8 +42,6 @@ def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
     if result is not None:
         return result
 
-    import re
-
     m = re.match(r"^(.+)_seg\d+$", orig_stem)
     if m:
         return _try_find(m.group(1))
@@ -59,9 +59,12 @@ def run_analyze_all(
     config.texts_dir.mkdir(parents=True, exist_ok=True)
     records: list[ClipRecord] = []
 
+    def _list_compressed(d: Path) -> list[Path]:
+        return sorted(p for p in d.iterdir() if p.suffix.lower() in VIDEO_EXTS and p.is_file())
+
     if single_file:
         items: list[tuple[Path, Path, str]] = []
-        candidates = sorted(config.compressed_dir.glob(f"*_{single_file.stem}*.mp4"))
+        candidates = [p for p in _list_compressed(config.compressed_dir) if single_file.stem.lower() in p.stem.lower()]
         if not candidates:
             print(f"[错误] 未找到 {single_file.name} 对应的压缩文件，请先运行压缩步骤")
             return []
@@ -70,7 +73,7 @@ def run_analyze_all(
         items.append((compressed, single_file, idx_str))
     else:
         items = []
-        for p in sorted(config.compressed_dir.glob("*.mp4")):
+        for p in _list_compressed(config.compressed_dir):
             parts = p.stem.split("_", 1)
             if len(parts) != 2 or not parts[0].isdigit():
                 continue
