@@ -108,11 +108,9 @@ class TestHandleGetWhisperCheck:
         handler = MagicMock()
         handler._send_json = MagicMock()
 
-        mock_torch = MagicMock()
-        mock_torch.cuda.is_available.return_value = True
         with (
             patch("vlog_tool.ui.routes.whisper_routes.check_whisper", return_value=True),
-            patch.dict("sys.modules", {"torch": mock_torch}),
+            patch("ctranslate2.get_cuda_device_count", return_value=1),
         ):
             handle_get_whisper_check(handler)
             handler._send_json.assert_called_once()

@@ -24,9 +24,9 @@ def run_whisper_install() -> int:
         return 1
     print("faster-whisper 安装完成")
 
-    import torch
+    from ctranslate2 import get_cuda_device_count
 
-    cuda_avail = torch.cuda.is_available()
+    cuda_avail = get_cuda_device_count() > 0
     print(f"CUDA: {'可用' if cuda_avail else '不可用（使用 CPU）'}")
 
     cfg = load_config()
@@ -51,9 +51,9 @@ def run_whisper_check() -> int:
         print("faster-whisper: 未安装  ✘（请执行 python main.py whisper install）")
         return 1
 
-    import torch
+    from ctranslate2 import get_cuda_device_count
 
-    cuda_avail = torch.cuda.is_available()
+    cuda_avail = get_cuda_device_count() > 0
     print(f"CUDA: {'可用 ✔' if cuda_avail else '不可用（使用 CPU）'}")
 
     cfg = load_config()

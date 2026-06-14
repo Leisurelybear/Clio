@@ -18,11 +18,6 @@ def check_whisper() -> bool:
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 try:
-    import torch
-except ImportError:
-    torch = None  # type: ignore[assignment]
-
-try:
     from faster_whisper import WhisperModel
 except ImportError:
     WhisperModel = None  # type: ignore[assignment]
@@ -39,7 +34,12 @@ def _resolve_cache_dir(config: AppConfig) -> Path:
 
 def _resolve_device(config: AppConfig) -> str:
     if config.whisper.device == "auto":
-        return "cuda" if torch is not None and torch.cuda.is_available() else "cpu"
+        try:
+            from ctranslate2 import get_cuda_device_count
+
+            return "cuda" if get_cuda_device_count() > 0 else "cpu"
+        except ImportError:
+            return "cpu"
     return config.whisper.device
 
 

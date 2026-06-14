@@ -54,12 +54,10 @@ whisper:
 
 @pytest.fixture(autouse=True)
 def _mock_whisper_deps():
-    """Mock faster_whisper and torch so import in whisper_cli.py works."""
+    """Mock faster_whisper import so CLI imports work."""
     fake_fw = MagicMock()
     fake_fw.__version__ = "1.0.0"
-    fake_torch = MagicMock()
-    fake_torch.cuda.is_available.return_value = False
-    with patch.dict("sys.modules", {"faster_whisper": fake_fw, "torch": fake_torch}):
+    with patch.dict("sys.modules", {"faster_whisper": fake_fw}):
         yield
 
 

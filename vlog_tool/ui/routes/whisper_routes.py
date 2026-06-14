@@ -10,9 +10,9 @@ def handle_get_whisper_check(handler) -> None:
     cuda = False
     if installed:
         try:
-            import torch  # noqa: F811
+            from ctranslate2 import get_cuda_device_count
 
-            cuda = torch.cuda.is_available()
+            cuda = get_cuda_device_count() > 0
         except ImportError:
             pass
 

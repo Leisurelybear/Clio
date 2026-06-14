@@ -43,14 +43,14 @@ class TestResolveDevice:
     def test_cuda(self):
         assert _resolve_device(MagicMock(whisper=WhisperConfig(device="cuda"))) == "cuda"
 
-    @patch("vlog_tool.transcribe.torch")
-    def test_auto_cpu(self, mock_torch):
-        mock_torch.cuda.is_available.return_value = False
+    @patch("ctranslate2.get_cuda_device_count")
+    def test_auto_cpu(self, mock_cuda_count):
+        mock_cuda_count.return_value = 0
         assert _resolve_device(MagicMock(whisper=WhisperConfig(device="auto"))) == "cpu"
 
-    @patch("vlog_tool.transcribe.torch")
-    def test_auto_cuda(self, mock_torch):
-        mock_torch.cuda.is_available.return_value = True
+    @patch("ctranslate2.get_cuda_device_count")
+    def test_auto_cuda(self, mock_cuda_count):
+        mock_cuda_count.return_value = 1
         assert _resolve_device(MagicMock(whisper=WhisperConfig(device="auto"))) == "cuda"
 
 
