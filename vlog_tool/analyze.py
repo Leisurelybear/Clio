@@ -19,22 +19,47 @@ from vlog_tool.prompts import (
 )
 from vlog_tool.utils import extract_json
 
+_trip_context_cache: dict[str, str] = {}
+
+
+def _read_trip_context(project_dir: str) -> str:
+    """读取 trip_context.md，按项目目录缓存。
+
+    查找优先级：
+    1. <project_dir>/templates/trip_context.md（项目级）
+    2. <default_package>/templates/trip_context.md（包默认）
+    """
+    if project_dir in _trip_context_cache:
+        return _trip_context_cache[project_dir]
+    project_path = Path(project_dir) / "templates" / "trip_context.md"
+    if project_path.is_file():
+        text = project_path.read_text(encoding="utf-8").strip()
+        if text:
+            _trip_context_cache[project_dir] = text
+            return text
+    default_path = Path(__file__).parent.parent / "templates" / "trip_context.md"
+    if default_path.is_file():
+        text = default_path.read_text(encoding="utf-8").strip()
+        if text:
+            _trip_context_cache[project_dir] = text
+            return text
+    _trip_context_cache[project_dir] = ""
+    return ""
+
 
 def _wrap_with_context(prompt: str, config: AppConfig, context_override: str | None = None) -> str:
     """将背景/规范附加在 prompt 前面。
 
     层级（从上到下叠加）：
-    1. templates/trip_context.md（项目默认模板，不存在则跳过）
+    1. templates/trip_context.md（项目级优先 → 包默认）
     2. config.ai.context（用户在设置页填写的项目特定内容）
     3. context_override（临时覆写，如 refine 时的额外说明）
     """
     parts = []
     # 1. 默认模板
-    trip_ctx = Path(__file__).parent.parent / "templates" / "trip_context.md"
-    if trip_ctx.is_file():
-        text = trip_ctx.read_text(encoding="utf-8").strip()
-        if text:
-            parts.append(text)
+    text = _read_trip_context(str(config.paths.input_dir))
+    if text:
+        parts.append(text)
     # 2. 用户配置的 context
     if config.ai.context:
         parts.append(config.ai.context)

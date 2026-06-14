@@ -14,6 +14,7 @@ def _fake_config(context: str = "", context_override: str | None = None) -> Simp
         ai=SimpleNamespace(context=context),
         plan=SimpleNamespace(max_clips_per_day=10, target_duration_sec=300),
         script=SimpleNamespace(target_words=150),
+        paths=SimpleNamespace(input_dir=Path("/tmp")),
     )
 
 
@@ -66,6 +67,9 @@ class TestWrapWithContext:
 
     def test_config_context_and_trip_context_both(self, monkeypatch):
         """Both trip_context.md and config.ai.context should appear."""
+        import vlog_tool.analyze as analyze_mod
+
+        analyze_mod._trip_context_cache.clear()
         orig_is_file = Path.is_file
         orig_read_text = Path.read_text
 
