@@ -20,6 +20,7 @@ from vlog_tool.pipeline import (
     run_refine_scripts,
     run_refine_texts,
 )
+from vlog_tool.tasks.transcribe import run_transcribe_all
 from vlog_tool.ui import run as run_ui
 from vlog_tool.ui.services.file_service import _migrate_project_configs
 from vlog_tool.utils import discover_ffmpeg_bin, find_videos
@@ -205,6 +206,15 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--port", type=int, default=8765, help="端口（默认 8765）")
     p_serve.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
 
+    p_transcribe = sub.add_parser("transcribe", help="Whisper ASR 语音转录（需先安装 faster-whisper）")
+    _add_io_args(p_transcribe)
+    p_transcribe.add_argument("--force", action="store_true", help="忽略已有转录，重新生成")
+
+    p_whisper = sub.add_parser("whisper", help="Whisper 环境管理（安装/检测）")
+    whisper_sub = p_whisper.add_subparsers(dest="whisper_command", required=True)
+    whisper_sub.add_parser("install", help="安装 faster-whisper 依赖并预下载模型")
+    whisper_sub.add_parser("check", help="检测 faster-whisper / CUDA 状态")
+
     args = parser.parse_args(argv)
     config_path = Path(args.config)
     if not config_path.exists():
@@ -216,6 +226,22 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         return run_check(config_path, getattr(args, "input", None))
+
+    elif args.command == "transcribe":
+        config = load_config(config_path)
+        if getattr(args, "input", None):
+            config = apply_run_paths(config, input_dir=args.input)
+        config.analyze.skip_existing = not getattr(args, "force", False)
+        run_transcribe_all(config)
+        return 0
+
+    elif args.command == "whisper":
+        from vlog_tool.whisper_cli import run_whisper_install, run_whisper_check
+
+        if args.whisper_command == "install":
+            return run_whisper_install()
+        elif args.whisper_command == "check":
+            return run_whisper_check()
 
     # ── Single-file detection ────────────────────────────────────────
     # If -i points to a single file for compress/analyze/scripts,
