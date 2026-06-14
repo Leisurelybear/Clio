@@ -165,8 +165,23 @@ def probe_video_info(video_path: Path, ffprobe: str) -> dict:
     return {"duration_sec": round(duration, 2), "size_mb": round(size_mb, 2)}
 
 
-def run_ffmpeg(args: list[str], ffmpeg: str) -> None:
+def run_ffmpeg(
+    args: list[str],
+    ffmpeg: str,
+    progress_callback: Callable[[float], None] | None = None,
+) -> None:
     cmd = [ffmpeg, *args]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg 执行失败:\n{' '.join(cmd)}\n{result.stderr}")
+    process = subprocess.Popen(cmd, stderr=subprocess.PIPE, text=True, bufsize=1)
+    stderr_lines: list[str] = []
+    time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
+    for line in process.stderr or []:
+        print(line, end="")
+        stderr_lines.append(line)
+        if progress_callback:
+            m = time_pat.search(line)
+            if m:
+                h, mi, s = int(m.group(1)), int(m.group(2)), float(m.group(3))
+                progress_callback(h * 3600 + mi * 60 + s)
+    process.wait()
+    if process.returncode != 0:
+        raise RuntimeError(f"ffmpeg 执行失败:\n{' '.join(cmd)}\n{''.join(stderr_lines)}")

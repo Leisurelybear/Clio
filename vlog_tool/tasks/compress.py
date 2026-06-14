@@ -57,7 +57,17 @@ def run_compress_all(
             else:
                 print(_eta_line("压缩", i, len(items), label_name, completed, elapsed_total))
                 t0 = time.monotonic()
-                compress_video(source, use_out, config)
+                if tracker:
+
+                    def _on_progress(_sec: float, total_dur: float):
+                        pct = int(_sec / total_dur * 100) if total_dur > 0 else 0
+                        tracker.update(
+                            phase="compress", current=i, total=len(items), message=f"压缩 {source.name} ({pct}%)"
+                        )
+
+                    compress_video(source, use_out, config, progress_callback=_on_progress)
+                else:
+                    compress_video(source, use_out, config)
                 elapsed_total += time.monotonic() - t0
                 completed += 1
             records.append(ClipRecord(index=use_idx, stem=use_out.stem, source_path=original, compressed_path=use_out))
