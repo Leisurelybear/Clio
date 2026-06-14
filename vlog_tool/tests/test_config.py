@@ -9,6 +9,7 @@ import pytest
 
 from vlog_tool.config import (
     AppConfig,
+    WhisperConfig,
     _load_context,
     _path,
     _resolve_api_key,
@@ -260,6 +261,50 @@ class TestLoadConfig:
 
         cfg = load_config(cfg_path, project_dir=proj_dir)
         assert cfg.ai.context == "project specific"
+
+
+# ── WhisperConfig ────────────────────────────────────────────────────
+
+
+class TestWhisperConfig:
+    def test_defaults(self):
+        cfg = WhisperConfig()
+        assert cfg.enabled is False
+        assert cfg.model_size == "medium"
+        assert cfg.language == "zh"
+        assert cfg.device == "auto"
+        assert cfg.max_segments_per_clip == 5
+        assert cfg.cache_dir is None
+        assert cfg.transcripts_subdir == "transcripts"
+
+    def test_custom_values(self):
+        cfg = WhisperConfig(enabled=True, model_size="small", language="en", device="cpu")
+        assert cfg.enabled is True
+        assert cfg.model_size == "small"
+        assert cfg.language == "en"
+        assert cfg.device == "cpu"
+
+    def test_invalid_model_size_raises(self):
+        with pytest.raises(ValueError):
+            WhisperConfig(model_size="invalid").sanitize()
+
+    def test_invalid_language_raises(self):
+        with pytest.raises(ValueError):
+            WhisperConfig(language="fr").sanitize()
+
+    def test_invalid_device_raises(self):
+        with pytest.raises(ValueError):
+            WhisperConfig(device="gpu").sanitize()
+
+    def test_zero_clips_resets_to_default(self):
+        cfg = WhisperConfig(max_segments_per_clip=0)
+        cfg.sanitize()
+        assert cfg.max_segments_per_clip == 5
+
+    def test_auto_language_accepted(self):
+        cfg = WhisperConfig(language="auto")
+        cfg.sanitize()
+        assert cfg.language == "auto"
 
 
 # ── Helpers ─────────────────────────────────────────────────────────

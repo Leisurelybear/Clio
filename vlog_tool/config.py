@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from copy import deepcopy
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -89,6 +90,45 @@ class PlanConfig:
     target_duration_sec: int = 180
 
 
+class WhisperModelSize(StrEnum):
+    SMALL = "small"
+    MEDIUM = "medium"
+    LARGE_V3 = "large-v3"
+
+
+class WhisperLang(StrEnum):
+    ZH = "zh"
+    EN = "en"
+    AUTO = "auto"
+
+
+class WhisperDevice(StrEnum):
+    AUTO = "auto"
+    CPU = "cpu"
+    CUDA = "cuda"
+
+
+@dataclass
+class WhisperConfig:
+    enabled: bool = False
+    model_size: str = "medium"
+    language: str = "zh"
+    device: str = "auto"
+    max_segments_per_clip: int = 5
+    cache_dir: str | None = None
+    transcripts_subdir: str = "transcripts"
+
+    def sanitize(self) -> None:
+        if self.model_size not in list(WhisperModelSize):
+            raise ValueError(f"whisper.model_size 必须是 {', '.join(WhisperModelSize)}，当前: {self.model_size}")
+        if self.language not in list(WhisperLang):
+            raise ValueError(f"whisper.language 必须是 {', '.join(WhisperLang)}，当前: {self.language}")
+        if self.device not in list(WhisperDevice):
+            raise ValueError(f"whisper.device 必须是 {', '.join(WhisperDevice)}，当前: {self.device}")
+        if self.max_segments_per_clip < 1:
+            self.max_segments_per_clip = 5
+
+
 @dataclass
 class AppConfig:
     paths: PathsConfig
@@ -99,6 +139,7 @@ class AppConfig:
     naming: NamingConfig = field(default_factory=NamingConfig)
     script: ScriptConfig = field(default_factory=ScriptConfig)
     plan: PlanConfig = field(default_factory=PlanConfig)
+    whisper: WhisperConfig = field(default_factory=WhisperConfig)
 
     @property
     def compressed_dir(self) -> Path:
@@ -234,6 +275,12 @@ def _legacy_ai_config(raw: dict) -> AIConfig:
     )
 
 
+def _parse_whisper(raw: dict) -> WhisperConfig:
+    cfg = WhisperConfig(**raw)
+    cfg.sanitize()
+    return cfg
+
+
 def _validate_config(config: AppConfig) -> None:
     """早期校验：让拼写错误和明显遗漏在 load 时就 fail，不要等到运行时。"""
     if config.proxy.enabled and not config.proxy.url:
@@ -327,6 +374,7 @@ def load_config(
             target_words=raw.get("script", {}).get("target_words", 80),
         ),
         plan=PlanConfig(**raw.get("plan", {})),
+        whisper=_parse_whisper(raw.get("whisper", {})),
     )
     _validate_config(config)
     return config
