@@ -590,3 +590,38 @@ button .icon { width: 12px; height: 12px; }
 }
 .menu-item:hover { background: var(--bg-active); }
 .menu-item:not(:last-child) { border-bottom: 1px solid var(--border); }
+
+/* ── Transcript Tab ────────────────────────────── */
+.transcript-seg {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.transcript-seg:hover {
+  background: var(--bg-surface);
+}
+.transcript-seg .seg-time {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+.transcript-seg .seg-text {
+  font-size: var(--text-base);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 2px 0;
+}
+.transcript-seg .seg-text-edit {
+  width: 100%;
+  font: inherit;
+  font-size: var(--text-base);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  resize: vertical;
+  box-sizing: border-box;
+}

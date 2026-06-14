@@ -11,6 +11,7 @@ const state = {
   currentTab: 'texts',
   texts: null,
   voiceover: null,
+  transcript: null,
   plan: null,
   dirty: false,
   projectName: null,

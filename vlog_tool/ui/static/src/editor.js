@@ -3,6 +3,7 @@ import {
   $, $$,
   escapeHtml,
   parseTimecode,
+  fmtTime,
   markDirty,
   updateSaveBtn,
   setStatus,
@@ -31,6 +32,7 @@ function renderActiveTab() {
   $$('.tab-pane').forEach(p => p.classList.toggle('active', p.id === `tab-${state.currentTab}`));
   if (state.currentTab === 'texts') renderTexts();
   else if (state.currentTab === 'voiceover') renderVoiceover();
+  else if (state.currentTab === 'transcript') renderTranscript();
 }
 
 function renderTexts() {
@@ -106,6 +108,90 @@ function renderVoiceover() {
   const dEl = pane.querySelector('[data-field="duration_hint_sec"]');
   dEl.value = v.duration_hint_sec ?? '';
   dEl.oninput = () => { v.duration_hint_sec = parseFloat(dEl.value) || 0; markDirty(); };
+}
+
+function renderTranscript() {
+  const t = state.transcript;
+  const pane = $('tab-transcript');
+  if (!t || !t.ok) {
+    pane.innerHTML = '<p class="muted">当前视频没有转录数据。</p><p class="hint">请先运行流水线中的「转录」步骤，或在 CLI 执行 <code>python main.py transcribe</code>。</p>';
+    return;
+  }
+  const segments = t.segments || [];
+  pane.innerHTML = `
+    <h3>语音转录 (ASR) — ${segments.length} 段</h3>
+    <p class="hint">点击 segment 跳到对应时间；双击文字框可编辑；修改后需点击「保存」</p>
+    <ol id="transcript-list"></ol>
+  `;
+  const ol = pane.querySelector('#transcript-list');
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const li = document.createElement('li');
+    li.className = 'transcript-seg';
+    const startStr = fmtTime(seg.start || 0);
+    const endStr = fmtTime(seg.end || 0);
+    const confidence = seg.avg_logprob != null
+      ? `<span class="muted" title="log-prob: ${seg.avg_logprob.toFixed(2)}">${Math.round((1 - Math.min(0, seg.avg_logprob || 0)) * 100)}%</span>`
+      : '';
+    li.innerHTML = `
+      <div class="seg-time">${escapeHtml(startStr)} - ${escapeHtml(endStr)} ${confidence}</div>
+      <div class="seg-text" data-seg-index="${i}">${escapeHtml(seg.text || '')}</div>
+    `;
+    li.onclick = (e) => {
+      if (e.target.closest('.seg-text')) return;
+      const player = $('player');
+      const v = state.videos.find(x => x.file === state.currentVideo);
+      player.currentTime = seg.start + (v?.offset_sec || 0);
+      player.play().catch(() => {});
+    };
+    const textDiv = li.querySelector('.seg-text');
+    textDiv.ondblclick = () => {
+      const inp = document.createElement('textarea');
+      inp.className = 'seg-text-edit';
+      inp.value = seg.text || '';
+      inp.rows = 2;
+      textDiv.replaceWith(inp);
+      inp.focus();
+      inp.onblur = async () => {
+        const newText = inp.value;
+        if (newText === seg.text) {
+          const newDiv = document.createElement('div');
+          newDiv.className = 'seg-text';
+          newDiv.dataset.segIndex = i;
+          newDiv.textContent = seg.text;
+          inp.replaceWith(newDiv);
+          newDiv.ondblclick = textDiv.ondblclick;
+          return;
+        }
+        const v = state.videos.find(x => x.file === state.currentVideo);
+        if (!v) { setStatus('找不到当前视频', 'err'); return; }
+        try {
+          const r = await api('PUT', `/api/transcripts?video=${encodeURIComponent(v.file)}`, {
+            segment_index: i,
+            text: newText,
+          });
+          if (r.ok) {
+            seg.text = newText;
+            setStatus('转录文本已保存', 'ok');
+          } else {
+            setStatus('保存失败: ' + (r.error || '未知错误'), 'err');
+          }
+        } catch (e) {
+          setStatus('保存失败: ' + e.message, 'err');
+        }
+        const newDiv = document.createElement('div');
+        newDiv.className = 'seg-text';
+        newDiv.dataset.segIndex = i;
+        newDiv.textContent = seg.text;
+        inp.replaceWith(newDiv);
+        newDiv.ondblclick = textDiv.ondblclick;
+      };
+      inp.onkeydown = (e) => {
+        if (e.key === 'Escape') { inp.blur(); }
+      };
+    };
+    ol.appendChild(li);
+  }
 }
 
 function renderPlan() {

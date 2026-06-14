@@ -87,7 +87,7 @@ async function saveProject(extra) {
 function renderSteps() {
   const ul = $('step-list');
   if (!ul) return;
-  const labels = { compress: '压缩', analyze: '分析', scripts: '口播', plan: '规划', label: '标号', cut: '裁剪' };
+  const labels = { compress: '压缩', analyze: '分析', scripts: '口播', plan: '规划', label: '标号', cut: '裁剪', transcribe: '转录' };
   ul.innerHTML = '';
   for (const [key, label] of Object.entries(labels)) {
     const done = state.steps[key];
@@ -111,8 +111,10 @@ function renderVideoItem(v) {
 
   const tCls = v.text_json ? 'has' : 'miss';
   const sCls = v.script_json ? 'has' : 'miss';
+  const tTransCls = v.transcript_file ? 'has' : 'miss';
   const tLabel = v.text_json ? `${icon('check', 12)} texts` : '· texts';
   const sLabel = v.script_json ? `${icon('check', 12)} voiceover` : '· voiceover';
+  const tTransLabel = v.transcript_file ? `${icon('check', 12)} trans.` : '· trans.';
   const counterpartLabel = state.source === 'compressed' ? '原' : '压';
   let matchBadge;
   if (v.match) {
@@ -133,6 +135,8 @@ function renderVideoItem(v) {
       <span class="${tCls}">${tLabel}</span>
       &nbsp;
       <span class="${sCls}">${sLabel}</span>
+      &nbsp;
+      <span class="${tTransCls}">${tTransLabel}</span>
     </div>
     <div class="video-actions">
       <button class="menu-btn" title="操作">⋮</button>
@@ -297,6 +301,7 @@ async function selectVideo(file) {
   state.dirty = false;
   state.texts = null;
   state.voiceover = null;
+  state.transcript = null;
 
   const v = state.videos.find(x => x.file === file);
   if (!v) return;
@@ -315,6 +320,11 @@ async function selectVideo(file) {
     try {
       state.voiceover = await api('GET', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`);
     } catch (e) { setStatus('voiceover 加载失败: ' + e.message, 'err'); }
+  }
+  if (v.transcript_file) {
+    try {
+      state.transcript = await api('GET', `/api/transcripts?video=${encodeURIComponent(v.file)}`);
+    } catch (e) { setStatus('transcript 加载失败: ' + e.message, 'err'); }
   }
   if (!state.plan) {
     try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); }

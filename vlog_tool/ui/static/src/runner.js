@@ -16,6 +16,7 @@ const RUN_STEPS = [
   { key: 'voiceover', label: '生成口播文案', hint: '基于分析结果生成每段的口播脚本' },
   { key: 'plan', label: 'vlog 剪辑规划', hint: '根据所有素材生成剪辑顺序和时间轴' },
   { key: 'label', label: '烧录序号', hint: '在压缩视频左上角标上序号便于剪映对照' },
+  { key: 'transcribe', label: 'Whisper 语音转录', hint: '用 faster-whisper 转录音频为文字（需安装）' },
 ];
 
 function renderRun() {
