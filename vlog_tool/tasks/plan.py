@@ -47,11 +47,24 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
         print("没有可用的分析结果，请先运行 analyze")
         return
 
+    # 加载 transcript 数据
+    transcripts_map: dict[str, dict] = {}
+    trans_dir = config.paths.output_dir / config.whisper.transcripts_subdir
+    if trans_dir.is_dir() and config.whisper.enabled:
+        for tf in sorted(trans_dir.glob("*_transcript.json")):
+            try:
+                data = json.loads(tf.read_text(encoding="utf-8"))
+                stem = data.get("source_stem", "")
+                if stem:
+                    transcripts_map[stem] = data
+            except (json.JSONDecodeError, KeyError):
+                continue
+
     if tracker:
         tracker.update(phase="plan", total=1, current=0, message=f"生成 {day_label} 规划...")
     with timed(f"run_plan_vlog {day_label}（{len(clips)} 条）"):
         print(f"[规划] {day_label}，共 {len(clips)} 条素材")
-        plan = plan_daily_vlog(clips, config, day_label)
+        plan = plan_daily_vlog(clips, config, day_label, transcripts_map=transcripts_map)
     out_json.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
 
     lines = [
