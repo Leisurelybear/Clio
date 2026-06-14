@@ -42,10 +42,8 @@ def handle_get_config(handler: BaseHTTPRequestHandler, qs: dict) -> None:
 def handle_get_config_raw(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     """Handle GET /api/config/raw."""
 
-    config_path = (
-        handler.server.config_path if hasattr(handler.server, "config_path") else getattr(handler, "config_path", None)
-    )
-    input_dir = handler.server.input_dir if hasattr(handler.server, "input_dir") else handler.input_dir
+    config_path = handler.config_path
+    input_dir = handler.input_dir
 
     if not config_path or not config_path.is_file():
         return handler._send_json({"error": "config file not available"}, 500)
@@ -75,10 +73,8 @@ def handle_get_config_raw(handler: BaseHTTPRequestHandler, qs: dict) -> None:
 
 def handle_put_config_raw(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
     """Handle PUT /api/config/raw."""
-    config_path = (
-        handler.server.config_path if hasattr(handler.server, "config_path") else getattr(handler, "config_path", None)
-    )
-    input_dir = handler.server.input_dir if hasattr(handler.server, "input_dir") else handler.input_dir
+    config_path = handler.config_path
+    input_dir = handler.input_dir
 
     if not config_path:
         return handler._send_json({"ok": False, "error": "config_path not available"}, 500)
@@ -129,15 +125,15 @@ def handle_put_config_raw(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
     _save_atomic(config_path, yml.encode("utf-8"))
     if tmp_path and tmp_path.exists():
         tmp_path.unlink()
+    with handler.__class__._config_cache_lock:
+        handler.__class__._config_cache.clear()
     handler._send_json({"ok": True, "path": str(config_path)})
 
 
 def handle_post_config_init(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
     """Handle POST /api/config/init."""
-    config_path = (
-        handler.server.config_path if hasattr(handler.server, "config_path") else getattr(handler, "config_path", None)
-    )
-    input_dir = handler.server.input_dir if hasattr(handler.server, "input_dir") else handler.input_dir
+    config_path = handler.config_path
+    input_dir = handler.input_dir
 
     proj_input = handler._resolve_project_input(qs)
     if proj_input == input_dir:

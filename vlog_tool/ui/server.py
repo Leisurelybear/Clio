@@ -101,13 +101,19 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         server: Any  # set by HTTPServer
 
         def _get_config(self, project_input: Path | None = None) -> AppConfig:
-            """Return project-specific config (deep-merged with project.yaml), cached."""
+            """Return project-specific config (deep-merged with project.yaml), cached.
+
+            Cache is LRU-style: capped at 20 entries, evicts oldest when full.
+            """
             if project_input is None:
                 return config
             key = str(project_input.resolve())
             with self.__class__._config_cache_lock:
                 cache = self.__class__._config_cache
                 if key not in cache:
+                    if len(cache) >= 20:
+                        # Evict the first (oldest) entry
+                        cache.pop(next(iter(cache)), None)
                     cache[key] = load_config(config_path, project_dir=project_input)
                 return cache[key]
 
@@ -247,6 +253,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     self.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
                     return
                 length = end - start + 1
+                if length <= 0:
+                    self.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+                    return
                 self.send_response(206)
                 self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
                 self.send_header("Content-Length", str(length))
