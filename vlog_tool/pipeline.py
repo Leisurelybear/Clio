@@ -26,6 +26,7 @@ from vlog_tool.tasks.label import run_label_videos  # noqa: F401
 from vlog_tool.tasks.plan import run_plan_vlog  # noqa: F401
 from vlog_tool.tasks.refine import run_refine_scripts, run_refine_texts  # noqa: F401
 from vlog_tool.tasks.scripts import run_generate_scripts  # noqa: F401
+from vlog_tool.tasks.transcribe import run_transcribe_all  # noqa: F401
 
 
 def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:
@@ -45,6 +46,7 @@ def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:
 
 _STEP_LABELS = {
     "compress": "压缩原视频",
+    "transcribe": "语音转录",
     "analyze": "AI 分析素材",
     "voiceover": "生成口播文案",
     "plan": "vlog 剪辑规划",
@@ -53,6 +55,7 @@ _STEP_LABELS = {
 
 _STEP_FUNCS = {
     "compress": run_compress_all,
+    "transcribe": run_transcribe_all,
     "analyze": run_analyze_all,
     "voiceover": run_generate_scripts,
     "plan": run_plan_vlog,
