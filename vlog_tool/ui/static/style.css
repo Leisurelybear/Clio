@@ -125,6 +125,7 @@ header {
 .status.ok { color: var(--success); }
 .status.err { color: var(--error); }
 .status.warn { color: var(--warning); }
+.muted.warn, .warn { color: #f0a030; }
 .status button { background: none; border: 1px solid currentColor; border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer; color: inherit; font: inherit; font-size: var(--text-sm); }
 
 /* ── Main Layout ───────────────────────────────────────────── */
