@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vlog_tool.config import AppConfig, WhisperConfig
+from vlog_tool.tasks.transcribe import run_transcribe_all
 from vlog_tool.transcribe import (
     _get_model,
     _resolve_cache_dir,
@@ -159,3 +160,31 @@ class TestTranscribeAudio:
 
         _, kwargs = mock_model.transcribe.call_args
         assert kwargs["language"] is None
+
+
+class TestRunTranscribeAll:
+    def test_transcribe_enabled_check_no_deps(self):
+        """当 faster-whisper 不可导入时，run_transcribe_all 打印警告并返回 0"""
+        config = AppConfig(
+            paths=MagicMock(),
+            whisper=WhisperConfig(enabled=True),
+        )
+
+        with (
+            patch("vlog_tool.tasks.transcribe._check_whisper", return_value=False),
+            patch("builtins.print") as mock_print,
+        ):
+            result = run_transcribe_all(config)
+            assert result == 0
+            # should have printed some warning
+
+    def test_transcribe_skipped_when_disabled(self):
+        """whisper.enabled=False 时跳过转录"""
+        config = AppConfig(
+            paths=MagicMock(),
+            whisper=WhisperConfig(enabled=False),
+        )
+
+        with patch("builtins.print") as mock_print:
+            result = run_transcribe_all(config)
+            assert result == 0

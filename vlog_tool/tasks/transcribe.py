@@ -16,6 +16,15 @@ from vlog_tool.transcribe import transcribe_audio
 from vlog_tool.utils import get_duration_sec, resolve_binary
 
 
+def _check_whisper() -> bool:
+    try:
+        import faster_whisper  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
 def _extract_audio(video_path: Path) -> Path | None:
     """ffmpeg 提取 16kHz 单声道 WAV，返回临时文件路径。"""
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
@@ -46,16 +55,13 @@ def run_transcribe_all(
     config: AppConfig,
     tracker: ProgressTracker | None = None,
     single_file: Path | None = None,
-) -> None:
+) -> int:
     if not config.whisper.enabled:
-        print("[跳过] Whisper 转录未启用（设置 whisper.enabled=true）")
-        return
-
-    try:
-        import faster_whisper  # noqa: F401
-    except ImportError:
-        print("错误: faster-whisper 未安装，请执行 `pip install faster-whisper`")
-        return
+        print("Whisper 转录未启用（whisper.enabled=false），跳过")
+        return 0
+    if not _check_whisper():
+        print("警告：faster-whisper 未安装，跳过转录。执行: python main.py whisper install")
+        return 0
 
     transcripts_dir = config.paths.output_dir / config.whisper.transcripts_subdir
     transcripts_dir.mkdir(parents=True, exist_ok=True)
@@ -143,6 +149,8 @@ def run_transcribe_all(
 
         if tracker:
             tracker.next(message=f"完成 {stem}")
+
+    return 0
 
 
 def run_transcribe_one(config: AppConfig, video_path: Path) -> dict:

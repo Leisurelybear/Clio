@@ -12,3 +12,9 @@ projects.json.bak
 .opencode/
 opencode_session_import.json
 .claude/
+
+# Whisper model cache
+/models/
+
+# Whisper transcripts output
+/transcripts/
