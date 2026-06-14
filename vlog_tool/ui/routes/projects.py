@@ -33,7 +33,7 @@ def handle_get_project(handler: BaseHTTPRequestHandler, qs: dict) -> None:
             data = {}
     # Record this as the most recently used project
     qs_project = qs.get("project", [None])[0]
-    config_path = handler.server.config_path if hasattr(handler.server, "config_path") else None
+    config_path = handler.config_path
     if qs_project:
         _save_last_project(qs_project, config_path)
     merged = {**handler.DEFAULT_PROJECT, **data}
@@ -45,8 +45,8 @@ def handle_get_project(handler: BaseHTTPRequestHandler, qs: dict) -> None:
 def handle_get_projects(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     """Handle GET /api/projects."""
     req_project = qs.get("project", [None])[0]
-    config_path = handler.server.config_path if hasattr(handler.server, "config_path") else None
-    input_dir = handler.server.input_dir if hasattr(handler.server, "input_dir") else handler.input_dir
+    config_path = handler.config_path
+    input_dir = handler.input_dir
     reg_file = _registry_path(config_path)
     last_project = None
     if reg_file.is_file():
@@ -81,14 +81,14 @@ def handle_put_project(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> 
         merged["createdAt"] = merged["updatedAt"]
     proj_input.mkdir(parents=True, exist_ok=True)
     _save_atomic(proj_file, json.dumps(merged, ensure_ascii=False, indent=2).encode("utf-8"))
-    config_path = handler.server.config_path if hasattr(handler.server, "config_path") else None
+    config_path = handler.config_path
     _save_last_project(merged.get("name") or proj_input.name, config_path)
     handler._send_json({"ok": True})
 
 
 def handle_post_project_create(handler: BaseHTTPRequestHandler, obj: dict) -> None:
     """Handle POST /api/project/create."""
-    config_path = handler.server.config_path if hasattr(handler.server, "config_path") else None
+    config_path = handler.config_path
 
     name = (obj.get("name") or "").strip()
     input_dir_raw = (obj.get("input_dir") or "").strip()
@@ -129,7 +129,7 @@ def handle_post_project_create(handler: BaseHTTPRequestHandler, obj: dict) -> No
 
 def handle_post_project_add(handler: BaseHTTPRequestHandler, obj: dict) -> None:
     """Handle POST /api/project/add."""
-    config_path = handler.server.config_path if hasattr(handler.server, "config_path") else None
+    config_path = handler.config_path
 
     input_dir_raw = (obj.get("input_dir") or "").strip()
     if not input_dir_raw:

@@ -47,8 +47,8 @@ class TestHandleGetConfigRaw:
         default_input = tmp_path / "input"
         default_input.mkdir()
 
-        handler.server.config_path = cfg
-        handler.server.input_dir = default_input
+        handler.config_path = cfg
+        handler.input_dir = default_input
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
 
@@ -63,8 +63,8 @@ class TestHandleGetConfigRaw:
         proj_input = tmp_path / "default"
         proj_input.mkdir()
 
-        handler.server.config_path = cfg
-        handler.server.input_dir = proj_input
+        handler.config_path = cfg
+        handler.input_dir = proj_input
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
 
@@ -86,10 +86,11 @@ class TestHandlePostConfigInit:
         cfg.write_bytes(b"")
         proj_input = tmp_path / "input"
 
-        handler.server.config_path = cfg
-        handler.server.input_dir = proj_input
+        handler.config_path = cfg
+        handler.input_dir = proj_input
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
+        handler.__class__._config_cache_lock = MagicMock()
 
         handle_post_config_init(handler, {}, {})
 
@@ -101,7 +102,7 @@ class TestHandlePostConfigInit:
 class TestHandlePutConfigRaw:
     def test_no_config_path(self):
         handler = MagicMock()
-        handler.server.config_path = None
+        handler.config_path = None
         handler._send_json = MagicMock()
         handle_put_config_raw(handler, {}, {"test": True})
         handler._send_json.assert_called_once_with({"ok": False, "error": "config_path not available"}, 500)
@@ -115,8 +116,8 @@ class TestHandlePutConfigRaw:
         proj_input = tmp_path / "custom"
         proj_input.mkdir()
 
-        handler.server.config_path = cfg
-        handler.server.input_dir = tmp_path
+        handler.config_path = cfg
+        handler.input_dir = tmp_path
         handler._resolve_project_input.return_value = proj_input
         handler.__class__._config_cache = {}
         handler.__class__._config_cache_lock = MagicMock()

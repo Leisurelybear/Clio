@@ -47,8 +47,8 @@ class TestHandleGetProject:
 class TestHandleGetProjects:
     def test_empty(self, tmp_path: Path):
         handler = MagicMock()
-        handler.server.config_path = tmp_path / "config.yaml"
-        handler.server.input_dir = tmp_path / "input"
+        handler.config_path = tmp_path / "config.yaml"
+        handler.input_dir = tmp_path / "input"
         handler._send_json = MagicMock()
         handler.__class__._config_cache = {}
         handler.__class__._config_cache_lock = MagicMock()
@@ -68,7 +68,7 @@ class TestHandlePutProject:
         cfg = tmp_path / "config.yaml"
         cfg.write_bytes(b"")
         handler._resolve_project_input.return_value = proj_input
-        handler.server.config_path = cfg
+        handler.config_path = cfg
         handler.DEFAULT_PROJECT = {"name": "Unnamed", "currentDay": "day1", "source": "compressed"}
         handler._send_json = MagicMock()
 
@@ -112,7 +112,7 @@ class TestHandlePostProjectCreate:
         handler = MagicMock()
         proj_input = tmp_path / "new_project"
         proj_input.mkdir()
-        handler.server.config_path = tmp_path / "config.yaml"
+        handler.config_path = tmp_path / "config.yaml"
         handler.__class__._config_cache = {}
         handler.__class__._config_cache_lock = MagicMock()
         handler._send_json = MagicMock()
@@ -141,7 +141,7 @@ class TestHandlePostProjectAdd:
         proj_input = tmp_path / "existing"
         proj_input.mkdir()
         (proj_input / "project.json").write_text(json.dumps({"name": "Existing Project"}), encoding="utf-8")
-        handler.server.config_path = tmp_path / "config.yaml"
+        handler.config_path = tmp_path / "config.yaml"
         handler._send_json = MagicMock()
 
         handle_post_project_add(handler, {"input_dir": str(proj_input)})
@@ -153,7 +153,7 @@ class TestHandlePostProjectAdd:
         handler = MagicMock()
         proj_input = tmp_path / "new_dir"
         proj_input.mkdir()
-        handler.server.config_path = tmp_path / "config.yaml"
+        handler.config_path = tmp_path / "config.yaml"
         handler.__class__._config_cache = {}
         handler.__class__._config_cache_lock = MagicMock()
         handler._send_json = MagicMock()
