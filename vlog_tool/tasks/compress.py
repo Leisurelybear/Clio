@@ -38,7 +38,16 @@ def run_compress_all(
         else:
             items.append((video, video))
 
-    # Phase 2: assign indices and compress each
+    # Phase 2: build existing lookup (source_stem -> (index, Path))
+    existing_map: dict[str, tuple[int, Path]] = {}
+    if config.analyze.skip_existing and config.compressed_dir.is_dir():
+        for f in config.compressed_dir.iterdir():
+            if "_" in f.stem:
+                prefix, stem_part = f.stem.split("_", 1)
+                if prefix.isdigit():
+                    existing_map[stem_part] = (int(prefix), f)
+
+    # Phase 3: assign indices and compress each
     next_idx = _next_index(config.compressed_dir, config.naming.index_width)
     records: list[ClipRecord] = []
     comp_label = f"run_compress_all（{len(items)} 个）"
@@ -46,29 +55,37 @@ def run_compress_all(
         completed = 0
         elapsed_total = 0.0
         for i, (original, source) in enumerate(items, start=1):
-            use_idx = next_idx + i - 1
+            label_name = source.name if source == original else f"{original.name} → {source.name}"
+
+            # Reuse existing compressed file if skip_existing matches by stem
+            if source.stem in existing_map:
+                use_idx, use_out = existing_map[source.stem]
+                if tracker:
+                    tracker.update(phase="compress", current=i, total=len(items), message=f"压缩 {source.name}...")
+                print(f"[跳过压缩] {label_name} (已存在: {use_out.name})")
+                records.append(
+                    ClipRecord(index=use_idx, stem=use_out.stem, source_path=original, compressed_path=use_out)
+                )
+                continue
+
+            use_idx = next_idx + completed
             use_out = config.compressed_dir / f"{format_index(use_idx, config.naming.index_width)}_{source.stem}.mp4"
             if tracker:
                 tracker.update(phase="compress", current=i, total=len(items), message=f"压缩 {source.name}...")
+            print(_eta_line("压缩", i, len(items), label_name, completed, elapsed_total))
+            t0 = time.monotonic()
+            if tracker:
 
-            label_name = source.name if source == original else f"{original.name} → {source.name}"
-            if config.analyze.skip_existing and use_out.exists():
-                print(f"[跳过压缩] {label_name} (已存在: {use_out.name})")
+                def _on_progress(_sec: float, total_dur: float):
+                    pct = int(_sec / total_dur * 100) if total_dur > 0 else 0
+                    tracker.update(
+                        phase="compress", current=i, total=len(items), message=f"压缩 {source.name} ({pct}%)"
+                    )
+
+                compress_video(source, use_out, config, progress_callback=_on_progress)
             else:
-                print(_eta_line("压缩", i, len(items), label_name, completed, elapsed_total))
-                t0 = time.monotonic()
-                if tracker:
-
-                    def _on_progress(_sec: float, total_dur: float):
-                        pct = int(_sec / total_dur * 100) if total_dur > 0 else 0
-                        tracker.update(
-                            phase="compress", current=i, total=len(items), message=f"压缩 {source.name} ({pct}%)"
-                        )
-
-                    compress_video(source, use_out, config, progress_callback=_on_progress)
-                else:
-                    compress_video(source, use_out, config)
-                elapsed_total += time.monotonic() - t0
-                completed += 1
+                compress_video(source, use_out, config)
+            elapsed_total += time.monotonic() - t0
+            completed += 1
             records.append(ClipRecord(index=use_idx, stem=use_out.stem, source_path=original, compressed_path=use_out))
     return records
