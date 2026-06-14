@@ -12,17 +12,8 @@ from vlog_tool.config import AppConfig
 from vlog_tool.log import format_duration
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.tasks.analyze import _resolve_original
-from vlog_tool.transcribe import transcribe_audio
+from vlog_tool.transcribe import check_whisper, transcribe_audio
 from vlog_tool.utils import get_duration_sec, resolve_binary
-
-
-def _check_whisper() -> bool:
-    try:
-        import faster_whisper  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
 
 
 def _extract_audio(video_path: Path) -> Path | None:
@@ -59,7 +50,7 @@ def run_transcribe_all(
     if not config.whisper.enabled:
         print("Whisper 转录未启用（whisper.enabled=false），跳过")
         return 0
-    if not _check_whisper():
+    if not check_whisper():
         print("警告：faster-whisper 未安装，跳过转录。执行: python main.py whisper install")
         return 0
 
@@ -78,7 +69,7 @@ def run_transcribe_all(
     total = len(stems)
     if total == 0:
         print("没有找到需要转录的视频")
-        return
+        return 0
 
     if tracker:
         tracker.update(phase="transcribe", total=total, current=0, message="Whisper 语音转录...")

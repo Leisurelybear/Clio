@@ -37,7 +37,7 @@ def _transcript_path(handler, qs: dict, video: str) -> Path | None:
             cfg = load_config()
     except Exception:
         cfg = load_config()
-    transcripts_dir = proj_out / getattr(cfg.whisper, "transcripts_subdir", "transcripts")
+    transcripts_dir = proj_out / cfg.whisper.transcripts_subdir
     return transcripts_dir / f"{stem}_transcript.json"
 
 

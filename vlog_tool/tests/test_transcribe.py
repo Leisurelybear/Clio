@@ -171,7 +171,7 @@ class TestRunTranscribeAll:
         )
 
         with (
-            patch("vlog_tool.tasks.transcribe._check_whisper", return_value=False),
+            patch("vlog_tool.tasks.transcribe.check_whisper", return_value=False),
             patch("builtins.print") as mock_print,
         ):
             result = run_transcribe_all(config)

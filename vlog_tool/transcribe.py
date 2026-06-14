@@ -5,6 +5,16 @@ from typing import Callable
 
 from vlog_tool.config import AppConfig
 
+
+def check_whisper() -> bool:
+    try:
+        import faster_whisper  # noqa: F401
+
+        return True
+    except ImportError:
+        return False
+
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 try:

@@ -111,7 +111,7 @@ class TestHandleGetWhisperCheck:
         mock_torch = MagicMock()
         mock_torch.cuda.is_available.return_value = True
         with (
-            patch("vlog_tool.ui.routes.whisper_routes._check_whisper", return_value=True),
+            patch("vlog_tool.ui.routes.whisper_routes.check_whisper", return_value=True),
             patch.dict("sys.modules", {"torch": mock_torch}),
         ):
             handle_get_whisper_check(handler)
@@ -124,7 +124,7 @@ class TestHandleGetWhisperCheck:
         handler = MagicMock()
         handler._send_json = MagicMock()
 
-        with patch("vlog_tool.ui.routes.whisper_routes._check_whisper", return_value=False):
+        with patch("vlog_tool.ui.routes.whisper_routes.check_whisper", return_value=False):
             handle_get_whisper_check(handler)
             args = handler._send_json.call_args
             assert args[0][0]["installed"] is False

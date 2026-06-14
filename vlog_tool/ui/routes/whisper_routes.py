@@ -2,18 +2,11 @@
 
 from __future__ import annotations
 
-
-def _check_whisper() -> bool:
-    try:
-        import faster_whisper  # noqa: F401
-
-        return True
-    except ImportError:
-        return False
+from vlog_tool.transcribe import check_whisper
 
 
 def handle_get_whisper_check(handler) -> None:
-    installed = _check_whisper()
+    installed = check_whisper()
     cuda = False
     if installed:
         try:
