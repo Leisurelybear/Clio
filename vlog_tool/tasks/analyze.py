@@ -30,7 +30,7 @@ def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
     _, orig_stem = compressed_stem.split("_", 1)
 
     def _try_find(stem: str) -> Path | None:
-        for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm"):
+        for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
             candidate = input_dir / f"{stem}{ext}"
             if candidate.is_file():
                 return candidate

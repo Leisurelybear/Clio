@@ -256,7 +256,13 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 self.send_response(200)
                 self.send_header("Content-Length", str(size))
             self.send_header("Accept-Ranges", "bytes")
-            _VIDEO_MIME = {".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm", ".m4v": "video/x-m4v"}
+            _VIDEO_MIME = {
+                ".mp4": "video/mp4",
+                ".mov": "video/quicktime",
+                ".webm": "video/webm",
+                ".m4v": "video/x-m4v",
+                ".lrv": "video/mp4",
+            }
             self.send_header("Content-Type", _VIDEO_MIME.get(path.suffix.lower(), "video/mp4"))
             self.send_header("Cache-Control", "no-store")
             self.end_headers()
