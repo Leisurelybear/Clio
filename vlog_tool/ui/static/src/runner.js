@@ -99,7 +99,7 @@ async function pollRunStatus() {
       }
       return;
     }
-    if (s.running) {
+    if (s.status === 'running') {
       if (btn) { btn.disabled = true; btn.textContent = '运行中...'; }
       const pct = s.total > 0 ? Math.round(s.current / s.total * 100) : 0;
       const eta = s.eta_sec ? `，预计剩余 ${Math.round(s.eta_sec)} 秒` : '';
