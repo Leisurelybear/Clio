@@ -133,7 +133,11 @@ def generate_voiceover(clip_data: dict, template: str, config: AppConfig) -> dic
 
 
 def plan_daily_vlog(
-    clips: list[dict], config: AppConfig, day_label: str = "day1", transcripts_map: dict[str, dict] | None = None
+    clips: list[dict],
+    config: AppConfig,
+    day_label: str = "day1",
+    transcripts_map: dict[str, dict] | None = None,
+    use_transcripts: bool = True,
 ) -> dict:
     provider, model = get_task_provider(config, TaskName.VLOG_PLAN)
 
@@ -146,7 +150,7 @@ def plan_daily_vlog(
         target_duration_sec=config.plan.target_duration_sec,
         example_index=first_idx,
     )
-    if transcripts_map and config.whisper.enabled:
+    if transcripts_map and use_transcripts and config.whisper.enabled:
         transcript_info = []
         for clip in clips:
             matched = []

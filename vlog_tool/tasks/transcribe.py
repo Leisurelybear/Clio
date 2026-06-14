@@ -51,7 +51,10 @@ def run_transcribe_all(
         print("Whisper 转录未启用（whisper.enabled=false），跳过")
         return 0
     if not check_whisper():
-        print("警告：faster-whisper 未安装，跳过转录。执行: python main.py whisper install")
+        msg = "faster-whisper 未安装，跳过转录。执行: python main.py whisper install"
+        print(f"警告：{msg}")
+        if tracker:
+            tracker.error(msg)
         return 0
 
     transcripts_dir = config.paths.output_dir / config.whisper.transcripts_subdir

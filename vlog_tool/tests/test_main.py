@@ -96,3 +96,12 @@ def test_whisper_check_subcommand(mock_torch, cli_runner, config_path):
     mock_torch.cuda.is_available.return_value = False
     result = cli_runner(["--config", str(config_path), "whisper", "check"])
     assert result == 0
+
+
+@patch("main.run_plan_vlog")
+def test_plan_no_transcripts_flag(mock_run_plan, cli_runner, config_path, tmp_path):
+    """--no-transcripts 应设置 config.plan.use_transcripts=False"""
+    result = cli_runner(["--config", str(config_path), "plan", "--no-transcripts"])
+    assert result == 0
+    cfg_arg = mock_run_plan.call_args[0][0]
+    assert cfg_arg.plan.use_transcripts is False

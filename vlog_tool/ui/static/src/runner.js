@@ -14,9 +14,9 @@ const RUN_STEPS = [
   { key: 'compress', label: '压缩原视频', hint: '将原片压缩为 640p，为 AI 分析做准备' },
   { key: 'analyze', label: 'AI 分析', hint: '提交 Gemini 分析压缩后的视频内容' },
   { key: 'voiceover', label: '生成口播文案', hint: '基于分析结果生成每段的口播脚本' },
+  { key: 'transcribe', label: 'Whisper 语音转录', hint: '用 faster-whisper 转录音频为文字（需安装）' },
   { key: 'plan', label: 'vlog 剪辑规划', hint: '根据所有素材生成剪辑顺序和时间轴' },
   { key: 'label', label: '烧录序号', hint: '在压缩视频左上角标上序号便于剪映对照' },
-  { key: 'transcribe', label: 'Whisper 语音转录', hint: '用 faster-whisper 转录音频为文字（需安装）' },
 ];
 
 function renderRun() {
@@ -35,6 +35,12 @@ function renderRun() {
     <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
     <label>分集 <input id="run-day" value="${escapeHtml(state.currentDay)}"></label>
     <div class="run-step-list">${stepChecks}</div>
+    <div class="run-options" style="margin:8px 0">
+      <label class="run-option" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--text-sm)">
+        <input type="checkbox" id="run-use-transcripts" checked>
+        <span>使用语音转录优化剪辑规划</span>
+      </label>
+    </div>
     <button id="btn-run-start" class="btn-primary">${icon('play', 16)} 运行选中步骤</button>
     <div id="run-progress" style="margin-top:12px">
       <p class="muted">尚未运行</p>
@@ -62,6 +68,7 @@ async function startRun() {
     const r = await api('POST', '/api/run/start', {
       day_label: _lastRunDay,
       steps: checked,
+      use_transcripts: $('run-use-transcripts').checked,
     });
     if (r.ok) {
       setStatus(r.message || '流水线已启动', 'ok');

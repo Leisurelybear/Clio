@@ -87,7 +87,7 @@ async function saveProject(extra) {
 function renderSteps() {
   const ul = $('step-list');
   if (!ul) return;
-  const labels = { compress: '压缩', analyze: '分析', scripts: '口播', plan: '规划', label: '标号', cut: '裁剪', transcribe: '转录' };
+  const labels = { compress: '压缩', analyze: '分析', scripts: '口播', transcribe: '转录', plan: '规划', label: '标号', cut: '裁剪' };
   ul.innerHTML = '';
   for (const [key, label] of Object.entries(labels)) {
     const done = state.steps[key];
@@ -143,6 +143,7 @@ function renderVideoItem(v) {
       <div class="menu-dropdown">
         ${state.source === 'original'
           ? `<button class="menu-item" data-action="compress" title="用 ffmpeg 将原视频压缩为 640p">压缩视频</button>
+             <button class="menu-item" data-action="transcribe" title="用 faster-whisper 提取音频转文字">Whisper 转录</button>
              <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">AI分析视频</button>
              <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑口播文案</button>
              <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑全部</button>`

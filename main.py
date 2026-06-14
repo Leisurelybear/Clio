@@ -142,6 +142,7 @@ def main(argv: list[str] | None = None) -> int:
     p_plan = sub.add_parser("plan", help="生成单日 vlog 剪辑规划")
     _add_io_args(p_plan)
     p_plan.add_argument("--day", default="day1", help="日 vlog 标签")
+    p_plan.add_argument("--no-transcripts", action="store_true", help="不注入语音转录信息到 prompt")
 
     p_run = sub.add_parser("run", help="一键执行完整流程")
     _add_io_args(p_run)
@@ -269,6 +270,7 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "label":
             run_label_videos(config)
         elif args.command == "plan":
+            config.plan.use_transcripts = not getattr(args, "no_transcripts", False)
             run_plan_vlog(config, args.day)
         elif args.command == "run":
             run_full_pipeline(config, args.day)

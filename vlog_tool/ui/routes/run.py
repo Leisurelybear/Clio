@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from vlog_tool.pipeline import run_analyze_all, run_compress_all, run_generate_scripts, run_pipeline_steps
+from vlog_tool.tasks.transcribe import run_transcribe_one
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.ui.services.file_service import _find_original_for_compressed, _find_texts_dirs
 from vlog_tool.ui.services.project_service import _project_output_dir
@@ -38,6 +39,8 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
     steps = obj.get("steps")
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
+    if "use_transcripts" in obj:
+        cfg.plan.use_transcripts = obj["use_transcripts"]
 
     def _run():
         try:
@@ -62,9 +65,13 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
 
     video_basename = (obj.get("video") or "").strip()
     task = (obj.get("task") or "").strip()
-    if not video_basename or task not in ("compress", "analyze", "texts", "voiceover", "all"):
+    if not video_basename or task not in ("compress", "analyze", "texts", "voiceover", "transcribe", "all"):
         return handler._send_json(
-            {"ok": False, "error": "requires video (filename) and task (compress|analyze|texts|voiceover|all)"}, 400
+            {
+                "ok": False,
+                "error": "requires video (filename) and task (compress|analyze|texts|voiceover|transcribe|all)",
+            },
+            400,
         )
     # 向后兼容
     if task == "texts":
@@ -127,6 +134,17 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
                 _log("Step: generating voiceover script...")
                 run_generate_scripts(cfg, tracker=tracker, single_file=texts_json)
                 _log("✓ voiceover generation complete")
+            if task in ("transcribe", "all"):
+                _log("Step: transcribing audio...")
+                from vlog_tool.transcribe import check_whisper
+
+                if not check_whisper():
+                    raise RuntimeError("faster-whisper 未安装。执行: python main.py whisper install")
+                result = run_transcribe_one(cfg, original_video)
+                if "error" in result:
+                    _log(f"✗ transcription failed: {result['error']}")
+                    raise RuntimeError(result["error"])
+                _log("✓ transcription complete")
             tracker.done(f"{task} → {video_basename} complete")
             print(f"  [rerun] ✓ {task} -> {video_basename} complete")
         except Exception as e:

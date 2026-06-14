@@ -98,6 +98,7 @@ plan:
   plans_subdir: plans
   max_clips_per_day: 12
   target_duration_sec: 180
+#   use_transcripts: true
 
 # Whisper ASR 语音转录（独立步骤，需要额外安装 faster-whisper）
 # 默认关闭，启用后需执行 `python main.py whisper install` 安装依赖

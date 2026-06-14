@@ -88,6 +88,7 @@ class PlanConfig:
     plans_subdir: str = "plans"
     max_clips_per_day: int = 12
     target_duration_sec: int = 180
+    use_transcripts: bool = True
 
 
 class WhisperModelSize(StrEnum):

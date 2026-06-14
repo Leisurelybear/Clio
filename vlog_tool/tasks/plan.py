@@ -64,7 +64,9 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
         tracker.update(phase="plan", total=1, current=0, message=f"生成 {day_label} 规划...")
     with timed(f"run_plan_vlog {day_label}（{len(clips)} 条）"):
         print(f"[规划] {day_label}，共 {len(clips)} 条素材")
-        plan = plan_daily_vlog(clips, config, day_label, transcripts_map=transcripts_map)
+        plan = plan_daily_vlog(
+            clips, config, day_label, transcripts_map=transcripts_map, use_transcripts=config.plan.use_transcripts
+        )
     out_json.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
 
     lines = [

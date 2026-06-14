@@ -100,6 +100,23 @@ class TestHandlePostRerun:
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args[0][1] == 400
 
+    def test_transcribe_valid_task(self, tmp_path: Path, _no_thread):
+        """transcribe 应作为有效 task 被接受"""
+        handler = MagicMock()
+        handler.__class__._run_lock = MagicMock()
+        handler._run_thread = None
+        proj_input = tmp_path / "input"
+        proj_input.mkdir()
+        (proj_input / "GL010695.MP4").write_bytes(b"")
+        handler._resolve_project_input.return_value = proj_input
+        handler._send_json = MagicMock()
+
+        handle_post_rerun(handler, {}, {"video": "GL010695.MP4", "task": "transcribe", "source": "original"})
+
+        handler._send_json.assert_called_once()
+        assert handler._send_json.call_args[0][0]["ok"] is True
+        assert handler._run_thread is not None
+
     def test_starts_rerun(self, tmp_path: Path, _no_thread):
         handler = MagicMock()
         handler.__class__._run_lock = MagicMock()

@@ -46,18 +46,18 @@ def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:
 
 _STEP_LABELS = {
     "compress": "压缩原视频",
-    "transcribe": "语音转录",
     "analyze": "AI 分析素材",
     "voiceover": "生成口播文案",
+    "transcribe": "语音转录",
     "plan": "vlog 剪辑规划",
     "label": "烧录序号标注",
 }
 
 _STEP_FUNCS = {
     "compress": run_compress_all,
-    "transcribe": run_transcribe_all,
     "analyze": run_analyze_all,
     "voiceover": run_generate_scripts,
+    "transcribe": run_transcribe_all,
     "plan": run_plan_vlog,
     "label": run_label_videos,
 }

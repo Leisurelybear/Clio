@@ -7,7 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vlog_tool.config import WhisperConfig
+from vlog_tool.config import AppConfig, WhisperConfig
+from vlog_tool.progress import ProgressTracker
 
 
 @pytest.fixture(autouse=True)
@@ -70,6 +71,18 @@ class TestRunTranscribeAll:
         tracker = MagicMock()
         run_transcribe_all(cfg, tracker)
         tracker.update.assert_not_called()
+
+    @patch("vlog_tool.tasks.transcribe.check_whisper", return_value=False)
+    def test_tracker_error_when_whisper_missing(self, mock_check, cfg, tmp_path):
+        """当 faster-whisper 未安装时 tracker.error 被调用"""
+        from vlog_tool.tasks.transcribe import run_transcribe_all
+
+        tracker = MagicMock(spec=ProgressTracker)
+        run_transcribe_all(cfg, tracker)
+        tracker.error.assert_called_once()
+        args = tracker.error.call_args[0][0]
+        assert "faster-whisper" in args
+        assert "whisper install" in args
 
     @patch("vlog_tool.tasks.transcribe._extract_audio")
     @patch("vlog_tool.tasks.transcribe.transcribe_audio")
