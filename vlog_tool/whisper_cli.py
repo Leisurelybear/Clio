@@ -4,8 +4,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import torch
-
 from vlog_tool.config import load_config
 from vlog_tool.transcribe import PROJECT_ROOT, _resolve_cache_dir
 
@@ -25,6 +23,8 @@ def run_whisper_install() -> int:
         print("安装失败:", result.stderr)
         return 1
     print("faster-whisper 安装完成")
+
+    import torch
 
     cuda_avail = torch.cuda.is_available()
     print(f"CUDA: {'可用' if cuda_avail else '不可用（使用 CPU）'}")
@@ -50,6 +50,8 @@ def run_whisper_check() -> int:
     except ImportError:
         print("faster-whisper: 未安装  ✘（请执行 python main.py whisper install）")
         return 1
+
+    import torch
 
     cuda_avail = torch.cuda.is_available()
     print(f"CUDA: {'可用 ✔' if cuda_avail else '不可用（使用 CPU）'}")

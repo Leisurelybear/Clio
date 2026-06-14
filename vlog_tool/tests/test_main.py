@@ -91,9 +91,7 @@ def test_whisper_help(cli_runner, config_path):
     assert result == 0
 
 
-@patch("vlog_tool.whisper_cli.torch")
-def test_whisper_check_subcommand(mock_torch, cli_runner, config_path):
-    mock_torch.cuda.is_available.return_value = False
+def test_whisper_check_subcommand(cli_runner, config_path):
     result = cli_runner(["--config", str(config_path), "whisper", "check"])
     assert result == 0
 
