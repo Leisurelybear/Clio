@@ -126,6 +126,8 @@ header {
 .status.err { color: var(--error); }
 .status.warn { color: var(--warning); }
 .muted.warn, .warn { color: #f0a030; }
+.run-logs { margin-top: 8px; max-height: 200px; overflow-y: auto; background: #1a1a1a; border-radius: var(--radius-sm); padding: 4px 8px; font-size: var(--text-sm); }
+.run-log-line { padding: 1px 0; white-space: pre-wrap; word-break: break-all; }
 .status button { background: none; border: 1px solid currentColor; border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer; color: inherit; font: inherit; font-size: var(--text-sm); }
 
 /* ── Main Layout ───────────────────────────────────────────── */

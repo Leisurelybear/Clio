@@ -103,16 +103,19 @@ async function pollRunStatus() {
       const stale = !s.running;
       if (stale) {
         if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+        const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
         prog.innerHTML = `
           <p class="warn">⚠ 上次运行时意外中断，以下为残留进度（已失效）</p>
           <p><strong>阶段:</strong> ${escapeHtml(s.phase || '')}</p>
           <p><strong>进度:</strong> ${s.current}/${s.total}</p>
           <p><strong>状态:</strong> ${escapeHtml(s.message || '')}</p>
+          ${logsHtml}
         `;
       } else {
         if (btn) { btn.disabled = true; btn.textContent = '运行中...'; }
         const pct = s.total > 0 ? Math.round(s.current / s.total * 100) : 0;
         const eta = s.eta_sec ? `，预计剩余 ${Math.round(s.eta_sec)} 秒` : '';
+        const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
         prog.innerHTML = `
           <p><strong>阶段:</strong> ${escapeHtml(s.phase || '')}</p>
           <p><strong>进度:</strong> ${s.current}/${s.total} (${pct}%)${eta}</p>
@@ -120,12 +123,14 @@ async function pollRunStatus() {
           <div style="background:#333;border-radius:3px;height:8px;margin:8px 0">
             <div style="background:#4a9eff;border-radius:3px;height:100%;width:${pct}%"></div>
           </div>
+          ${logsHtml}
         `;
       }
     } else if (s.status === 'done') {
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
-      prog.innerHTML = `<p class="ok">✓ 流水线完成</p><p>${escapeHtml(s.message || '')}</p>`;
+      const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
+      prog.innerHTML = `<p class="ok">✓ 流水线完成</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线完成', 'ok');
       state.currentDay = _lastRunDay;
       state.plan = null;
@@ -139,7 +144,8 @@ async function pollRunStatus() {
     } else if (s.status === 'error') {
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
-      prog.innerHTML = `<p class="err">✗ 流水线出错</p><p>${escapeHtml(s.message || '')}</p>`;
+      const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
+      prog.innerHTML = `<p class="err">✗ 流水线出错</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线出错', 'err');
     }
   } catch (e) {

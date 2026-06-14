@@ -62,6 +62,7 @@ def run_compress_all(
                 use_idx, use_out = existing_map[source.stem]
                 if tracker:
                     tracker.update(phase="compress", current=i, total=len(items), message=f"压缩 {source.name}...")
+                    tracker.log(f"⏭️ 跳过 {label_name}（已存在 {use_out.name}）")
                 print(f"[跳过压缩] {label_name} (已存在: {use_out.name})")
                 records.append(
                     ClipRecord(index=use_idx, stem=use_out.stem, source_path=original, compressed_path=use_out)
@@ -72,6 +73,7 @@ def run_compress_all(
             use_out = config.compressed_dir / f"{format_index(use_idx, config.naming.index_width)}_{source.stem}.mp4"
             if tracker:
                 tracker.update(phase="compress", current=i, total=len(items), message=f"压缩 {source.name}...")
+                tracker.log(f"▶ 压缩 {label_name}")
             print(_eta_line("压缩", i, len(items), label_name, completed, elapsed_total))
             t0 = time.monotonic()
             if tracker:
