@@ -79,6 +79,10 @@ def run_pipeline_steps(
     if tracker is None:
         tracker = ProgressTracker(config.paths.output_dir)
 
+    unknown = [s for s in steps if s not in _STEP_FUNCS]
+    if unknown:
+        raise ValueError(f"未知的 pipeline step: {', '.join(unknown)}（可选: {', '.join(_STEP_FUNCS)}）")
+
     try:
         for step in steps:
             label = _STEP_LABELS.get(step, step)
