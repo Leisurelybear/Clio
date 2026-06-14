@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 import time
 from pathlib import Path
@@ -39,7 +40,8 @@ class ProgressTracker:
 
     def _flush(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self._path.parent / (self._path.name + ".tmp")
+        suffix = os.urandom(4).hex()
+        tmp = self._path.parent / f"{self._path.name}.{suffix}.tmp"
         tmp.write_text(json.dumps(self._data, ensure_ascii=False), encoding="utf-8")
         tmp.replace(self._path)
 
