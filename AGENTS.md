@@ -31,12 +31,20 @@ vlog-video-analysis/
 │   ├── analyze.py             # AI 交互（analyze_video, generate_voiceover, plan_daily_vlog, refine_*）
 │   ├── compress.py            # ffmpeg 包装
 │   ├── prompts.py             # 所有 prompt 模板（常量）
+│   ├── transcribe.py          # Whisper ASR 转录核心
+│   ├── whisper_cli.py         # whisper install/check CLI
 │   ├── utils.py               # ffmpeg 路径发现、文件 IO、mask_if_looks_like_key、extract_json
 │   ├── log.py                 # 日志：按小时切文件 + _TeeWriter + timed/format_size/format_duration
 │   │                           #     + sys.excepthook 把未捕获异常整成一条 ERROR 日志
+│   ├── tasks/                 # pipeline 步骤（拆分自 pipeline.py）
+│   │   ├── transcribe.py        # Pipeline task: run_transcribe_all
+│   │   └── ...
 │   ├── ui/                    # 本地 Web UI（可视化编辑 AI 输出；stdib http.server，零新依赖）
 │   │   ├── server.py            #   UIHandler（BaseHTTPRequestHandler）+ make_handler + run
 │   │   ├── README.md            #   UI 使用文档
+│   │   ├── routes/              #   路由处理
+│   │   │   ├── transcripts.py   #   Transcript GET/PUT API
+│   │   │   └── whisper_routes.py#   Whisper check API
 │   │   └── static/              #   前端三件套（无构建步骤）
 │   │       ├── index.html
 │   │       ├── app.js
@@ -55,13 +63,15 @@ vlog-video-analysis/
 ├── requirements.txt           # 开发期宽松依赖
 ├── requirements-locked.txt    # 可重现构建锁定版本
 ├── .github/workflows/test.yml # GitHub Actions CI（pushes + PRs）
-├── vlog_tool/tests/           # 单元测试（pytest，128 用例）
+├── vlog_tool/tests/           # 单元测试（pytest，381 用例）
 │   ├── conftest.py            #   共享 fixtures
 │   ├── test_config.py         #   34 tests - config 加载/合并/校验
 │   ├── test_utils.py          #   34 tests - extract_json/mask_key/sanitize/find_videos
 │   ├── test_cut.py            #   25 tests - 时间解析/文件名生成
 │   ├── test_log.py            #   13 tests - TeeWriter/size&duration 格式化
-│   └── test_progress.py       #   12 tests - ProgressTracker read/write/init
+│   ├── test_progress.py       #   12 tests - ProgressTracker read/write/init
+│   ├── test_transcribe.py     #   15 tests - transcribe enabled/disabled/deps
+│   └── test_routes_transcripts.py #  7 tests - transcript/whisper API routes
 ```
 
 ## 4. 关键约定
@@ -172,9 +182,9 @@ ai:
 
 ## 7. 项目当前状态
 
-最后更新：2026-06-14（代码审查 P0~P3 14 项修了 12 项 + 344 测试稳定）。已上线：
+最后更新：2026-06-14（代码审查 P0~P3 14 项修了 12 项 + 381 测试稳定）。已上线：
 - GitHub Actions CI（Ubuntu，Python 3.11/3.12）
-- 344 个 pytest 用例：config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(9) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / file_service_routes(35)
+- 381 个 pytest 用例：config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(12) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / file_service_routes(35) / transcribe(15) / routes_transcripts(7)
 - 依赖版本锁定 `requirements-locked.txt`
 最近做的 commit 顺序：
 1. `chore: scaffold initial Vlog editing helper project`
@@ -267,6 +277,14 @@ ai:
 88. `34c0d3b` `refactor(ui): remove hasattr(handler.server) patterns, use direct attr access`  ← P1-003
 89. `ea2e79c` `fix(progress): random suffix for tmp file to avoid name conflicts`  ← P2-003
 90. `34846df` `fix(pipeline): validate step names before execution`  ← P2-004
+91. `f4b84e0` `feat(config): add WhisperConfig dataclass with enum validation`  ← Task 1
+92. `7263367` `feat(transcribe): add core Whisper transcription module`  ← Task 2
+93. `90da4b3` `feat(transcribe): add pipeline task with dedup and ffmpeg audio extraction`  ← Task 3
+94. `d2e3924` `feat(cli): add transcribe and whisper install/check subcommands`  ← Task 4
+95. `ef7b033` `feat(plan): inject transcript context into PLAN_PROMPT`  ← Task 5
+96. `370516c` `feat(whisper): add deps check, .gitignore entries, and enabled gate`  ← Task 6
+97. `4b1c6e6` `feat(ui): add transcripts and whisper check backend routes`  ← Task 7
+98. `bcfbe04` `feat(ui): add transcripts tab, sidebar badge, and run step`  ← Task 8
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。

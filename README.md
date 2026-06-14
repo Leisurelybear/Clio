@@ -21,7 +21,8 @@
 | 4 | 按模板生成口播文案 | `scripts` |
 | 5 | 推荐单日 vlog 片段顺序 | `plan --day day1` |
 | 6 | 烧录序号便于剪映对照 | `label` |
-| 7 | 按规划裁剪视频片段 | `cut --day day1 -o ./my_clips` |
+| 7 | 离线语音识别（ASR）转录 | `transcribe` |
+| 8 | 按规划裁剪视频片段 | `cut --day day1 -o ./my_clips` |
 | — | 一键全流程 | `run --day day1` |
 | — | 可视化 Web UI 编辑器 | `serve` |
 | — | 环境检查 | `check` |
@@ -507,6 +508,28 @@ python main.py refine -i output/Franch/scripts/001_机场轻轨清晨_voiceover.
 
 ---
 
+### 转录 → `transcribe` / `whisper`
+
+使用 faster-whisper 对视频进行离线语音识别（ASR），生成带时间戳的文字转录。先执行 `whisper install` 安装依赖，再执行 `transcribe`。
+
+```bash
+# 安装 faster-whisper（含 CUDA 检测与模型预下载）
+python main.py whisper install
+
+# 检测 faster-whisper / CUDA / 模型缓存状态
+python main.py whisper check
+
+# 对已压缩的视频进行语音转录
+python main.py transcribe
+
+# 忽略已有转录，全部重新生成
+python main.py transcribe --force
+```
+
+> 提示：transcript 数据会注入到 `plan` 的 prompt 中，AI 会参考实际口播内容来优化剪辑编排。
+
+---
+
 ### `serve` · 启动本地 Web UI（可视化编辑）
 
 启动一个浏览器里的可视化编辑器，看视频 + 改 AI 输出（texts / scripts / plan），直接保存回 JSON。
@@ -581,7 +604,7 @@ vlog-video-analysis/
 ├── setup.ps1             # 一键环境配置
 ├── main.py               # CLI 入口
 ├── .github/workflows/    # GitHub Actions CI
-├── vlog_tool/tests/      # 单元测试（343 用例）
+├── vlog_tool/tests/      # 单元测试（381 用例）
 ├── templates/
 │   ├── vlog_template.md  # 口播风格模板
 │   └── trip_context.md   # 旅行背景与 AI 规范
@@ -602,7 +625,7 @@ vlog-video-analysis/
     │   ├── plan.py / label.py / cut.py / refine.py
     │   └── _helpers.py
     ├── pipeline.py       # 编排层（~96 行）
-    ├── tests/            # 单元测试（343 用例）
+    ├── tests/            # 单元测试（381 用例）
     └── ui/               # 本地 Web UI（拆分自 server.py）
         ├── server.py     # 分发层（~454 行）
         ├── routes/       # 路由处理（videos / projects / texts / plan / config / run / fs）
@@ -624,7 +647,7 @@ vlog-video-analysis/
 
 ## 测试
 
-项目包含 **343 个 pytest 单元测试**，覆盖核心纯函数、路由 handler、辅助函数和编排逻辑：
+项目包含 **381 个 pytest 单元测试**，覆盖核心纯函数、路由 handler、辅助函数和编排逻辑：
 
 | 模块 | 用例数 | 覆盖内容 |
 |------|--------|----------|
@@ -641,8 +664,10 @@ vlog-video-analysis/
 | `test_file_service.py` | 60 | 安全 basename / atomic save / segment 匹配 / config 类型转换 |
 | `test_helpers.py` | 20 | `_next_index` / `_write_csv` / `_rewrite_text_file` |
 | `test_project_service.py` | 22 | output dir / registry / step detection |
-| `test_routes_*.py` | 37 | 视频 / 计划 / 配置 / 运行 / 项目路由 handler |
-| `test_tasks_*.py` | 9 | `run_compress_all` / `run_analyze_all` 编排 |
+| `test_routes_*.py` | 48 | 视频 / 计划 / 配置 / 运行 / 项目 / 转录路由 handler |
+| `test_tasks_*.py` | 12 | `run_compress_all` / `run_analyze_all` / `run_transcribe_all` 编排 |
+| `test_transcribe.py` | 15 | transcribe 开关 / enabled / deps 检测 |
+| `test_routes_transcripts.py` | 7 | transcript / whisper API 路由 |
 
 每次推送到 main 或提 PR 时，GitHub Actions 自动在 Python 3.11 / 3.12 上运行测试。
 
@@ -687,5 +712,5 @@ Hook 会在每次 `git commit` 前自动运行 `ruff format` 并重新 stage 格
 - [ ] 剪映草稿导出格式
 - [ ] Web UI 预览时间轴（R-012）
 - [ ] Web UI 单步执行：选目录 → 选文件 → 跑步骤 → 进度 → 自动刷新（R-008）
-- [ ] 支持 Whisper 本地语音转写（有口播的素材）（R-013）
+- [x] 支持 Whisper 本地语音转写（有口播的素材）（R-013）
 - [ ] AI token 用量统计面板（R-014）

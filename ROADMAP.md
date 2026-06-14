@@ -141,14 +141,14 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 **验收**：
 - ✅ `requirements.txt` 锁定所有依赖版本（`requirements-locked.txt`）
-- ✅ 核心纯函数 + 路由 handler + 编排逻辑有单元测试（**343 用例**，GitHub Actions CI）
+- ✅ 核心纯函数 + 路由 handler + 编排逻辑有单元测试（**381 用例**，GitHub Actions CI）
 - [ ] 补充 Linux/macOS 的 `setup.sh`（与现有 `setup.ps1` 等效）— 项目主要面向 Windows
 - [ ] `main.py check` 对 venv 检测兼容 Linux `bin/` 和 Windows `Scripts/`
 
 **子任务**：
 - [x] R-009a：锁依赖版本 + 迁移指南
 - [ ] R-009b：Linux `setup.sh`（低优先级，项目主要面向 Windows）
-- [x] R-009c：核心纯函数 + 路由 + 编排单元测试（pytest，343 用例，CI Linux + Windows 双平台）
+- [x] R-009c：核心纯函数 + 路由 + 编排单元测试（pytest，381 用例，CI Linux + Windows 双平台）
 - [ ] R-009d：venv 检测跨平台修复（B-007，影响 Linux CI）
 
 ## 需求 R-010：AI 输出质量与 Prompt 管理
@@ -267,11 +267,14 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - UI 侧栏流水线状态增加 `transcribe` 步骤
 
 **子任务**：
-- [ ] R-013a：Gemini / 其他 provider 接入音频/语音识别能力
-- [ ] R-013b：pipeline 新增 `run_transcribe_all` 步骤，存入 `transcript` 字段
-- [ ] R-013c：修改口播 prompt，加入 `{transcript}` 上下文参数
-- [ ] R-013d：CLI 子命令 `transcribe`
-- [ ] R-013e：UI 各处的步骤列表加入 `transcribe` 项
+- [x] R-013a：WhisperConfig dataclass 与模型枚举（Task 1, `f4b84e0`）
+- [x] R-013b：核心转录模块（Task 2, `7263367`）
+- [x] R-013c：pipeline 步骤 `run_transcribe_all`（Task 3, `90da4b3`）
+- [x] R-013d：CLI 子命令 `transcribe` / `whisper`（Task 4, `d2e3924`）
+- [x] R-013e：transcript 注入 PLAN_PROMPT（Task 5, `ef7b033`）
+- [x] R-013f：libs.whisper.package 等配置反序列化（Task 6, `370516c`）
+- [x] R-013g：UI 后端 transcript/whisper 路由（Task 7, `4b1c6e6`）
+- [x] R-013h：UI 前端 transcripts tab / sidebar badge / run step（Task 8, `bcfbe04`）
 
 ## 需求 R-014：AI 模型 Token 用量统计（项目级别）
 
