@@ -39,9 +39,11 @@ def _extract_audio(video_path: Path) -> Path | None:
         ]
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
         if result.returncode != 0:
-            print(f"  [ffmpeg] {result.stderr.strip()}")
+            print(f"  [ffmpeg] 失败: {result.stderr.strip()}")
             tmp_path.unlink(missing_ok=True)
             return None
+        if result.stderr.strip():
+            print(f"  [ffmpeg] stderr: {result.stderr.strip()[-500:]}")
         return tmp_path
     except Exception:
         tmp_path.unlink(missing_ok=True)
@@ -165,17 +167,41 @@ def run_transcribe_all(
 
 def run_transcribe_one(config: AppConfig, video_path: Path) -> dict:
     """单文件转录（供 UI rerun 使用）。"""
+    from vlog_tool.log import format_duration
+    import time
+
+    t0 = time.time()
+    print(f"  [transcribe_one] 开始处理: {video_path.name}")
     if not video_path.is_file():
         return {"error": f"文件不存在: {video_path}"}
+    print(f"  [transcribe_one] 提取音频...")
     wav_path = _extract_audio(video_path)
     if wav_path is None:
         return {"error": "音频提取失败"}
+    wav_size = wav_path.stat().st_size
+    print(f"  [transcribe_one] WAV 提取完成: {wav_path.name} ({wav_size / 1024:.0f} KB)，耗时 {time.time() - t0:.1f}s")
     try:
+        print(
+            f"  [transcribe_one] 开始 Whisper 转录 (device={config.whisper.device}, model={config.whisper.model_size})..."
+        )
+        t1 = time.time()
         segments = transcribe_audio(wav_path, config)
-        return {
+        t2 = time.time()
+        print(f"  [transcribe_one] Whisper 完成: {len(segments)} 段, 耗时 {t2 - t1:.1f}s")
+        transcript = {
             "source_video": video_path.name,
             "source_stem": video_path.stem,
+            "language": config.whisper.language,
+            "model_size": config.whisper.model_size,
             "segments": segments,
+            "generated_at": datetime.now().isoformat(),
         }
+        transcripts_dir = config.paths.output_dir / config.whisper.transcripts_subdir
+        transcripts_dir.mkdir(parents=True, exist_ok=True)
+        out_path = transcripts_dir / f"{video_path.stem}_transcript.json"
+        out_path.write_text(json.dumps(transcript, ensure_ascii=False, indent=2), encoding="utf-8")
+        print(f"  [transcribe_one] ✓ 已保存到 {out_path}")
+        return transcript
     finally:
         wav_path.unlink(missing_ok=True)
+        print(f"  [transcribe_one] 临时 WAV 已删除，总计耗时 {time.time() - t0:.1f}s")

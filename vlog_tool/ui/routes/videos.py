@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from http import HTTPStatus
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from vlog_tool._constants import VIDEO_EXTS
@@ -68,6 +69,15 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
             idx = f.stem.split("_", 1)[0]
             script_sidecars.setdefault(idx, []).append(f.name)
 
+    # build transcript lookup: original stem -> bool
+    cfg = handler._get_config(proj_input)
+    transcripts_dir = proj_out / cfg.whisper.transcripts_subdir
+    transcripts_set: set[str] = set()
+    if transcripts_dir.is_dir():
+        for f in transcripts_dir.iterdir():
+            if f.suffix == ".json" and f.stem.endswith("_transcript"):
+                transcripts_set.add(f.stem[: -len("_transcript")])
+
     videos: list[dict] = []
     groups: dict[str, dict] = {}
 
@@ -81,6 +91,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                 stem = p.stem
                 idx = stem.split("_", 1)[0] if "_" in stem else ""
                 orig = _find_original_for_compressed(stem, proj_input)
+                orig_stem = Path(orig).stem if orig else None
                 group_key, seg_num = _parse_segment_info(stem)
                 v: dict[str, Any] = {
                     "file": p.name,
@@ -89,6 +100,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                     "title": text_titles.get(idx, ""),
                     "text_json": (text_sidecars.get(idx) or [None])[0],
                     "script_json": (script_sidecars.get(idx) or [None])[0],
+                    "transcript_file": orig_stem if orig_stem and orig_stem in transcripts_set else None,
                     "match": ({"source": "original", "file": orig} if orig else None),
                     "group_key": group_key,
                     "segment_label": None,
@@ -97,7 +109,12 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                     group_members.setdefault(group_key, []).append((idx, seg_num))
                 videos.append(v)
 
-            # Pass 2: compute totals and fill segment labels
+            # Pass 2: compute totals, fill segment labels and offsets
+            # resolve ffprobe once for segment offset computation
+            try:
+                _ffprobe = resolve_binary(cfg.paths.ffprobe, "ffprobe")
+            except Exception:
+                _ffprobe = None
             for gk, members in group_members.items():
                 members.sort(key=lambda x: x[1])
                 total = len(members)
@@ -106,10 +123,28 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                     "indices": [m[0] for m in members],
                     "total": total,
                 }
+                # compute segment offset from original video duration
+                offsets: dict[str, float] = {}
+                if total > 1 and _ffprobe:
+                    orig: Path | None = None
+                    for ext in VIDEO_EXTS:
+                        candidate = proj_input / f"{gk}{ext}"
+                        if candidate.is_file():
+                            orig = candidate
+                            break
+                    if orig is not None:
+                        try:
+                            dur = get_duration_sec(orig, _ffprobe)
+                            seg_dur = dur / total
+                            for i, (member_idx, _) in enumerate(members):
+                                offsets[member_idx] = round(i * seg_dur, 1)
+                        except Exception:
+                            pass
                 for member_idx, seg_num in members:
                     for v in videos:
                         if v["index"] == member_idx:
                             v["segment_label"] = f"{seg_num}/{total}"
+                            v["offset_sec"] = offsets.get(member_idx, 0.0)
                             break
     else:  # original
         if proj_input.is_dir():
@@ -130,6 +165,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                             "source": "original",
                             "index": None,
                             "match": None,
+                            "transcript_file": p.stem if p.stem in transcripts_set else None,
                         }
                     )
                     continue
@@ -153,6 +189,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                         "offset_sec": offsets.get(c_idx, 0.0),
                         "text_json": (text_sidecars.get(c_idx) or [None])[0],
                         "script_json": (script_sidecars.get(c_idx) or [None])[0],
+                        "transcript_file": p.stem if p.stem in transcripts_set else None,
                         "match": {"source": "compressed", "file": c_file, "index": c_idx},
                     }
                     if len(segment_matches) > 1:

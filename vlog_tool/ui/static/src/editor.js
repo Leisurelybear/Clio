@@ -131,21 +131,23 @@ function renderTranscript() {
     const startStr = fmtTime(seg.start || 0);
     const endStr = fmtTime(seg.end || 0);
     const confidence = seg.avg_logprob != null
-      ? `<span class="muted" title="log-prob: ${seg.avg_logprob.toFixed(2)}">${Math.round((1 - Math.min(0, seg.avg_logprob || 0)) * 100)}%</span>`
+      ? `<span class="muted" title="avg_logprob=${seg.avg_logprob.toFixed(2)}">${Math.round(Math.max(0, Math.min(100, (1 + (seg.avg_logprob || 0)) * 100)))}%</span>`
       : '';
     li.innerHTML = `
-      <div class="seg-time">${escapeHtml(startStr)} - ${escapeHtml(endStr)} ${confidence}</div>
+      <div class="seg-time">${escapeHtml(startStr)} - ${escapeHtml(endStr)} ${confidence}
+        <button class="seg-del" data-index="${i}" title="删除此段">×</button>
+      </div>
       <div class="seg-text" data-seg-index="${i}">${escapeHtml(seg.text || '')}</div>
     `;
-    li.onclick = (e) => {
-      if (e.target.closest('.seg-text')) return;
+    li.onclick = () => {
       const player = $('player');
       const v = state.videos.find(x => x.file === state.currentVideo);
       player.currentTime = seg.start + (v?.offset_sec || 0);
       player.play().catch(() => {});
     };
     const textDiv = li.querySelector('.seg-text');
-    textDiv.ondblclick = () => {
+    textDiv.ondblclick = (e) => {
+      e.stopPropagation();
       const inp = document.createElement('textarea');
       inp.className = 'seg-text-edit';
       inp.value = seg.text || '';
@@ -189,6 +191,27 @@ function renderTranscript() {
       inp.onkeydown = (e) => {
         if (e.key === 'Escape') { inp.blur(); }
       };
+    };
+    const delBtn = li.querySelector('.seg-del');
+    delBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm(`确定删除第 ${i + 1} 段转录？`)) return;
+      const v = state.videos.find(x => x.file === state.currentVideo);
+      if (!v) { setStatus('找不到当前视频', 'err'); return; }
+      try {
+        const r = await api('PUT', `/api/transcripts?video=${encodeURIComponent(v.file)}`, {
+          segment_index: i, delete: true,
+        });
+        if (r.ok) {
+          segments.splice(i, 1);
+          setStatus('已删除', 'ok');
+          renderTranscript();
+        } else {
+          setStatus('删除失败: ' + (r.error || '未知错误'), 'err');
+        }
+      } catch (e) {
+        setStatus('删除失败: ' + e.message, 'err');
+      }
     };
     ol.appendChild(li);
   }

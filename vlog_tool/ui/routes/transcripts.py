@@ -61,10 +61,6 @@ def handle_put_transcripts(handler, qs: dict, obj: dict) -> None:
     if segment_index is None or not isinstance(segment_index, int):
         return handler._send_json({"ok": False, "error": "missing/invalid segment_index"}, 400)
 
-    new_text = obj.get("text", "")
-    if not isinstance(new_text, str):
-        return handler._send_json({"ok": False, "error": "text must be a string"}, 400)
-
     tp = _transcript_path(handler, qs, video)
     if not tp or not tp.is_file():
         return handler._send_json({"ok": False, "error": "transcript not found"}, 404)
@@ -74,7 +70,15 @@ def handle_put_transcripts(handler, qs: dict, obj: dict) -> None:
         segments = data.get("segments", [])
         if segment_index < 0 or segment_index >= len(segments):
             return handler._send_json({"ok": False, "error": f"segment_index {segment_index} out of range"}, 400)
-        segments[segment_index]["text"] = new_text
+
+        if obj.get("delete"):
+            del segments[segment_index]
+        else:
+            new_text = obj.get("text", "")
+            if not isinstance(new_text, str):
+                return handler._send_json({"ok": False, "error": "text must be a string"}, 400)
+            segments[segment_index]["text"] = new_text
+
         _save_atomic(tp, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
         handler._send_json({"ok": True})
     except Exception as e:

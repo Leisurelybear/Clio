@@ -83,12 +83,18 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
 
     stem = Path(video_basename).stem
 
-    # Resolve original video path (for texts/analyze rerun)
+    # Resolve original video path
     source_view = obj.get("source", "compressed")
     if source_view == "original":
         original_video = proj_input / video_basename
         if not original_video.is_file():
-            return handler._send_json({"ok": False, "error": f"original video not found: {video_basename}"}, 404)
+            # Maybe frontend sent a compressed filename with source:original
+            # (e.g. from original view where v.file is actually compressed name).
+            # Try resolving via _find_original_for_compressed as fallback.
+            original_name = _find_original_for_compressed(stem, proj_input)
+            if not original_name:
+                return handler._send_json({"ok": False, "error": f"original video not found: {video_basename}"}, 404)
+            original_video = proj_input / original_name
     else:
         original_name = _find_original_for_compressed(stem, proj_input)
         if not original_name:
@@ -144,11 +150,12 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
 
                 if not check_whisper():
                     raise RuntimeError("faster-whisper 未安装。执行: python main.py whisper install")
+                _log(f"original_video={original_video}, exists={original_video.is_file()}")
                 result = run_transcribe_one(cfg, original_video)
                 if "error" in result:
                     _log(f"✗ transcription failed: {result['error']}")
                     raise RuntimeError(result["error"])
-                _log("✓ transcription complete")
+                _log(f"✓ transcription complete, output_dir={cfg.paths.output_dir}")
             tracker.done(f"{task} → {video_basename} complete")
             print(f"  [rerun] ✓ {task} -> {video_basename} complete")
         except Exception as e:

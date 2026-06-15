@@ -61,12 +61,24 @@ def _get_model(config: AppConfig):
     key = f"{config.whisper.model_size}@{cache_dir}"
     if _whisper_model is None or _whisper_cache_key != key:
         device = _resolve_device(config)
-        _whisper_model = WhisperModel(
-            config.whisper.model_size,
-            device=device,
-            compute_type=_resolve_compute_type(device),
-            download_root=str(cache_dir),
-        )
+        try:
+            _whisper_model = WhisperModel(
+                config.whisper.model_size,
+                device=device,
+                compute_type=_resolve_compute_type(device),
+                download_root=str(cache_dir),
+            )
+        except (ValueError, RuntimeError, OSError) as e:
+            if device != "cuda":
+                raise
+            print(f"  [警告] CUDA 加载失败 ({e})，回退到 CPU")
+            device = "cpu"
+            _whisper_model = WhisperModel(
+                config.whisper.model_size,
+                device=device,
+                compute_type=_resolve_compute_type(device),
+                download_root=str(cache_dir),
+            )
         _whisper_cache_key = key
     return _whisper_model
 
@@ -91,10 +103,14 @@ def transcribe_audio(
         best_of=5,
         temperature=0.0,
     )
-    all_segments = list(segments_iter)
-
+    total_duration = info.duration
+    last_log_pct = 0
     result = []
-    for seg in all_segments:
+    for seg in segments_iter:
+        pct = int(seg.end / total_duration * 100) if total_duration > 0 else 0
+        if pct >= last_log_pct + 10:
+            print(f"  [whisper] 转录进度: {seg.end:.1f}s / {total_duration:.0f}s ({pct}%)")
+            last_log_pct = pct
         if seg.avg_logprob >= -0.8 and seg.no_speech_prob <= 0.1:
             result.append(
                 {
