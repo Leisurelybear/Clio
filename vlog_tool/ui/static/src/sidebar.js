@@ -427,10 +427,8 @@ async function setSource(source) {
 }
 
 // ── Empty-state helpers ──
-function switchToOriginalThenCompress() {
-  state.source = 'original';
-  $$('.source-toggle button').forEach(b => b.classList.toggle('active', b.dataset.source === 'original'));
-  saveProject();
+async function switchToOriginalThenCompress() {
+  await setSource('original');
 }
 
 function goToRunTab() {
