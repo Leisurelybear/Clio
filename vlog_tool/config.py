@@ -277,8 +277,13 @@ def _legacy_ai_config(raw: dict) -> AIConfig:
     )
 
 
+def _filter_dc(raw: dict, dc: type) -> dict:
+    fields = {f.name for f in dc.__dataclass_fields__.values()}
+    return {k: v for k, v in raw.items() if k in fields}
+
+
 def _parse_whisper(raw: dict) -> WhisperConfig:
-    cfg = WhisperConfig(**raw)
+    cfg = WhisperConfig(**_filter_dc(raw, WhisperConfig))
     cfg.sanitize()
     return cfg
 
@@ -362,11 +367,11 @@ def load_config(
             recursive=paths_raw.get("recursive", False),
             logs_dir=_path(paths_raw.get("logs_dir", "./logs"), base),
         ),
-        proxy=ProxyConfig(**raw.get("proxy", {})),
+        proxy=ProxyConfig(**_filter_dc(raw.get("proxy", {}), ProxyConfig)),
         ai=ai,
-        compress=CompressConfig(**raw.get("compress", {})),
-        analyze=AnalyzeConfig(**raw.get("analyze", {})),
-        naming=NamingConfig(**raw.get("naming", {})),
+        compress=CompressConfig(**_filter_dc(raw.get("compress", {}), CompressConfig)),
+        analyze=AnalyzeConfig(**_filter_dc(raw.get("analyze", {}), AnalyzeConfig)),
+        naming=NamingConfig(**_filter_dc(raw.get("naming", {}), NamingConfig)),
         script=ScriptConfig(
             scripts_subdir=raw.get("script", {}).get("scripts_subdir", "scripts"),
             template_file=_path(
@@ -375,7 +380,7 @@ def load_config(
             ),
             target_words=raw.get("script", {}).get("target_words", 80),
         ),
-        plan=PlanConfig(**raw.get("plan", {})),
+        plan=PlanConfig(**_filter_dc(raw.get("plan", {}), PlanConfig)),
         whisper=_parse_whisper(raw.get("whisper", {})),
     )
     _validate_config(config)
