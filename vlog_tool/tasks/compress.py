@@ -40,9 +40,13 @@ def run_compress_all(
             items.append((video, video))
 
     # Phase 2: build existing lookup (source_stem -> (index, Path))
+    # Only include files >= 256 bytes to skip partially-written files from interrupted runs.
+    MIN_VALID_SIZE = 256
     existing_map: dict[str, tuple[int, Path]] = {}
     if config.analyze.skip_existing and config.compressed_dir.is_dir():
         for f in config.compressed_dir.iterdir():
+            if f.is_file() and f.stat().st_size < MIN_VALID_SIZE:
+                continue
             if "_" in f.stem:
                 prefix, stem_part = f.stem.split("_", 1)
                 if prefix.isdigit():

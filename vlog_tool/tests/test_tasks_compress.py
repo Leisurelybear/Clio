@@ -73,7 +73,7 @@ class TestRunCompressAll:
         def _mock_compress(inp, outp, c):
             nonlocal call_count
             call_count += 1
-            outp.write_bytes(b"\x00" * 100)
+            outp.write_bytes(b"\x00" * 300)
             return outp
 
         monkeypatch.setattr("vlog_tool.tasks.compress.compress_video", _mock_compress)
@@ -99,7 +99,7 @@ class TestRunCompressAll:
         monkeypatch.setattr("vlog_tool.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
 
         def _mock_compress(inp, outp, c):
-            outp.write_bytes(b"\x00" * 100)
+            outp.write_bytes(b"\x00" * 300)
             return outp
 
         monkeypatch.setattr("vlog_tool.tasks.compress.compress_video", _mock_compress)
