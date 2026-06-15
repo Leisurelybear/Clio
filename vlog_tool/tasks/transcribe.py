@@ -21,26 +21,31 @@ def _extract_audio(video_path: Path) -> Path | None:
     """ffmpeg 提取 16kHz 单声道 WAV，返回临时文件路径。"""
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp.close()
-    cmd = [
-        "ffmpeg",
-        "-y",
-        "-i",
-        str(video_path),
-        "-vn",
-        "-acodec",
-        "pcm_s16le",
-        "-ar",
-        "16000",
-        "-ac",
-        "1",
-        str(tmp.name),
-    ]
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-    if result.returncode != 0:
-        print(f"  [ffmpeg] {result.stderr.strip()}")
-        Path(tmp.name).unlink(missing_ok=True)
-        return None
-    return Path(tmp.name)
+    tmp_path = Path(tmp.name)
+    try:
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(video_path),
+            "-vn",
+            "-acodec",
+            "pcm_s16le",
+            "-ar",
+            "16000",
+            "-ac",
+            "1",
+            str(tmp_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        if result.returncode != 0:
+            print(f"  [ffmpeg] {result.stderr.strip()}")
+            tmp_path.unlink(missing_ok=True)
+            return None
+        return tmp_path
+    except Exception:
+        tmp_path.unlink(missing_ok=True)
+        raise
 
 
 def run_transcribe_all(
@@ -144,6 +149,11 @@ def run_transcribe_all(
             raise
         except Exception as e:
             print(f"  [错误] {stem}: {e}")
+            state.mark(stem, "transcribe", "error")
+            if tracker:
+                tracker.next(message=f"失败 {stem}")
+            wav_path.unlink(missing_ok=True)
+            continue
         finally:
             wav_path.unlink(missing_ok=True)
 

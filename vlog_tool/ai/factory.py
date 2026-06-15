@@ -38,6 +38,6 @@ def get_task_provider(config: AppConfig, task: TaskName | str) -> tuple[TextAIPr
 
 def get_video_provider(config: AppConfig, task: TaskName | str) -> tuple[VideoAIProvider, str]:
     provider, model = get_task_provider(config, task)
-    if not hasattr(provider, "analyze_video"):
+    if not isinstance(provider, VideoAIProvider):
         raise ValueError(f"任务 '{task}' 使用的厂家不支持视频分析")
-    return provider, model  # type: ignore[return-value]
+    return provider, model

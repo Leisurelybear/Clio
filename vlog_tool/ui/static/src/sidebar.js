@@ -341,6 +341,7 @@ async function selectPlan(dayOverride) {
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换到规划吗？')) return;
   }
+  if (state.previewActive) stopPreview();
   state.currentEntity = 'plan';
   state.dirty = false;
   if (dayOverride) state.currentDay = dayOverride;
@@ -427,13 +428,9 @@ async function setSource(source) {
 
 // ── Empty-state helpers ──
 function switchToOriginalThenCompress() {
-  const btns = document.querySelectorAll('.source-toggle button');
-  for (const btn of btns) {
-    if (btn.dataset.source === 'original') {
-      btn.click();
-      break;
-    }
-  }
+  state.source = 'original';
+  $$('.source-toggle button').forEach(b => b.classList.toggle('active', b.dataset.source === 'original'));
+  saveProject();
 }
 
 function goToRunTab() {

@@ -29,6 +29,7 @@ def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
     Handles:
     - Direct match: '001_GL010683' → GL010683.mp4
     - Segment match: '001_GL010683_seg01' → strip _segXX → GL010683.mp4
+    - Recursive search: scans subdirectories for all above cases.
     """
     _, orig_stem = compressed_stem.split("_", 1)
 
@@ -37,6 +38,10 @@ def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
             candidate = input_dir / f"{stem}{ext}"
             if candidate.is_file():
                 return candidate
+        for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
+            for candidate in input_dir.rglob(f"{stem}{ext}"):
+                if candidate.is_file():
+                    return candidate
         return None
 
     result = _try_find(orig_stem)
@@ -101,10 +106,19 @@ def run_analyze_all(
             idx_val = int(idx_str)
 
             existing = sorted(config.texts_dir.glob(f"{idx_str}_*.json"))
+            json_path = None
+            analysis = None
             if config.analyze.skip_existing and existing:
-                json_path = existing[0]
+                candidate = existing[0]
+                try:
+                    existing_data = json.loads(candidate.read_text(encoding="utf-8"))
+                    if existing_data.get("source_file", "") == original.name:
+                        json_path = candidate
+                        analysis = existing_data
+                except (json.JSONDecodeError, OSError):
+                    pass
+            if json_path:
                 text_path = json_path.with_suffix(".txt")
-                analysis = json.loads(json_path.read_text(encoding="utf-8"))
                 if tracker:
                     tracker.update(phase="analyze", current=i, total=total, message=f"跳过 {compressed.name}...")
                 state.mark(original.stem, "analyze", "skipped")

@@ -5,6 +5,7 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.compress import compress_video
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
@@ -45,7 +46,9 @@ def run_compress_all(
     existing_map: dict[str, tuple[int, Path]] = {}
     if config.analyze.skip_existing and config.compressed_dir.is_dir():
         for f in config.compressed_dir.iterdir():
-            if f.is_file() and f.stat().st_size < MIN_VALID_SIZE:
+            if not f.is_file() or f.suffix.lower() not in VIDEO_EXTS:
+                continue
+            if f.stat().st_size < MIN_VALID_SIZE:
                 continue
             if "_" in f.stem:
                 prefix, stem_part = f.stem.split("_", 1)

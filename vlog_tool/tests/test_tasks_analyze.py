@@ -60,7 +60,12 @@ class TestRunAnalyzeAll:
         monkeypatch.setattr("vlog_tool.tasks.analyze.get_duration_sec", lambda *a: 60.0)
         monkeypatch.setattr(
             "vlog_tool.tasks.analyze.analyze_video",
-            lambda *a, **kw: {"title": "Test Clip", "summary": "A test", "location": "Paris"},
+            lambda *a, **kw: {
+                "title": "Test Clip",
+                "summary": "A test",
+                "location": "Paris",
+                "source_file": "GL010695.mp4",
+            },
         )
 
         records = run_analyze_all(cfg)
@@ -74,7 +79,9 @@ class TestRunAnalyzeAll:
         comp = cfg.compressed_dir / "001_GL010695.mp4"
         comp.write_bytes(b"\x00" * 100)
         existing_json = cfg.texts_dir / "001_Test_Clip.json"
-        existing_json.write_text(json.dumps({"title": "Test Clip", "summary": "A test"}), encoding="utf-8")
+        existing_json.write_text(
+            json.dumps({"title": "Test Clip", "summary": "A test", "source_file": "GL010695.mp4"}), encoding="utf-8"
+        )
 
         _common_mocks(monkeypatch)
         analyze_called = False

@@ -104,6 +104,9 @@ class GeminiProvider:
             raise RuntimeError(f"视频处理失败: {uploaded.name}")
         return uploaded
 
+    def close(self) -> None:
+        pass
+
     def generate_text(self, prompt: str, model: str) -> str:
         rl_ctx = self._rl or nullcontext()
 

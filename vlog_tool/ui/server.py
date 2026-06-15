@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import mimetypes
 import re
@@ -121,7 +122,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                         # Evict the first (oldest) entry
                         cache.pop(next(iter(cache)), None)
                     cache[key] = load_config(config_path, project_dir=project_input)
-                return cache[key]
+                return copy.deepcopy(cache[key])
 
         def log_message(self, fmt, *args):
             print(f"  [serve] {self.address_string()} - {fmt % args}")

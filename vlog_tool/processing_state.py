@@ -54,4 +54,4 @@ class ProcessingState:
 
     def get_state(self) -> dict:
         with self._lock:
-            return dict(self._data)
+            return json.loads(json.dumps(self._data))

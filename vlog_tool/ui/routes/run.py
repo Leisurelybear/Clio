@@ -29,7 +29,9 @@ def handle_get_run_status(handler: BaseHTTPRequestHandler, qs: dict) -> None:
             data = {"status": "unknown"}
     else:
         data = {"status": "idle"}
-    data["running"] = handler._run_thread is not None and handler._run_thread.is_alive()
+    with handler.__class__._run_lock:
+        running = handler._run_thread is not None and handler._run_thread.is_alive()
+    data["running"] = running
     handler._send_json(data)
 
 
@@ -43,9 +45,11 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
         cfg.plan.use_transcripts = obj["use_transcripts"]
 
     def _run():
+        tracker = ProgressTracker(cfg.paths.output_dir)
         try:
-            run_pipeline_steps(cfg, day_label, steps)
+            run_pipeline_steps(cfg, day_label, steps, tracker=tracker)
         except Exception:
+            tracker.error("pipeline failed")
             traceback.print_exc()
 
     with handler.__class__._run_lock:

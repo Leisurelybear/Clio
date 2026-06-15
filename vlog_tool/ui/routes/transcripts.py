@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from vlog_tool.config import load_config
 from vlog_tool.ui.services.file_service import _is_safe_basename, _save_atomic
 
 
@@ -30,13 +29,8 @@ def _transcript_path(handler, qs: dict, video: str) -> Path | None:
     proj_out = handler._get_project_output(qs)
     if not proj_out:
         return None
-    try:
-        if hasattr(handler, "config_path") and handler.config_path:
-            cfg = load_config(Path(handler.config_path))
-        else:
-            cfg = load_config()
-    except Exception:
-        cfg = load_config()
+    proj_input = handler._resolve_project_input(qs)
+    cfg = handler._get_config(proj_input)
     transcripts_dir = proj_out / cfg.whisper.transcripts_subdir
     return transcripts_dir / f"{stem}_transcript.json"
 

@@ -9,6 +9,7 @@ import { api, icon } from './api.js';
 
 let _runPollTimer = null;
 let _lastRunDay = 'day1';
+let _pollErrorCount = 0;
 
 const RUN_STEPS = [
   { key: 'compress', label: '压缩原视频', hint: '将原片压缩为 640p，为 AI 分析做准备' },
@@ -144,7 +145,7 @@ async function pollRunStatus() {
       try { state.plan = await api('GET', `/api/plan?day=${_lastRunDay}`); } catch {}
       await import('./sidebar.js').then(mod => mod.loadVideos());
       if (state.currentEntity === 'plan') import('./sidebar.js').then(mod => mod.selectPlan());
-    } else if (s.status === 'error') {
+    } else     if (s.status === 'error') {
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
@@ -152,8 +153,15 @@ async function pollRunStatus() {
       setStatus('流水线出错', 'err');
       renderProcessingState(prog);
     }
+    _pollErrorCount = 0;
   } catch (e) {
-    // poll error, ignore
+    _pollErrorCount++;
+    if (_pollErrorCount >= 5) {
+      _stopRunPoll();
+      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+      prog.innerHTML = `<p class="err">✗ 状态更新失败（连续 5 次错误）</p><p>${escapeHtml(e.message)}</p>`;
+      setStatus('状态更新失败', 'err');
+    }
   }
 }
 

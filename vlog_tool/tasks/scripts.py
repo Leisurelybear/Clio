@@ -49,8 +49,8 @@ def run_generate_scripts(
             script = generate_voiceover(data, template, config)
             elapsed_total += time.monotonic() - t0
             completed += 1
-            state.mark(orig_stem, "voiceover", "done")
             out.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+            state.mark(orig_stem, "voiceover", "done")
 
             md_out = config.scripts_dir / f"{json_file.stem}_voiceover.md"
             md_out.write_text(

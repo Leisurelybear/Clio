@@ -128,7 +128,7 @@ class WhisperConfig:
         if self.device not in list(WhisperDevice):
             raise ValueError(f"whisper.device 必须是 {', '.join(WhisperDevice)}，当前: {self.device}")
         if self.max_segments_per_clip < 1:
-            self.max_segments_per_clip = 5
+            raise ValueError(f"plan.max_segments_per_clip 必须 >= 1，当前: {self.max_segments_per_clip}")
 
 
 @dataclass

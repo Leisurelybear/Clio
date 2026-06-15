@@ -296,10 +296,10 @@ class TestWhisperConfig:
         with pytest.raises(ValueError):
             WhisperConfig(device="gpu").sanitize()
 
-    def test_zero_clips_resets_to_default(self):
-        cfg = WhisperConfig(max_segments_per_clip=0)
-        cfg.sanitize()
-        assert cfg.max_segments_per_clip == 5
+    def test_zero_clips_raises(self):
+        with pytest.raises(ValueError):
+            cfg = WhisperConfig(max_segments_per_clip=0)
+            cfg.sanitize()
 
     def test_auto_language_accepted(self):
         cfg = WhisperConfig(language="auto")

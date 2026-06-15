@@ -10,6 +10,17 @@ from vlog_tool.ui.routes.transcripts import handle_get_transcripts, handle_put_t
 from vlog_tool.ui.routes.whisper_routes import handle_get_whisper_check
 
 
+def _handler_with_config(tmp_path: Path, transcripts_subdir: str = "transcripts") -> MagicMock:
+    handler = MagicMock()
+    handler.config_path = str(tmp_path / "config.yaml")
+    handler._get_project_output.return_value = tmp_path
+    handler._resolve_project_input.return_value = tmp_path
+    cfg = MagicMock()
+    cfg.whisper.transcripts_subdir = transcripts_subdir
+    handler._get_config.return_value = cfg
+    return handler
+
+
 class TestHandleGetTranscripts:
     def test_no_video_param(self):
         handler = MagicMock()
@@ -18,9 +29,7 @@ class TestHandleGetTranscripts:
         handler._send_json.assert_called_once_with({"ok": False, "error": "missing video param"}, 400)
 
     def test_present(self, tmp_path: Path):
-        handler = MagicMock()
-        handler.config_path = str(tmp_path / "config.yaml")
-        handler._get_project_output.return_value = tmp_path
+        handler = _handler_with_config(tmp_path)
         (tmp_path / "transcripts").mkdir()
         transcript = {
             "source_stem": "GL010683",
@@ -28,39 +37,25 @@ class TestHandleGetTranscripts:
         }
         (tmp_path / "transcripts" / "GL010683_transcript.json").write_text(json.dumps(transcript), encoding="utf-8")
 
-        with patch("vlog_tool.ui.routes.transcripts.load_config") as mock_lc:
-            mock_cfg = MagicMock()
-            mock_cfg.whisper.transcripts_subdir = "transcripts"
-            mock_lc.return_value = mock_cfg
-
-            handler._send_json = MagicMock()
-            handle_get_transcripts(handler, {"video": ["001_GL010683.mp4"]})
-            handler._send_json.assert_called_once()
-            args = handler._send_json.call_args
-            assert args[0][0]["ok"] is True
-            assert args[0][0]["source_stem"] == "GL010683"
+        handler._send_json = MagicMock()
+        handle_get_transcripts(handler, {"video": ["001_GL010683.mp4"]})
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args
+        assert args[0][0]["ok"] is True
+        assert args[0][0]["source_stem"] == "GL010683"
 
     def test_not_found(self, tmp_path: Path):
-        handler = MagicMock()
-        handler.config_path = str(tmp_path / "config.yaml")
-        handler._get_project_output.return_value = tmp_path
+        handler = _handler_with_config(tmp_path)
         (tmp_path / "transcripts").mkdir()
 
-        with patch("vlog_tool.ui.routes.transcripts.load_config") as mock_lc:
-            mock_cfg = MagicMock()
-            mock_cfg.whisper.transcripts_subdir = "transcripts"
-            mock_lc.return_value = mock_cfg
-
-            handler._send_json = MagicMock()
-            handle_get_transcripts(handler, {"video": ["nonexistent.mp4"]})
-            handler._send_json.assert_called_once_with({"ok": False}, 404)
+        handler._send_json = MagicMock()
+        handle_get_transcripts(handler, {"video": ["nonexistent.mp4"]})
+        handler._send_json.assert_called_once_with({"ok": False}, 404)
 
 
 class TestHandlePutTranscripts:
     def test_update_segment(self, tmp_path: Path):
-        handler = MagicMock()
-        handler.config_path = str(tmp_path / "config.yaml")
-        handler._get_project_output.return_value = tmp_path
+        handler = _handler_with_config(tmp_path)
         (tmp_path / "transcripts").mkdir()
         transcript = {
             "source_stem": "GL010683",
@@ -69,23 +64,18 @@ class TestHandlePutTranscripts:
         tf = tmp_path / "transcripts" / "GL010683_transcript.json"
         tf.write_text(json.dumps(transcript), encoding="utf-8")
 
-        with patch("vlog_tool.ui.routes.transcripts.load_config") as mock_lc:
-            mock_cfg = MagicMock()
-            mock_cfg.whisper.transcripts_subdir = "transcripts"
-            mock_lc.return_value = mock_cfg
-
-            handler._send_json = MagicMock()
-            handle_put_transcripts(
-                handler,
-                {"video": ["001_GL010683.mp4"]},
-                {
-                    "segment_index": 0,
-                    "text": "new text",
-                },
-            )
-            handler._send_json.assert_called_once_with({"ok": True})
-            updated = json.loads(tf.read_text(encoding="utf-8"))
-            assert updated["segments"][0]["text"] == "new text"
+        handler._send_json = MagicMock()
+        handle_put_transcripts(
+            handler,
+            {"video": ["001_GL010683.mp4"]},
+            {
+                "segment_index": 0,
+                "text": "new text",
+            },
+        )
+        handler._send_json.assert_called_once_with({"ok": True})
+        updated = json.loads(tf.read_text(encoding="utf-8"))
+        assert updated["segments"][0]["text"] == "new text"
 
     def test_invalid_index(self, tmp_path: Path):
         handler = MagicMock()
