@@ -10,6 +10,7 @@ from pathlib import Path
 from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_duration
+from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.tasks.analyze import _resolve_original
 from vlog_tool.transcribe import check_whisper, transcribe_audio
@@ -76,12 +77,14 @@ def run_transcribe_all(
 
     if tracker:
         tracker.update(phase="transcribe", total=total, current=0, message="Whisper 语音转录...")
+    state = ProcessingState(config.paths.output_dir)
 
     start_time = time.time()
     for i, stem in enumerate(stems):
         out_path = transcripts_dir / f"{stem}_transcript.json"
         if config.analyze.skip_existing and out_path.exists():
             print(f"[跳过] {stem} (已有转录)")
+            state.mark(stem, "transcribe", "skipped")
             if tracker:
                 tracker.next(message=f"跳过 {stem}")
             continue
@@ -102,6 +105,7 @@ def run_transcribe_all(
             max_min = config.analyze.max_analyze_duration_min
             if max_min > 0 and duration > max_min * 60:
                 print(f"  [跳过] {stem}: 时长 {format_duration(duration)} 超过限制")
+                state.mark(stem, "transcribe", "skipped")
                 if tracker:
                     tracker.next(message=f"跳过 {stem} (超长)")
                 continue
@@ -111,6 +115,7 @@ def run_transcribe_all(
         wav_path = _extract_audio(orig_video)
         if wav_path is None:
             print(f"  [跳过] {stem}: 音频提取失败（可能无音轨）")
+            state.mark(stem, "transcribe", "skipped")
             if tracker:
                 tracker.next(message=f"跳过 {stem} (no audio)")
             continue
@@ -126,6 +131,7 @@ def run_transcribe_all(
                 "generated_at": datetime.now().isoformat(),
             }
             out_path.write_text(json.dumps(transcript, ensure_ascii=False, indent=2), encoding="utf-8")
+            state.mark(stem, "transcribe", "done")
             seg_info = f"{len(segments)} 段" if segments else "无有效内容"
             elapsed = time.time() - start_time
             pace = elapsed / (i + 1)

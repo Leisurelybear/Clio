@@ -96,6 +96,7 @@ async function pollRunStatus() {
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       if (!s.running) {
         prog.innerHTML = '<p class="muted">尚未运行</p>';
+        renderProcessingState(prog);
       }
       return;
     }
@@ -111,6 +112,7 @@ async function pollRunStatus() {
           <p><strong>状态:</strong> ${escapeHtml(s.message || '')}</p>
           ${logsHtml}
         `;
+        renderProcessingState(prog);
       } else {
         if (btn) { btn.disabled = true; btn.textContent = '运行中...'; }
         const pct = s.total > 0 ? Math.round(s.current / s.total * 100) : 0;
@@ -132,6 +134,7 @@ async function pollRunStatus() {
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="ok">✓ 流水线完成</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线完成', 'ok');
+      renderProcessingState(prog);
       state.currentDay = _lastRunDay;
       state.plan = null;
       await import('./sidebar.js').then(mod => mod.loadPlans());
@@ -147,6 +150,7 @@ async function pollRunStatus() {
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="err">✗ 流水线出错</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线出错', 'err');
+      renderProcessingState(prog);
     }
   } catch (e) {
     // poll error, ignore
@@ -158,6 +162,32 @@ function _stopRunPoll() {
     clearInterval(_runPollTimer);
     _runPollTimer = null;
   }
+}
+
+const _STEP_LABELS_SHORT = { compress: '压缩', analyze: '分析', voiceover: '口播', transcribe: '转录' };
+const _STATUS_ICON = { done: '✅', skipped: '⏭️', error: '✗' };
+
+async function renderProcessingState(container) {
+  try {
+    const st = await api('GET', '/api/processing-state');
+    const files = st.files;
+    const stepKeys = ['compress', 'analyze', 'voiceover', 'transcribe'];
+    const entries = Object.entries(files).sort((a, b) => a[0].localeCompare(b[0]));
+    if (!entries.length) return;
+    let html = '<h4 style="margin:12px 0 4px">处理状态</h4><div class="state-table"><div class="state-row state-header"><span class="state-file">文件</span>';
+    for (const k of stepKeys) html += `<span class="state-cell">${_STEP_LABELS_SHORT[k]}</span>`;
+    html += '</div>';
+    for (const [file, steps] of entries) {
+      html += `<div class="state-row"><span class="state-file">${escapeHtml(file)}</span>`;
+      for (const k of stepKeys) {
+        const v = steps[k];
+        html += `<span class="state-cell">${v ? _STATUS_ICON[v] || v : ''}</span>`;
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+    if (container) container.insertAdjacentHTML('beforeend', html);
+  } catch { /* ignore */ }
 }
 
 export {

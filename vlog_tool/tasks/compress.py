@@ -8,6 +8,7 @@ from pathlib import Path
 from vlog_tool.compress import compress_video
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
+from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.split import split_video
 from vlog_tool.tasks._helpers import ClipRecord, _eta_line, _next_index
@@ -50,6 +51,7 @@ def run_compress_all(
     # Phase 3: assign indices and compress each
     next_idx = _next_index(config.compressed_dir, config.naming.index_width)
     records: list[ClipRecord] = []
+    state = ProcessingState(config.paths.output_dir)
     comp_label = f"run_compress_all（{len(items)} 个）"
     with timed(comp_label):
         completed = 0
@@ -63,6 +65,7 @@ def run_compress_all(
                 if tracker:
                     tracker.update(phase="compress", current=i, total=len(items), message=f"压缩 {source.name}...")
                     tracker.log(f"⏭️ 跳过 {label_name}（已存在 {use_out.name}）")
+                state.mark(original.stem, "compress", "skipped")
                 print(f"[跳过压缩] {label_name} (已存在: {use_out.name})")
                 records.append(
                     ClipRecord(index=use_idx, stem=use_out.stem, source_path=original, compressed_path=use_out)
@@ -87,6 +90,7 @@ def run_compress_all(
                 compress_video(source, use_out, config, progress_callback=_on_progress)
             else:
                 compress_video(source, use_out, config)
+            state.mark(original.stem, "compress", "done")
             elapsed_total += time.monotonic() - t0
             completed += 1
             records.append(ClipRecord(index=use_idx, stem=use_out.stem, source_path=original, compressed_path=use_out))

@@ -33,6 +33,7 @@ from vlog_tool.ui.routes.plan import (
     handle_post_cut,
     handle_put_plan,
 )
+from vlog_tool.ui.routes.processing_state_routes import handle_get_processing_state
 from vlog_tool.ui.routes.projects import (
     handle_get_project,
     handle_get_projects,
@@ -353,6 +354,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_get_run_status(self, qs)
             if path == "/api/plan":
                 return handle_get_plan(self, qs)
+            if path == "/api/processing-state":
+                return handle_get_processing_state(self, qs)
             if path == "/api/fs/dirs":
                 return handle_get_fs_dirs(self, qs)
             if path == "/api/transcripts":

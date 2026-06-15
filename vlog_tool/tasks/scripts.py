@@ -9,6 +9,7 @@ from pathlib import Path
 from vlog_tool.analyze import generate_voiceover
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
+from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.tasks._helpers import _eta_line
 
@@ -17,6 +18,7 @@ def run_generate_scripts(
     config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None
 ) -> None:
     config.scripts_dir.mkdir(parents=True, exist_ok=True)
+    state = ProcessingState(config.paths.output_dir)
     template = config.script.template_file.read_text(encoding="utf-8") if config.script.template_file.exists() else ""
 
     if single_file:
@@ -31,9 +33,11 @@ def run_generate_scripts(
         for i, json_file in enumerate(files, start=1):
             data = json.loads(json_file.read_text(encoding="utf-8"))
             data["index"] = data.get("index", json_file.stem[:3])
+            orig_stem = Path(data.get("source_file") or json_file.stem).stem
             out = config.scripts_dir / f"{json_file.stem}_voiceover.json"
             if config.analyze.skip_existing and out.exists():
                 print(f"[跳过] {out.name}")
+                state.mark(orig_stem, "voiceover", "skipped")
                 if tracker:
                     tracker.next(message=f"跳过 {json_file.stem}")
                 continue
@@ -45,6 +49,7 @@ def run_generate_scripts(
             script = generate_voiceover(data, template, config)
             elapsed_total += time.monotonic() - t0
             completed += 1
+            state.mark(orig_stem, "voiceover", "done")
             out.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
 
             md_out = config.scripts_dir / f"{json_file.stem}_voiceover.md"

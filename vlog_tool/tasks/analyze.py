@@ -11,6 +11,7 @@ from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.analyze import analyze_video
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_duration, timed
+from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.tasks._helpers import (
     ClipRecord,
@@ -90,6 +91,7 @@ def run_analyze_all(
 
     total = len(items)
     print(f"待分析视频: {total} 个（压缩目录: {config.compressed_dir}）")
+    state = ProcessingState(config.paths.output_dir)
 
     with timed(f"run_analyze_all（{total} 个）"):
         completed = 0
@@ -105,6 +107,7 @@ def run_analyze_all(
                 analysis = json.loads(json_path.read_text(encoding="utf-8"))
                 if tracker:
                     tracker.update(phase="analyze", current=i, total=total, message=f"跳过 {compressed.name}...")
+                state.mark(original.stem, "analyze", "skipped")
                 print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
                 records.append(
                     ClipRecord(
@@ -133,6 +136,7 @@ def run_analyze_all(
                                 phase="analyze", current=i, total=total, message=f"跳过 {compressed.name}（超长）"
                             )
                             tracker.log(f"跳过 {compressed.name}（超长 {format_duration(dur_sec)}）")
+                        state.mark(original.stem, "analyze", "skipped")
                         continue
                 except Exception as e:
                     print(f"  [警告] 无法检查 {compressed.name} 时长: {e}")
@@ -148,6 +152,7 @@ def run_analyze_all(
             except Exception as e:
                 print(f"  [错误] 分析 {compressed.name} 失败: {e}")
                 failed += 1
+                state.mark(original.stem, "analyze", "error")
                 if tracker:
                     tracker.update(phase="analyze", current=i, total=total, message=f"失败 {compressed.name}")
                     tracker.log(f"分析 {compressed.name} 失败: {e}")
@@ -175,6 +180,7 @@ def run_analyze_all(
                     analysis=analysis,
                 )
             )
+            state.mark(original.stem, "analyze", "done")
             print(f"  -> {final_text.name}")
 
     _write_csv(config.summary_csv, records, config)

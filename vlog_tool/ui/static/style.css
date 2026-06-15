@@ -128,6 +128,11 @@ header {
 .muted.warn, .warn { color: #f0a030; }
 .run-logs { margin-top: 8px; max-height: 200px; overflow-y: auto; background: #1a1a1a; border-radius: var(--radius-sm); padding: 4px 8px; font-size: var(--text-sm); }
 .run-log-line { padding: 1px 0; white-space: pre-wrap; word-break: break-all; }
+.state-table { display: table; width: 100%; border-collapse: collapse; margin-top: 4px; font-size: var(--text-sm); }
+.state-row { display: table-row; }
+.state-header { font-weight: bold; }
+.state-file { display: table-cell; padding: 2px 8px; white-space: nowrap; border-bottom: 1px solid #333; }
+.state-cell { display: table-cell; padding: 2px 8px; text-align: center; border-bottom: 1px solid #333; }
 .status button { background: none; border: 1px solid currentColor; border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer; color: inherit; font: inherit; font-size: var(--text-sm); }
 
 /* ── Main Layout ───────────────────────────────────────────── */
