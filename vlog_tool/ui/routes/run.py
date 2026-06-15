@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 from vlog_tool.pipeline import run_analyze_all, run_compress_all, run_generate_scripts, run_pipeline_steps
 from vlog_tool.tasks.transcribe import run_transcribe_one
 from vlog_tool.progress import ProgressTracker
-from vlog_tool.ui.services.file_service import _find_original_for_compressed, _find_texts_dirs
+from vlog_tool.ui.services.file_service import _find_original_for_compressed, _find_texts_dirs, _is_safe_basename
 from vlog_tool.ui.services.project_service import _project_output_dir
 
 if TYPE_CHECKING:
@@ -69,7 +69,9 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
 
     video_basename = (obj.get("video") or "").strip()
     task = (obj.get("task") or "").strip()
-    if not video_basename or task not in ("compress", "analyze", "texts", "voiceover", "transcribe", "all"):
+    if not video_basename or not _is_safe_basename(video_basename):
+        return handler._send_json({"ok": False, "error": "invalid video filename"}, 400)
+    if task not in ("compress", "analyze", "texts", "voiceover", "transcribe", "all"):
         return handler._send_json(
             {
                 "ok": False,
