@@ -52,6 +52,11 @@ def _get_model(config: AppConfig):
     if WhisperModel is None:
         raise ImportError("faster-whisper is not installed. Run: pip install faster-whisper")
 
+    import os
+
+    if config.whisper.hf_endpoint:
+        os.environ.setdefault("HF_ENDPOINT", config.whisper.hf_endpoint)
+
     cache_dir = _resolve_cache_dir(config)
     key = f"{config.whisper.model_size}@{cache_dir}"
     if _whisper_model is None or _whisper_cache_key != key:

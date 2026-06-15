@@ -10,6 +10,16 @@ from vlog_tool.transcribe import PROJECT_ROOT, _resolve_cache_dir
 
 def run_whisper_install() -> int:
     print("正在安装 faster-whisper...")
+
+    cfg = load_config()
+    import os
+
+    if cfg.whisper.hf_endpoint:
+        os.environ.setdefault("HF_ENDPOINT", cfg.whisper.hf_endpoint)
+        print(f"HF_ENDPOINT 已设置为: {cfg.whisper.hf_endpoint}")
+    else:
+        print("HF_ENDPOINT: 使用 HuggingFace 官方默认地址")
+
     req = PROJECT_ROOT / "requirements-whisper.txt"
     if not req.is_file():
         print(f"未找到依赖文件: {req}")
@@ -29,11 +39,10 @@ def run_whisper_install() -> int:
     cuda_avail = get_cuda_device_count() > 0
     print(f"CUDA: {'可用' if cuda_avail else '不可用（使用 CPU）'}")
 
-    cfg = load_config()
     model_name = cfg.whisper.model_size
     cache_dir = _resolve_cache_dir(cfg)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    print(f"正在预下载模型 '{model_name}' 到 {cache_dir}...")
+    print(f"和以预下载模型 '{model_name}' 到 {cache_dir}...")
     from faster_whisper import WhisperModel
 
     WhisperModel(model_name, device="cpu", download_root=str(cache_dir))
@@ -64,4 +73,6 @@ def run_whisper_check() -> int:
             print(f"已缓存模型: {', '.join(models)}")
         else:
             print("模型缓存: 空（尚无缓存模型）")
+    ep = cfg.whisper.hf_endpoint
+    print(f"HF_ENDPOINT: {ep or 'HuggingFace 官方默认地址'}")
     return 0

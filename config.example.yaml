@@ -110,3 +110,4 @@ plan:
 #   max_segments_per_clip: 5   # plan 注入时每段视频最多取 N 条
 #   cache_dir: null      # null=默认 <程序根目录>/models/；可指定共享目录
 #   transcripts_subdir: transcripts
+#   hf_endpoint: ''       # 设为 '' 使用 HuggingFace 官方地址；国内可设 https://hf-mirror.com

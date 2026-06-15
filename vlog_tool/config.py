@@ -118,6 +118,7 @@ class WhisperConfig:
     max_segments_per_clip: int = 5
     cache_dir: str | None = None
     transcripts_subdir: str = "transcripts"
+    hf_endpoint: str = ""
 
     def sanitize(self) -> None:
         if self.model_size not in list(WhisperModelSize):
