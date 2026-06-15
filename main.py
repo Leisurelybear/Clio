@@ -9,18 +9,6 @@ from pathlib import Path
 
 from vlog_tool.config import apply_run_paths, load_config
 from vlog_tool.log import setup_logging
-from vlog_tool.pipeline import (
-    run_analyze_all,
-    run_compress_all,
-    run_cut_all,
-    run_full_pipeline,
-    run_generate_scripts,
-    run_label_videos,
-    run_plan_vlog,
-    run_refine_scripts,
-    run_refine_texts,
-)
-from vlog_tool.tasks.transcribe import run_transcribe_all
 from vlog_tool.ui import run as run_ui
 from vlog_tool.ui.services.file_service import _migrate_project_configs
 from vlog_tool.utils import discover_ffmpeg_bin, find_videos
@@ -229,6 +217,8 @@ def main(argv: list[str] | None = None) -> int:
         return run_check(config_path, getattr(args, "input", None))
 
     elif args.command == "transcribe":
+        from vlog_tool.tasks.transcribe import run_transcribe_all
+
         config = load_config(config_path)
         if getattr(args, "input", None):
             config = apply_run_paths(config, input_dir=args.input)
@@ -262,19 +252,33 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "compress":
+            from vlog_tool.pipeline import run_compress_all
+
             run_compress_all(config, single_file=single_file)
         elif args.command == "analyze":
+            from vlog_tool.pipeline import run_analyze_all
+
             run_analyze_all(config, single_file=single_file)
         elif args.command == "scripts":
+            from vlog_tool.pipeline import run_generate_scripts
+
             run_generate_scripts(config, single_file=single_file)
         elif args.command == "label":
+            from vlog_tool.pipeline import run_label_videos
+
             run_label_videos(config)
         elif args.command == "plan":
+            from vlog_tool.pipeline import run_plan_vlog
+
             config.plan.use_transcripts = not getattr(args, "no_transcripts", False)
             run_plan_vlog(config, args.day)
         elif args.command == "run":
+            from vlog_tool.pipeline import run_full_pipeline
+
             run_full_pipeline(config, args.day)
         elif args.command == "refine":
+            from vlog_tool.pipeline import run_refine_scripts, run_refine_texts
+
             if not config.ai.context and not context_override:
                 print(
                     "警告: config.yaml 里没有配置 ai.context 或 ai.context_file，"
@@ -299,6 +303,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"错误: {e}", file=sys.stderr)
                 return 1
         elif args.command == "cut":
+            from vlog_tool.pipeline import run_cut_all
+
             run_cut_all(
                 config,
                 day_label=args.day,

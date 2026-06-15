@@ -94,7 +94,7 @@ def test_whisper_check_subcommand(cli_runner, config_path):
     assert result == 0
 
 
-@patch("main.run_plan_vlog")
+@patch("vlog_tool.pipeline.run_plan_vlog")
 def test_plan_no_transcripts_flag(mock_run_plan, cli_runner, config_path, tmp_path):
     """--no-transcripts 应设置 config.plan.use_transcripts=False"""
     result = cli_runner(["--config", str(config_path), "plan", "--no-transcripts"])
