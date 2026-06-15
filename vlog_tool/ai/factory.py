@@ -11,15 +11,22 @@ _PROVIDER_TYPES = {
     "openai_compat": OpenAICompatProvider,
 }
 
+_provider_cache: dict[str, TextAIProvider] = {}
+
 
 def _build_provider(config: AppConfig, provider_name: str):
+    cached = _provider_cache.get(provider_name)
+    if cached is not None:
+        return cached
     provider_cfg = config.ai.providers.get(provider_name)
     if not provider_cfg:
         raise ValueError(f"未定义的 AI 厂家: {provider_name}")
     cls = _PROVIDER_TYPES.get(provider_cfg.type)
     if not cls:
         raise ValueError(f"不支持的厂家类型 '{provider_cfg.type}'，可选: {', '.join(_PROVIDER_TYPES)}")
-    return cls(provider_cfg, config.proxy)
+    provider = cls(provider_cfg, config.proxy)
+    _provider_cache[provider_name] = provider
+    return provider
 
 
 def get_task_config(config: AppConfig, task: TaskName | str) -> TaskConfig:
