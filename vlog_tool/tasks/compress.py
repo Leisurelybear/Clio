@@ -55,6 +55,21 @@ def run_compress_all(
                 if prefix.isdigit():
                     existing_map[stem_part] = (int(prefix), f)
 
+    # Also build lookup by original stem for split videos (strip _segNN suffix).
+    # Handles the case where split_video fails on re-run (e.g. ffprobe returns 0)
+    # but segments were already compressed before.
+    def _orig_stem_for(stem_part: str) -> str:
+        import re
+
+        m = re.match(r"^(.+?)_seg\d+$", stem_part)
+        return m.group(1) if m else stem_part
+
+    orig_to_compressed: dict[str, set[str]] = {}
+    if config.analyze.skip_existing:
+        for stem_part in existing_map:
+            orig_stem = _orig_stem_for(stem_part)
+            orig_to_compressed.setdefault(orig_stem, set()).add(stem_part)
+
     # Phase 3: assign indices and compress each
     next_idx = _next_index(config.compressed_dir, config.naming.index_width)
     records: list[ClipRecord] = []
@@ -77,6 +92,17 @@ def run_compress_all(
                 records.append(
                     ClipRecord(index=use_idx, stem=use_out.stem, source_path=original, compressed_path=use_out)
                 )
+                continue
+
+            # Fallback: source == original (no split) but compressed files with _segNN exist.
+            # This happens when split_video failed/is inconsistent on re-run.
+            if config.analyze.skip_existing and source is original and original.stem in orig_to_compressed:
+                seg_stems = orig_to_compressed[original.stem]
+                print(f"[跳过压缩] {label_name}: 已存在分割压缩片段 {', '.join(sorted(seg_stems))}")
+                if tracker:
+                    tracker.log(f"⏭️ 跳过 {label_name}（已存在分割文件）")
+                state.mark(original.stem, "compress", "skipped")
+                records.append(ClipRecord(index=0, stem=original.stem, source_path=original, compressed_path=None))
                 continue
 
             use_idx = next_idx + completed

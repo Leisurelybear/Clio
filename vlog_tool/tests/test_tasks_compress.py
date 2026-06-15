@@ -91,6 +91,38 @@ class TestRunCompressAll:
         assert len(records2) == 1
         assert call_count == 1  # still 1 — no new compress calls
 
+    def test_skip_existing_split_fallback(self, monkeypatch, tmp_path: Path):
+        """Compressed dir has _segNN files; items has original (no split) — should skip via fallback."""
+        cfg = _cfg(tmp_path)
+        src = cfg.paths.input_dir / "test.mp4"
+        src.write_bytes(b"\x00" * 1000)
+
+        monkeypatch.setattr("vlog_tool.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
+        monkeypatch.setattr("vlog_tool.tasks.compress.find_videos", lambda *a, **kw: [src])
+
+        # Create compressed segment files (as if a previous split+compress ran)
+        seg1 = cfg.compressed_dir / "001_test_seg01.mp4"
+        seg1.write_bytes(b"\x00" * 300)
+        seg2 = cfg.compressed_dir / "002_test_seg02.mp4"
+        seg2.write_bytes(b"\x00" * 300)
+
+        call_count = 0
+
+        def _mock_compress(inp, outp, c):
+            nonlocal call_count
+            call_count += 1
+            return outp
+
+        monkeypatch.setattr("vlog_tool.tasks.compress.compress_video", _mock_compress)
+
+        cfg.analyze.skip_existing = True
+        records = run_compress_all(cfg)
+        assert call_count == 0  # should NOT re-compress
+        # Expect 1 skipped record (original file skipped via fallback)
+        assert len(records) == 1
+        assert records[0].stem == "test"
+        assert records[0].compressed_path is None
+
     def test_single_file_param(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
         src = cfg.paths.input_dir / "custom.mp4"
