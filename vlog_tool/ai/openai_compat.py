@@ -53,7 +53,9 @@ class OpenAICompatProvider:
             sc = response.status_code
             if sc == 429 or sc >= 500:
                 raise httpx.HTTPStatusError(f"status {sc}", request=response.request, response=response)
-            response.raise_for_status()
+            if 400 <= sc < 500:
+                body = response.text[:200]
+                raise ValueError(f"API {self._base_url} 返回 {sc}: {body}")
             data = response.json()
             return data["choices"][0]["message"]["content"]
 
