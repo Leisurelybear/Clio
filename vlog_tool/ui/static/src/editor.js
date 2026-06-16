@@ -148,6 +148,7 @@ function renderTranscript() {
     const textDiv = li.querySelector('.seg-text');
     textDiv.ondblclick = (e) => {
       e.stopPropagation();
+      const origV = state.videos.find(x => x.file === state.currentVideo);
       const inp = document.createElement('textarea');
       inp.className = 'seg-text-edit';
       inp.value = seg.text || '';
@@ -165,7 +166,7 @@ function renderTranscript() {
           newDiv.ondblclick = textDiv.ondblclick;
           return;
         }
-        const v = state.videos.find(x => x.file === state.currentVideo);
+        const v = origV || state.videos.find(x => x.file === state.currentVideo);
         if (!v) { setStatus('找不到当前视频', 'err'); return; }
         try {
           const r = await api('PUT', `/api/transcripts?video=${encodeURIComponent(v.file)}`, {
