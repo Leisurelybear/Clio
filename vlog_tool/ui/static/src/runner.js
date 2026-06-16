@@ -55,16 +55,18 @@ function renderRun() {
 
 async function startRun() {
   const btn = $('btn-run-start');
-  const prog = $('run-progress');
+  if (btn.disabled) return;
+  btn.disabled = true;
+  btn.textContent = '启动中...';
   const checked = [...document.querySelectorAll('.run-step-cb:checked')].map(cb => cb.dataset.step);
   if (!checked.length) {
+    btn.disabled = false;
+    btn.textContent = '运行选中步骤';
     setStatus('请至少选择一个步骤', 'warn');
     return;
   }
   _lastRunDay = ($('run-day')?.value.trim() || state.currentDay);
   if (_runPollTimer) clearInterval(_runPollTimer);
-  btn.disabled = true;
-  btn.textContent = '启动中...';
   try {
     const r = await api('POST', '/api/run/start', {
       day_label: _lastRunDay,
