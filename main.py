@@ -32,7 +32,9 @@ def _add_io_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _prepare_config(config_path: Path, args: argparse.Namespace):
-    config = load_config(config_path)
+    raw_input = getattr(args, "input", None)
+    project_dir = raw_input if (raw_input and raw_input.is_dir()) else Path.cwd()
+    config = load_config(config_path, project_dir=project_dir)
     input_override = getattr(args, "input", None)
     output_override = getattr(args, "output", None)
     if input_override or output_override:
