@@ -42,7 +42,7 @@ class TestRunTranscribeAll:
         compressed.mkdir(parents=True)
         inp = tmp_path / "input"
         inp.mkdir()
-        (inp / "GL010683.MP4").touch()
+        (inp / "GL010683.mp4").touch()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
 
@@ -93,7 +93,7 @@ class TestRunTranscribeAll:
         output = tmp_path / "output"
         inp = tmp_path / "input"
         inp.mkdir()
-        (inp / "GL010683.MP4").touch()
+        (inp / "GL010683.mp4").touch()
         compressed = output / "compressed"
         compressed.mkdir(parents=True)
         (compressed / "001_GL010683.mp4").touch()

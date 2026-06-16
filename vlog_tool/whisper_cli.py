@@ -7,10 +7,10 @@ from vlog_tool.config import load_config
 from vlog_tool.transcribe import PROJECT_ROOT, _resolve_cache_dir
 
 
-def run_whisper_install() -> int:
+def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
     print("正在安装 faster-whisper...")
 
-    cfg = load_config()
+    cfg = load_config(config_path)
     import os
 
     if cfg.whisper.hf_endpoint:
@@ -49,7 +49,7 @@ def run_whisper_install() -> int:
     return 0
 
 
-def run_whisper_check() -> int:
+def run_whisper_check(config_path: str | Path = "config.yaml") -> int:
     print("=== Whisper 环境检测 ===")
     try:
         import faster_whisper
@@ -64,7 +64,7 @@ def run_whisper_check() -> int:
     cuda_avail = get_cuda_device_count() > 0
     print(f"CUDA: {'可用 ✔' if cuda_avail else '不可用（使用 CPU）'}")
 
-    cfg = load_config()
+    cfg = load_config(config_path)
     cache_dir = _resolve_cache_dir(cfg)
     if cache_dir.is_dir():
         models = [d.name for d in cache_dir.iterdir() if d.is_dir()]

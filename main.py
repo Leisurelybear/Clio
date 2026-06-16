@@ -232,9 +232,9 @@ def main(argv: list[str] | None = None) -> int:
         from vlog_tool.whisper_cli import run_whisper_check, run_whisper_install
 
         if args.whisper_command == "install":
-            return run_whisper_install()
+            return run_whisper_install(config_path)
         elif args.whisper_command == "check":
-            return run_whisper_check()
+            return run_whisper_check(config_path)
 
     # ── Single-file detection ────────────────────────────────────────
     # If -i points to a single file for compress/analyze/scripts,
