@@ -172,7 +172,7 @@ def run_ffmpeg(
     progress_callback: Callable[[float], None] | None = None,
 ) -> None:
     cmd = [ffmpeg, *args]
-    process = subprocess.Popen(cmd, stderr=subprocess.PIPE, text=True, bufsize=1)
+    process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
     stderr_lines: list[str] = []
     time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
     for line in process.stderr or []:
