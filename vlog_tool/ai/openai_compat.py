@@ -30,6 +30,7 @@ class OpenAICompatProvider:
             client_kwargs["proxy"] = proxy.url
         self._client = httpx.Client(**client_kwargs)
         self._rl = make_rate_limiter(cfg.requests_per_minute)
+        self._retry_attempts = max(1, cfg.retry_attempts + 1)
 
     def close(self) -> None:
         self._client.close()
@@ -61,7 +62,7 @@ class OpenAICompatProvider:
 
         return with_retry(
             _do,
-            attempts=3,
+            attempts=self._retry_attempts,
             base_delay=1.0,
             retry_on=(httpx.HTTPError,),
             what=f"OpenAI 兼容 {self._base_url}",
