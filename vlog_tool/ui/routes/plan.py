@@ -53,6 +53,8 @@ def handle_put_plan(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> Non
 def handle_post_cut(handler: BaseHTTPRequestHandler, obj: dict) -> None:
     """Handle POST /api/cut."""
     day_label = obj.get("day_label", "day1")
+    if not _is_safe_basename(day_label):
+        return handler._send_json({"ok": False, "error": "invalid day_label"}, 400)
     source = obj.get("source", "compressed")
     reencode = obj.get("reencode", False)
     out_dir_raw = obj.get("output_dir", None)
