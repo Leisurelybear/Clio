@@ -46,6 +46,7 @@ function renderRun() {
     <div id="run-progress" style="margin-top:12px">
       <p class="muted">尚未运行</p>
     </div>
+    <div id="run-state-container"></div>
   `;
   $('btn-run-start').onclick = startRun;
   if (_runPollTimer) clearInterval(_runPollTimer);
@@ -99,7 +100,7 @@ async function pollRunStatus() {
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       if (!s.running) {
         prog.innerHTML = '<p class="muted">尚未运行</p>';
-        renderProcessingState(prog);
+        renderProcessingState($('run-state-container'));
       }
       return;
     }
@@ -115,7 +116,7 @@ async function pollRunStatus() {
           <p><strong>状态:</strong> ${escapeHtml(s.message || '')}</p>
           ${logsHtml}
         `;
-        renderProcessingState(prog);
+        renderProcessingState($('run-state-container'));
       } else {
         if (btn) { btn.disabled = true; btn.textContent = '运行中...'; }
         const pct = s.total > 0 ? Math.round(s.current / s.total * 100) : 0;
@@ -137,7 +138,7 @@ async function pollRunStatus() {
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="ok">✓ 流水线完成</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线完成', 'ok');
-      renderProcessingState(prog);
+      renderProcessingState($('run-state-container'));
       state.currentDay = _lastRunDay;
       state.plan = null;
       await import('./sidebar.js').then(mod => mod.loadPlans());
@@ -153,7 +154,7 @@ async function pollRunStatus() {
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="err">✗ 流水线出错</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线出错', 'err');
-      renderProcessingState(prog);
+      renderProcessingState($('run-state-container'));
     }
     _pollErrorCount = 0;
   } catch (e) {
@@ -183,7 +184,7 @@ async function renderProcessingState(container) {
     const files = st.files;
     const stepKeys = ['compress', 'analyze', 'voiceover', 'transcribe'];
     const entries = Object.entries(files).sort((a, b) => a[0].localeCompare(b[0]));
-    if (!entries.length) return;
+    if (!entries.length) { if (container) container.innerHTML = ''; return; }
     let html = '<h4 style="margin:12px 0 4px">处理状态</h4><div class="state-table"><div class="state-row state-header"><span class="state-file">文件</span>';
     for (const k of stepKeys) html += `<span class="state-cell">${_STEP_LABELS_SHORT[k]}</span>`;
     html += '</div>';
@@ -196,7 +197,7 @@ async function renderProcessingState(container) {
       html += '</div>';
     }
     html += '</div>';
-    if (container) container.insertAdjacentHTML('beforeend', html);
+    if (container) container.innerHTML = html;
   } catch { /* ignore */ }
 }
 

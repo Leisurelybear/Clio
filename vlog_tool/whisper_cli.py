@@ -34,15 +34,28 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
         return 1
     print("faster-whisper 安装完成")
 
-    from ctranslate2 import get_cuda_device_count
+    try:
+        from ctranslate2 import get_cuda_device_count
 
-    cuda_avail = get_cuda_device_count() > 0
-    print(f"CUDA: {'可用' if cuda_avail else '不可用（使用 CPU）'}")
+        cuda_avail = get_cuda_device_count() > 0
+    except (ImportError, OSError):
+        cuda_avail = False
+    if cuda_avail:
+        print("检测到 NVIDIA GPU，安装 CUDA 运行时加速...")
+        r = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "nvidia-cublas-cu12", "nvidia-cudnn-cu12", "-q"],
+        )
+        if r.returncode == 0:
+            print("CUDA 运行时安装完成")
+        else:
+            print(f"  [警告] CUDA 运行时安装失败（返回码 {r.returncode}），将使用 CPU 运行")
+    else:
+        print("CUDA: 不可用（使用 CPU）")
 
     model_name = cfg.whisper.model_size
     cache_dir = _resolve_cache_dir(cfg)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    print(f"和以预下载模型 '{model_name}' 到 {cache_dir}...")
+    print(f"正在预下载模型 '{model_name}' 到 {cache_dir}...")
     from faster_whisper import WhisperModel
 
     WhisperModel(model_name, device="cpu", download_root=str(cache_dir))
@@ -60,9 +73,12 @@ def run_whisper_check(config_path: str | Path = "config.yaml") -> int:
         print("faster-whisper: 未安装  ✘（请执行 python main.py whisper install）")
         return 1
 
-    from ctranslate2 import get_cuda_device_count
+    try:
+        from ctranslate2 import get_cuda_device_count
 
-    cuda_avail = get_cuda_device_count() > 0
+        cuda_avail = get_cuda_device_count() > 0
+    except (ImportError, OSError):
+        cuda_avail = False
     print(f"CUDA: {'可用 ✔' if cuda_avail else '不可用（使用 CPU）'}")
 
     cfg = load_config(config_path)

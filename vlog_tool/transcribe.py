@@ -38,7 +38,7 @@ def _resolve_device(config: AppConfig) -> str:
             from ctranslate2 import get_cuda_device_count
 
             return "cuda" if get_cuda_device_count() > 0 else "cpu"
-        except ImportError:
+        except (ImportError, OSError):
             return "cpu"
     return config.whisper.device
 
