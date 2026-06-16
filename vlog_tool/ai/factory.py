@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 from vlog_tool.ai.base import TaskName, TextAIProvider, VideoAIProvider
 from vlog_tool.ai.gemini import GeminiProvider
 from vlog_tool.ai.openai_compat import OpenAICompatProvider
@@ -12,12 +14,14 @@ _PROVIDER_TYPES = {
 }
 
 _provider_cache: dict[str, TextAIProvider] = {}
+_provider_cache_lock = threading.Lock()
 
 
 def _build_provider(config: AppConfig, provider_name: str):
-    cached = _provider_cache.get(provider_name)
-    if cached is not None:
-        return cached
+    with _provider_cache_lock:
+        cached = _provider_cache.get(provider_name)
+        if cached is not None:
+            return cached
     provider_cfg = config.ai.providers.get(provider_name)
     if not provider_cfg:
         raise ValueError(f"未定义的 AI 厂家: {provider_name}")
@@ -25,8 +29,20 @@ def _build_provider(config: AppConfig, provider_name: str):
     if not cls:
         raise ValueError(f"不支持的厂家类型 '{provider_cfg.type}'，可选: {', '.join(_PROVIDER_TYPES)}")
     provider = cls(provider_cfg, config.proxy)
-    _provider_cache[provider_name] = provider
+    with _provider_cache_lock:
+        _provider_cache[provider_name] = provider
     return provider
+
+
+def _clear_provider_cache() -> None:
+    """Close all cached providers and clear the cache (for testing / config reload)."""
+    with _provider_cache_lock:
+        for p in _provider_cache.values():
+            try:
+                p.close()
+            except Exception:
+                pass
+        _provider_cache.clear()
 
 
 def get_task_config(config: AppConfig, task: TaskName | str) -> TaskConfig:
