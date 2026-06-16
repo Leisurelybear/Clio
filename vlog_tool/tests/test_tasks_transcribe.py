@@ -110,3 +110,147 @@ class TestRunTranscribeAll:
         tracker = MagicMock()
         run_transcribe_all(cfg, tracker)
         mock_transcribe.assert_not_called()
+
+    @patch("vlog_tool.tasks.transcribe._extract_audio")
+    @patch("vlog_tool.tasks.transcribe.transcribe_audio")
+    @patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffprobe")
+    def test_duration_exceeded(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
+        """时长超过限制时跳过"""
+        from vlog_tool.tasks.transcribe import run_transcribe_all
+
+        output = tmp_path / "output"
+        inp = tmp_path / "input"
+        inp.mkdir()
+        (inp / "GL010683.mp4").touch()
+        compressed = output / "compressed"
+        compressed.mkdir(parents=True)
+        (compressed / "001_GL010683.mp4").touch()
+        cfg.paths.input_dir = inp
+        cfg.paths.output_dir = output
+        cfg.analyze.max_analyze_duration_min = 0.001
+
+        transcripts = output / "transcripts"
+        transcripts.mkdir(parents=True)
+
+        with patch("vlog_tool.tasks.transcribe.get_duration_sec", return_value=60.0):
+            tracker = MagicMock()
+            run_transcribe_all(cfg, tracker)
+            mock_transcribe.assert_not_called()
+
+    @patch("vlog_tool.tasks.transcribe._extract_audio")
+    @patch("vlog_tool.tasks.transcribe.transcribe_audio")
+    def test_original_not_found(self, mock_transcribe, mock_extract, cfg, tmp_path):
+        """压缩文件在 input_dir 中找不到原始视频时跳过"""
+        from vlog_tool.tasks.transcribe import run_transcribe_all
+
+        output = tmp_path / "output"
+        compressed = output / "compressed"
+        compressed.mkdir(parents=True)
+        inp = tmp_path / "input"
+        inp.mkdir()
+        cfg.paths.input_dir = inp
+        cfg.paths.output_dir = output
+
+        (compressed / "001_GL010683.mp4").touch()
+
+        transcripts = output / "transcripts"
+        transcripts.mkdir(parents=True)
+
+        tracker = MagicMock()
+        run_transcribe_all(cfg, tracker)
+        mock_transcribe.assert_not_called()
+
+    @patch("vlog_tool.tasks.transcribe._extract_audio")
+    @patch("vlog_tool.tasks.transcribe.transcribe_audio")
+    def test_audio_extraction_failure(self, mock_transcribe, mock_extract, cfg, tmp_path):
+        """音频提取失败时跳过"""
+        from vlog_tool.tasks.transcribe import run_transcribe_all
+
+        output = tmp_path / "output"
+        inp = tmp_path / "input"
+        inp.mkdir()
+        (inp / "GL010683.mp4").touch()
+        compressed = output / "compressed"
+        compressed.mkdir(parents=True)
+        (compressed / "001_GL010683.mp4").touch()
+        cfg.paths.input_dir = inp
+        cfg.paths.output_dir = output
+
+        transcripts = output / "transcripts"
+        transcripts.mkdir(parents=True)
+
+        mock_extract.return_value = None
+
+        tracker = MagicMock()
+        run_transcribe_all(cfg, tracker)
+        mock_transcribe.assert_not_called()
+
+    @patch("vlog_tool.tasks.transcribe._extract_audio")
+    @patch("vlog_tool.tasks.transcribe.transcribe_audio")
+    def test_transcribe_error(self, mock_transcribe, mock_extract, cfg, tmp_path):
+        """Whisper 转录出错时记录错误状态并继续"""
+        from vlog_tool.tasks.transcribe import run_transcribe_all
+
+        output = tmp_path / "output"
+        inp = tmp_path / "input"
+        inp.mkdir()
+        (inp / "GL010683.mp4").touch()
+        compressed = output / "compressed"
+        compressed.mkdir(parents=True)
+        (compressed / "001_GL010683.mp4").touch()
+        cfg.paths.input_dir = inp
+        cfg.paths.output_dir = output
+
+        transcripts = output / "transcripts"
+        transcripts.mkdir(parents=True)
+
+        mock_extract.return_value = tmp_path / "fake.wav"
+        (tmp_path / "fake.wav").touch()
+        mock_transcribe.side_effect = RuntimeError("whisper崩溃")
+
+        tracker = MagicMock()
+        result = run_transcribe_all(cfg, tracker)
+        assert result == 0
+
+
+class TestRunTranscribeOne:
+    def test_success(self, cfg, tmp_path):
+        from vlog_tool.tasks.transcribe import run_transcribe_one
+
+        video = tmp_path / "test.mp4"
+        video.write_text("fake video")
+
+        cfg.paths.output_dir = tmp_path / "output"
+
+        with (
+            patch("vlog_tool.tasks.transcribe._extract_audio", return_value=tmp_path / "fake.wav"),
+            patch(
+                "vlog_tool.tasks.transcribe.transcribe_audio", return_value=[{"start": 0.0, "end": 1.0, "text": "test"}]
+            ),
+        ):
+            (tmp_path / "fake.wav").touch()
+            result = run_transcribe_one(cfg, video)
+            assert "error" not in result
+            assert result["source_stem"] == "test"
+            assert len(result["segments"]) == 1
+
+    def test_file_not_found(self, cfg, tmp_path):
+        from vlog_tool.tasks.transcribe import run_transcribe_one
+
+        video = tmp_path / "nonexistent.mp4"
+        result = run_transcribe_one(cfg, video)
+        assert "error" in result
+        assert "不存在" in result["error"]
+
+    def test_extraction_failure(self, cfg, tmp_path):
+        from vlog_tool.tasks.transcribe import run_transcribe_one
+
+        video = tmp_path / "test.mp4"
+        video.write_text("fake video")
+
+        cfg.paths.output_dir = tmp_path / "output"
+
+        with patch("vlog_tool.tasks.transcribe._extract_audio", return_value=None):
+            result = run_transcribe_one(cfg, video)
+            assert "error" in result
+            assert "音频提取失败" in result["error"]

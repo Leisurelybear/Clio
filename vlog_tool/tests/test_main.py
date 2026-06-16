@@ -93,6 +93,32 @@ def test_whisper_check_subcommand(cli_runner, config_path):
     assert result == 0
 
 
+@patch("vlog_tool.tasks.transcribe.run_transcribe_all")
+def test_transcribe_force_flag(mock_run, cli_runner, config_path):
+    """--force 应设置 skip_existing=False"""
+    cli_runner(["--config", str(config_path), "transcribe", "--force"])
+    cfg_arg = mock_run.call_args[0][0]
+    assert cfg_arg.analyze.skip_existing is False
+
+
+@patch("vlog_tool.tasks.transcribe.run_transcribe_all")
+def test_transcribe_default(mock_run, cli_runner, config_path):
+    """默认 transcribe 应保持 skip_existing=True"""
+    cli_runner(["--config", str(config_path), "transcribe"])
+    cfg_arg = mock_run.call_args[0][0]
+    assert cfg_arg.analyze.skip_existing is True
+
+
+@patch("main.apply_run_paths")
+@patch("vlog_tool.tasks.transcribe.run_transcribe_all")
+def test_transcribe_with_input(mock_run, mock_apply, cli_runner, config_path, tmp_path):
+    """-i 参数应传递给 apply_run_paths"""
+    inp = tmp_path / "my_videos"
+    inp.mkdir()
+    cli_runner(["--config", str(config_path), "transcribe", "-i", str(inp)])
+    mock_apply.assert_called_once()
+
+
 @patch("vlog_tool.pipeline.run_plan_vlog")
 def test_plan_no_transcripts_flag(mock_run_plan, cli_runner, config_path, tmp_path):
     """--no-transcripts 应设置 config.plan.use_transcripts=False"""

@@ -98,6 +98,61 @@ class TestGetModel:
             assert m1 is not m2
             assert mock_whisper_cls.call_count == 2
 
+    @patch("vlog_tool.transcribe.WhisperModel")
+    def test_cuda_fallback_on_value_error(self, mock_whisper_cls):
+        """CUDA 加载失败时回退到 CPU"""
+        mock_whisper_cls.side_effect = [
+            ValueError("CUDA error"),
+            MagicMock(),
+        ]
+        cfg = MagicMock(whisper=WhisperConfig(model_size="small", cache_dir="/cache"))
+        with (
+            patch("vlog_tool.transcribe._whisper_model", None),
+            patch("vlog_tool.transcribe._whisper_cache_key", None),
+            patch("vlog_tool.transcribe._resolve_device", return_value="cuda"),
+        ):
+            result = _get_model(cfg)
+            assert mock_whisper_cls.call_count == 2
+            _, second_kwargs = mock_whisper_cls.call_args
+            assert second_kwargs["device"] == "cpu"
+            assert result is not None
+
+    @patch("vlog_tool.transcribe.WhisperModel")
+    def test_cuda_fallback_re_raises_on_non_cuda(self, mock_whisper_cls):
+        """非 CUDA 设备抛异常时不回退"""
+        mock_whisper_cls.side_effect = ValueError("model error")
+        cfg = MagicMock(whisper=WhisperConfig(model_size="small", cache_dir="/cache"))
+        with (
+            patch("vlog_tool.transcribe._whisper_model", None),
+            patch("vlog_tool.transcribe._whisper_cache_key", None),
+            patch("vlog_tool.transcribe._resolve_device", return_value="cpu"),
+            pytest.raises(ValueError, match="model error"),
+        ):
+            _get_model(cfg)
+
+    @patch("vlog_tool.transcribe.WhisperModel")
+    def test_sets_hf_endpoint_env(self, mock_whisper_cls):
+        """HF_ENDPOINT 环境变量被正确设置"""
+        import os
+
+        mock_whisper_cls.return_value = MagicMock()
+        cfg = MagicMock(
+            whisper=WhisperConfig(model_size="small", cache_dir="/cache", hf_endpoint="https://hf-mirror.com")
+        )
+        old_val = os.environ.pop("HF_ENDPOINT", None)
+        try:
+            with (
+                patch("vlog_tool.transcribe._whisper_model", None),
+                patch("vlog_tool.transcribe._whisper_cache_key", None),
+            ):
+                _get_model(cfg)
+                assert os.environ["HF_ENDPOINT"] == "https://hf-mirror.com"
+        finally:
+            if old_val is not None:
+                os.environ["HF_ENDPOINT"] = old_val
+            else:
+                os.environ.pop("HF_ENDPOINT", None)
+
 
 class TestTranscribeAudio:
     @patch("vlog_tool.transcribe._get_model")
