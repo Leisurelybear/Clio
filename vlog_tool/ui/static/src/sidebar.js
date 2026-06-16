@@ -167,6 +167,7 @@ function renderVideoItem(v) {
   menuBtn.onclick = (e) => {
     e.stopPropagation();
     if (_portalDropdown) { _portalDropdown.remove(); _portalDropdown = null; }
+    if (_portalCloseHandler) { document.removeEventListener('click', _portalCloseHandler); _portalCloseHandler = null; }
     const rect = menuBtn.getBoundingClientRect();
     const clone = dropdown.cloneNode(true);
     clone.classList.add('open');
@@ -177,6 +178,7 @@ function renderVideoItem(v) {
       item.onclick = async (ev) => {
         ev.stopPropagation(); if (item.disabled) return;
         clone.remove(); _portalDropdown = null;
+        if (_portalCloseHandler) { document.removeEventListener('click', _portalCloseHandler); _portalCloseHandler = null; }
         const task = item.dataset.action;
         const file = v.file;
         setStatus(`正在重跑 ${task} (${file})...`, 'ok');
