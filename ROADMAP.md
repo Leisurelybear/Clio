@@ -254,17 +254,17 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [ ] R-012b：进度条点击/拖动切换到对应 segment
 - [ ] R-012c：手动拖动播放器进度时不触发自动推进
 
-## 需求 R-013：语音识别（语音 → 文本 → 口播参考）
+## ✅ 需求 R-013：离线语音识别（Whisper ASR → 转录 → 口播参考）
 
-**背景**：当前口播文案完全基于视频画面分析生成（地点、动作、时间轴），但无法知道视频中的人物说了什么。如果 AI 能先识别视频中的语音生成字幕/对话文本，再作为上下文传给口播生成步骤，口播文案会更准确、更贴合视频实际内容。
+**背景**：当前口播文案完全基于视频画面分析生成（地点、动作、时间轴），但无法知道视频中的人物说了什么。离线 whisper 转录提供语音内容作为口播计划上下文。
 
-**验收**：
-- 新增 pipeline 步骤 `transcribe`（介于 `analyze` 和 `scripts` 之间）
-- 调用支持语音识别的 AI 模型（如 Gemini 的音频理解能力）提取视频中的语音文本
-- 将识别结果以 `transcript` 字段存入 texts JSON
-- 口播生成（`scripts` 步骤）自动读取 `transcript` 作为上下文参考
-- CLI 支持 `main.py transcribe` 子命令
-- UI 侧栏流水线状态增加 `transcribe` 步骤
+**验收**（全部 ✅）：
+- ✅ 新增 pipeline 步骤 `transcribe`（compress → analyze → **transcribe** → voiceover → plan）
+- ✅ 离线 faster-whisper 转录，原始视频绝对时间轴，split 段通过 `offset_sec` 换算
+- ✅ CLI 子命令 `transcribe` / `whisper install` / `whisper check`
+- ✅ UI 转录 tab + delete/edit/seek + 每视频 rerun + 10% 进度
+- ✅ CUDA 自动检测 + CPU 回退（`cublas64_12.dll` 缺失处理）
+- ✅ 独立依赖 `requirements-whisper.txt`，不污染主依赖，惰性导入
 
 **子任务**：
 - [x] R-013a：WhisperConfig dataclass 与模型枚举（Task 1, `f4b84e0`）
@@ -275,6 +275,8 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [x] R-013f：libs.whisper.package 等配置反序列化（Task 6, `370516c`）
 - [x] R-013g：UI 后端 transcript/whisper 路由（Task 7, `4b1c6e6`）
 - [x] R-013h：UI 前端 transcripts tab / sidebar badge / run step（Task 8, `bcfbe04`）
+- [x] R-013i：CUDA 回退 CPU + 惰性导入 + 无 torch 依赖（`1d1b46a`, `1c5d681`）
+- [x] R-013j：综合修复：rerun 404, UI 显示/seek/delete, 10% 进度, offset_sec 换算（`1b53499`）
 
 ## 需求 R-014：AI 模型 Token 用量统计（项目级别）
 
@@ -338,6 +340,30 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 ## 已知问题（Bug Tracker）
 
 按优先级 P0（立即）→ P1（近期）→ P2（中期）→ P3（长期）排列。
+
+### 代码审查发现（2026-06-16，5 路平行 subagent）
+
+| ID | 优先级 | 问题 | 状态 |
+| --- | --- | --- | --- |
+| C1 | P0 | POST /api/rerun path traversal — video_basename 未校验 | ✅ `41abe5b` |
+| C2 | P0 | Empty-state 按钮不刷新视频列表 | ✅ `89614a4` |
+| C3 | P0 | playVideoSegment addEventListener 泄漏 | ✅ `bce09ce` |
+| C4 | P0 | OpenAI 4xx 被静默重试 | ✅ `dba1cd9` |
+| C5 | P0 | YAML 未知字段→dataclass TypeError 崩溃 | ✅ `18ccee4` |
+| C6 | P0 | Provider HTTP 连接泄漏 | ✅ `71659aa` + `ef68308` |
+| I1 | P1 | 转录编辑 onblur 竞态 | ✅ `fe511be` |
+| I2 | P1 | save() 数据引用竞态 | ✅ `8d3b2f8` + `bebf21f` |
+| I3 | P1 | startRun 双击启动两条流水线 | ✅ `1406e0e` |
+| I4 | P1 | Portal 菜单事件监听器泄漏 | ✅ `08d815c` |
+| I5 | P1 | Range 请求不支持 bytes=-N 后缀 | ✅ `d2591a9` |
+| I6 | P1 | POST /api/cut day_label 路径穿越 | ✅ `b072240` |
+| I7 | P1 | 硬编码 G:/ffmpeg | ✅ `74c34f5` |
+| I8 | P1 | _resolve_original 无下划线 stem 的 ValueError 崩溃 | ✅ `e6e7666` |
+| I9 | P1 | run_ffmpeg stdout pipe 死锁 | ✅ `9288216` |
+| I10 | P1 | CLI 不加载 project.yaml 覆盖 | ✅ `60d765f` |
+| I11 | P1 | _TeeWriter.__getattr__ 暴露原始 stdout/stderr 的 close/writelines | ✅ `947a320` |
+| I12 | P1 | openai_compat 重试次数硬编码 | ✅ `ef2311d` + `ef68308` |
+| M1~M36 | P2 | Minor issues — 见 `docs/review/2026-06-16-feat-whisper-full-audit.md` | 🆕 |
 
 ### P0 — 立即修复
 
@@ -419,6 +445,17 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | B-072 | `tasks/compress.py` 损坏的 `.mp4` 会被 `skip_existing` 永久跳过不重试 | 加文件完整性校验或 fallback 重试 | 🆕 |
 | B-073 | `routes/videos.py` `_parse_segment_info` 只识别 `001_GL010683_seg01` 格式 | 放宽命名格式假设，支持用户自定义命名 | 🆕 |
 | B-074 | `analyze.py:_wrap_with_context` 每次 AI 调用都读 `trip_context.md` 磁盘 | 模块级 `_trip_context_cache` 缓存 | ✅ `fe57a7f` |
+| B-075 | `ui/server.py` Range 请求不支持 suffix `bytes=-N` | 空 start + 非空 end → suffix 计算 | ✅ `d2591a9` |
+| B-076 | `utils/discover_ffmpeg_bin` 硬编码 `G:/ffmpeg` | 移除，改为 `FFMPEG_HOME` 环境变量 | ✅ `74c34f5` |
+| B-077 | `tasks/analyze.py` `_resolve_original` 无 `_` stem 时 ValueError | 前置 `if "_" not in stem:` 检查 | ✅ `e6e7666` |
+| B-078 | `main.py` 不传 `project_dir` 给 `load_config`，project.yaml 被忽略 | 从 `-i` 目录或 cwd 推断 `project_dir` | ✅ `60d765f` |
+| B-079 | `log.py` `_TeeWriter.__getattr__` 透传 `close`/`writelines`/`truncate` | 拦截并 raise AttributeError | ✅ `947a320` |
+| B-080 | `openai_compat.py` 硬编码 `attempts=3` 忽略配置的 `retry_attempts` | 从 `cfg.retry_attempts` 读取 + `+1` 转换 | ✅ `ef2311d` |
+| B-081 | `gemini.py` `retry_attempts` 与 openai_compat 语义不一致（缺 `+1`） | 对齐为 `max(1, cfg.retry_attempts + 1)` | ✅ `ef68308` |
+| B-082 | `ai/factory.py` provider 缓存线程不安全 + 无测试清理机制 | 加锁 + `_clear_provider_cache()` + autouse fixture | ✅ `ef68308` |
+| B-083 | `ui/routes/run.py` `obj.get("index")` 未消毒用作 glob 模式 | `re.sub(r"[^a-zA-Z0-9_-]", "")` 过滤 | ✅ `bebf21f` |
+| B-084 | `ui/static/src/editor.js` `save()` 内部的数据引用未捕获 | 捕获 `planData/textsData/voiceoverData/configRaw` | ✅ `bebf21f` |
+| B-085 | `ui/static/src/editor.js` 转录编辑 onblur 从 `state.currentVideo` 读而非双击时捕获 | `origV` 在 dblclick 时捕获 | ✅ `fe511be` |
 
 ## ~~测试覆盖盲区~~ ✅ 全部修复（163 新测试，2026-06-13）
 
@@ -451,6 +488,41 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `bebf21f` | fix(save): capture data refs at entry; sanitize index_prefix in rerun |
+| `ef68308` | fix(review): align Gemini retry_attempts, thread-safe provider cache, test isolation |
+| `ef2311d` | fix(ai): use configurable retry_attempts |
+| `947a320` | fix(log): block destructive calls on _TeeWriter |
+| `60d765f` | fix(cli): pass project_dir to load_config |
+| `9288216` | fix(utils): add stdout=DEVNULL to run_ffmpeg Popen |
+| `e6e7666` | fix(tasks): handle stem without underscore |
+| `74c34f5` | fix(utils): remove hardcoded G:/ffmpeg |
+| `b072240` | fix(security): add _is_safe_basename for cut day_label |
+| `d2591a9` | fix(ui): handle suffix range bytes=-N |
+| `08d815c` | fix(ui): clean up portal close listener |
+| `1406e0e` | fix(ui): guard startRun with btn.disabled check |
+| `8d3b2f8` | fix(ui): capture state at save() entry |
+| `fe511be` | fix(ui): capture video ref at dblclick in transcript edit |
+| `71659aa` | fix(ai): cache provider instances |
+| `18ccee4` | fix(config): filter unknown YAML fields |
+| `dba1cd9` | fix(ai): fail fast on non-retryable 4xx |
+| `bce09ce` | fix(ui): replace addEventListener with onloadedmetadata |
+| `89614a4` | fix(ui): delegate switchToOriginalThenCompress to setSource |
+| `41abe5b` | fix(security): add _is_safe_basename guard to rerun |
+| `1b53499` | fix(transcribe): resolve rerun 404, CUDA fallback, UI transcript display |
+| `d0d0847` | fix(compress): fallback skip when split segments exist but source is original |
+| `6a56eaf` | fix: batch fix 19 review issues from project-wide code audit |
+| `fe1a078` | fix(compress): filter partial files (<256B) from existing_map |
+| `1c5d681` | fix(cli): lazy imports prevent google-genai loading on whisper install |
+| `8412e03` | fix(config): hf_endpoint defaults to empty, only overrides when configured |
+| `31abfac` | feat(processing-state): per-file pipeline state matrix with UI table |
+| `eff8fce` | feat(ui): per-file compress log in run tab panel |
+| `417aa0a` | fix(ui): keep btn enabled when stale progress from interrupted run |
+| `c600840` | fix(ui): pollRunStatus shows progress when s.status==='running' even without live thread |
+| `11ea035` | fix(compress): skip_existing now matches existing files by stem instead of by path |
+| `306f349` | feat(compress): real-time stderr progress with progress_callback for tracker |
+| `1d1b46a` | fix(whisper): replace torch with ctranslate2 for CUDA detection |
+| `812b520` | fix(whisper): lazy import torch in whisper_cli |
+| `c6e01ec` | feat(whisper): reorder pipeline, per-video rerun, plan toggle, UI error handling |
 | `34846df` | fix(pipeline): validate step names before execution |
 | `ea2e79c` | fix(progress): random suffix for tmp file to avoid name conflicts |
 | `34c0d3b` | refactor(ui): remove hasattr(handler.server) patterns, use direct attr access |
