@@ -8,7 +8,6 @@ from pathlib import Path
 
 from vlog_tool.ui.services.file_service import _is_safe_basename, _save_atomic
 
-
 _SEG_SUFFIX_RE = re.compile(r"_seg\d+$")
 
 

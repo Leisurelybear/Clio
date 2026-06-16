@@ -43,7 +43,6 @@ def _extract_audio(
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
         time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
         last_pct = 0
-        total_assumed: float | None = None
         for line in proc.stderr or []:
             m = time_pat.search(line)
             if m:
@@ -150,9 +149,8 @@ def run_transcribe_all(
             elapsed = time.time() - start_time
             pace = elapsed / (i + 1)
             eta = pace * (total - i - 1)
-            print(
-                f"  [转录 {i + 1}/{total}] {stem}（{seg_info}，平均 {format_duration(pace)}，剩余 ~{format_duration(eta)}）"
-            )
+            eta_str = format_duration(eta)
+            print(f"  [转录 {i + 1}/{total}] {stem}（{seg_info}，平均 {format_duration(pace)}，剩余 ~{eta_str}）")
         except KeyboardInterrupt:
             wav_path.unlink(missing_ok=True)
             raise
@@ -188,9 +186,9 @@ def run_transcribe_one(config: AppConfig, video_path: Path) -> dict:
     wav_size = wav_path.stat().st_size
     print(f"  [transcribe_one] WAV 提取完成: {wav_path.name} ({wav_size / 1024:.0f} KB)，耗时 {time.time() - t0:.1f}s")
     try:
-        print(
-            f"  [transcribe_one] 开始 Whisper 转录 (device={config.whisper.device}, model={config.whisper.model_size})..."
-        )
+        dev = config.whisper.device
+        model = config.whisper.model_size
+        print(f"  [transcribe_one] 开始 Whisper 转录 (device={dev}, model={model})...")
         t1 = time.time()
         segments = transcribe_audio(wav_path, config)
         t2 = time.time()

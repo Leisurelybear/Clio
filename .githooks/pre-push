@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""Pre-push hook: run ruff check on all tracked .py files."""
+import subprocess
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+ruff_candidates = [
+    REPO_ROOT / ".venv" / "Scripts" / "ruff.exe",
+    REPO_ROOT / ".venv" / "bin" / "ruff",
+]
+RUFF = next((p for p in ruff_candidates if p.is_file()), None)
+if RUFF is None:
+    python = REPO_ROOT / ".venv" / "Scripts" / "python.exe"
+    if not python.is_file():
+        python = REPO_ROOT / ".venv" / "bin" / "python"
+    if python.is_file():
+        result = subprocess.run([str(python), "-m", "ruff", "--version"],
+                                capture_output=True, text=True, cwd=REPO_ROOT)
+        if result.returncode == 0:
+            RUFF = [str(python), "-m", "ruff"]
+        else:
+            print("⚠️  pre-push: ruff not found, skipping lint check")
+            sys.exit(0)
+    else:
+        print("⚠️  pre-push: no Python venv found, skipping lint check")
+        sys.exit(0)
+
+if not isinstance(RUFF, list):
+    RUFF = [str(RUFF)]
+
+result = subprocess.run(
+    ["git", "ls-files", "--", "*.py"],
+    capture_output=True, text=True, cwd=REPO_ROOT,
+)
+if result.returncode != 0 or not result.stdout.strip():
+    sys.exit(0)
+
+py_files = result.stdout.splitlines()
+print(f"ruff check: {len(py_files)} files")
+check = subprocess.run([*RUFF, "check", *py_files], cwd=REPO_ROOT)
+if check.returncode != 0:
+    print("⚠️  pre-push: lint errors found, push blocked. Run `ruff check` locally to fix.")
+    sys.exit(1)
