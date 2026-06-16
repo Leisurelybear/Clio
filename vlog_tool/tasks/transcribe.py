@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import tempfile
 import time
+from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -12,13 +14,14 @@ from vlog_tool.config import AppConfig
 from vlog_tool.log import format_duration
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
-from vlog_tool.tasks.analyze import _resolve_original
 from vlog_tool.transcribe import check_whisper, transcribe_audio
 from vlog_tool.utils import resolve_binary, write_json_atomic
 
 
-def _extract_audio(video_path: Path, ffmpeg: str) -> Path | None:
-    """ffmpeg 提取 16kHz 单声道 WAV，返回临时文件路径。"""
+def _extract_audio(
+    video_path: Path, ffmpeg: str, progress_callback: Callable[[float], None] | None = None
+) -> Path | None:
+    """ffmpeg 提取 16kHz 单声道 WAV，返回临时文件路径。实时输出进度。"""
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp.close()
     tmp_path = Path(tmp.name)
@@ -37,13 +40,25 @@ def _extract_audio(video_path: Path, ffmpeg: str) -> Path | None:
             "1",
             str(tmp_path),
         ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
-        if result.returncode != 0:
-            print(f"  [ffmpeg] 失败: {result.stderr.strip()}")
+        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
+        time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
+        last_pct = 0
+        total_assumed: float | None = None
+        for line in proc.stderr or []:
+            m = time_pat.search(line)
+            if m:
+                sec = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
+                if progress_callback and sec > 0:
+                    progress_callback(sec)
+                pct = int(sec)
+                if pct >= last_pct + 5:
+                    print(f"  [提取音频] {sec:.0f}s")
+                    last_pct = pct
+        proc.wait()
+        if proc.returncode != 0:
+            print(f"  [ffmpeg] 提取失败 (code {proc.returncode})")
             tmp_path.unlink(missing_ok=True)
             return None
-        if result.stderr.strip():
-            print(f"  [ffmpeg] stderr: {result.stderr.strip()[-500:]}")
         return tmp_path
     except Exception:
         tmp_path.unlink(missing_ok=True)
@@ -69,12 +84,9 @@ def run_transcribe_all(
     transcripts_dir.mkdir(parents=True, exist_ok=True)
 
     stems: set[str] = set()
-    compressed_dir = config.paths.output_dir / config.analyze.compressed_subdir
-    for f in sorted(compressed_dir.rglob("*")):
-        if f.suffix.lower() in VIDEO_EXTS and f.is_file():
-            orig = _resolve_original(config.paths.input_dir, f.stem)
-            if orig:
-                stems.add(orig.stem)
+    for f in sorted(config.paths.input_dir.iterdir()):
+        if f.is_file() and f.suffix.lower() in VIDEO_EXTS:
+            stems.add(f.stem)
 
     stems = sorted(stems)
     total = len(stems)
