@@ -167,14 +167,13 @@ def run_transcribe_all(
 
 def run_transcribe_one(config: AppConfig, video_path: Path) -> dict:
     """单文件转录（供 UI rerun 使用）。"""
-    from vlog_tool.log import format_duration
     import time
 
     t0 = time.time()
     print(f"  [transcribe_one] 开始处理: {video_path.name}")
     if not video_path.is_file():
         return {"error": f"文件不存在: {video_path}"}
-    print(f"  [transcribe_one] 提取音频...")
+    print("  [transcribe_one] 提取音频...")
     wav_path = _extract_audio(video_path)
     if wav_path is None:
         return {"error": "音频提取失败"}

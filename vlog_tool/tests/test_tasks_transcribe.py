@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from vlog_tool.config import AppConfig, WhisperConfig
+from vlog_tool.config import WhisperConfig
 from vlog_tool.progress import ProgressTracker
 
 

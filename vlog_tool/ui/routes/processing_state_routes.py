@@ -1,8 +1,5 @@
 from __future__ import annotations
 
-import json
-from http import HTTPStatus
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from vlog_tool.processing_state import ProcessingState

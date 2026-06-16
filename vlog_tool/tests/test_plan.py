@@ -2,12 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from unittest.mock import MagicMock, patch
 
-import pytest
-
-from vlog_tool.config import AppConfig, WhisperConfig
+from vlog_tool.config import AppConfig
 
 
 def test_plan_prompt_includes_transcripts():

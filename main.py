@@ -229,7 +229,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     elif args.command == "whisper":
-        from vlog_tool.whisper_cli import run_whisper_install, run_whisper_check
+        from vlog_tool.whisper_cli import run_whisper_check, run_whisper_install
 
         if args.whisper_command == "install":
             return run_whisper_install()

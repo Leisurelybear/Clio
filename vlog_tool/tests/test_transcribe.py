@@ -172,11 +172,10 @@ class TestRunTranscribeAll:
 
         with (
             patch("vlog_tool.tasks.transcribe.check_whisper", return_value=False),
-            patch("builtins.print") as mock_print,
+            patch("builtins.print"),
         ):
             result = run_transcribe_all(config)
             assert result == 0
-            # should have printed some warning
 
     def test_transcribe_skipped_when_disabled(self):
         """whisper.enabled=False 时跳过转录"""
@@ -185,6 +184,6 @@ class TestRunTranscribeAll:
             whisper=WhisperConfig(enabled=False),
         )
 
-        with patch("builtins.print") as mock_print:
+        with patch("builtins.print"):
             result = run_transcribe_all(config)
             assert result == 0

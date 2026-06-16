@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from vlog_tool.pipeline import run_analyze_all, run_compress_all, run_generate_scripts, run_pipeline_steps
-from vlog_tool.tasks.transcribe import run_transcribe_one
 from vlog_tool.progress import ProgressTracker
+from vlog_tool.tasks.transcribe import run_transcribe_one
 from vlog_tool.ui.services.file_service import _find_original_for_compressed, _find_texts_dirs, _is_safe_basename
 from vlog_tool.ui.services.project_service import _project_output_dir
 
