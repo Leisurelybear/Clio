@@ -16,7 +16,9 @@ from vlog_tool.config import AppConfig, ProviderConfig, ProxyConfig, load_config
 def _mock_ctranslate2() -> None:
     """Mock ctranslate2 so tests that patch it don't fail on CI (where it's not installed)."""
     if "ctranslate2" not in sys.modules:
-        sys.modules["ctranslate2"] = MagicMock()
+        fake = MagicMock()
+        fake.get_cuda_device_count.return_value = 0
+        sys.modules["ctranslate2"] = fake
 
 
 @pytest.fixture(autouse=True)
