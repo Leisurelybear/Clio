@@ -26,19 +26,22 @@ from vlog_tool.tasks.label import run_label_videos  # noqa: F401
 from vlog_tool.tasks.plan import run_plan_vlog  # noqa: F401
 from vlog_tool.tasks.refine import run_refine_scripts, run_refine_texts  # noqa: F401
 from vlog_tool.tasks.scripts import run_generate_scripts  # noqa: F401
+from vlog_tool.tasks.transcribe import run_transcribe_all  # noqa: F401
 
 
 def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:
     config.paths.output_dir.mkdir(parents=True, exist_ok=True)
-    with timed("=== 1/5 压缩原视频 ==="):
+    with timed("=== 1/7 压缩原视频 ==="):
         run_compress_all(config)
-    with timed("=== 2/5 AI 分析素材 ==="):
+    with timed("=== 2/7 AI 分析素材 ==="):
         run_analyze_all(config)
-    with timed("=== 3/5 生成口播文案 ==="):
+    with timed("=== 3/7 生成口播文案 ==="):
         run_generate_scripts(config)
-    with timed("=== 4/5 vlog 剪辑规划 ==="):
+    with timed("=== 4/7 语音转录 ==="):
+        run_transcribe_all(config)
+    with timed("=== 5/7 vlog 剪辑规划 ==="):
         run_plan_vlog(config, day_label)
-    with timed("=== 5/5 烧录序号标注 ==="):
+    with timed("=== 6/7 烧录序号标注 ==="):
         run_label_videos(config)
     print("\n完成！输出目录:", config.paths.output_dir)
 
@@ -47,6 +50,7 @@ _STEP_LABELS = {
     "compress": "压缩原视频",
     "analyze": "AI 分析素材",
     "voiceover": "生成口播文案",
+    "transcribe": "语音转录",
     "plan": "vlog 剪辑规划",
     "label": "烧录序号标注",
 }
@@ -55,6 +59,7 @@ _STEP_FUNCS = {
     "compress": run_compress_all,
     "analyze": run_analyze_all,
     "voiceover": run_generate_scripts,
+    "transcribe": run_transcribe_all,
     "plan": run_plan_vlog,
     "label": run_label_videos,
 }

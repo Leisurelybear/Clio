@@ -11,6 +11,7 @@ from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.analyze import analyze_video
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_duration, timed
+from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.tasks._helpers import (
     ClipRecord,
@@ -19,7 +20,7 @@ from vlog_tool.tasks._helpers import (
     _write_csv,
     _write_text_file,
 )
-from vlog_tool.utils import get_duration_sec, resolve_binary
+from vlog_tool.utils import get_duration_sec, resolve_binary, write_json_atomic
 
 
 def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
@@ -28,14 +29,23 @@ def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
     Handles:
     - Direct match: '001_GL010683' → GL010683.mp4
     - Segment match: '001_GL010683_seg01' → strip _segXX → GL010683.mp4
+    - Recursive search: scans subdirectories for all above cases.
+    - No index prefix: 'GL010683' → GL010683.mp4
     """
-    _, orig_stem = compressed_stem.split("_", 1)
+    if "_" not in compressed_stem:
+        orig_stem = compressed_stem
+    else:
+        _, orig_stem = compressed_stem.split("_", 1)
 
     def _try_find(stem: str) -> Path | None:
         for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
             candidate = input_dir / f"{stem}{ext}"
             if candidate.is_file():
                 return candidate
+        for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
+            for candidate in input_dir.rglob(f"{stem}{ext}"):
+                if candidate.is_file():
+                    return candidate
         return None
 
     result = _try_find(orig_stem)
@@ -90,6 +100,7 @@ def run_analyze_all(
 
     total = len(items)
     print(f"待分析视频: {total} 个（压缩目录: {config.compressed_dir}）")
+    state = ProcessingState(config.paths.output_dir)
 
     with timed(f"run_analyze_all（{total} 个）"):
         completed = 0
@@ -99,12 +110,22 @@ def run_analyze_all(
             idx_val = int(idx_str)
 
             existing = sorted(config.texts_dir.glob(f"{idx_str}_*.json"))
+            json_path = None
+            analysis = None
             if config.analyze.skip_existing and existing:
-                json_path = existing[0]
+                candidate = existing[0]
+                try:
+                    existing_data = json.loads(candidate.read_text(encoding="utf-8"))
+                    if existing_data.get("source_file", "") == original.name:
+                        json_path = candidate
+                        analysis = existing_data
+                except (json.JSONDecodeError, OSError):
+                    pass
+            if json_path:
                 text_path = json_path.with_suffix(".txt")
-                analysis = json.loads(json_path.read_text(encoding="utf-8"))
                 if tracker:
                     tracker.update(phase="analyze", current=i, total=total, message=f"跳过 {compressed.name}...")
+                state.mark(original.stem, "analyze", "skipped")
                 print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
                 records.append(
                     ClipRecord(
@@ -133,6 +154,7 @@ def run_analyze_all(
                                 phase="analyze", current=i, total=total, message=f"跳过 {compressed.name}（超长）"
                             )
                             tracker.log(f"跳过 {compressed.name}（超长 {format_duration(dur_sec)}）")
+                        state.mark(original.stem, "analyze", "skipped")
                         continue
                 except Exception as e:
                     print(f"  [警告] 无法检查 {compressed.name} 时长: {e}")
@@ -148,6 +170,7 @@ def run_analyze_all(
             except Exception as e:
                 print(f"  [错误] 分析 {compressed.name} 失败: {e}")
                 failed += 1
+                state.mark(original.stem, "analyze", "error")
                 if tracker:
                     tracker.update(phase="analyze", current=i, total=total, message=f"失败 {compressed.name}")
                     tracker.log(f"分析 {compressed.name} 失败: {e}")
@@ -163,7 +186,7 @@ def run_analyze_all(
 
             _on_progress("写入磁盘...")
             _write_text_file(final_text, analysis, original, compressed)
-            json_path.write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(json_path, analysis)
 
             records.append(
                 ClipRecord(
@@ -175,6 +198,7 @@ def run_analyze_all(
                     analysis=analysis,
                 )
             )
+            state.mark(original.stem, "analyze", "done")
             print(f"  -> {final_text.name}")
 
     _write_csv(config.summary_csv, records, config)

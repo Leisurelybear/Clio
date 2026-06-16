@@ -3,6 +3,7 @@ import {
   $, $$,
   escapeHtml,
   parseTimecode,
+  fmtTime,
   markDirty,
   updateSaveBtn,
   setStatus,
@@ -31,6 +32,7 @@ function renderActiveTab() {
   $$('.tab-pane').forEach(p => p.classList.toggle('active', p.id === `tab-${state.currentTab}`));
   if (state.currentTab === 'texts') renderTexts();
   else if (state.currentTab === 'voiceover') renderVoiceover();
+  else if (state.currentTab === 'transcript') renderTranscript();
 }
 
 function renderTexts() {
@@ -106,6 +108,114 @@ function renderVoiceover() {
   const dEl = pane.querySelector('[data-field="duration_hint_sec"]');
   dEl.value = v.duration_hint_sec ?? '';
   dEl.oninput = () => { v.duration_hint_sec = parseFloat(dEl.value) || 0; markDirty(); };
+}
+
+function renderTranscript() {
+  const t = state.transcript;
+  const pane = $('tab-transcript');
+  if (!t || !t.ok) {
+    pane.innerHTML = '<p class="muted">当前视频没有转录数据。</p><p class="hint">请先运行流水线中的「转录」步骤，或在 CLI 执行 <code>python main.py transcribe</code>。</p>';
+    return;
+  }
+  const segments = t.segments || [];
+  pane.innerHTML = `
+    <h3>语音转录 (ASR) — ${segments.length} 段</h3>
+    <p class="hint">点击 segment 跳到对应时间；双击文字框可编辑；修改后需点击「保存」</p>
+    <ol id="transcript-list"></ol>
+  `;
+  const ol = pane.querySelector('#transcript-list');
+  for (let i = 0; i < segments.length; i++) {
+    const seg = segments[i];
+    const li = document.createElement('li');
+    li.className = 'transcript-seg';
+    const startStr = fmtTime(seg.start || 0);
+    const endStr = fmtTime(seg.end || 0);
+    const confidence = seg.avg_logprob != null
+      ? `<span class="muted" title="avg_logprob=${seg.avg_logprob.toFixed(2)}">${Math.round(Math.max(0, Math.min(100, (1 + (seg.avg_logprob || 0)) * 100)))}%</span>`
+      : '';
+    li.innerHTML = `
+      <div class="seg-time">${escapeHtml(startStr)} - ${escapeHtml(endStr)} ${confidence}
+        <button class="seg-del" data-index="${i}" title="删除此段">×</button>
+      </div>
+      <div class="seg-text" data-seg-index="${i}">${escapeHtml(seg.text || '')}</div>
+    `;
+    li.onclick = () => {
+      const player = $('player');
+      const v = state.videos.find(x => x.file === state.currentVideo);
+      player.currentTime = seg.start + (v?.offset_sec || 0);
+      player.play().catch(() => {});
+    };
+    const textDiv = li.querySelector('.seg-text');
+    textDiv.ondblclick = (e) => {
+      e.stopPropagation();
+      const origV = state.videos.find(x => x.file === state.currentVideo);
+      const inp = document.createElement('textarea');
+      inp.className = 'seg-text-edit';
+      inp.value = seg.text || '';
+      inp.rows = 2;
+      textDiv.replaceWith(inp);
+      inp.focus();
+      inp.onblur = async () => {
+        const newText = inp.value;
+        if (newText === seg.text) {
+          const newDiv = document.createElement('div');
+          newDiv.className = 'seg-text';
+          newDiv.dataset.segIndex = i;
+          newDiv.textContent = seg.text;
+          inp.replaceWith(newDiv);
+          newDiv.ondblclick = textDiv.ondblclick;
+          return;
+        }
+        const v = origV || state.videos.find(x => x.file === state.currentVideo);
+        if (!v) { setStatus('找不到当前视频', 'err'); return; }
+        try {
+          const r = await api('PUT', `/api/transcripts?video=${encodeURIComponent(v.file)}`, {
+            segment_index: i,
+            text: newText,
+          });
+          if (r.ok) {
+            seg.text = newText;
+            setStatus('转录文本已保存', 'ok');
+          } else {
+            setStatus('保存失败: ' + (r.error || '未知错误'), 'err');
+          }
+        } catch (e) {
+          setStatus('保存失败: ' + e.message, 'err');
+        }
+        const newDiv = document.createElement('div');
+        newDiv.className = 'seg-text';
+        newDiv.dataset.segIndex = i;
+        newDiv.textContent = seg.text;
+        inp.replaceWith(newDiv);
+        newDiv.ondblclick = textDiv.ondblclick;
+      };
+      inp.onkeydown = (e) => {
+        if (e.key === 'Escape') { inp.blur(); }
+      };
+    };
+    const delBtn = li.querySelector('.seg-del');
+    delBtn.onclick = async (e) => {
+      e.stopPropagation();
+      if (!confirm(`确定删除第 ${i + 1} 段转录？`)) return;
+      const v = state.videos.find(x => x.file === state.currentVideo);
+      if (!v) { setStatus('找不到当前视频', 'err'); return; }
+      try {
+        const r = await api('PUT', `/api/transcripts?video=${encodeURIComponent(v.file)}`, {
+          segment_index: i, delete: true,
+        });
+        if (r.ok) {
+          segments.splice(i, 1);
+          setStatus('已删除', 'ok');
+          renderTranscript();
+        } else {
+          setStatus('删除失败: ' + (r.error || '未知错误'), 'err');
+        }
+      } catch (e) {
+        setStatus('删除失败: ' + e.message, 'err');
+      }
+    };
+    ol.appendChild(li);
+  }
 }
 
 function renderPlan() {
@@ -263,32 +373,39 @@ async function executeCut() {
 
 async function save() {
   if (!state.dirty) { setStatus('没有改动需要保存', 'warn'); return; }
+  const entity = state.currentEntity;
+  const day = state.currentDay;
+  const tab = state.currentTab;
+  const videoFile = state.currentVideo;
+  const planData = state.plan;
+  const textsData = state.texts;
+  const voiceoverData = state.voiceover;
+  const configRaw = state.configRaw;
   try {
-    if (state.currentEntity === 'run') {
+    if (entity === 'run') {
       setStatus('当前视图不需要保存', 'warn');
       return;
     }
-    if (state.currentEntity === 'config') {
-      const r = await api('PUT', '/api/config/raw', state.configRaw);
+    if (entity === 'config') {
+      const r = await api('PUT', '/api/config/raw', configRaw);
       if (r.error) throw new Error(r.error);
       state.dirty = false;
       updateSaveBtn();
       setStatus('配置已保存（需重启服务生效）', 'ok');
       return;
     }
-    if (state.currentEntity === 'plan') {
-      const r = await api('PUT', `/api/plan?day=${state.currentDay}`, state.plan);
+    if (entity === 'plan') {
+      const r = await api('PUT', `/api/plan?day=${day}`, planData);
       if (!r.ok) throw new Error(r.error);
     } else {
-      const tab = state.currentTab;
-      const v = state.videos.find(x => x.file === state.currentVideo);
+      const v = state.videos.find(x => x.file === videoFile);
       if (tab === 'texts') {
         if (!v || !v.text_json) throw new Error('当前视频没有 texts JSON');
-        const r = await api('PUT', `/api/texts?file=${encodeURIComponent(v.text_json)}`, state.texts);
+        const r = await api('PUT', `/api/texts?file=${encodeURIComponent(v.text_json)}`, textsData);
         if (!r.ok) throw new Error(r.error);
       } else if (tab === 'voiceover') {
         if (!v || !v.script_json) throw new Error('当前视频没有 voiceover JSON');
-        const r = await api('PUT', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`, state.voiceover);
+        const r = await api('PUT', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`, voiceoverData);
         if (!r.ok) throw new Error(r.error);
       }
     }

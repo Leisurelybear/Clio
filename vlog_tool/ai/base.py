@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from enum import StrEnum
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
 
 class TaskName(StrEnum):
@@ -12,12 +12,15 @@ class TaskName(StrEnum):
     REFINE_TEXT = "refine_text"
 
 
+@runtime_checkable
 class TextAIProvider(Protocol):
     """纯文本 AI 能力（口播、规划等）。"""
 
     provider_id: str
 
     def generate_text(self, prompt: str, model: str) -> str: ...
+
+    def close(self) -> None: ...
 
 
 class VideoAIProvider(TextAIProvider, Protocol):

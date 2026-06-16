@@ -16,6 +16,7 @@ from vlog_tool.prompts import (
     REFINE_TEXT_FIX_PROMPT,
     REFINE_TEXT_PROMPT,
     SCRIPT_PROMPT,
+    TRANSCRIPT_CONTEXT,
 )
 from vlog_tool.utils import extract_json
 
@@ -81,6 +82,16 @@ def _call_ai(label: str, provider_id: str, model: str, prompt: str, fn) -> str:
     return text
 
 
+def _parse_timestamp_sec(ts: str) -> float:
+    """将 "MM:SS" 或 "HH:MM:SS" 转为秒数。"""
+    parts = ts.strip().split(":")
+    if len(parts) == 2:
+        return int(parts[0]) * 60 + float(parts[1])
+    elif len(parts) == 3:
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+    return 0.0
+
+
 def analyze_video(video_path: str, config: AppConfig, progress_callback: Callable[[str], None] | None = None) -> dict:
     provider, model = get_video_provider(config, TaskName.VIDEO_ANALYZE)
     prompt = _wrap_with_context(ANALYZE_PROMPT, config)
@@ -121,7 +132,13 @@ def generate_voiceover(clip_data: dict, template: str, config: AppConfig) -> dic
     return extract_json(text)
 
 
-def plan_daily_vlog(clips: list[dict], config: AppConfig, day_label: str = "day1") -> dict:
+def plan_daily_vlog(
+    clips: list[dict],
+    config: AppConfig,
+    day_label: str = "day1",
+    transcripts_map: dict[str, dict] | None = None,
+    use_transcripts: bool = True,
+) -> dict:
     provider, model = get_task_provider(config, TaskName.VLOG_PLAN)
 
     # 取第一个 clip 的 index 作为 prompt 示例，确保格式一致
@@ -133,6 +150,33 @@ def plan_daily_vlog(clips: list[dict], config: AppConfig, day_label: str = "day1
         target_duration_sec=config.plan.target_duration_sec,
         example_index=first_idx,
     )
+    if transcripts_map and use_transcripts and config.whisper.enabled:
+        transcript_info = []
+        for clip in clips:
+            clip_stem = clip.get("source_stem", "")
+            trans = transcripts_map.get(clip_stem) if clip_stem else None
+            if trans is None:
+                continue
+            matched = []
+            for tl in clip.get("timeline", []):
+                tl_start = _parse_timestamp_sec(tl.get("start", "00:00"))
+                tl_end = _parse_timestamp_sec(tl.get("end", "00:00"))
+                for seg in trans.get("segments", []):
+                    if seg["start"] >= tl_start and seg["end"] <= tl_end:
+                        matched.append(seg)
+            if matched:
+                matched.sort(key=lambda s: -s.get("avg_logprob", 0))
+                matched = matched[: config.whisper.max_segments_per_clip]
+                transcript_info.append(
+                    {
+                        "clip_index": clip.get("index"),
+                        "clip_title": clip.get("title"),
+                        "transcript_segments": matched,
+                    }
+                )
+        if transcript_info:
+            transcript_json = json.dumps(transcript_info, ensure_ascii=False, indent=2)
+            base += TRANSCRIPT_CONTEXT.format(transcripts_json=transcript_json)
     prompt = _wrap_with_context(f"日 vlog 标签: {day_label}\n\n{base}", config)
     text = _call_ai(
         "AI vlog 剪辑规划",

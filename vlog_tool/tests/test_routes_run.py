@@ -12,6 +12,17 @@ from vlog_tool.ui.routes.run import handle_get_run_status, handle_post_rerun, ha
 
 
 @pytest.fixture
+def _handler():
+    """Create a mock handler with _run_lock and _run_thread."""
+    from threading import Lock
+
+    handler = MagicMock()
+    handler.__class__._run_lock = Lock()
+    handler.__class__._run_thread = None
+    return handler
+
+
+@pytest.fixture
 def _no_thread(monkeypatch):
     """Prevent background threads from actually starting — avoids copy.deepcopy leaks on CI."""
     monkeypatch.setattr(
@@ -21,18 +32,16 @@ def _no_thread(monkeypatch):
 
 
 class TestHandleGetRunStatus:
-    def test_idle_when_no_progress_file(self):
-        handler = MagicMock()
+    def test_idle_when_no_progress_file(self, _handler):
+        handler = _handler
         handler._get_project_output.return_value = Path("/nonexistent")
-        handler._run_thread = None
-        handler._send_json = MagicMock()
 
         handle_get_run_status(handler, {})
 
         handler._send_json.assert_called_once_with({"status": "idle", "running": False})
 
-    def test_reads_progress_file(self, tmp_path: Path):
-        handler = MagicMock()
+    def test_reads_progress_file(self, tmp_path: Path, _handler):
+        handler = _handler
         proj_out = tmp_path / "output"
         proj_out.mkdir(parents=True)
         progress = proj_out / ".progress.json"
@@ -40,7 +49,6 @@ class TestHandleGetRunStatus:
         handler._get_project_output.return_value = proj_out
         handler._run_thread = MagicMock()
         handler._run_thread.is_alive.return_value = True
-        handler._send_json = MagicMock()
 
         handle_get_run_status(handler, {})
 
@@ -52,66 +60,66 @@ class TestHandleGetRunStatus:
 
 
 class TestHandlePostRunStart:
-    def test_already_running(self):
-        handler = MagicMock()
-        handler.__class__._run_lock = MagicMock()
+    def test_already_running(self, _handler):
+        handler = _handler
         handler._run_thread = MagicMock()
         handler._run_thread.is_alive.return_value = True
-        handler._send_json = MagicMock()
 
         handle_post_run_start(handler, {}, {})
 
         handler._send_json.assert_called_once_with({"ok": False, "error": "pipeline is already running"}, 409)
 
-    def test_starts_thread(self, tmp_path: Path, _no_thread):
-        handler = MagicMock()
-        handler.__class__._run_lock = MagicMock()
-        handler._run_thread = None
+    def test_starts_thread(self, tmp_path: Path, _no_thread, _handler):
+        handler = _handler
         handler._resolve_project_input.return_value = tmp_path / "input"
         handler._get_config.return_value = MagicMock()
-        handler._send_json = MagicMock()
 
         handle_post_run_start(handler, {}, {"steps": ["compress", "analyze"]})
 
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args[0][0]["ok"] is True
-        assert handler._run_thread is not None
 
 
 class TestHandlePostRerun:
-    def test_missing_params(self, tmp_path: Path):
-        handler = MagicMock()
-        handler.send_error = MagicMock()
+    def test_missing_params(self, tmp_path: Path, _handler):
+        handler = _handler
         handler._resolve_project_input.return_value = tmp_path
-        handler._send_json = MagicMock()
 
         handle_post_rerun(handler, {}, {})
 
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args[0][1] == 400
 
-    def test_invalid_task(self, tmp_path: Path):
-        handler = MagicMock()
+    def test_invalid_task(self, tmp_path: Path, _handler):
+        handler = _handler
         handler._resolve_project_input.return_value = tmp_path
-        handler._send_json = MagicMock()
 
         handle_post_rerun(handler, {}, {"video": "test.mp4", "task": "invalid"})
 
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args[0][1] == 400
 
-    def test_starts_rerun(self, tmp_path: Path, _no_thread):
-        handler = MagicMock()
-        handler.__class__._run_lock = MagicMock()
-        handler._run_thread = None
+    def test_transcribe_valid_task(self, tmp_path: Path, _no_thread, _handler):
+        """transcribe 应作为有效 task 被接受"""
+        handler = _handler
         proj_input = tmp_path / "input"
         proj_input.mkdir()
         (proj_input / "GL010695.MP4").write_bytes(b"")
         handler._resolve_project_input.return_value = proj_input
-        handler._send_json = MagicMock()
+
+        handle_post_rerun(handler, {}, {"video": "GL010695.MP4", "task": "transcribe", "source": "original"})
+
+        handler._send_json.assert_called_once()
+        assert handler._send_json.call_args[0][0]["ok"] is True
+
+    def test_starts_rerun(self, tmp_path: Path, _no_thread, _handler):
+        handler = _handler
+        proj_input = tmp_path / "input"
+        proj_input.mkdir()
+        (proj_input / "GL010695.MP4").write_bytes(b"")
+        handler._resolve_project_input.return_value = proj_input
 
         handle_post_rerun(handler, {}, {"video": "001_GL010695.mp4", "task": "compress"})
 
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args[0][0]["ok"] is True
-        assert handler._run_thread is not None

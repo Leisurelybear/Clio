@@ -9,17 +9,6 @@ from pathlib import Path
 
 from vlog_tool.config import apply_run_paths, load_config
 from vlog_tool.log import setup_logging
-from vlog_tool.pipeline import (
-    run_analyze_all,
-    run_compress_all,
-    run_cut_all,
-    run_full_pipeline,
-    run_generate_scripts,
-    run_label_videos,
-    run_plan_vlog,
-    run_refine_scripts,
-    run_refine_texts,
-)
 from vlog_tool.ui import run as run_ui
 from vlog_tool.ui.services.file_service import _migrate_project_configs
 from vlog_tool.utils import discover_ffmpeg_bin, find_videos
@@ -43,7 +32,9 @@ def _add_io_args(parser: argparse.ArgumentParser) -> None:
 
 
 def _prepare_config(config_path: Path, args: argparse.Namespace):
-    config = load_config(config_path)
+    raw_input = getattr(args, "input", None)
+    project_dir = raw_input if (raw_input and raw_input.is_dir()) else Path.cwd()
+    config = load_config(config_path, project_dir=project_dir)
     input_override = getattr(args, "input", None)
     output_override = getattr(args, "output", None)
     if input_override or output_override:
@@ -141,6 +132,7 @@ def main(argv: list[str] | None = None) -> int:
     p_plan = sub.add_parser("plan", help="生成单日 vlog 剪辑规划")
     _add_io_args(p_plan)
     p_plan.add_argument("--day", default="day1", help="日 vlog 标签")
+    p_plan.add_argument("--no-transcripts", action="store_true", help="不注入语音转录信息到 prompt")
 
     p_run = sub.add_parser("run", help="一键执行完整流程")
     _add_io_args(p_run)
@@ -205,6 +197,15 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--port", type=int, default=8765, help="端口（默认 8765）")
     p_serve.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
 
+    p_transcribe = sub.add_parser("transcribe", help="Whisper ASR 语音转录（需先安装 faster-whisper）")
+    _add_io_args(p_transcribe)
+    p_transcribe.add_argument("--force", action="store_true", help="忽略已有转录，重新生成")
+
+    p_whisper = sub.add_parser("whisper", help="Whisper 环境管理（安装/检测）")
+    whisper_sub = p_whisper.add_subparsers(dest="whisper_command", required=True)
+    whisper_sub.add_parser("install", help="安装 faster-whisper 依赖并预下载模型")
+    whisper_sub.add_parser("check", help="检测 faster-whisper / CUDA 状态")
+
     args = parser.parse_args(argv)
     config_path = Path(args.config)
     if not config_path.exists():
@@ -216,6 +217,24 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         return run_check(config_path, getattr(args, "input", None))
+
+    elif args.command == "transcribe":
+        from vlog_tool.tasks.transcribe import run_transcribe_all
+
+        config = load_config(config_path)
+        if getattr(args, "input", None):
+            config = apply_run_paths(config, input_dir=args.input)
+        config.analyze.skip_existing = not getattr(args, "force", False)
+        run_transcribe_all(config)
+        return 0
+
+    elif args.command == "whisper":
+        from vlog_tool.whisper_cli import run_whisper_check, run_whisper_install
+
+        if args.whisper_command == "install":
+            return run_whisper_install(config_path)
+        elif args.whisper_command == "check":
+            return run_whisper_check(config_path)
 
     # ── Single-file detection ────────────────────────────────────────
     # If -i points to a single file for compress/analyze/scripts,
@@ -235,18 +254,33 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "compress":
+            from vlog_tool.pipeline import run_compress_all
+
             run_compress_all(config, single_file=single_file)
         elif args.command == "analyze":
+            from vlog_tool.pipeline import run_analyze_all
+
             run_analyze_all(config, single_file=single_file)
         elif args.command == "scripts":
+            from vlog_tool.pipeline import run_generate_scripts
+
             run_generate_scripts(config, single_file=single_file)
         elif args.command == "label":
+            from vlog_tool.pipeline import run_label_videos
+
             run_label_videos(config)
         elif args.command == "plan":
+            from vlog_tool.pipeline import run_plan_vlog
+
+            config.plan.use_transcripts = not getattr(args, "no_transcripts", False)
             run_plan_vlog(config, args.day)
         elif args.command == "run":
+            from vlog_tool.pipeline import run_full_pipeline
+
             run_full_pipeline(config, args.day)
         elif args.command == "refine":
+            from vlog_tool.pipeline import run_refine_scripts, run_refine_texts
+
             if not config.ai.context and not context_override:
                 print(
                     "警告: config.yaml 里没有配置 ai.context 或 ai.context_file，"
@@ -271,6 +305,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"错误: {e}", file=sys.stderr)
                 return 1
         elif args.command == "cut":
+            from vlog_tool.pipeline import run_cut_all
+
             run_cut_all(
                 config,
                 day_label=args.day,

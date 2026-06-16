@@ -96,9 +96,10 @@ def discover_ffmpeg_bin(name: str) -> str | None:
     local_app = Path(os.environ.get("LOCALAPPDATA", ""))
     search_roots = [
         local_app / "Microsoft/WinGet/Packages",
-        Path("C:/ffmpeg"),
-        Path("G:/ffmpeg"),
     ]
+    ffmpeg_home = os.environ.get("FFMPEG_HOME")
+    if ffmpeg_home:
+        search_roots.append(Path(ffmpeg_home))
     for root in search_roots:
         if not root.is_dir():
             continue
@@ -149,6 +150,30 @@ def get_duration_sec(video_path: Path, ffprobe: str) -> float:
     return float(raw)
 
 
+def write_json_atomic(path: Path, data: dict, *, ensure_ascii: bool = False, indent: int = 2) -> None:
+    """Write JSON to a file using tmp + rename for crash safety."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + f".tmp.{os.urandom(4).hex()}")
+    try:
+        tmp.write_text(json.dumps(data, ensure_ascii=ensure_ascii, indent=indent), encoding="utf-8")
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def write_text_atomic(path: Path, text: str) -> None:
+    """Write text to a file using tmp + rename for crash safety."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + f".tmp.{os.urandom(4).hex()}")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def sanitize_name(text: str, max_len: int = 40) -> str:
     text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", text)
     text = re.sub(r"\s+", "_", text.strip())
@@ -165,8 +190,23 @@ def probe_video_info(video_path: Path, ffprobe: str) -> dict:
     return {"duration_sec": round(duration, 2), "size_mb": round(size_mb, 2)}
 
 
-def run_ffmpeg(args: list[str], ffmpeg: str) -> None:
+def run_ffmpeg(
+    args: list[str],
+    ffmpeg: str,
+    progress_callback: Callable[[float], None] | None = None,
+) -> None:
     cmd = [ffmpeg, *args]
-    result = subprocess.run(cmd, capture_output=True, text=True)
-    if result.returncode != 0:
-        raise RuntimeError(f"ffmpeg 执行失败:\n{' '.join(cmd)}\n{result.stderr}")
+    process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
+    stderr_lines: list[str] = []
+    time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
+    for line in process.stderr or []:
+        print(line, end="")
+        stderr_lines.append(line)
+        if progress_callback:
+            m = time_pat.search(line)
+            if m:
+                h, mi, s = int(m.group(1)), int(m.group(2)), float(m.group(3))
+                progress_callback(h * 3600 + mi * 60 + s)
+    process.wait()
+    if process.returncode != 0:
+        raise RuntimeError(f"ffmpeg 执行失败:\n{' '.join(cmd)}\n{''.join(stderr_lines)}")

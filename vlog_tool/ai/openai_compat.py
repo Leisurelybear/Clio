@@ -30,6 +30,7 @@ class OpenAICompatProvider:
             client_kwargs["proxy"] = proxy.url
         self._client = httpx.Client(**client_kwargs)
         self._rl = make_rate_limiter(cfg.requests_per_minute)
+        self._retry_attempts = max(1, cfg.retry_attempts + 1)
 
     def close(self) -> None:
         self._client.close()
@@ -53,13 +54,15 @@ class OpenAICompatProvider:
             sc = response.status_code
             if sc == 429 or sc >= 500:
                 raise httpx.HTTPStatusError(f"status {sc}", request=response.request, response=response)
-            response.raise_for_status()
+            if 400 <= sc < 500:
+                body = response.text[:200]
+                raise ValueError(f"API {self._base_url} 返回 {sc}: {body}")
             data = response.json()
             return data["choices"][0]["message"]["content"]
 
         return with_retry(
             _do,
-            attempts=3,
+            attempts=self._retry_attempts,
             base_delay=1.0,
             retry_on=(httpx.HTTPError,),
             what=f"OpenAI 兼容 {self._base_url}",

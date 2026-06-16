@@ -20,6 +20,7 @@ or any editor of your choice.
 | 4 | Voiceover script generation using a template | `scripts` |
 | 5 | Recommended clip order for a single-day vlog | `plan --day day1` |
 | 6 | Burn the index number onto the video for editing reference | `label` |
+| 7 | Offline ASR speech transcription | `transcribe` |
 | — | One-shot full pipeline | `run --day day1` |
 | — | Web UI visual editor | `serve` |
 | — | Environment check | `check` |
@@ -479,6 +480,28 @@ python main.py refine -i output/Franch/texts/001_CDG_RER.json `
 
 ---
 
+### Transcribe → `transcribe` / `whisper`
+
+Offline speech recognition (ASR) using faster-whisper. Generates timestamped text transcripts. Run `whisper install` first, then `transcribe`.
+
+```bash
+# Install faster-whisper (includes CUDA detection and model pre-download)
+python main.py whisper install
+
+# Check faster-whisper / CUDA / model cache status
+python main.py whisper check
+
+# Transcribe all compressed videos
+python main.py transcribe
+
+# Force re-transcribe (ignore existing)
+python main.py transcribe --force
+```
+
+> Note: transcript data is injected into the `plan` prompt, so the AI can optimize clip ordering based on actual spoken content.
+
+---
+
 ### `serve` · Launch local Web UI (visual editor)
 
 Starts a browser-based visual editor: watch the compressed video side-by-side with the AI outputs (texts / scripts / plan) and save edits back to JSON.
@@ -555,7 +578,7 @@ vlog-video-analysis/
 ├── setup.ps1             # one-shot environment setup
 ├── main.py               # CLI entry point
 ├── .github/workflows/    # GitHub Actions CI
-├── vlog_tool/tests/      # unit tests (128 tests)
+├── vlog_tool/tests/      # unit tests (381 tests)
 ├── templates/
 │   ├── vlog_template.md  # voiceover style template
 │   └── trip_context.md   # trip background & AI spec
@@ -585,7 +608,7 @@ vlog-video-analysis/
 
 ## Testing
 
-The project includes **128 pytest unit tests** covering core pure functions:
+The project includes **381 pytest unit tests** covering core pure functions, route handlers, and orchestration logic:
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
@@ -594,6 +617,8 @@ The project includes **128 pytest unit tests** covering core pure functions:
 | `tests/test_cut.py` | 25 | time parsing / filename generation |
 | `tests/test_log.py` | 13 | TeeWriter / timed / format_size / format_duration |
 | `tests/test_progress.py` | 12 | ProgressTracker read/write/init |
+| `tests/test_transcribe.py` | 15 | transcribe enable / disable / deps detection |
+| `tests/test_routes_transcripts.py` | 7 | transcript / whisper API routes |
 
 Tests run automatically on GitHub Actions (Python 3.11 & 3.12) on every push
 to main or pull request.
@@ -621,4 +646,4 @@ Use the looser `requirements.txt` for daily development.
 - [ ] Auto-group multi-day vlogs by folder/date
 - [ ] Export to 剪映 draft format
 - [ ] Web UI for timeline preview
-- [ ] Local Whisper transcription for clips with live commentary
+- [x] Local Whisper transcription for clips with live commentary

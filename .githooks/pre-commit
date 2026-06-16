@@ -55,3 +55,9 @@ if fmt.returncode != 0:
 
 # Re-stage formatted files
 subprocess.run(["git", "add", *staged], cwd=REPO_ROOT)
+
+# Lint check (only errors, ignore warnings like F811)
+check = subprocess.run([*RUFF, "check", "--select", "F,E,I", *staged], cwd=REPO_ROOT)
+if check.returncode != 0:
+    print("⚠️  ruff check failed — fix errors above before committing")
+    sys.exit(1)

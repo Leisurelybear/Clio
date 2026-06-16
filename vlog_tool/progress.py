@@ -43,7 +43,10 @@ class ProgressTracker:
         suffix = os.urandom(4).hex()
         tmp = self._path.parent / f"{self._path.name}.{suffix}.tmp"
         tmp.write_text(json.dumps(self._data, ensure_ascii=False), encoding="utf-8")
-        tmp.replace(self._path)
+        try:
+            tmp.replace(self._path)
+        except OSError:
+            tmp.unlink(missing_ok=True)
 
     def update(
         self,

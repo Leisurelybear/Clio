@@ -41,7 +41,7 @@ class GeminiProvider:
         self._client = genai.Client(api_key=cfg.api_key, http_options=http_options)
         self._rl = make_rate_limiter(cfg.requests_per_minute)
         self._poll_interval = cfg.poll_interval_sec
-        self._retry_attempts = cfg.retry_attempts
+        self._retry_attempts = max(1, cfg.retry_attempts + 1)
 
     def _is_retryable(self, exc: BaseException) -> bool:
         """判断异常是否应该重试。"""
@@ -103,6 +103,9 @@ class GeminiProvider:
         if uploaded.state == types.FileState.FAILED:
             raise RuntimeError(f"视频处理失败: {uploaded.name}")
         return uploaded
+
+    def close(self) -> None:
+        pass
 
     def generate_text(self, prompt: str, model: str) -> str:
         rl_ctx = self._rl or nullcontext()

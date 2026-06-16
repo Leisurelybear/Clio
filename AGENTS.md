@@ -31,12 +31,20 @@ vlog-video-analysis/
 │   ├── analyze.py             # AI 交互（analyze_video, generate_voiceover, plan_daily_vlog, refine_*）
 │   ├── compress.py            # ffmpeg 包装
 │   ├── prompts.py             # 所有 prompt 模板（常量）
+│   ├── transcribe.py          # Whisper ASR 转录核心
+│   ├── whisper_cli.py         # whisper install/check CLI
 │   ├── utils.py               # ffmpeg 路径发现、文件 IO、mask_if_looks_like_key、extract_json
 │   ├── log.py                 # 日志：按小时切文件 + _TeeWriter + timed/format_size/format_duration
 │   │                           #     + sys.excepthook 把未捕获异常整成一条 ERROR 日志
+│   ├── tasks/                 # pipeline 步骤（拆分自 pipeline.py）
+│   │   ├── transcribe.py        # Pipeline task: run_transcribe_all
+│   │   └── ...
 │   ├── ui/                    # 本地 Web UI（可视化编辑 AI 输出；stdib http.server，零新依赖）
 │   │   ├── server.py            #   UIHandler（BaseHTTPRequestHandler）+ make_handler + run
 │   │   ├── README.md            #   UI 使用文档
+│   │   ├── routes/              #   路由处理
+│   │   │   ├── transcripts.py   #   Transcript GET/PUT API
+│   │   │   └── whisper_routes.py#   Whisper check API
 │   │   └── static/              #   前端三件套（无构建步骤）
 │   │       ├── index.html
 │   │       ├── app.js
@@ -55,13 +63,15 @@ vlog-video-analysis/
 ├── requirements.txt           # 开发期宽松依赖
 ├── requirements-locked.txt    # 可重现构建锁定版本
 ├── .github/workflows/test.yml # GitHub Actions CI（pushes + PRs）
-├── vlog_tool/tests/           # 单元测试（pytest，128 用例）
+├── vlog_tool/tests/           # 单元测试（pytest，381 用例）
 │   ├── conftest.py            #   共享 fixtures
 │   ├── test_config.py         #   34 tests - config 加载/合并/校验
 │   ├── test_utils.py          #   34 tests - extract_json/mask_key/sanitize/find_videos
 │   ├── test_cut.py            #   25 tests - 时间解析/文件名生成
 │   ├── test_log.py            #   13 tests - TeeWriter/size&duration 格式化
-│   └── test_progress.py       #   12 tests - ProgressTracker read/write/init
+│   ├── test_progress.py       #   12 tests - ProgressTracker read/write/init
+│   ├── test_transcribe.py     #   15 tests - transcribe enabled/disabled/deps
+│   └── test_routes_transcripts.py #  7 tests - transcript/whisper API routes
 ```
 
 ## 4. 关键约定
@@ -103,8 +113,11 @@ vlog-video-analysis/
 - **模块拆分**：当前 `server.py` / `app.js` 集中了 UI 层所有逻辑，后续应该拆成不同文件/目录，每个负责独立功能
 - **去本地化**：移除所有代码中硬编码的本机路径、机器名、特定目录结构等，方便项目通用化/开源
 - **两阶段计划已定稿**，见 `docs/superpowers/specs/2026-06-09-architecture-cleanup-and-r008-design.md`
-  - Phase 1：server.py 拆 routes/ + services.py，app.js 拆 state/api/viewer，.gitignore 补漏，去本地化，修 bug
+  - Phase 1：server.py 拆 routes/ + services.py，app.js 拆 state/api/viewer，.gitignore 补漏，去本地化，修 bug — **已完成**
   - Phase 2：R-008 UI 单步执行（选目录 → 选文件 → 跑步骤 → 进度 → 自动刷新）
+- **FFMPEG_HOME** 环境变量取代硬编码路径；`discover_ffmpeg_bin` 搜索链：`shutil.which` → WinGet Packages → `FFMPEG_HOME`
+- **Provider 缓存**：`ai/factory.py` `_provider_cache` 按名缓存，`_provider_cache_lock` 线程安全，`_clear_provider_cache()` 测试隔离
+- **Config 未知字段**：`_filter_dc()` 过滤 YAML 未知字段再送入 dataclass 构造器，静默忽略拼写错误
 
 ## 5. 添加新功能的标准做法
 
@@ -172,113 +185,86 @@ ai:
 
 ## 7. 项目当前状态
 
-最后更新：2026-06-14（代码审查 P0~P3 14 项修了 12 项 + 344 测试稳定）。已上线：
-- GitHub Actions CI（Ubuntu，Python 3.11/3.12）
-- 344 个 pytest 用例：config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(9) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / file_service_routes(35)
+最后更新：2026-06-16（Whisper 全功能 + 412 测试稳定 + 6+12+25 项代码审查修复 + CI 修复 + 27 新测试）。已上线：
+- GitHub Actions CI（Ubuntu，Windows，Python 3.11/3.12）
+- 412 个 pytest 用例：transcribe(18) / tasks_transcribe(11) / processing_state(8) / whisper_cli(6) / main(7) / config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(12) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / 等
 - 依赖版本锁定 `requirements-locked.txt`
+- Whisper ASR 独立 `requirements-whisper.txt`（faster-whisper，不污染主依赖）
 最近做的 commit 顺序：
 1. `chore: scaffold initial Vlog editing helper project`
 2. `fix(compress): escape comma in scale expression`  ← Windows ffmpeg filter 逗号转义
-3. `feat(pipeline): make all steps resume-safe`  ← skip_existing 真接上
-4. `docs: add English README and link from Chinese README`
-5. `fix(ai): clearer error when API key is missing or misconfigured`  ← 防止 key 被回显
-6. `feat(ai): support per-trip context preamble`  ← ai.context / ai.context_file
-7. `feat(cli): add refine subcommand to polish existing outputs`  ← 用 trip context 修正旧输出
-8. `docs: add AGENTS.md`  ← AI 维护手册
-9. `feat(ai): independent provider for refine tasks`  ← refine_text 独立可配（texts/scripts 共用）
-10. `feat(log): persist execution logs to per-hour files`  ← logs/YYYY-MM-DD-HH.log（gitignored）
-11. `docs: expand command reference with per-subcommand sections`  ← README 命令参考细化
-12. `feat(refine): add --fix mode for targeted single-file corrections`  ← 定向修正 prompt
-13. `feat(log): add format_size, format_duration, and timed() helpers`  ← 日志助手函数
-14. `feat(integration): detailed logs - commands, sizes, AI timing, ETA progress`  ← 接入 compress/analyze/pipeline
-15. `fix(log): uncaught exceptions as one ERROR entry, not per-line noise`  ← sys.excepthook
-16. `chore: remove orphan video_analysis.py`  ← 已废弃的单文件 demo
-17. `refactor(utils): move extract_json out of ai/gemini.py`  ← 通用工具不应在 gemini 模块
-18. `feat(config): validate proxy/tasks at load time`  ← 拼写错误提前 fail
-19. `feat(ai): retry transient API failures with exponential backoff`  ← with_retry 助手，gemini 5xx + openai 429/5xx
-20. `feat(ui): add stdlib HTTP server backend for visual editor`  ← vlog_tool/ui/server.py，纯 stdlib
-21. `feat(ui): add 'serve' subcommand to start the UI from the CLI`  ← main.py 13 行
-22. `feat(ui): add HTML/CSS/JS frontend for the visual editor`  ← 静态三件套，无构建
-23. `docs(ui): document the visual editor UI`  ← vlog_tool/ui/README.md + 两份顶层 README
-24. `fix(ui): plan tab sequence click now also seeks the video`  ← 解析 use_timeline 起始时间
-25. `feat(ui): backend supports source=compressed|original for videos and video`  ← R-001 后端，server.py +91/-28
-26. `feat(ui): add source toggle with match indicators`  ← R-001 前端，HTML/CSS/JS +63/-4
-27. `docs(ui): document source toggle`  ← R-001 文档，ui/README.md +31/-1
-28. `fix(ui): accept CJK punctuation (full-width colon) in basenames`  ← 沙盒正则过严，`：` U+FF1A 被拒，video 002 voiceover 404
-29. `docs: add R-006 (UI sidebar project/video hierarchy) to ROADMAP`  ← R-006 ROADMAP 录入
-30. `feat(ui): split sidebar into project and video sections`  ← R-006a HTML+CSS，sidebar 两段结构
-31. `feat(ui): wire sidebar project/video hierarchy with entity state machine`  ← R-006b JS，state.currentEntity + selectPlan
-32. `docs(ui): document sidebar project/video hierarchy`  ← R-006c README 布局图更新
-33. `fix(ui): use querySelector for the plan project-item in updateEntityUI`  ← $ 是 getElementById，CSS 选择器要用 querySelector
-34. `fix(ui): plan segment click plays the video without switching entity`  ← plan/video 独立：playVideoSegment 不动 entity
-35. `fix(ui): source toggle in plan view does not switch entity`  ← setSource 分支：plan 时只刷新列表+清空 player，不调 selectVideo；renderActiveTab 同步刷新 plan 节点的 v.file
-36. `feat(ui): add config editor (R-004)`  ← 后端 raw config API + 校验 + .bak 保存；前端递归嵌套表单渲染 + 保存提示重启
-37. `feat(ui): add one-click cut from plan (R-002)`  ← cut CLI + cut API + UI cut tab
-38. `fix(cut): support per-day original source and plan day selection`  ← cut 双日修复
-39. `fix(ui): plan-not-found handling and segment _cut_info JSON`  ← cut 边角 case
-40. `feat(ui): add project metadata with persistent source/day state`  ← project.json
-41. `feat(ui): add pipeline runner with progress tracking (R-005)`  ← run tab + ProgressTracker + 后台线程
-42. `feat(ui): pipeline step selection and done() param fix`  ← R-005f checkbox 选步骤 + R-005g done() 修复
-43. `feat(ui): multi-project switching with create (R-007)`  ← /api/projects, /api/project/create, sidebar selector, modal, URL param switching, empty state
-44. `fix(ai): clean up Gemini File API uploads and move upload out of retry`  ← B-001+B-002，上传仅一次 + finally 清理
-45. `fix(ui): prevent temp file leak on interrupt in config save`  ← B-003，NamedTemporaryFile → with 语句 + 显式 unlink
-46. `feat(config): per-project configuration via project.yaml`  ← deep_merge + _get_config cache + server.py 适配
-47. `chore: add local state files to .gitignore`  ← projects.json + *.bak + .opencode/
-48. `fix: address review findings - gemini upload cleanup scope and project config validation`  ← 上传移入 try + PUT project.yaml 校验修正
-49. `fix(ui): fall back to global config when project has no project.yaml`  ← 无 project.yaml 时回退到 config.yaml 而非返回空
-50. `docs(roadmap): record comprehensive code review findings`  ← B-012~B-020 + D-001~D-004 + A-001~A-005
-51. `test: add test infrastructure and GitHub Actions CI`  ← pytest 框架 + CI yml
-52. `test: comprehensive config.py unit tests (34 tests)`  ← 配置加载/合并/校验
-53. `test: comprehensive utils.py unit tests (34 tests)`  ← extract_json/mask_key/sanitize/find_videos
-54. `test: log.py and cut.py unit tests (38 tests)`  ← TeeWriter/cut 时间解析
-55. `test: progress.py unit tests (12 tests)`  ← ProgressTracker read/write/init
-56. `feat(split): add video splitting and long-video duration gate`  ← split.py + config + Phase 1/2 + duration gate
-57. `feat(ai): retry Gemini ClientError 429 with should_retry callback`  ← utils.with_retry + gemini._call_with_retry
-58. `docs: update note in segment grouping spec (split already implemented)`  ← spec 同步
-59. `feat(ui): add _segNN matching for compressed-original lookup (方案A)`  ← file_service.py seg 回溯
-60. `feat(ui): add group_key/segment_label/groups to /api/videos response (方案B backend)`  ← routes/videos.py 两遍 pass
-61. `feat(ui): add CSS for video group tree (方案B CSS)`  ← style.css 4 个 group class
-62. `feat(ui): add group tree rendering to sidebar (方案B frontend)`  ← sidebar.js renderVideoItem + 树状 renderVideoList
-63. `3b69ff0` `fix(ui): prevent duplicate project in _list_projects — missing seen_dirs.add in sibling scan`  ← 同级目录扫描漏掉 seen_dirs.add，导致重复项目
-64. `7868a95` `fix(ui): overwrite stale .bak in _save_atomic instead of skip`  ← 每次保存覆盖 .bak，防止无限堆积
-65. `18f7358` `fix(ui): serve correct MIME type per video extension instead of hardcoded video/mp4`  ← 按扩展名选择 Content-Type
-66. `8608d14` `fix(analyze): add .m4v and .webm to _resolve_original extension list`  ← 补齐缺失的扩展名
-67. `c283bb9` `fix(ui): hoist statusEl/fill/logsEl before early return`  ← 解决 pollRerunStatus 中 statusEl 声明前使用的 ReferenceError
-68. `dc01300` `fix(run): serialize _run_thread check-and-set under _run_lock`  ← TOCTOU 竞态，加锁保护
-69. `93eb4f1` `fix(ui): wrap _config_cache.pop with _config_cache_lock to fix data race`  ← 修复 config 缓存 pop 的无锁数据竞争
-70. `a276225` `fix: batch low-priority bug fixes and config injection`  ← B-005/B-017/B-018/B-042/B-044/B-045/B-059
-71. `e3f87a1` `feat(config): add migrate-config subcommand to inject provider defaults into existing project.yaml`  ← `_inject_provider_defaults` + `_migrate_project_configs`
-72. `2f1d56c` `docs: add config hot-reload audit spec (R-015) and update ROADMAP`  ← 热更新调研 + ROADMAP 更新
-73. `4d146d0` `style: ruff format vlog_tool/ui/services/file_service.py and project_service.py`  ← CI format 修复
-74. `6c2ab33` `chore: add pre-commit hook to auto-format staged .py files with ruff`  ← `.githooks/pre-commit` + `setup.ps1` 自动配置
-75. `c59880d` `feat(analyze): add progress_callback for per-file upload/wait/AI/disk granularity`  ← 同时修复原视频视图下 split 段 index 丢失导致 plan 播放 404
-76. `e72ba10` `fix(ui): create per-segment entries in original video view for plan segment playback`  ← split 段独立条目
-77. `e6e068c` `feat(ui): show AI analysis title below filename in sidebar video list`  ← 视频列表展示 AI 标题
-78. `3fb8263` `fix(ui): update plan preview counter and unique video identity for split segments in original view`  ← 预览计数器动态刷新 + 原视图 split 段独立标识
-79. `c78622f` `fix(ui): compute segment offset_sec for original view so plan playback seeks to correct position`  ← split 段 offset 计算
-80. `86a281d` `fix(ui): add offset_sec to timeline click seek in texts tab for split segments in original view`  ← timeline seek 加 offset
-81. `2cc3451` `fix(cut): resolve original source path and apply segment offset for split videos`  ← cut split 段双 bug 修复
-82. `cb4d8e9` `fix(ui): delegate browse-btn click handler to cover dynamically created buttons`  ← 浏览按钮事件委托
-83. `fad1cc8` `feat: add .lrv (GoPro proxy) video format support`  ← GoPro 代理视频格式支持
-84. `e21373e` `fix(config): clear _config_cache on global config write and cap cache at 20 entries`  ← P0-001 + P1-004
-85. `51f50d7` `fix(analyze): replace *.mp4 glob with VIDEO_EXTS filtering, move import re to top`  ← P0-002 + P2-001
-86. `7f05ee4` `feat(ui): return segment_matches array for multi-segment original videos`  ← P1-001
-87. `fe57a7f` `fix(analyze): use project-level trip_context.md with read cache`  ← P1-002 + P3-003
-88. `34c0d3b` `refactor(ui): remove hasattr(handler.server) patterns, use direct attr access`  ← P1-003
-89. `ea2e79c` `fix(progress): random suffix for tmp file to avoid name conflicts`  ← P2-003
-90. `34846df` `fix(pipeline): validate step names before execution`  ← P2-004
+...（#3~#98 同上）...
+98. `bcfbe04` `feat(ui): add transcripts tab, sidebar badge, and run step`  ← Task 8
+99. `c6e01ec` `feat(whisper): reorder pipeline, add per-video transcribe rerun, plan toggle, and UI error handling`  ← 综合增强
+100. `1d1b46a` `fix(whisper): replace torch with ctranslate2 for CUDA detection (no torch dependency)`  ← 去掉 torch
+101. `306f349` `feat(compress): real-time stderr progress with progress_callback for tracker`  ← 实进度
+102. `11ea035` `fix(compress): skip_existing now matches existing files by stem instead of by path`  ← stem 匹配
+103. `c600840` `fix(ui): pollRunStatus shows progress when s.status==='running' even without live thread`  ← 进度面板
+104. `417aa0a` `fix(ui): keep btn enabled when stale progress from interrupted run`  ← 按钮状态
+105. `eff8fce` `feat(ui): per-file compress log in run tab panel`  ← 压缩日志
+106. `31abfac` `feat(processing-state): per-file pipeline state matrix with UI table`  ← 状态矩阵
+107. `8412e03` `fix(config): hf_endpoint defaults to empty, only overrides when configured`  ← 配置修复
+108. `1c5d681` `fix(cli): lazy imports prevent google-genai loading on whisper install`  ← 惰性导入
+109. `fe1a078` `fix(compress): filter partial files (<256B) from existing_map`  ← 过滤残损文件
+110. `6a56eaf` `fix: batch fix 19 review issues from project-wide code audit`  ← 批量修复
+111. `d0d0847` `fix(compress): fallback skip when split segments exist but source is original`  ← compress 分支
+112. `1b53499` `fix(transcribe): resolve rerun 404, CUDA fallback, UI transcript display and seek`  ← 综合修复
+113. `41abe5b` `fix(security): add _is_safe_basename guard to POST /api/rerun`  ← C1
+114. `89614a4` `fix(ui): delegate switchToOriginalThenCompress to setSource`  ← C2
+115. `bce09ce` `fix(ui): replace addEventListener with onloadedmetadata`  ← C3
+116. `dba1cd9` `fix(ai): fail fast on non-retryable 4xx errors in OpenAI compat`  ← C4
+117. `18ccee4` `fix(config): filter unknown YAML fields from dataclass constructors`  ← C5
+118. `71659aa` `fix(ai): cache provider instances to prevent HTTP connection leak`  ← C6
+119. `fe511be` `fix(ui): capture video ref at dblclick in transcript edit`  ← I1
+120. `8d3b2f8` `fix(ui): capture state at save() entry`  ← I2
+121. `1406e0e` `fix(ui): guard startRun with btn.disabled check`  ← I3
+122. `08d815c` `fix(ui): clean up portal close listener`  ← I4
+123. `d2591a9` `fix(ui): handle suffix range bytes=-N`  ← I5
+124. `b072240` `fix(security): add _is_safe_basename for cut day_label`  ← I6
+125. `74c34f5` `fix(utils): remove hardcoded G:/ffmpeg`  ← I7
+126. `e6e7666` `fix(tasks): handle stem without underscore`  ← I8
+127. `9288216` `fix(utils): add stdout=DEVNULL to Popen`  ← I9
+128. `60d765f` `fix(cli): pass project_dir to load_config`  ← I10
+129. `947a320` `fix(log): block destructive calls on _TeeWriter`  ← I11
+130. `ef2311d` `fix(ai): use configurable retry_attempts`  ← I12
+131. `ef68308` `fix(review): align Gemini retry_attempts, thread-safe provider cache, test isolation`  ← 审查反馈
+132. `bebf21f` `fix(save): capture data refs at entry; sanitize index_prefix in rerun`  ← 审查反馈
+133. `8688a85` `fix(tests): mock ctranslate2 module for CI where it's not installed`  ← CI 修复
+134. `f51e7b9` `fix(tests): return int from mock ctranslate2.get_cuda_device_count`  ← CI 修复
+135. `88cbf4c` `fix(ci): pass config_path to whisper subcommands, lowercase .mp4 for Linux`  ← CI 修复
+136. `4abc241` `fix(whisper_cli): add missing Path import for F821`  ← Lint 修复
+137. `f4a6a71` `test: add 27 high-value unit tests for whisper, processing_state, and CLI`  ← 27 新测试
+
+最近代码审查修复（2026-06-16 第二次审查，5 S0 + 5 S1 + 1 S2 项）：
+- **S0-1** `runner.js`: `prog` undefined → `$('run-progress')`
+- **S0-2** `analyze.py`: transcript 不绑 source_stem → clip 携带 source_stem，仅匹配对应 transcript
+- **S0-3** `split.py`: 缺 manifest → 输出 `_split_manifest.json` 含 source_stem/offset/duration
+- **S0-4** pipeline 恢复: 新增 `write_json_atomic`/`write_text_atomic`（tmp+rename）+ JSON 校验跳过
+- **S1-1** `/api/cut`: 忽略 project query → 接收 qs 参数
+- **S1-2** transcript UI: `_resolve_stem` 没切 `_segNN` → 加 `_SEG_SUFFIX_RE` 剥离
+- **S1-3** `_extract_audio`: 硬编码 "ffmpeg" → 接收 ffmpeg 参数
+- **S1-4** Whisper batch 受 `max_analyze_duration_min` → 移除该检查
+- **S1-5** AI provider 缓存: 仅按名缓存 → 复合 key（name+api_key+base_url+proxy）
+- **S2-3** Whisper 模型缓存 key: 缺 device/compute_type → 加入 key；CUDA 回退 CPU 时更新 key
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
 
 项目文档状态：
-- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012/ R-013/ R-014/ R-015（a[✓] d[✓]）+ Bug 跟踪（B-001~B-074）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）+ 代码审查 P0~P3（14 项修了 12 项）
-- 2026-06-14 代码审查修复 12/14 项（P0-001/P0-002/P1-001~P1-004/P2-001/P2-003~P2-005/P3-003）；剩余 P2-002（split 黑帧需权衡）/P3-001（损坏 mp4 永久跳过）/P3-002（segment 命名格式过严）
+- 2026-06-16 全面代码审查（5 路平行 subagent）：发现 **6 Critical + 12 Important + 36 Minor**，已修复 6+12+5，剩余 31 Minor 待处理
+- 2026-06-16 第二次审查（逐项 review）：5 S0 + 5 S1 + 1 S2 全部修复
+- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012/ R-013（✓）/ R-014/ R-015（a[✓] d[✓]）+ Bug 跟踪（B-001~B-085）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）+ 代码审查 P0~P3（14 项修了 12 项）
+- Whisper ASR 已完全接入：独立 CLI（transcribe / whisper install / whisper check）+ pipeline 步骤 + UI 转录 tab + delete/edit/seek + 10% 进度 + CUDA 回退 CPU + 每视频 rerun + 完整 UT 覆盖（18 个测试）
+- CI 兼容性修复：ctranslate2 mock 模块、config_path 参数传递、Linux 大小写感知、F821 lint
+- 新增 ProcessingState UT（8 个测试全面覆盖 mark/reset_step/持久化/损坏回退）
+- 新增 whisper_cli UT（6 个测试覆盖 check/install/未安装/CUDA/依赖缺失/pip 失败）
 - per-project 配置已实现：每个项目目录下可选 `project.yaml`，deep-merge 覆盖全局 config.yaml
 - 视频分段压缩已实现（split.py + compress Phase 1/2），默认 15 分钟分割阈值
-- UI compressed view 已支持 `_segNN` 分组树：segment 文件按原文件名分组显示，可折叠/展开
-- 原视频视图下 split 段 index 丢失已修复：每个 split 段创建独立条目，plan 播放 404 不再出现
-- AI 分析进度已细化：`progress_callback` 贯穿 analyze_video → GeminiProvider，UI 进度面板显示上传/等待/AI 分析/写入磁盘各阶段
+- UI compressed view 已支持 `_segNN` 分组树；原视频视图下 split 段独立条目 + offset_sec 换算
+- AI 分析进度已细化：`progress_callback` 贯穿分析全流程
+- Provider 缓存：factory 按名缓存，线程安全，测试隔离自动清理
+- 安全修复：rerun/cut 路径遍历防御（`_is_safe_basename`），4xx 非重试错误立即失败，`index_prefix` 消毒
+- 配置修复：YAML 未知字段静默忽略，`project.yaml` CLI 生效，`FFMPEG_HOME` 环境变量支持
 
 ## 8. Gotchas（踩过的坑）
 
@@ -348,6 +334,25 @@ ai:
 - `setup.ps1` 会自动设置 `git config core.hooksPath .githooks`
 - 手动配置：`git config core.hooksPath .githooks`
 - hook 依赖 `.venv` 中的 ruff，找不到时静默跳过（不阻塞 commit）
+
+### 8.12 `_filter_dc()` 与 dataclass 构造
+
+- YAML 中拼写错误的字段名（如 `whisper.modle_size`）会导致 `TypeError: unexpected keyword argument`
+- 修复：所有 `**raw` 解包前调用 `_filter_dc(raw, DataclassType)` 过滤未知键
+- 注意：`ScriptConfig` 使用显式 kwargs 构造，不需过滤；`_parse_providers`/`_parse_tasks` 用 `.get()` 安全读取
+
+### 8.13 Provider 缓存与测试隔离
+
+- `ai/factory.py` 的 `_provider_cache` 是模块级全局变量，跨测试持续存在
+- 如果测试 A 缓存了一个 provider，测试 B 的 `monkeypatch` 修改配置后仍可能拿到旧 provider
+- 修复：`_clear_provider_cache()` + `conftest.py` 的 `autouse` fixture 每个测试前自动清理
+
+### 8.14 `retry_attempts` 语义
+
+- `ProviderConfig.retry_attempts` 表示**额外重试次数**（不含首次），默认 `2`
+- `with_retry(attempts=N)` 的 `attempts` 表示**总调用次数**（含首次）
+- 转换公式：`with_retry(attempts=cfg.retry_attempts + 1)`
+- 两个 provider（gemini + openai_compat）都用同一个公式，保持语义一致
 
 ## 9. 验证流程
 

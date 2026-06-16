@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+
 from vlog_tool.ai.base import TaskName, TextAIProvider, VideoAIProvider
 from vlog_tool.ai.gemini import GeminiProvider
 from vlog_tool.ai.openai_compat import OpenAICompatProvider
@@ -11,15 +13,45 @@ _PROVIDER_TYPES = {
     "openai_compat": OpenAICompatProvider,
 }
 
+_provider_cache: dict[tuple, TextAIProvider] = {}
+_provider_cache_lock = threading.Lock()
+
 
 def _build_provider(config: AppConfig, provider_name: str):
     provider_cfg = config.ai.providers.get(provider_name)
     if not provider_cfg:
         raise ValueError(f"未定义的 AI 厂家: {provider_name}")
+    cache_key = (
+        provider_name,
+        provider_cfg.api_key,
+        provider_cfg.base_url,
+        provider_cfg.type,
+        provider_cfg.poll_interval_sec,
+        config.proxy.url,
+        config.proxy.enabled,
+    )
+    with _provider_cache_lock:
+        cached = _provider_cache.get(cache_key)
+        if cached is not None:
+            return cached
     cls = _PROVIDER_TYPES.get(provider_cfg.type)
     if not cls:
         raise ValueError(f"不支持的厂家类型 '{provider_cfg.type}'，可选: {', '.join(_PROVIDER_TYPES)}")
-    return cls(provider_cfg, config.proxy)
+    provider = cls(provider_cfg, config.proxy)
+    with _provider_cache_lock:
+        _provider_cache[cache_key] = provider
+    return provider
+
+
+def _clear_provider_cache() -> None:
+    """Close all cached providers and clear the cache (for testing / config reload)."""
+    with _provider_cache_lock:
+        for p in _provider_cache.values():
+            try:
+                p.close()
+            except Exception:
+                pass
+        _provider_cache.clear()
 
 
 def get_task_config(config: AppConfig, task: TaskName | str) -> TaskConfig:
@@ -38,6 +70,6 @@ def get_task_provider(config: AppConfig, task: TaskName | str) -> tuple[TextAIPr
 
 def get_video_provider(config: AppConfig, task: TaskName | str) -> tuple[VideoAIProvider, str]:
     provider, model = get_task_provider(config, task)
-    if not hasattr(provider, "analyze_video"):
+    if not isinstance(provider, VideoAIProvider):
         raise ValueError(f"任务 '{task}' 使用的厂家不支持视频分析")
-    return provider, model  # type: ignore[return-value]
+    return provider, model

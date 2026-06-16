@@ -19,6 +19,32 @@ Write-Host "[2/4] 安装 Python 依赖..."
 .\.venv\Scripts\python.exe -m pip install --upgrade pip -q
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt -q
 
+# Whisper 语音转录（可选加速）
+$whisperAnswer = Read-Host "是否安装 Whisper 语音转录? (y/N, 默认 N)"
+if ($whisperAnswer -eq 'y' -or $whisperAnswer -eq 'Y') {
+    Write-Host "[2b] 安装 faster-whisper 及推理依赖..." -ForegroundColor Yellow
+    .\.venv\Scripts\python.exe -m pip install -r requirements-whisper.txt -q
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "     Whisper 依赖安装失败，跳过后续步骤" -ForegroundColor Red
+    } else {
+        # 检测 CUDA 显卡
+        $cudaAvail = $false
+        try {
+            $nvidiaSmi = Get-Command nvidia-smi -ErrorAction Stop
+            $cudaAvail = $true
+            Write-Host "     检测到 NVIDIA GPU，安装 CUDA 运行时加速..." -ForegroundColor Green
+            .\.venv\Scripts\python.exe -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 -q
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "     CUDA 运行时安装失败，将使用 CPU 运行（速度较慢）" -ForegroundColor DarkYellow
+            }
+        } catch {
+            Write-Host "     未检测到 NVIDIA GPU，将使用 CPU 运行（速度较慢）" -ForegroundColor DarkYellow
+        }
+    }
+} else {
+    Write-Host "     跳过 Whisper 安装，后续可运行 'python main.py whisper install' 单独安装" -ForegroundColor DarkYellow
+}
+
 # 2. ffmpeg
 $ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
 if (-not $ffmpeg) {

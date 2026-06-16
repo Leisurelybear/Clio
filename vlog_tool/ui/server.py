@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 import mimetypes
 import re
@@ -33,6 +34,7 @@ from vlog_tool.ui.routes.plan import (
     handle_post_cut,
     handle_put_plan,
 )
+from vlog_tool.ui.routes.processing_state_routes import handle_get_processing_state
 from vlog_tool.ui.routes.projects import (
     handle_get_project,
     handle_get_projects,
@@ -52,7 +54,12 @@ from vlog_tool.ui.routes.texts import (
     handle_put_texts,
     handle_put_voiceover,
 )
+from vlog_tool.ui.routes.transcripts import (
+    handle_get_transcripts,
+    handle_put_transcripts,
+)
 from vlog_tool.ui.routes.videos import handle_get_video, handle_get_videos
+from vlog_tool.ui.routes.whisper_routes import handle_get_whisper_check
 from vlog_tool.ui.services.file_service import _find_texts_dirs, _is_safe_basename
 from vlog_tool.ui.services.project_service import _project_output_dir, _registry_path
 
@@ -115,7 +122,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                         # Evict the first (oldest) entry
                         cache.pop(next(iter(cache)), None)
                     cache[key] = load_config(config_path, project_dir=project_input)
-                return cache[key]
+                return copy.deepcopy(cache[key])
 
         def log_message(self, fmt, *args):
             print(f"  [serve] {self.address_string()} - {fmt % args}")
@@ -247,8 +254,13 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     self.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
                     return
                 start_s, end_s = m.group(1), m.group(2)
-                start = int(start_s) if start_s else 0
-                end = int(end_s) if end_s else size - 1
+                if start_s == "" and end_s != "":
+                    suffix_len = int(end_s)
+                    start = max(0, size - suffix_len)
+                    end = size - 1
+                else:
+                    start = int(start_s) if start_s else 0
+                    end = int(end_s) if end_s else size - 1
                 if start >= size or end >= size or start > end:
                     self.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
                     return
@@ -348,8 +360,14 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_get_run_status(self, qs)
             if path == "/api/plan":
                 return handle_get_plan(self, qs)
+            if path == "/api/processing-state":
+                return handle_get_processing_state(self, qs)
             if path == "/api/fs/dirs":
                 return handle_get_fs_dirs(self, qs)
+            if path == "/api/transcripts":
+                return handle_get_transcripts(self, qs)
+            if path == "/api/whisper/check":
+                return handle_get_whisper_check(self)
 
             return self.send_error(HTTPStatus.NOT_FOUND)
 
@@ -376,6 +394,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_put_voiceover(self, qs, obj)
             if path == "/api/plan":
                 return handle_put_plan(self, qs, obj)
+            if path == "/api/transcripts":
+                return handle_put_transcripts(self, qs, obj)
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
@@ -397,7 +417,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             if path == "/api/config/init":
                 return handle_post_config_init(self, qs, obj)
             if path == "/api/cut":
-                return handle_post_cut(self, obj)
+                return handle_post_cut(self, qs, obj)
             if path == "/api/project/create":
                 return handle_post_project_create(self, obj)
             if path == "/api/project/add":

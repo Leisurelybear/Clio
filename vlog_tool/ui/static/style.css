@@ -125,6 +125,14 @@ header {
 .status.ok { color: var(--success); }
 .status.err { color: var(--error); }
 .status.warn { color: var(--warning); }
+.muted.warn, .warn { color: #f0a030; }
+.run-logs { margin-top: 8px; max-height: 200px; overflow-y: auto; background: #1a1a1a; border-radius: var(--radius-sm); padding: 4px 8px; font-size: var(--text-sm); }
+.run-log-line { padding: 1px 0; white-space: pre-wrap; word-break: break-all; }
+.state-table { display: table; width: 100%; border-collapse: collapse; margin-top: 4px; font-size: var(--text-sm); }
+.state-row { display: table-row; }
+.state-header { font-weight: bold; }
+.state-file { display: table-cell; padding: 2px 8px; white-space: nowrap; border-bottom: 1px solid #333; }
+.state-cell { display: table-cell; padding: 2px 8px; text-align: center; border-bottom: 1px solid #333; }
 .status button { background: none; border: 1px solid currentColor; border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer; color: inherit; font: inherit; font-size: var(--text-sm); }
 
 /* ── Main Layout ───────────────────────────────────────────── */
@@ -590,3 +598,38 @@ button .icon { width: 12px; height: 12px; }
 }
 .menu-item:hover { background: var(--bg-active); }
 .menu-item:not(:last-child) { border-bottom: 1px solid var(--border); }
+
+/* ── Transcript Tab ────────────────────────────── */
+.transcript-seg {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.transcript-seg:hover {
+  background: var(--bg-surface);
+}
+.transcript-seg .seg-time {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  margin-bottom: 2px;
+}
+.transcript-seg .seg-text {
+  font-size: var(--text-base);
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 2px 0;
+}
+.transcript-seg .seg-text-edit {
+  width: 100%;
+  font: inherit;
+  font-size: var(--text-base);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 4px 6px;
+  resize: vertical;
+  box-sizing: border-box;
+}

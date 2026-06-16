@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import threading
 import traceback
 from pathlib import Path
@@ -11,7 +12,8 @@ from typing import TYPE_CHECKING
 
 from vlog_tool.pipeline import run_analyze_all, run_compress_all, run_generate_scripts, run_pipeline_steps
 from vlog_tool.progress import ProgressTracker
-from vlog_tool.ui.services.file_service import _find_original_for_compressed, _find_texts_dirs
+from vlog_tool.tasks.transcribe import run_transcribe_one
+from vlog_tool.ui.services.file_service import _find_original_for_compressed, _find_texts_dirs, _is_safe_basename
 from vlog_tool.ui.services.project_service import _project_output_dir
 
 if TYPE_CHECKING:
@@ -28,7 +30,9 @@ def handle_get_run_status(handler: BaseHTTPRequestHandler, qs: dict) -> None:
             data = {"status": "unknown"}
     else:
         data = {"status": "idle"}
-    data["running"] = handler._run_thread is not None and handler._run_thread.is_alive()
+    with handler.__class__._run_lock:
+        running = handler._run_thread is not None and handler._run_thread.is_alive()
+    data["running"] = running
     handler._send_json(data)
 
 
@@ -38,11 +42,15 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
     steps = obj.get("steps")
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
+    if "use_transcripts" in obj:
+        cfg.plan.use_transcripts = obj["use_transcripts"]
 
     def _run():
+        tracker = ProgressTracker(cfg.paths.output_dir)
         try:
-            run_pipeline_steps(cfg, day_label, steps)
+            run_pipeline_steps(cfg, day_label, steps, tracker=tracker)
         except Exception:
+            tracker.error("pipeline failed")
             traceback.print_exc()
 
     with handler.__class__._run_lock:
@@ -62,9 +70,15 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
 
     video_basename = (obj.get("video") or "").strip()
     task = (obj.get("task") or "").strip()
-    if not video_basename or task not in ("compress", "analyze", "texts", "voiceover", "all"):
+    if not video_basename or not _is_safe_basename(video_basename):
+        return handler._send_json({"ok": False, "error": "invalid video filename"}, 400)
+    if task not in ("compress", "analyze", "texts", "voiceover", "transcribe", "all"):
         return handler._send_json(
-            {"ok": False, "error": "requires video (filename) and task (compress|analyze|texts|voiceover|all)"}, 400
+            {
+                "ok": False,
+                "error": "requires video (filename) and task (compress|analyze|texts|voiceover|transcribe|all)",
+            },
+            400,
         )
     # 向后兼容
     if task == "texts":
@@ -72,12 +86,18 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
 
     stem = Path(video_basename).stem
 
-    # Resolve original video path (for texts/analyze rerun)
+    # Resolve original video path
     source_view = obj.get("source", "compressed")
     if source_view == "original":
         original_video = proj_input / video_basename
         if not original_video.is_file():
-            return handler._send_json({"ok": False, "error": f"original video not found: {video_basename}"}, 404)
+            # Maybe frontend sent a compressed filename with source:original
+            # (e.g. from original view where v.file is actually compressed name).
+            # Try resolving via _find_original_for_compressed as fallback.
+            original_name = _find_original_for_compressed(stem, proj_input)
+            if not original_name:
+                return handler._send_json({"ok": False, "error": f"original video not found: {video_basename}"}, 404)
+            original_video = proj_input / original_name
     else:
         original_name = _find_original_for_compressed(stem, proj_input)
         if not original_name:
@@ -85,7 +105,10 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
         original_video = proj_input / original_name
 
     # Resolve texts JSON path (for voiceover rerun)
-    index_prefix = obj.get("index") or (stem.split("_", 1)[0] if "_" in stem else stem)
+    raw_index = obj.get("index") or ""
+    index_prefix = (
+        re.sub(r"[^a-zA-Z0-9_-]", "", raw_index) if raw_index else (stem.split("_", 1)[0] if "_" in stem else stem)
+    )
     texts_json = None
     if task in ("voiceover", "all"):
         for td in _find_texts_dirs(proj_out):
@@ -127,6 +150,18 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
                 _log("Step: generating voiceover script...")
                 run_generate_scripts(cfg, tracker=tracker, single_file=texts_json)
                 _log("✓ voiceover generation complete")
+            if task in ("transcribe", "all"):
+                _log("Step: transcribing audio...")
+                from vlog_tool.transcribe import check_whisper
+
+                if not check_whisper():
+                    raise RuntimeError("faster-whisper 未安装。执行: python main.py whisper install")
+                _log(f"original_video={original_video}, exists={original_video.is_file()}")
+                result = run_transcribe_one(cfg, original_video)
+                if "error" in result:
+                    _log(f"✗ transcription failed: {result['error']}")
+                    raise RuntimeError(result["error"])
+                _log(f"✓ transcription complete, output_dir={cfg.paths.output_dir}")
             tracker.done(f"{task} → {video_basename} complete")
             print(f"  [rerun] ✓ {task} -> {video_basename} complete")
         except Exception as e:

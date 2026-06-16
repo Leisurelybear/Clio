@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from vlog_tool.analyze import plan_daily_vlog
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
 from vlog_tool.progress import ProgressTracker
-from vlog_tool.utils import format_index
+from vlog_tool.utils import format_index, write_json_atomic, write_text_atomic
 
 
 def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressTracker | None = None) -> None:
@@ -17,8 +18,13 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
     out_json = config.plans_dir / f"{day_label}_plan.json"
     out_md = config.plans_dir / f"{day_label}_plan.md"
     if config.analyze.skip_existing and out_json.exists() and out_md.exists():
-        print(f"[跳过] {day_label} 计划 (已存在)")
-        return
+        try:
+            json.loads(out_json.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            print(f"  [重新规划] {day_label} (已有规划文件损坏)")
+        else:
+            print(f"[跳过] {day_label} 计划 (已存在)")
+            return
 
     clips = []
     for json_file in sorted(config.texts_dir.glob("*.json")):
@@ -31,6 +37,7 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
         except (ValueError, TypeError):
             print(f"  [跳过] 无效 index '{raw_idx}' 在 {json_file.name}")
             continue
+        source_stem = Path(data.get("source_file", "")).stem
         clips.append(
             {
                 "index": format_index(idx, config.naming.index_width),
@@ -40,6 +47,7 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
                 "timeline": data.get("timeline", []),
                 "highlights": data.get("highlights", []),
                 "suggested_use": data.get("suggested_use", ""),
+                "source_stem": source_stem,
             }
         )
 
@@ -47,12 +55,27 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
         print("没有可用的分析结果，请先运行 analyze")
         return
 
+    # 加载 transcript 数据
+    transcripts_map: dict[str, dict] = {}
+    trans_dir = config.paths.output_dir / config.whisper.transcripts_subdir
+    if trans_dir.is_dir() and config.whisper.enabled:
+        for tf in sorted(trans_dir.glob("*_transcript.json")):
+            try:
+                data = json.loads(tf.read_text(encoding="utf-8"))
+                stem = data.get("source_stem", "")
+                if stem:
+                    transcripts_map[stem] = data
+            except (json.JSONDecodeError, KeyError):
+                continue
+
     if tracker:
         tracker.update(phase="plan", total=1, current=0, message=f"生成 {day_label} 规划...")
     with timed(f"run_plan_vlog {day_label}（{len(clips)} 条）"):
         print(f"[规划] {day_label}，共 {len(clips)} 条素材")
-        plan = plan_daily_vlog(clips, config, day_label)
-    out_json.write_text(json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+        plan = plan_daily_vlog(
+            clips, config, day_label, transcripts_map=transcripts_map, use_transcripts=config.plan.use_transcripts
+        )
+    write_json_atomic(out_json, plan)
 
     lines = [
         f"# {plan.get('day_title', day_label)}",
@@ -81,5 +104,5 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
             plan.get("ending_tip", ""),
         ]
     )
-    out_md.write_text("\n".join(lines), encoding="utf-8")
+    write_text_atomic(out_md, "\n".join(lines))
     print(f"  -> {out_md.name}")

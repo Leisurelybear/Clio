@@ -1,16 +1,20 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_size, timed
 from vlog_tool.utils import get_duration_sec, resolve_binary, run_ffmpeg
 
+ProgressCB = Callable[[float, float], None]  # (current_sec, total_sec)
+
 
 def compress_video(
     input_path: Path,
     output_path: Path,
     config: AppConfig,
+    progress_callback: ProgressCB | None = None,
 ) -> Path:
     """压缩视频：去声音、降分辨率，尽量接近目标大小。"""
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
@@ -18,6 +22,12 @@ def compress_video(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     duration = get_duration_sec(input_path, ffprobe)
+    _cb = progress_callback
+
+    def _on_ffmpeg_progress(sec: float) -> None:
+        if _cb:
+            _cb(sec, duration)
+
     if duration <= 0:
         raise ValueError(f"无法读取视频时长: {input_path}")
 
@@ -52,7 +62,7 @@ def compress_video(
     cmd_preview = f"ffmpeg {' '.join(args)}"
     print(f"  ffmpeg: {cmd_preview}")
     with timed(f"压缩 {input_path.name} -> {output_path.name}"):
-        run_ffmpeg(args, ffmpeg)
+        run_ffmpeg(args, ffmpeg, progress_callback=_on_ffmpeg_progress)
     new_size = output_path.stat().st_size
     ratio = (1 - new_size / orig_size) * 100 if orig_size > 0 else 0
     print(

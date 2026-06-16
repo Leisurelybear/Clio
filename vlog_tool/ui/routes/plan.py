@@ -50,9 +50,11 @@ def handle_put_plan(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> Non
     handler._send_json({"ok": True, "path": str(p)})
 
 
-def handle_post_cut(handler: BaseHTTPRequestHandler, obj: dict) -> None:
+def handle_post_cut(handler: BaseHTTPRequestHandler, qs: dict[str, list[str]], obj: dict) -> None:
     """Handle POST /api/cut."""
     day_label = obj.get("day_label", "day1")
+    if not _is_safe_basename(day_label):
+        return handler._send_json({"ok": False, "error": "invalid day_label"}, 400)
     source = obj.get("source", "compressed")
     reencode = obj.get("reencode", False)
     out_dir_raw = obj.get("output_dir", None)
@@ -61,7 +63,7 @@ def handle_post_cut(handler: BaseHTTPRequestHandler, obj: dict) -> None:
         return handler._send_json({"ok": False, "error": "source must be compressed|original"}, 400)
 
     out_path = Path(out_dir_raw) if out_dir_raw else None
-    proj_input = handler._resolve_project_input({})  # no qs, use default
+    proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
 
     try:

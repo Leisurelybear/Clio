@@ -74,6 +74,7 @@ def _create_project_yaml(proj_input: Path, config_path: Path | None, proj_out: P
         raw.setdefault("ai", {})
         raw["ai"].setdefault("context", "")
         _inject_provider_defaults(raw)
+        _inject_whisper_defaults(raw)
         yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
         _save_atomic(target, yml.encode("utf-8"))
         return target
@@ -89,6 +90,18 @@ def _inject_provider_defaults(raw: dict) -> None:
         if isinstance(pcfg, dict):
             pcfg.setdefault("requests_per_minute", 0)
             pcfg.setdefault("retry_attempts", 2)
+
+
+def _inject_whisper_defaults(raw: dict) -> None:
+    """Inject default whisper fields into a config dict."""
+    whisper = raw.setdefault("whisper", {})
+    if isinstance(whisper, dict):
+        whisper.setdefault("enabled", False)
+        whisper.setdefault("model_size", "medium")
+        whisper.setdefault("language", "zh")
+        whisper.setdefault("device", "auto")
+        whisper.setdefault("max_segments_per_clip", 5)
+        whisper.setdefault("transcripts_subdir", "transcripts")
 
 
 def _migrate_project_configs(projects_root: Path) -> tuple[int, list[str]]:
@@ -109,6 +122,7 @@ def _migrate_project_configs(projects_root: Path) -> tuple[int, list[str]]:
                 raw = yaml.safe_load(f) or {}
             before = yaml.dump(raw, allow_unicode=True, sort_keys=False)
             _inject_provider_defaults(raw)
+            _inject_whisper_defaults(raw)
             after = yaml.dump(raw, allow_unicode=True, sort_keys=False)
             if before != after:
                 yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from copy import deepcopy
 from dataclasses import dataclass, field
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -87,6 +88,47 @@ class PlanConfig:
     plans_subdir: str = "plans"
     max_clips_per_day: int = 12
     target_duration_sec: int = 180
+    use_transcripts: bool = True
+
+
+class WhisperModelSize(StrEnum):
+    SMALL = "small"
+    MEDIUM = "medium"
+    LARGE_V3 = "large-v3"
+
+
+class WhisperLang(StrEnum):
+    ZH = "zh"
+    EN = "en"
+    AUTO = "auto"
+
+
+class WhisperDevice(StrEnum):
+    AUTO = "auto"
+    CPU = "cpu"
+    CUDA = "cuda"
+
+
+@dataclass
+class WhisperConfig:
+    enabled: bool = False
+    model_size: str = "medium"
+    language: str = "zh"
+    device: str = "auto"
+    max_segments_per_clip: int = 5
+    cache_dir: str | None = None
+    transcripts_subdir: str = "transcripts"
+    hf_endpoint: str = ""
+
+    def sanitize(self) -> None:
+        if self.model_size not in list(WhisperModelSize):
+            raise ValueError(f"whisper.model_size 必须是 {', '.join(WhisperModelSize)}，当前: {self.model_size}")
+        if self.language not in list(WhisperLang):
+            raise ValueError(f"whisper.language 必须是 {', '.join(WhisperLang)}，当前: {self.language}")
+        if self.device not in list(WhisperDevice):
+            raise ValueError(f"whisper.device 必须是 {', '.join(WhisperDevice)}，当前: {self.device}")
+        if self.max_segments_per_clip < 1:
+            raise ValueError(f"plan.max_segments_per_clip 必须 >= 1，当前: {self.max_segments_per_clip}")
 
 
 @dataclass
@@ -99,6 +141,7 @@ class AppConfig:
     naming: NamingConfig = field(default_factory=NamingConfig)
     script: ScriptConfig = field(default_factory=ScriptConfig)
     plan: PlanConfig = field(default_factory=PlanConfig)
+    whisper: WhisperConfig = field(default_factory=WhisperConfig)
 
     @property
     def compressed_dir(self) -> Path:
@@ -234,6 +277,17 @@ def _legacy_ai_config(raw: dict) -> AIConfig:
     )
 
 
+def _filter_dc(raw: dict, dc: type) -> dict:
+    fields = {f.name for f in dc.__dataclass_fields__.values()}
+    return {k: v for k, v in raw.items() if k in fields}
+
+
+def _parse_whisper(raw: dict) -> WhisperConfig:
+    cfg = WhisperConfig(**_filter_dc(raw, WhisperConfig))
+    cfg.sanitize()
+    return cfg
+
+
 def _validate_config(config: AppConfig) -> None:
     """早期校验：让拼写错误和明显遗漏在 load 时就 fail，不要等到运行时。"""
     if config.proxy.enabled and not config.proxy.url:
@@ -313,11 +367,11 @@ def load_config(
             recursive=paths_raw.get("recursive", False),
             logs_dir=_path(paths_raw.get("logs_dir", "./logs"), base),
         ),
-        proxy=ProxyConfig(**raw.get("proxy", {})),
+        proxy=ProxyConfig(**_filter_dc(raw.get("proxy", {}), ProxyConfig)),
         ai=ai,
-        compress=CompressConfig(**raw.get("compress", {})),
-        analyze=AnalyzeConfig(**raw.get("analyze", {})),
-        naming=NamingConfig(**raw.get("naming", {})),
+        compress=CompressConfig(**_filter_dc(raw.get("compress", {}), CompressConfig)),
+        analyze=AnalyzeConfig(**_filter_dc(raw.get("analyze", {}), AnalyzeConfig)),
+        naming=NamingConfig(**_filter_dc(raw.get("naming", {}), NamingConfig)),
         script=ScriptConfig(
             scripts_subdir=raw.get("script", {}).get("scripts_subdir", "scripts"),
             template_file=_path(
@@ -326,7 +380,8 @@ def load_config(
             ),
             target_words=raw.get("script", {}).get("target_words", 80),
         ),
-        plan=PlanConfig(**raw.get("plan", {})),
+        plan=PlanConfig(**_filter_dc(raw.get("plan", {}), PlanConfig)),
+        whisper=_parse_whisper(raw.get("whisper", {})),
     )
     _validate_config(config)
     return config

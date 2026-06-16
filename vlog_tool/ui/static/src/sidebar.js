@@ -87,7 +87,7 @@ async function saveProject(extra) {
 function renderSteps() {
   const ul = $('step-list');
   if (!ul) return;
-  const labels = { compress: '压缩', analyze: '分析', scripts: '口播', plan: '规划', label: '标号', cut: '裁剪' };
+  const labels = { compress: '压缩', analyze: '分析', scripts: '口播', transcribe: '转录', plan: '规划', label: '标号', cut: '裁剪' };
   ul.innerHTML = '';
   for (const [key, label] of Object.entries(labels)) {
     const done = state.steps[key];
@@ -111,8 +111,10 @@ function renderVideoItem(v) {
 
   const tCls = v.text_json ? 'has' : 'miss';
   const sCls = v.script_json ? 'has' : 'miss';
+  const tTransCls = v.transcript_file ? 'has' : 'miss';
   const tLabel = v.text_json ? `${icon('check', 12)} texts` : '· texts';
   const sLabel = v.script_json ? `${icon('check', 12)} voiceover` : '· voiceover';
+  const tTransLabel = v.transcript_file ? `${icon('check', 12)} trans.` : '· trans.';
   const counterpartLabel = state.source === 'compressed' ? '原' : '压';
   let matchBadge;
   if (v.match) {
@@ -133,12 +135,15 @@ function renderVideoItem(v) {
       <span class="${tCls}">${tLabel}</span>
       &nbsp;
       <span class="${sCls}">${sLabel}</span>
+      &nbsp;
+      <span class="${tTransCls}">${tTransLabel}</span>
     </div>
     <div class="video-actions">
       <button class="menu-btn" title="操作">⋮</button>
       <div class="menu-dropdown">
         ${state.source === 'original'
           ? `<button class="menu-item" data-action="compress" title="用 ffmpeg 将原视频压缩为 640p">压缩视频</button>
+             <button class="menu-item" data-action="transcribe" title="用 faster-whisper 提取音频转文字">Whisper 转录</button>
              <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">AI分析视频</button>
              <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑口播文案</button>
              <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑全部</button>`
@@ -162,6 +167,7 @@ function renderVideoItem(v) {
   menuBtn.onclick = (e) => {
     e.stopPropagation();
     if (_portalDropdown) { _portalDropdown.remove(); _portalDropdown = null; }
+    if (_portalCloseHandler) { document.removeEventListener('click', _portalCloseHandler); _portalCloseHandler = null; }
     const rect = menuBtn.getBoundingClientRect();
     const clone = dropdown.cloneNode(true);
     clone.classList.add('open');
@@ -172,6 +178,7 @@ function renderVideoItem(v) {
       item.onclick = async (ev) => {
         ev.stopPropagation(); if (item.disabled) return;
         clone.remove(); _portalDropdown = null;
+        if (_portalCloseHandler) { document.removeEventListener('click', _portalCloseHandler); _portalCloseHandler = null; }
         const task = item.dataset.action;
         const file = v.file;
         setStatus(`正在重跑 ${task} (${file})...`, 'ok');
@@ -297,6 +304,7 @@ async function selectVideo(file) {
   state.dirty = false;
   state.texts = null;
   state.voiceover = null;
+  state.transcript = null;
 
   const v = state.videos.find(x => x.file === file);
   if (!v) return;
@@ -316,6 +324,11 @@ async function selectVideo(file) {
       state.voiceover = await api('GET', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`);
     } catch (e) { setStatus('voiceover 加载失败: ' + e.message, 'err'); }
   }
+  if (v.transcript_file) {
+    try {
+      state.transcript = await api('GET', `/api/transcripts?video=${encodeURIComponent(v.file)}`);
+    } catch (e) { setStatus('transcript 加载失败: ' + e.message, 'err'); }
+  }
   if (!state.plan) {
     try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); }
     catch (e) { /* plan 可选, 加载失败不报错 */ }
@@ -330,6 +343,7 @@ async function selectPlan(dayOverride) {
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换到规划吗？')) return;
   }
+  if (state.previewActive) stopPreview();
   state.currentEntity = 'plan';
   state.dirty = false;
   if (dayOverride) state.currentDay = dayOverride;
@@ -415,14 +429,8 @@ async function setSource(source) {
 }
 
 // ── Empty-state helpers ──
-function switchToOriginalThenCompress() {
-  const btns = document.querySelectorAll('.source-toggle button');
-  for (const btn of btns) {
-    if (btn.dataset.source === 'original') {
-      btn.click();
-      break;
-    }
-  }
+async function switchToOriginalThenCompress() {
+  await setSource('original');
 }
 
 function goToRunTab() {

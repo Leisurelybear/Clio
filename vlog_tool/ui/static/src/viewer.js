@@ -8,8 +8,10 @@ function playVideoSegment(file, seekTo) {
   if (player.src && player.src.includes(encodeURIComponent(file)) && player.readyState >= 1) {
     doSeek();
   } else {
-    const onLoaded = () => { doSeek(); player.removeEventListener('loadedmetadata', onLoaded); };
-    player.addEventListener('loadedmetadata', onLoaded);
+    player.onloadedmetadata = () => {
+      $('player-time').textContent = `${fmtTime(0)} / ${fmtTime(player.duration)}`;
+      doSeek();
+    };
     const projParam = state.currentProjectName ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
     player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${projParam}`;
   }

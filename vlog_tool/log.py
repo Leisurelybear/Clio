@@ -96,6 +96,8 @@ class _TeeWriter:
         return bool(getattr(self._original, "isatty", lambda: False)())
 
     def __getattr__(self, name: str):
+        if name in ("close", "writelines", "truncate", "detach", "__del__"):
+            raise AttributeError(f"_TeeWriter does not support '{name}'")
         return getattr(self._original, name)
 
 
