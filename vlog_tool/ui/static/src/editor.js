@@ -373,12 +373,16 @@ async function executeCut() {
 
 async function save() {
   if (!state.dirty) { setStatus('没有改动需要保存', 'warn'); return; }
+  const entity = state.currentEntity;
+  const day = state.currentDay;
+  const tab = state.currentTab;
+  const videoFile = state.currentVideo;
   try {
-    if (state.currentEntity === 'run') {
+    if (entity === 'run') {
       setStatus('当前视图不需要保存', 'warn');
       return;
     }
-    if (state.currentEntity === 'config') {
+    if (entity === 'config') {
       const r = await api('PUT', '/api/config/raw', state.configRaw);
       if (r.error) throw new Error(r.error);
       state.dirty = false;
@@ -386,12 +390,11 @@ async function save() {
       setStatus('配置已保存（需重启服务生效）', 'ok');
       return;
     }
-    if (state.currentEntity === 'plan') {
-      const r = await api('PUT', `/api/plan?day=${state.currentDay}`, state.plan);
+    if (entity === 'plan') {
+      const r = await api('PUT', `/api/plan?day=${day}`, state.plan);
       if (!r.ok) throw new Error(r.error);
     } else {
-      const tab = state.currentTab;
-      const v = state.videos.find(x => x.file === state.currentVideo);
+      const v = state.videos.find(x => x.file === videoFile);
       if (tab === 'texts') {
         if (!v || !v.text_json) throw new Error('当前视频没有 texts JSON');
         const r = await api('PUT', `/api/texts?file=${encodeURIComponent(v.text_json)}`, state.texts);
