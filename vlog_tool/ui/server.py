@@ -254,8 +254,13 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                     self.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
                     return
                 start_s, end_s = m.group(1), m.group(2)
-                start = int(start_s) if start_s else 0
-                end = int(end_s) if end_s else size - 1
+                if start_s == "" and end_s != "":
+                    suffix_len = int(end_s)
+                    start = max(0, size - suffix_len)
+                    end = size - 1
+                else:
+                    start = int(start_s) if start_s else 0
+                    end = int(end_s) if end_s else size - 1
                 if start >= size or end >= size or start > end:
                     self.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
                     return
