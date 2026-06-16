@@ -96,9 +96,10 @@ def discover_ffmpeg_bin(name: str) -> str | None:
     local_app = Path(os.environ.get("LOCALAPPDATA", ""))
     search_roots = [
         local_app / "Microsoft/WinGet/Packages",
-        Path("C:/ffmpeg"),
-        Path("G:/ffmpeg"),
     ]
+    ffmpeg_home = os.environ.get("FFMPEG_HOME")
+    if ffmpeg_home:
+        search_roots.append(Path(ffmpeg_home))
     for root in search_roots:
         if not root.is_dir():
             continue
