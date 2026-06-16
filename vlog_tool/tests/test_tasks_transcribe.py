@@ -33,7 +33,8 @@ def cfg():
 class TestRunTranscribeAll:
     @patch("vlog_tool.tasks.transcribe._extract_audio")
     @patch("vlog_tool.tasks.transcribe.transcribe_audio")
-    def test_dedup(self, mock_transcribe, mock_extract, cfg, tmp_path):
+    @patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffmpeg")
+    def test_dedup(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
         """同一原始视频只转录一次（有 split 段时）"""
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
@@ -86,7 +87,8 @@ class TestRunTranscribeAll:
 
     @patch("vlog_tool.tasks.transcribe._extract_audio")
     @patch("vlog_tool.tasks.transcribe.transcribe_audio")
-    def test_skip_existing(self, mock_transcribe, mock_extract, cfg, tmp_path):
+    @patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffmpeg")
+    def test_skip_existing(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
         """已有 transcript 文件时跳过"""
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
@@ -113,9 +115,9 @@ class TestRunTranscribeAll:
 
     @patch("vlog_tool.tasks.transcribe._extract_audio")
     @patch("vlog_tool.tasks.transcribe.transcribe_audio")
-    @patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffprobe")
-    def test_duration_exceeded(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
-        """时长超过限制时跳过"""
+    @patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffmpeg")
+    def test_audio_extracted(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
+        """转录会提取音频并调用 Whisper（无 duration 限制）"""
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
@@ -127,15 +129,16 @@ class TestRunTranscribeAll:
         (compressed / "001_GL010683.mp4").touch()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
-        cfg.analyze.max_analyze_duration_min = 0.001
 
         transcripts = output / "transcripts"
         transcripts.mkdir(parents=True)
 
-        with patch("vlog_tool.tasks.transcribe.get_duration_sec", return_value=60.0):
-            tracker = MagicMock()
-            run_transcribe_all(cfg, tracker)
-            mock_transcribe.assert_not_called()
+        mock_extract.return_value = tmp_path / "fake.wav"
+        (tmp_path / "fake.wav").touch()
+
+        tracker = MagicMock()
+        run_transcribe_all(cfg, tracker)
+        mock_transcribe.assert_called_once()
 
     @patch("vlog_tool.tasks.transcribe._extract_audio")
     @patch("vlog_tool.tasks.transcribe.transcribe_audio")
@@ -162,7 +165,8 @@ class TestRunTranscribeAll:
 
     @patch("vlog_tool.tasks.transcribe._extract_audio")
     @patch("vlog_tool.tasks.transcribe.transcribe_audio")
-    def test_audio_extraction_failure(self, mock_transcribe, mock_extract, cfg, tmp_path):
+    @patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffmpeg")
+    def test_audio_extraction_failure(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
         """音频提取失败时跳过"""
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
@@ -187,7 +191,8 @@ class TestRunTranscribeAll:
 
     @patch("vlog_tool.tasks.transcribe._extract_audio")
     @patch("vlog_tool.tasks.transcribe.transcribe_audio")
-    def test_transcribe_error(self, mock_transcribe, mock_extract, cfg, tmp_path):
+    @patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffmpeg")
+    def test_transcribe_error(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
         """Whisper 转录出错时记录错误状态并继续"""
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
@@ -214,7 +219,8 @@ class TestRunTranscribeAll:
 
 
 class TestRunTranscribeOne:
-    def test_success(self, cfg, tmp_path):
+    @patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffmpeg")
+    def test_success(self, mock_resolve, cfg, tmp_path):
         from vlog_tool.tasks.transcribe import run_transcribe_one
 
         video = tmp_path / "test.mp4"
@@ -242,7 +248,8 @@ class TestRunTranscribeOne:
         assert "error" in result
         assert "不存在" in result["error"]
 
-    def test_extraction_failure(self, cfg, tmp_path):
+    @patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffmpeg")
+    def test_extraction_failure(self, mock_resolve, cfg, tmp_path):
         from vlog_tool.tasks.transcribe import run_transcribe_one
 
         video = tmp_path / "test.mp4"

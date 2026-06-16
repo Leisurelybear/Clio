@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from vlog_tool.utils import get_duration_sec, run_ffmpeg
@@ -17,6 +18,10 @@ def split_video(
     Uses ffmpeg -c copy (no re-encode) for speed — segments are split at
     approximate keyframe boundaries, which is fine for AI analysis.
 
+    Writes a JSON manifest sidecar (e.g. GL010683_split_manifest.json)
+    recording each segment's source_stem, segment_index, offset_sec,
+    and actual_duration_sec.
+
     Returns list of segment paths. If no splitting is needed, returns [video_path].
     """
     duration_sec = get_duration_sec(video_path, ffprobe)
@@ -30,6 +35,7 @@ def split_video(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     segments: list[Path] = []
+    manifest: list[dict] = []
 
     for i in range(num):
         start = round(i * seg_duration, 2)
@@ -54,5 +60,17 @@ def split_video(
         ]
         run_ffmpeg(args, ffmpeg)
         segments.append(seg_path)
+        manifest.append(
+            {
+                "segment_index": i + 1,
+                "filename": seg_path.name,
+                "source_stem": video_path.stem,
+                "offset_sec": start,
+                "actual_duration_sec": dur,
+            }
+        )
+
+    manifest_path = output_dir / f"{video_path.stem}_split_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
 
     return segments

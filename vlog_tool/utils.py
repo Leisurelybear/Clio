@@ -150,6 +150,30 @@ def get_duration_sec(video_path: Path, ffprobe: str) -> float:
     return float(raw)
 
 
+def write_json_atomic(path: Path, data: dict, *, ensure_ascii: bool = False, indent: int = 2) -> None:
+    """Write JSON to a file using tmp + rename for crash safety."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + f".tmp.{os.urandom(4).hex()}")
+    try:
+        tmp.write_text(json.dumps(data, ensure_ascii=ensure_ascii, indent=indent), encoding="utf-8")
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
+def write_text_atomic(path: Path, text: str) -> None:
+    """Write text to a file using tmp + rename for crash safety."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + f".tmp.{os.urandom(4).hex()}")
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
+
+
 def sanitize_name(text: str, max_len: int = 40) -> str:
     text = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "", text)
     text = re.sub(r"\s+", "_", text.strip())

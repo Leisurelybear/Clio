@@ -14,17 +14,17 @@ from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.tasks.analyze import _resolve_original
 from vlog_tool.transcribe import check_whisper, transcribe_audio
-from vlog_tool.utils import get_duration_sec, resolve_binary
+from vlog_tool.utils import resolve_binary, write_json_atomic
 
 
-def _extract_audio(video_path: Path) -> Path | None:
+def _extract_audio(video_path: Path, ffmpeg: str) -> Path | None:
     """ffmpeg 提取 16kHz 单声道 WAV，返回临时文件路径。"""
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp.close()
     tmp_path = Path(tmp.name)
     try:
         cmd = [
-            "ffmpeg",
+            ffmpeg,
             "-y",
             "-i",
             str(video_path),
@@ -90,11 +90,16 @@ def run_transcribe_all(
     for i, stem in enumerate(stems):
         out_path = transcripts_dir / f"{stem}_transcript.json"
         if config.analyze.skip_existing and out_path.exists():
-            print(f"[跳过] {stem} (已有转录)")
-            state.mark(stem, "transcribe", "skipped")
-            if tracker:
-                tracker.next(message=f"跳过 {stem}")
-            continue
+            try:
+                json.loads(out_path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                print(f"  [重新转录] {stem} (已有文件损坏)")
+            else:
+                print(f"[跳过] {stem} (已有转录)")
+                state.mark(stem, "transcribe", "skipped")
+                if tracker:
+                    tracker.next(message=f"跳过 {stem}")
+                continue
 
         orig_video: Path | None = None
         for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
@@ -106,20 +111,10 @@ def run_transcribe_all(
             print(f"  [跳过] {stem}: 找不到原始视频")
             continue
 
-        try:
-            ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
-            duration = get_duration_sec(orig_video, ffprobe)
-            max_min = config.analyze.max_analyze_duration_min
-            if max_min > 0 and duration > max_min * 60:
-                print(f"  [跳过] {stem}: 时长 {format_duration(duration)} 超过限制")
-                state.mark(stem, "transcribe", "skipped")
-                if tracker:
-                    tracker.next(message=f"跳过 {stem} (超长)")
-                continue
-        except Exception as e:
-            print(f"  [警告] 无法检查 {stem} 时长: {e}")
+        # Whisper 没有像 Gemini 那样的时长限制，跳过时长检查
 
-        wav_path = _extract_audio(orig_video)
+        ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
+        wav_path = _extract_audio(orig_video, ffmpeg)
         if wav_path is None:
             print(f"  [跳过] {stem}: 音频提取失败（可能无音轨）")
             state.mark(stem, "transcribe", "skipped")
@@ -137,7 +132,7 @@ def run_transcribe_all(
                 "segments": segments,
                 "generated_at": datetime.now().isoformat(),
             }
-            out_path.write_text(json.dumps(transcript, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(out_path, transcript)
             state.mark(stem, "transcribe", "done")
             seg_info = f"{len(segments)} 段" if segments else "无有效内容"
             elapsed = time.time() - start_time
@@ -174,7 +169,8 @@ def run_transcribe_one(config: AppConfig, video_path: Path) -> dict:
     if not video_path.is_file():
         return {"error": f"文件不存在: {video_path}"}
     print("  [transcribe_one] 提取音频...")
-    wav_path = _extract_audio(video_path)
+    ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
+    wav_path = _extract_audio(video_path, ffmpeg)
     if wav_path is None:
         return {"error": "音频提取失败"}
     wav_size = wav_path.stat().st_size
@@ -198,7 +194,7 @@ def run_transcribe_one(config: AppConfig, video_path: Path) -> dict:
         transcripts_dir = config.paths.output_dir / config.whisper.transcripts_subdir
         transcripts_dir.mkdir(parents=True, exist_ok=True)
         out_path = transcripts_dir / f"{video_path.stem}_transcript.json"
-        out_path.write_text(json.dumps(transcript, ensure_ascii=False, indent=2), encoding="utf-8")
+        write_json_atomic(out_path, transcript)
         print(f"  [transcribe_one] ✓ 已保存到 {out_path}")
         return transcript
     finally:

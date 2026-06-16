@@ -75,13 +75,13 @@ async function startRun() {
     });
     if (r.ok) {
       setStatus(r.message || '流水线已启动', 'ok');
-      prog.innerHTML = '<p class="muted">流水线已启动，等待进度...</p>';
+      $('run-progress').innerHTML = '<p class="muted">流水线已启动，等待进度...</p>';
       _runPollTimer = setInterval(pollRunStatus, 2000);
     } else {
       throw new Error(r.error || '启动失败');
     }
   } catch (e) {
-    prog.innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
+    $('run-progress').innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
     setStatus('启动失败: ' + e.message, 'err');
     btn.disabled = false;
     btn.innerHTML = `${icon('play', 16)} 运行选中步骤`;

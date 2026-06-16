@@ -101,5 +101,5 @@ class TestHandlePostCut:
     def test_invalid_source(self):
         handler = MagicMock()
         handler._send_json = MagicMock()
-        handle_post_cut(handler, {"source": "invalid"})
+        handle_post_cut(handler, {}, {"source": "invalid"})
         handler._send_json.assert_called_once_with({"ok": False, "error": "source must be compressed|original"}, 400)

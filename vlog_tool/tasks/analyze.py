@@ -20,7 +20,7 @@ from vlog_tool.tasks._helpers import (
     _write_csv,
     _write_text_file,
 )
-from vlog_tool.utils import get_duration_sec, resolve_binary
+from vlog_tool.utils import get_duration_sec, resolve_binary, write_json_atomic
 
 
 def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
@@ -186,7 +186,7 @@ def run_analyze_all(
 
             _on_progress("写入磁盘...")
             _write_text_file(final_text, analysis, original, compressed)
-            json_path.write_text(json.dumps(analysis, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(json_path, analysis)
 
             records.append(
                 ClipRecord(

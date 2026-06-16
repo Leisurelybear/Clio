@@ -185,9 +185,9 @@ ai:
 
 ## 7. 项目当前状态
 
-最后更新：2026-06-16（Whisper 全功能 + 385 测试稳定 + 6+12+25 项代码审查修复）。已上线：
-- GitHub Actions CI（Ubuntu，Python 3.11/3.12）
-- 385 个 pytest 用例：config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(12) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / file_service_routes(35) / transcribe(15) / routes_transcripts(7) + 更多
+最后更新：2026-06-16（Whisper 全功能 + 412 测试稳定 + 6+12+25 项代码审查修复 + CI 修复 + 27 新测试）。已上线：
+- GitHub Actions CI（Ubuntu，Windows，Python 3.11/3.12）
+- 412 个 pytest 用例：transcribe(18) / tasks_transcribe(11) / processing_state(8) / whisper_cli(6) / main(7) / config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(12) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / 等
 - 依赖版本锁定 `requirements-locked.txt`
 - Whisper ASR 独立 `requirements-whisper.txt`（faster-whisper，不污染主依赖）
 最近做的 commit 顺序：
@@ -229,14 +229,35 @@ ai:
 130. `ef2311d` `fix(ai): use configurable retry_attempts`  ← I12
 131. `ef68308` `fix(review): align Gemini retry_attempts, thread-safe provider cache, test isolation`  ← 审查反馈
 132. `bebf21f` `fix(save): capture data refs at entry; sanitize index_prefix in rerun`  ← 审查反馈
+133. `8688a85` `fix(tests): mock ctranslate2 module for CI where it's not installed`  ← CI 修复
+134. `f51e7b9` `fix(tests): return int from mock ctranslate2.get_cuda_device_count`  ← CI 修复
+135. `88cbf4c` `fix(ci): pass config_path to whisper subcommands, lowercase .mp4 for Linux`  ← CI 修复
+136. `4abc241` `fix(whisper_cli): add missing Path import for F821`  ← Lint 修复
+137. `f4a6a71` `test: add 27 high-value unit tests for whisper, processing_state, and CLI`  ← 27 新测试
+
+最近代码审查修复（2026-06-16 第二次审查，5 S0 + 5 S1 + 1 S2 项）：
+- **S0-1** `runner.js`: `prog` undefined → `$('run-progress')`
+- **S0-2** `analyze.py`: transcript 不绑 source_stem → clip 携带 source_stem，仅匹配对应 transcript
+- **S0-3** `split.py`: 缺 manifest → 输出 `_split_manifest.json` 含 source_stem/offset/duration
+- **S0-4** pipeline 恢复: 新增 `write_json_atomic`/`write_text_atomic`（tmp+rename）+ JSON 校验跳过
+- **S1-1** `/api/cut`: 忽略 project query → 接收 qs 参数
+- **S1-2** transcript UI: `_resolve_stem` 没切 `_segNN` → 加 `_SEG_SUFFIX_RE` 剥离
+- **S1-3** `_extract_audio`: 硬编码 "ffmpeg" → 接收 ffmpeg 参数
+- **S1-4** Whisper batch 受 `max_analyze_duration_min` → 移除该检查
+- **S1-5** AI provider 缓存: 仅按名缓存 → 复合 key（name+api_key+base_url+proxy）
+- **S2-3** Whisper 模型缓存 key: 缺 device/compute_type → 加入 key；CUDA 回退 CPU 时更新 key
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
 
 项目文档状态：
 - 2026-06-16 全面代码审查（5 路平行 subagent）：发现 **6 Critical + 12 Important + 36 Minor**，已修复 6+12+5，剩余 31 Minor 待处理
+- 2026-06-16 第二次审查（逐项 review）：5 S0 + 5 S1 + 1 S2 全部修复
 - `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012/ R-013（✓）/ R-014/ R-015（a[✓] d[✓]）+ Bug 跟踪（B-001~B-085）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）+ 代码审查 P0~P3（14 项修了 12 项）
-- Whisper ASR 已完全接入：独立 CLI（transcribe / whisper install / whisper check）+ pipeline 步骤 + UI 转录 tab + delete/edit/seek + 10% 进度 + CUDA 回退 CPU + 每视频 rerun
+- Whisper ASR 已完全接入：独立 CLI（transcribe / whisper install / whisper check）+ pipeline 步骤 + UI 转录 tab + delete/edit/seek + 10% 进度 + CUDA 回退 CPU + 每视频 rerun + 完整 UT 覆盖（18 个测试）
+- CI 兼容性修复：ctranslate2 mock 模块、config_path 参数传递、Linux 大小写感知、F821 lint
+- 新增 ProcessingState UT（8 个测试全面覆盖 mark/reset_step/持久化/损坏回退）
+- 新增 whisper_cli UT（6 个测试覆盖 check/install/未安装/CUDA/依赖缺失/pip 失败）
 - per-project 配置已实现：每个项目目录下可选 `project.yaml`，deep-merge 覆盖全局 config.yaml
 - 视频分段压缩已实现（split.py + compress Phase 1/2），默认 15 分钟分割阈值
 - UI compressed view 已支持 `_segNN` 分组树；原视频视图下 split 段独立条目 + offset_sec 换算

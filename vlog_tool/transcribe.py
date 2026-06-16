@@ -58,9 +58,10 @@ def _get_model(config: AppConfig):
         os.environ.setdefault("HF_ENDPOINT", config.whisper.hf_endpoint)
 
     cache_dir = _resolve_cache_dir(config)
-    key = f"{config.whisper.model_size}@{cache_dir}"
+    device = _resolve_device(config)
+    compute_type = _resolve_compute_type(device)
+    key = f"{config.whisper.model_size}@{device}@{compute_type}@{cache_dir}"
     if _whisper_model is None or _whisper_cache_key != key:
-        device = _resolve_device(config)
         try:
             _whisper_model = WhisperModel(
                 config.whisper.model_size,
@@ -73,12 +74,14 @@ def _get_model(config: AppConfig):
                 raise
             print(f"  [警告] CUDA 加载失败 ({e})，回退到 CPU")
             device = "cpu"
+            compute_type = _resolve_compute_type(device)
             _whisper_model = WhisperModel(
                 config.whisper.model_size,
                 device=device,
-                compute_type=_resolve_compute_type(device),
+                compute_type=compute_type,
                 download_root=str(cache_dir),
             )
+            key = f"{config.whisper.model_size}@{device}@{compute_type}@{cache_dir}"
         _whisper_cache_key = key
     return _whisper_model
 

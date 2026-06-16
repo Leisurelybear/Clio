@@ -417,7 +417,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             if path == "/api/config/init":
                 return handle_post_config_init(self, qs, obj)
             if path == "/api/cut":
-                return handle_post_cut(self, obj)
+                return handle_post_cut(self, qs, obj)
             if path == "/api/project/create":
                 return handle_post_project_create(self, obj)
             if path == "/api/project/add":
