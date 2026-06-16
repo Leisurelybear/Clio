@@ -30,8 +30,12 @@ def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
     - Direct match: '001_GL010683' → GL010683.mp4
     - Segment match: '001_GL010683_seg01' → strip _segXX → GL010683.mp4
     - Recursive search: scans subdirectories for all above cases.
+    - No index prefix: 'GL010683' → GL010683.mp4
     """
-    _, orig_stem = compressed_stem.split("_", 1)
+    if "_" not in compressed_stem:
+        orig_stem = compressed_stem
+    else:
+        _, orig_stem = compressed_stem.split("_", 1)
 
     def _try_find(stem: str) -> Path | None:
         for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
