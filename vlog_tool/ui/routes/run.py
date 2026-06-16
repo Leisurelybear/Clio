@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 import threading
 import traceback
 from pathlib import Path
@@ -104,7 +105,10 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
         original_video = proj_input / original_name
 
     # Resolve texts JSON path (for voiceover rerun)
-    index_prefix = obj.get("index") or (stem.split("_", 1)[0] if "_" in stem else stem)
+    raw_index = obj.get("index") or ""
+    index_prefix = (
+        re.sub(r"[^a-zA-Z0-9_-]", "", raw_index) if raw_index else (stem.split("_", 1)[0] if "_" in stem else stem)
+    )
     texts_json = None
     if task in ("voiceover", "all"):
         for td in _find_texts_dirs(proj_out):

@@ -377,13 +377,17 @@ async function save() {
   const day = state.currentDay;
   const tab = state.currentTab;
   const videoFile = state.currentVideo;
+  const planData = state.plan;
+  const textsData = state.texts;
+  const voiceoverData = state.voiceover;
+  const configRaw = state.configRaw;
   try {
     if (entity === 'run') {
       setStatus('当前视图不需要保存', 'warn');
       return;
     }
     if (entity === 'config') {
-      const r = await api('PUT', '/api/config/raw', state.configRaw);
+      const r = await api('PUT', '/api/config/raw', configRaw);
       if (r.error) throw new Error(r.error);
       state.dirty = false;
       updateSaveBtn();
@@ -391,17 +395,17 @@ async function save() {
       return;
     }
     if (entity === 'plan') {
-      const r = await api('PUT', `/api/plan?day=${day}`, state.plan);
+      const r = await api('PUT', `/api/plan?day=${day}`, planData);
       if (!r.ok) throw new Error(r.error);
     } else {
       const v = state.videos.find(x => x.file === videoFile);
       if (tab === 'texts') {
         if (!v || !v.text_json) throw new Error('当前视频没有 texts JSON');
-        const r = await api('PUT', `/api/texts?file=${encodeURIComponent(v.text_json)}`, state.texts);
+        const r = await api('PUT', `/api/texts?file=${encodeURIComponent(v.text_json)}`, textsData);
         if (!r.ok) throw new Error(r.error);
       } else if (tab === 'voiceover') {
         if (!v || !v.script_json) throw new Error('当前视频没有 voiceover JSON');
-        const r = await api('PUT', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`, state.voiceover);
+        const r = await api('PUT', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`, voiceoverData);
         if (!r.ok) throw new Error(r.error);
       }
     }
