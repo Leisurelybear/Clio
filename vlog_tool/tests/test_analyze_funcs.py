@@ -72,6 +72,7 @@ class TestWrapWithContext:
         analyze_mod._trip_context_cache.clear()
         orig_is_file = Path.is_file
         orig_read_text = Path.read_text
+        orig_stat = Path.stat
 
         def mock_is_file(self):
             if self.name == "trip_context.md":
@@ -83,8 +84,17 @@ class TestWrapWithContext:
                 return "Trip: Paris"
             return orig_read_text(self, **kw)
 
+        def mock_stat(self):
+            import os
+            from unittest.mock import MagicMock
+
+            st = MagicMock()
+            st.st_mtime = 1234567890.0
+            return st
+
         monkeypatch.setattr("pathlib.Path.is_file", mock_is_file)
         monkeypatch.setattr("pathlib.Path.read_text", mock_read_text)
+        monkeypatch.setattr("pathlib.Path.stat", mock_stat)
 
         result = _wrap_with_context("prompt", _fake_config("user context"))
         assert "Trip: Paris" in result

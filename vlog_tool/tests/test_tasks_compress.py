@@ -73,7 +73,7 @@ class TestRunCompressAll:
         def _mock_compress(inp, outp, c):
             nonlocal call_count
             call_count += 1
-            outp.write_bytes(b"\x00" * 300)
+            outp.write_bytes(b"\x00" * 60_000)  # > MIN_VALID_SIZE (50KB)
             return outp
 
         monkeypatch.setattr("vlog_tool.tasks.compress.compress_video", _mock_compress)
@@ -102,9 +102,9 @@ class TestRunCompressAll:
 
         # Create compressed segment files (as if a previous split+compress ran)
         seg1 = cfg.compressed_dir / "001_test_seg01.mp4"
-        seg1.write_bytes(b"\x00" * 300)
+        seg1.write_bytes(b"\x00" * 60_000)  # > MIN_VALID_SIZE (50KB)
         seg2 = cfg.compressed_dir / "002_test_seg02.mp4"
-        seg2.write_bytes(b"\x00" * 300)
+        seg2.write_bytes(b"\x00" * 60_000)
 
         call_count = 0
 
