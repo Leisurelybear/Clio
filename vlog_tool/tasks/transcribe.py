@@ -4,6 +4,7 @@ import json
 import re
 import subprocess
 import tempfile
+import threading
 import time
 from collections.abc import Callable
 from datetime import datetime
@@ -19,7 +20,10 @@ from vlog_tool.utils import resolve_binary, write_json_atomic
 
 
 def _extract_audio(
-    video_path: Path, ffmpeg: str, progress_callback: Callable[[float], None] | None = None
+    video_path: Path,
+    ffmpeg: str,
+    progress_callback: Callable[[float], None] | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> Path | None:
     """ffmpeg 提取 16kHz 单声道 WAV，返回临时文件路径。实时输出进度。"""
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)

@@ -5,6 +5,7 @@ import os
 import re
 import shutil
 import subprocess
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -194,19 +195,34 @@ def run_ffmpeg(
     args: list[str],
     ffmpeg: str,
     progress_callback: Callable[[float], None] | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     cmd = [ffmpeg, *args]
     process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
     stderr_lines: list[str] = []
     time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
-    for line in process.stderr or []:
-        print(line, end="")
-        stderr_lines.append(line)
-        if progress_callback:
-            m = time_pat.search(line)
-            if m:
-                h, mi, s = int(m.group(1)), int(m.group(2)), float(m.group(3))
-                progress_callback(h * 3600 + mi * 60 + s)
-    process.wait()
+    try:
+        for line in process.stderr or []:
+            if cancel_event and cancel_event.is_set():
+                process.terminate()
+                raise InterruptedError("ffmpeg 被用户取消")
+            # Only print error/warning lines to reduce noise
+            if "error" in line.lower() or "warning" in line.lower():
+                print(line, end="")
+            stderr_lines.append(line)
+            if progress_callback:
+                m = time_pat.search(line)
+                if m:
+                    h, mi, s = int(m.group(1)), int(m.group(2)), float(m.group(3))
+                    progress_callback(h * 3600 + mi * 60 + s)
+        process.wait()
+    except BaseException:
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        raise
     if process.returncode != 0:
         raise RuntimeError(f"ffmpeg 执行失败:\n{' '.join(cmd)}\n{''.join(stderr_lines)}")

@@ -31,6 +31,7 @@ class OpenAICompatProvider:
         self._client = httpx.Client(**client_kwargs)
         self._rl = make_rate_limiter(cfg.requests_per_minute)
         self._retry_attempts = max(1, cfg.retry_attempts + 1)
+        self._max_tokens = cfg.max_tokens
 
     def close(self) -> None:
         self._client.close()
@@ -49,6 +50,8 @@ class OpenAICompatProvider:
                     json={
                         "model": model,
                         "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": self._max_tokens,
+                        "temperature": 0.3,
                     },
                 )
             sc = response.status_code

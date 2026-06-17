@@ -40,6 +40,7 @@ ai:
       type: openai              # OpenAI 兼容接口
       api_key_env: DEEPSEEK_API_KEY
       base_url: https://api.deepseek.com/v1
+      # max_tokens: 4096  # 可选：AI 输出最大 token 数（默认 4096，覆盖大部分输出）
 
   # 注意：model 请填写厂商实际支持的模型名。
   # DeepSeek 官网可用：deepseek-chat（V3）、deepseek-reasoner（R1）。
