@@ -10,13 +10,12 @@ from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
 
-from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_duration
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.transcribe import check_whisper, transcribe_audio
-from vlog_tool.utils import resolve_binary, write_json_atomic
+from vlog_tool.utils import find_videos, resolve_binary, write_json_atomic
 
 
 def _extract_audio(
@@ -86,13 +85,8 @@ def run_transcribe_all(
     transcripts_dir = config.paths.output_dir / config.whisper.transcripts_subdir
     transcripts_dir.mkdir(parents=True, exist_ok=True)
 
-    stems: set[str] = set()
-    for f in sorted(config.paths.input_dir.iterdir()):
-        if f.is_file() and f.suffix.lower() in VIDEO_EXTS:
-            stems.add(f.stem)
-
-    stems = sorted(stems)
-    total = len(stems)
+    videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
+    total = len(videos)
     if total == 0:
         print("没有找到需要转录的视频")
         return 0
@@ -102,7 +96,8 @@ def run_transcribe_all(
     state = ProcessingState(config.paths.output_dir)
 
     start_time = time.time()
-    for i, stem in enumerate(stems):
+    for i, orig_video in enumerate(videos):
+        stem = orig_video.stem
         out_path = transcripts_dir / f"{stem}_transcript.json"
         if config.analyze.skip_existing and out_path.exists():
             try:
@@ -115,18 +110,6 @@ def run_transcribe_all(
                 if tracker:
                     tracker.next(message=f"跳过 {stem}")
                 continue
-
-        orig_video: Path | None = None
-        for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
-            candidate = config.paths.input_dir / f"{stem}{ext}"
-            if candidate.is_file():
-                orig_video = candidate
-                break
-        if orig_video is None:
-            print(f"  [跳过] {stem}: 找不到原始视频")
-            continue
-
-        # Whisper 没有像 Gemini 那样的时长限制，跳过时长检查
 
         ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
         wav_path = _extract_audio(orig_video, ffmpeg)
@@ -156,14 +139,12 @@ def run_transcribe_all(
             eta_str = format_duration(eta)
             print(f"  [转录 {i + 1}/{total}] {stem}（{seg_info}，平均 {format_duration(pace)}，剩余 ~{eta_str}）")
         except KeyboardInterrupt:
-            wav_path.unlink(missing_ok=True)
             raise
         except Exception as e:
             print(f"  [错误] {stem}: {e}")
             state.mark(stem, "transcribe", "error")
             if tracker:
                 tracker.next(message=f"失败 {stem}")
-            wav_path.unlink(missing_ok=True)
             continue
         finally:
             wav_path.unlink(missing_ok=True)
