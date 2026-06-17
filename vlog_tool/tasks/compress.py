@@ -114,10 +114,12 @@ def run_compress_all(
             t0 = time.monotonic()
             if tracker:
 
-                def _on_progress(_sec: float, total_dur: float):
+                def _on_progress(
+                    _sec: float, total_dur: float, _i: int = i, _name: str = label_name
+                ):
                     pct = int(_sec / total_dur * 100) if total_dur > 0 else 0
                     tracker.update(
-                        phase="compress", current=i, total=len(items), message=f"压缩 {source.name} ({pct}%)"
+                        phase="compress", current=_i, total=len(items), message=f"压缩 {_name} ({pct}%)"
                     )
 
                 compress_video(source, use_out, config, progress_callback=_on_progress)
