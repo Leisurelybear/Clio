@@ -54,6 +54,50 @@ def _read_trip_context(project_dir: str) -> str:
     return ""
 
 
+def _validate_analysis(data: dict, source: str) -> dict:
+    """校验 AI 分析结果，缺失字段补默认值并告警。"""
+    required = {"title", "summary", "timeline"}
+    missing = required - data.keys()
+    if missing:
+        print(f"  [警告] {source}: AI 返回缺少字段 {missing}，使用默认值")
+    data.setdefault("title", Path(source).stem)
+    data.setdefault("summary", "")
+    data.setdefault("timeline", [])
+    data.setdefault("highlights", [])
+    data.setdefault("location", "未知")
+    data.setdefault("mood", "")
+    data.setdefault("suggested_use", "")
+    return data
+
+
+def _validate_voiceover(data: dict, source: str) -> dict:
+    """校验 AI 口播文案结果。"""
+    required = {"voiceover", "title"}
+    missing = required - data.keys()
+    if missing:
+        print(f"  [警告] {source}: AI 返回缺少字段 {missing}，使用默认值")
+    data.setdefault("title", Path(source).stem)
+    data.setdefault("voiceover", "")
+    data.setdefault("duration_hint_sec", 20)
+    data.setdefault("edit_tip", "")
+    return data
+
+
+def _validate_plan(data: dict, source: str) -> dict:
+    """校验 AI vlog 规划结果。"""
+    required = {"day_title", "sequence"}
+    missing = required - data.keys()
+    if missing:
+        print(f"  [警告] {source}: AI 返回缺少字段 {missing}，使用默认值")
+    data.setdefault("day_title", source)
+    data.setdefault("theme", "")
+    data.setdefault("total_estimated_sec", 180)
+    data.setdefault("sequence", [])
+    data.setdefault("opening_tip", "")
+    data.setdefault("ending_tip", "")
+    return data
+
+
 def _wrap_with_context(prompt: str, config: AppConfig, context_override: str | None = None) -> str:
     """将背景/规范附加在 prompt 前面。
 
@@ -108,7 +152,7 @@ def analyze_video(video_path: str, config: AppConfig, progress_callback: Callabl
         prompt,
         lambda: provider.analyze_video(video_path, prompt, model, progress_callback=progress_callback),
     )
-    return extract_json(text)
+    return _validate_analysis(extract_json(text), video_path)
 
 
 def generate_voiceover(clip_data: dict, template: str, config: AppConfig) -> dict:
@@ -135,7 +179,7 @@ def generate_voiceover(clip_data: dict, template: str, config: AppConfig) -> dic
         prompt,
         lambda: provider.generate_text(prompt, model),
     )
-    return extract_json(text)
+    return _validate_voiceover(extract_json(text), clip_data.get("title", ""))
 
 
 def plan_daily_vlog(
@@ -191,7 +235,7 @@ def plan_daily_vlog(
         prompt,
         lambda: provider.generate_text(prompt, model),
     )
-    result = extract_json(text)
+    result = _validate_plan(extract_json(text), day_label)
 
     # 后处理：过滤掉 segment 中引用不存在的 index 的项
     # 用整数比较（去零填充），兼容 "001"、"1"、1 等不同格式
@@ -247,7 +291,11 @@ def refine_text(analysis: dict, config: AppConfig, fix: str | None = None, conte
         prompt,
         lambda: provider.generate_text(prompt, model),
     )
-    return extract_json(text)
+    result = extract_json(text)
+    if not isinstance(result, dict) or "index" not in result:
+        print(f"  [警告] refine_text: AI 返回结构异常，使用原始数据")
+        return analysis
+    return result
 
 
 def refine_script(
@@ -283,4 +331,8 @@ def refine_script(
         prompt,
         lambda: provider.generate_text(prompt, model),
     )
-    return extract_json(text)
+    result = extract_json(text)
+    if not isinstance(result, dict) or "voiceover" not in result:
+        print(f"  [警告] refine_script: AI 返回结构异常，使用原始数据")
+        return script
+    return result
