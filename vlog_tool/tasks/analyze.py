@@ -119,6 +119,10 @@ def run_analyze_all(
                     if existing_data.get("source_file", "") == original.name:
                         json_path = candidate
                         analysis = existing_data
+                    else:
+                        print(f"  [覆盖] {candidate.name} 的 source_file 不匹配，将重新分析")
+                        candidate.unlink()
+                        candidate.with_suffix(".txt").unlink(missing_ok=True)
                 except (json.JSONDecodeError, OSError):
                     pass
             if json_path:
