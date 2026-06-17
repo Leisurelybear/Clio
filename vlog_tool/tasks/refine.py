@@ -10,6 +10,7 @@ from vlog_tool.analyze import refine_script, refine_text
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
 from vlog_tool.tasks._helpers import _eta_line, _rewrite_script_md, _rewrite_text_file
+from vlog_tool.utils import write_json_atomic
 
 
 def _collect_target_files(path: Path | None, default_dir: Path, pattern: str = "*.json") -> list[Path]:
@@ -68,7 +69,7 @@ def run_refine_texts(
                 continue
             elapsed_total += time.monotonic() - t0
             completed += 1
-            json_file.write_text(json.dumps(refined, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(json_file, refined)
             txt_path = json_file.with_suffix(".txt")
             _rewrite_text_file(txt_path, refined)
             changelog = refined.get("_changelog") or []
@@ -111,7 +112,7 @@ def run_refine_scripts(
                 continue
             elapsed_total += time.monotonic() - t0
             completed += 1
-            json_file.write_text(json.dumps(refined, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(json_file, refined)
             md_path = json_file.with_name(json_file.stem + ".md")
             _rewrite_script_md(md_path, refined)
             changelog = refined.get("_changelog") or []

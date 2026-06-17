@@ -8,7 +8,7 @@ from pathlib import Path
 
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_duration
-from vlog_tool.utils import format_index, probe_video_info, resolve_binary, sanitize_name
+from vlog_tool.utils import format_index, probe_video_info, resolve_binary, sanitize_name, write_text_atomic
 
 
 @dataclass
@@ -73,7 +73,7 @@ def _write_text_file(path: Path, analysis: dict, source: Path, compressed: Path)
     for h in analysis.get("highlights", []):
         lines.append(f"- {h}")
 
-    path.write_text("\n".join(lines), encoding="utf-8")
+    write_text_atomic(path, "\n".join(lines))
 
 
 def _rewrite_text_file(path: Path, analysis: dict) -> None:
@@ -102,7 +102,7 @@ def _rewrite_text_file(path: Path, analysis: dict) -> None:
         lines.extend(["", "## 本次 refine 改动"])
         for item in analysis["_changelog"]:
             lines.append(f"- {item}")
-    path.write_text("\n".join(lines), encoding="utf-8")
+    write_text_atomic(path, "\n".join(lines))
 
 
 def _rewrite_script_md(path: Path, script: dict) -> None:
@@ -115,7 +115,7 @@ def _rewrite_script_md(path: Path, script: dict) -> None:
         md += "\n## 本次 refine 改动\n"
         for item in script["_changelog"]:
             md += f"- {item}\n"
-    path.write_text(md, encoding="utf-8")
+    write_text_atomic(path, md)
 
 
 def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None:

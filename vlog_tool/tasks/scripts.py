@@ -12,6 +12,7 @@ from vlog_tool.log import timed
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.tasks._helpers import _eta_line
+from vlog_tool.utils import write_json_atomic, write_text_atomic
 
 
 def run_generate_scripts(
@@ -49,14 +50,14 @@ def run_generate_scripts(
             script = generate_voiceover(data, template, config)
             elapsed_total += time.monotonic() - t0
             completed += 1
-            out.write_text(json.dumps(script, ensure_ascii=False, indent=2), encoding="utf-8")
+            write_json_atomic(out, script)
             state.mark(orig_stem, "voiceover", "done")
 
             md_out = config.scripts_dir / f"{json_file.stem}_voiceover.md"
-            md_out.write_text(
+            md_content = (
                 f"# {script.get('title', json_file.stem)} 口播\n\n"
                 f"{script.get('voiceover', '')}\n\n"
-                f"**剪辑建议**: {script.get('edit_tip', '')}\n",
-                encoding="utf-8",
+                f"**剪辑建议**: {script.get('edit_tip', '')}\n"
             )
+            write_text_atomic(md_out, md_content)
             print(f"  -> {md_out.name}")
