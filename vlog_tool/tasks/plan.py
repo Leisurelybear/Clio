@@ -8,6 +8,7 @@ from pathlib import Path
 from vlog_tool.analyze import plan_daily_vlog
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
+from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.utils import format_index, write_json_atomic, write_text_atomic
 
@@ -106,3 +107,9 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
     )
     write_text_atomic(out_md, "\n".join(lines))
     print(f"  -> {out_md.name}")
+
+    state = ProcessingState(config.paths.output_dir)
+    for clip in clips:
+        source_stem = clip.get("source_stem", "")
+        if source_stem:
+            state.mark(source_stem, "plan", "done")
