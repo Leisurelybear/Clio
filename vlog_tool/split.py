@@ -1,9 +1,8 @@
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from vlog_tool.utils import get_duration_sec, run_ffmpeg
+from vlog_tool.utils import get_duration_sec, run_ffmpeg, write_json_atomic
 
 
 def split_video(
@@ -37,40 +36,45 @@ def split_video(
     segments: list[Path] = []
     manifest: list[dict] = []
 
-    for i in range(num):
-        start = round(i * seg_duration, 2)
-        dur = round(seg_duration if i < num - 1 else duration_sec - i * seg_duration, 2)
+    try:
+        for i in range(num):
+            start = round(i * seg_duration, 2)
+            dur = round(seg_duration if i < num - 1 else duration_sec - i * seg_duration, 2)
 
-        seg_path = output_dir / f"{video_path.stem}_seg{i + 1:02d}{video_path.suffix}"
-        args = [
-            "-ss",
-            str(start),
-            "-i",
-            str(video_path),
-            "-t",
-            str(dur),
-            "-c",
-            "copy",
-            "-map",
-            "0:v:0",
-            "-map",
-            "0:a:0?",
-            "-y",
-            str(seg_path),
-        ]
-        run_ffmpeg(args, ffmpeg)
-        segments.append(seg_path)
-        manifest.append(
-            {
-                "segment_index": i + 1,
-                "filename": seg_path.name,
-                "source_stem": video_path.stem,
-                "offset_sec": start,
-                "actual_duration_sec": dur,
-            }
-        )
+            seg_path = output_dir / f"{video_path.stem}_seg{i + 1:02d}{video_path.suffix}"
+            args = [
+                "-ss",
+                str(start),
+                "-i",
+                str(video_path),
+                "-t",
+                str(dur),
+                "-c",
+                "copy",
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a:0?",
+                "-y",
+                str(seg_path),
+            ]
+            run_ffmpeg(args, ffmpeg)
+            segments.append(seg_path)
+            manifest.append(
+                {
+                    "segment_index": i + 1,
+                    "filename": seg_path.name,
+                    "source_stem": video_path.stem,
+                    "offset_sec": start,
+                    "actual_duration_sec": dur,
+                }
+            )
 
-    manifest_path = output_dir / f"{video_path.stem}_split_manifest.json"
-    manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        manifest_path = output_dir / f"{video_path.stem}_split_manifest.json"
+        write_json_atomic(manifest_path, manifest)
+    except BaseException:
+        for f in segments:
+            f.unlink(missing_ok=True)
+        raise
 
     return segments
