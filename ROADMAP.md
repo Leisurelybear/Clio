@@ -488,6 +488,17 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `d410c4e` | fix(compress): fix closure late-binding trap in progress callback |
+| `129de90` | feat(ai): add structured validation for AI responses (P2-1) |
+| `eb93573` | fix(analyze): clean up stale existing files on source_file mismatch (P2-6) |
+| `097a6ff` | fix(split): clean up partial segments + atomic manifest (P2-2) |
+| `123c84f` | fix(tasks): use atomic writes for scripts/refine output (P0-3) |
+| `3ce9ef3` | fix(prompts): TRANSCRIPT_CONTEXT 英文→中文 (Q-6) |
+| `cdcc873` | fix(ai): include file mtime in trip_context_cache key (P2-3) |
+| `6d23de3` | fix(transcribe): use find_videos for recursive scanning (P2-5) |
+| `78a0b69` | fix(compress): raise MIN_VALID_SIZE 256→50KB (P2-7) |
+| `3660fea` | fix(ai): add max_tokens + temperature to OpenAI API (P1-2) |
+| `a29a53c` | fix(plan): record ProcessingState after generating plan (P0-5) |
 | `bebf21f` | fix(save): capture data refs at entry; sanitize index_prefix in rerun |
 | `ef68308` | fix(review): align Gemini retry_attempts, thread-safe provider cache, test isolation |
 | `ef2311d` | fix(ai): use configurable retry_attempts |

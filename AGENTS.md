@@ -185,7 +185,7 @@ ai:
 
 ## 7. 项目当前状态
 
-最后更新：2026-06-16（Whisper 全功能 + 412 测试稳定 + 6+12+25 项代码审查修复 + CI 修复 + 27 新测试）。已上线：
+最后更新：2026-06-17（2026-06-17 全面分析报告修复：10 个 commit 覆盖 P0-5、P1-2、P2-1、P2-2、P2-3、P2-5、P2-6、P2-7、Q-2、Q-6 + atomic writes）。已上线：
 - GitHub Actions CI（Ubuntu，Windows，Python 3.11/3.12）
 - 412 个 pytest 用例：transcribe(18) / tasks_transcribe(11) / processing_state(8) / whisper_cli(6) / main(7) / config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(12) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / 等
 - 依赖版本锁定 `requirements-locked.txt`
@@ -234,6 +234,17 @@ ai:
 135. `88cbf4c` `fix(ci): pass config_path to whisper subcommands, lowercase .mp4 for Linux`  ← CI 修复
 136. `4abc241` `fix(whisper_cli): add missing Path import for F821`  ← Lint 修复
 137. `f4a6a71` `test: add 27 high-value unit tests for whisper, processing_state, and CLI`  ← 27 新测试
+138. `a29a53c` `fix(plan): record ProcessingState after generating plan`  ← P0-5
+139. `3660fea` `fix(ai): add max_tokens + temperature to OpenAI API calls`  ← P1-2
+140. `78a0b69` `fix(compress): raise MIN_VALID_SIZE 256→50KB`  ← P2-7
+141. `6d23de3` `fix(transcribe): use find_videos for recursive scanning`  ← P2-5
+142. `cdcc873` `fix(ai): include file mtime in trip_context_cache key`  ← P2-3
+143. `3ce9ef3` `fix(prompts): TRANSCRIPT_CONTEXT 英文→中文`  ← Q-6
+144. `123c84f` `fix(tasks): use atomic writes for scripts/refine output`  ← P0-3
+145. `097a6ff` `fix(split): clean up partial segments + atomic manifest`  ← P2-2
+146. `eb93573` `fix(analyze): clean up stale existing files on source_file mismatch`  ← P2-6
+147. `129de90` `feat(ai): add structured validation for AI responses`  ← P2-1
+148. `d410c4e` `fix(compress): fix closure late-binding trap in progress callback`  ← Q-2
 
 最近代码审查修复（2026-06-16 第二次审查，5 S0 + 5 S1 + 1 S2 项）：
 - **S0-1** `runner.js`: `prog` undefined → `$('run-progress')`
@@ -265,6 +276,7 @@ ai:
 - Provider 缓存：factory 按名缓存，线程安全，测试隔离自动清理
 - 安全修复：rerun/cut 路径遍历防御（`_is_safe_basename`），4xx 非重试错误立即失败，`index_prefix` 消毒
 - 配置修复：YAML 未知字段静默忽略，`project.yaml` CLI 生效，`FFMPEG_HOME` 环境变量支持
+- 2026-06-17 全面分析报告修复：10 个 commit 覆盖可用性（plan 状态/原子写入/max_tokens/验证）到代码质量（closure/transcript 中文/prompts 校验），详见 ROADMAP 已完成表
 
 ## 8. Gotchas（踩过的坑）
 
