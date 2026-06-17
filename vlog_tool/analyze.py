@@ -24,27 +24,33 @@ _trip_context_cache: dict[str, str] = {}
 
 
 def _read_trip_context(project_dir: str) -> str:
-    """读取 trip_context.md，按项目目录缓存。
+    """读取 trip_context.md，按项目目录 + 文件 mtime 缓存。
 
     查找优先级：
     1. <project_dir>/templates/trip_context.md（项目级）
     2. <default_package>/templates/trip_context.md（包默认）
     """
-    if project_dir in _trip_context_cache:
-        return _trip_context_cache[project_dir]
     project_path = Path(project_dir) / "templates" / "trip_context.md"
     if project_path.is_file():
+        mtime = project_path.stat().st_mtime
+        key = f"{project_dir}@{mtime}"
+        if key in _trip_context_cache:
+            return _trip_context_cache[key]
         text = project_path.read_text(encoding="utf-8").strip()
         if text:
-            _trip_context_cache[project_dir] = text
+            _trip_context_cache[key] = text
             return text
     default_path = Path(__file__).parent.parent / "templates" / "trip_context.md"
     if default_path.is_file():
+        mtime = default_path.stat().st_mtime
+        key = f"{project_dir}@default@{mtime}"
+        if key in _trip_context_cache:
+            return _trip_context_cache[key]
         text = default_path.read_text(encoding="utf-8").strip()
         if text:
-            _trip_context_cache[project_dir] = text
+            _trip_context_cache[key] = text
             return text
-    _trip_context_cache[project_dir] = ""
+    _trip_context_cache[f"{project_dir}@empty"] = ""
     return ""
 
 
