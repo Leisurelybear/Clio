@@ -132,6 +132,39 @@ function _setupPreviewBarDrag() {
 }
 
 // ── Preview playback ─────────────────────────────────────────
+function _setPlayBtnPause() {
+  const btn = $('btn-play-preview');
+  if (!btn) return;
+  btn.innerHTML = `${icon('pause', 14)}`;
+  btn.classList.add('preview-active');
+  btn.title = '暂停';
+  btn.onclick = togglePreviewPlayback;
+}
+
+function _setPlayBtnPlay(title) {
+  const btn = $('btn-play-preview');
+  if (!btn) return;
+  btn.innerHTML = `${icon('play', 14)}`;
+  btn.classList.remove('preview-active');
+  btn.title = title || '预览播放';
+  btn.onclick = togglePreviewPlayback;
+}
+
+function togglePreviewPlayback() {
+  if (!state.previewActive) {
+    startPreview();
+    return;
+  }
+  const player = $('player');
+  if (player.paused) {
+    player.play().catch(() => {});
+    _setPlayBtnPause();
+  } else {
+    player.pause();
+    _setPlayBtnPlay('继续');
+  }
+}
+
 function startPreview(startIndex) {
   const p = state.plan;
   if (!p || !p.sequence || !p.sequence.length) return;
@@ -143,13 +176,7 @@ function startPreview(startIndex) {
   renderPreviewBar();
   const segNameEl = $('preview-seg-name');
   if (segNameEl) segNameEl.textContent = `1/${p.sequence.length} ${p.sequence[0]?.title || p.sequence[0]?.index || ''}`;
-  const playBtn = $('btn-play-preview');
-  if (playBtn) {
-    playBtn.innerHTML = `${icon('stop', 14)}`;
-    playBtn.classList.add('preview-active');
-    playBtn.title = '停止预览';
-    playBtn.onclick = stopPreview;
-  }
+  _setPlayBtnPause();
 
   import('./editor.js').then(mod => mod.renderPlan());
   _playPreviewSegment();
@@ -165,13 +192,7 @@ function stopPreview() {
   renderPreviewBar();
   const segNameEl = $('preview-seg-name');
   if (segNameEl) segNameEl.textContent = '预览已停止';
-  const playBtn = $('btn-play-preview');
-  if (playBtn) {
-    playBtn.innerHTML = `${icon('play', 14)}`;
-    playBtn.classList.remove('preview-active');
-    playBtn.title = '预览播放';
-    playBtn.onclick = startPreview;
-  }
+  _setPlayBtnPlay('预览播放');
 
   import('./editor.js').then(mod => mod.renderPlan());
   setStatus('预览已停止', '');
@@ -209,13 +230,7 @@ function _playPreviewSegment() {
   const segNameEl = $('preview-seg-name');
   if (segNameEl) segNameEl.textContent = `${state.previewIndex + 1}/${p.sequence.length} ${seg.title || seg.index}`;
 
-  const playBtn = $('btn-play-preview');
-  if (playBtn) {
-    playBtn.innerHTML = `${icon('stop', 14)}`;
-    playBtn.classList.add('preview-active');
-    playBtn.title = '停止预览';
-    playBtn.onclick = stopPreview;
-  }
+  _setPlayBtnPause();
 }
 
 function setupPlayer() {
@@ -271,7 +286,7 @@ function setupPlayer() {
   const playBtn = $('btn-play-preview');
   if (playBtn) {
     playBtn.innerHTML = `${icon('play', 14)}`;
-    playBtn.onclick = startPreview;
+    playBtn.onclick = togglePreviewPlayback;
   }
 
   _setupPreviewBarDrag();

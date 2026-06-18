@@ -43,6 +43,7 @@ function icon(name, size = 18) {
     search: '<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>',
     chevron_right: '<polyline points="9 18 15 12 9 6"/>',
     stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+    pause: '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>',
   };
   const d = icons[name] || icons.file;
   return `<span class="icon"><svg viewBox="0 0 24 24">${d}</svg></span>`;
