@@ -299,6 +299,7 @@ async function selectVideo(file) {
     if (!confirm('当前 tab 有未保存的修改，确定切换视频吗？')) return;
   }
   if (state.previewActive) stopPreview();
+  $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'video';
   state.currentVideo = file;
   state.dirty = false;
@@ -344,6 +345,7 @@ async function selectPlan(dayOverride) {
     if (!confirm('当前 tab 有未保存的修改，确定切换到规划吗？')) return;
   }
   if (state.previewActive) stopPreview();
+  $('player-pane').classList.add('plan-mode');
   state.currentEntity = 'plan';
   state.dirty = false;
   if (dayOverride) state.currentDay = dayOverride;
@@ -362,6 +364,7 @@ async function selectRun() {
     if (!confirm('当前 tab 有未保存的修改，确定切换到运行吗？')) return;
   }
   if (state.previewActive) stopPreview();
+  $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'run';
   state.dirty = false;
   updateEntityUI();
@@ -373,6 +376,7 @@ async function selectConfig() {
     if (!confirm('当前 tab 有未保存的修改，确定切换到设置吗？')) return;
   }
   if (state.previewActive) stopPreview();
+  $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'config';
   state.dirty = false;
   try {
@@ -398,6 +402,7 @@ async function selectLogs() {
     if (!confirm('当前 tab 有未保存的修改，确定切换到日志吗？')) return;
   }
   if (state.previewActive) stopPreview();
+  $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'logs';
   state.dirty = false;
   updateEntityUI();
@@ -410,6 +415,7 @@ async function setSource(source) {
     if (!confirm('当前 tab 有未保存的修改，确定切换源吗？')) return;
   }
   if (state.previewActive) stopPreview();
+  $('player-pane').classList.remove('plan-mode');
   state.source = source;
   state.currentVideo = null;
   state.texts = null;
@@ -445,6 +451,7 @@ async function switchToOriginalThenCompress() {
 }
 
 function goToRunTab() {
+  $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'run';
   updateEntityUI();
   import('./editor.js').then(mod => mod.renderActiveTab());

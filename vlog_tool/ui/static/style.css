@@ -271,6 +271,46 @@ aside, section { overflow-y: auto; }
   cursor: pointer;
 }
 #playback-speed:focus { outline: none; border-color: var(--border-focus); }
+
+/* ── Preview Bar (R-012) ───────────────────────────────────── */
+#preview-bar {
+  display: none; align-items: center; gap: var(--space-2);
+  padding: 2px var(--space-1); flex-wrap: wrap;
+  font-size: var(--text-xs);
+}
+#player-pane.plan-mode #preview-bar { display: flex; }
+
+.preview-controls { display: flex; gap: 2px; align-items: center; }
+.preview-bar-btn {
+  background: var(--bg-surface-2); color: var(--text-secondary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 3px 6px; cursor: pointer; font: inherit;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all var(--transition-fast); line-height: 1;
+}
+.preview-bar-btn:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-light); }
+.preview-bar-btn:active { background: var(--bg-active); }
+.preview-bar-btn.preview-active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.preview-seg-name {
+  color: var(--text-secondary); flex-shrink: 0;
+  max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.preview-seg-bar {
+  display: flex; flex: 1; height: 8px;
+  background: var(--bg-surface-2); border-radius: 4px;
+  cursor: pointer; overflow: hidden; min-width: 80px;
+}
+.preview-seg-block {
+  height: 100%; transition: background var(--transition-fast);
+  border-right: 1px solid var(--bg-surface);
+}
+.preview-seg-block:last-child { border-right: none; }
+.preview-seg-block:hover { opacity: 0.8; }
+.preview-seg-block.done { background: var(--text-tertiary); }
+.preview-seg-block.active { background: var(--accent); }
+.preview-seg-block.pending { background: var(--border); }
+
 .player-tip { color: var(--text-muted); font-size: var(--text-xs); padding: var(--space-1); }
 
 /* ── Editor ────────────────────────────────────────────────── */

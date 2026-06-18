@@ -11,7 +11,7 @@ import {
   setDeep,
 } from './utils.js';
 import { api, icon } from './api.js';
-import { playVideoSegment, startPreview, stopPreview } from './viewer.js';
+import { playVideoSegment } from './viewer.js';
 
 // ── Rendering ──────────────────────────────────────────────────
 
@@ -225,6 +225,8 @@ function renderTranscript() {
 function renderPlan() {
   const p = state.plan;
   const pane = $('tab-plan');
+  $('player-pane').classList.add('plan-mode');
+  import('./viewer.js').then(mod => mod.renderPreviewBar());
   if (!p) {
     pane.innerHTML = `
       <h3>vlog 剪辑规划</h3>
@@ -248,13 +250,6 @@ function renderPlan() {
     <label>开场提示 <textarea data-field="opening_tip" rows="2"></textarea></label>
     <label>收尾提示 <textarea data-field="ending_tip" rows="2"></textarea></label>
     <h3>顺序 (sequence) — ${(p.sequence || []).length} 项</h3>
-    <div style="display:flex;gap:6px;margin-bottom:8px;">
-      ${state.previewActive
-        ? `<button id="btn-stop-preview" class="btn-primary" style="flex:1">${icon('stop', 16)} 停止预览</button>
-           <span class="hint" style="display:flex;align-items:center;color:var(--accent);font-weight:500;">${state.previewIndex + 1}/${(p.sequence || []).length}</span>`
-        : `<button id="btn-start-preview" class="btn-primary" style="flex:1">${icon('play', 16)} 预览播放</button>`
-      }
-    </div>
     <p class="hint">点击 segment 跳到对应视频</p>
     <ol id="plan-list"></ol>
   `;
@@ -273,12 +268,6 @@ function renderPlan() {
       await import('./sidebar.js').then(mod => mod.selectPlan());
     };
   }
-  // Preview buttons
-  const startBtn = $('btn-start-preview');
-  if (startBtn) startBtn.onclick = startPreview;
-  const stopBtn = $('btn-stop-preview');
-  if (stopBtn) stopBtn.onclick = stopPreview;
-
   for (const k of ['theme', 'opening_tip', 'ending_tip']) {
     const el = pane.querySelector(`[data-field="${k}"]`);
     el.value = p[k] || '';
