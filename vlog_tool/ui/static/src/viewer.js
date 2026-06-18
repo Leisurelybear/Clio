@@ -26,8 +26,11 @@ function renderPreviewBar() {
   bar.style.display = isPlan ? '' : 'none';
   if (!isPlan) return;
   const p = state.plan;
+  const segBar = $('#preview-seg-bar');
+  if (!segBar) return;
+
   if (!p || !p.sequence || !p.sequence.length) {
-    bar.innerHTML = '<span class="muted">暂无可预览内容</span>';
+    segBar.innerHTML = '<span class="muted">暂无可预览内容</span>';
     return;
   }
 
@@ -43,7 +46,7 @@ function renderPreviewBar() {
     return 0;
   });
 
-  const barHtml = p.sequence.map((seg, i) => {
+  const segHtml = p.sequence.map((seg, i) => {
     const w = totalDuration > 0 ? (durations[i] / totalDuration * 100) : (100 / p.sequence.length);
     const cls = i < state.previewIndex ? 'done'
       : i === state.previewIndex && state.previewActive ? 'active'
@@ -51,9 +54,9 @@ function renderPreviewBar() {
     return `<div class="preview-seg-block ${cls}" data-seg="${i}" style="width:${w}%"></div>`;
   }).join('');
 
-  bar.innerHTML = barHtml;
+  segBar.innerHTML = segHtml;
 
-  bar.querySelectorAll('.preview-seg-block').forEach(el => {
+  segBar.querySelectorAll('.preview-seg-block').forEach(el => {
     el.onclick = () => {
       const i = parseInt(el.dataset.seg);
       if (state.previewActive && i >= 0 && i < p.sequence.length) {
