@@ -114,6 +114,14 @@ class TestProgressTracker:
         assert data["logs"][0] == "first line"
         assert data["logs"][1] == "second line"
 
+    def test_cancelled_sets_status(self, tmp_path):
+        t = ProgressTracker(tmp_path)
+        t.cancelled("用户中断")
+        data = json.loads(t._path.read_text(encoding="utf-8"))
+        assert data["status"] == "cancelled"
+        assert data["phase"] == "cancelled"
+        assert "用户中断" in data["message"]
+
     def test_log_truncates_at_100(self, tmp_path):
         t = ProgressTracker(tmp_path)
         for i in range(105):

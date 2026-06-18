@@ -104,3 +104,7 @@ class ProgressTracker:
     def error(self, message: str) -> None:
         self.update(status="error", message=message)
         self.log("✗ " + message)
+
+    def cancelled(self, message: str = "") -> None:
+        self.update(phase="cancelled", current=0, total=0, message=message or "已取消", status="cancelled")
+        self.log("⏹ " + (message or "已取消"))
