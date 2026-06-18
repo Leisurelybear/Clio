@@ -41,6 +41,7 @@ def run_generate_scripts(
                 state.mark(orig_stem, "voiceover", "skipped")
                 if tracker:
                     tracker.next(message=f"跳过 {json_file.stem}")
+                    tracker.log(f"跳过 {json_file.stem}（已存在）")
                 continue
 
             print(_eta_line("口播", i, len(files), json_file.stem, completed, elapsed_total))
@@ -52,6 +53,8 @@ def run_generate_scripts(
             completed += 1
             write_json_atomic(out, script)
             state.mark(orig_stem, "voiceover", "done")
+            if tracker:
+                tracker.log(f"口播 {orig_stem} ✓")
 
             md_out = config.scripts_dir / f"{json_file.stem}_voiceover.md"
             md_content = (

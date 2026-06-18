@@ -123,6 +123,7 @@ def run_transcribe_all(
                 state.mark(stem, "transcribe", "skipped")
                 if tracker:
                     tracker.next(message=f"跳过 {stem}")
+                    tracker.log(f"跳过 {stem}（已转录）")
                 continue
 
         if cancel_event and cancel_event.is_set():
@@ -135,6 +136,7 @@ def run_transcribe_all(
             state.mark(stem, "transcribe", "skipped")
             if tracker:
                 tracker.next(message=f"跳过 {stem} (no audio)")
+                tracker.log(f"跳过 {stem}（无音轨）")
             continue
 
         try:
@@ -162,12 +164,14 @@ def run_transcribe_all(
             state.mark(stem, "transcribe", "error")
             if tracker:
                 tracker.next(message=f"失败 {stem}")
+                tracker.log(f"转录 {stem} 失败")
             continue
         finally:
             wav_path.unlink(missing_ok=True)
 
         if tracker:
             tracker.next(message=f"完成 {stem}")
+            tracker.log(f"转录 {stem} ✓")
 
     return 0
 

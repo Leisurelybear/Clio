@@ -77,6 +77,8 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
             clips, config, day_label, transcripts_map=transcripts_map, use_transcripts=config.plan.use_transcripts
         )
     write_json_atomic(out_json, plan)
+    if tracker:
+        tracker.log(f"规划 {day_label} ✓")
 
     lines = [
         f"# {plan.get('day_title', day_label)}",

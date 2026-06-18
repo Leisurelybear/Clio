@@ -59,4 +59,6 @@ def run_label_videos(config: AppConfig, tracker: ProgressTracker | None = None) 
             run_ffmpeg(["-i", str(compressed), "-vf", vf, "-an", "-y", str(out)], ffmpeg)
             elapsed_total += time.monotonic() - t0
             completed += 1
+            if tracker:
+                tracker.log(f"标号 {json_file.stem} ✓")
             print(f"  -> {out.name}")

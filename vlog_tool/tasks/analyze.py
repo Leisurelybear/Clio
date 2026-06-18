@@ -129,6 +129,7 @@ def run_analyze_all(
                 text_path = json_path.with_suffix(".txt")
                 if tracker:
                     tracker.update(phase="analyze", current=i, total=total, message=f"跳过 {compressed.name}...")
+                    tracker.log(f"跳过 {compressed.name}（已分析）")
                 state.mark(original.stem, "analyze", "skipped")
                 print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
                 records.append(
@@ -203,6 +204,8 @@ def run_analyze_all(
                 )
             )
             state.mark(original.stem, "analyze", "done")
+            if tracker:
+                tracker.log(f"分析 {original.stem} ✓")
             print(f"  -> {final_text.name}")
 
     _write_csv(config.summary_csv, records, config)
