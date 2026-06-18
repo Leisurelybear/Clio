@@ -20,13 +20,13 @@ function playVideoSegment(file, seekTo) {
 
 // ── Preview bar (R-012) ──────────────────────────────────────
 function renderPreviewBar() {
-  const bar = $('#preview-bar');
+  const bar = $('preview-bar');
   if (!bar) return;
   const isPlan = state.currentEntity === 'plan';
-  bar.style.display = isPlan ? '' : 'none';
+  bar.style.display = isPlan ? 'flex' : 'none';
   if (!isPlan) return;
   const p = state.plan;
-  const segBar = $('#preview-seg-bar');
+  const segBar = $('preview-seg-bar');
   if (!segBar) return;
 
   if (!p || !p.sequence || !p.sequence.length) {
@@ -70,7 +70,7 @@ function renderPreviewBar() {
 let _dragTargetSeg = -1;
 
 function _setupPreviewBarDrag() {
-  const segBar = $('#preview-seg-bar');
+  const segBar = $('preview-seg-bar');
   if (!segBar) return;
 
   const _getDurations = (plan) => {
@@ -136,9 +136,9 @@ function startPreview() {
   setStatus(`预览播放`, 'ok');
 
   renderPreviewBar();
-  const segNameEl = $('#preview-seg-name');
+  const segNameEl = $('preview-seg-name');
   if (segNameEl) segNameEl.textContent = `1/${p.sequence.length} ${p.sequence[0]?.title || p.sequence[0]?.index || ''}`;
-  const playBtn = $('#btn-play-preview');
+  const playBtn = $('btn-play-preview');
   if (playBtn) {
     playBtn.innerHTML = `${icon('stop', 14)}`;
     playBtn.classList.add('preview-active');
@@ -158,9 +158,9 @@ function stopPreview() {
   player.pause();
 
   renderPreviewBar();
-  const segNameEl = $('#preview-seg-name');
+  const segNameEl = $('preview-seg-name');
   if (segNameEl) segNameEl.textContent = '预览已停止';
-  const playBtn = $('#btn-play-preview');
+  const playBtn = $('btn-play-preview');
   if (playBtn) {
     playBtn.innerHTML = `${icon('play', 14)}`;
     playBtn.classList.remove('preview-active');
@@ -201,10 +201,10 @@ function _playPreviewSegment() {
   });
 
   renderPreviewBar();
-  const segNameEl = $('#preview-seg-name');
+  const segNameEl = $('preview-seg-name');
   if (segNameEl) segNameEl.textContent = `${state.previewIndex + 1}/${p.sequence.length} ${seg.title || seg.index}`;
 
-  const playBtn = $('#btn-play-preview');
+  const playBtn = $('btn-play-preview');
   if (playBtn) {
     playBtn.innerHTML = `${icon('stop', 14)}`;
     playBtn.classList.add('preview-active');
@@ -240,7 +240,7 @@ function setupPlayer() {
   player.onerror = () => setStatus('视频加载失败', 'err');
 
   // Preview bar buttons
-  const prevBtn = $('#btn-prev-seg');
+  const prevBtn = $('btn-prev-seg');
   if (prevBtn) {
     prevBtn.innerHTML = `${icon('chevron_right', 14)}`;
     prevBtn.style.transform = 'scaleX(-1)';
@@ -252,7 +252,7 @@ function setupPlayer() {
       _playPreviewSegment();
     };
   }
-  const nextBtn = $('#btn-next-seg');
+  const nextBtn = $('btn-next-seg');
   if (nextBtn) {
     nextBtn.innerHTML = `${icon('chevron_right', 14)}`;
     nextBtn.onclick = () => {
@@ -263,7 +263,7 @@ function setupPlayer() {
       _playPreviewSegment();
     };
   }
-  const playBtn = $('#btn-play-preview');
+  const playBtn = $('btn-play-preview');
   if (playBtn) {
     playBtn.innerHTML = `${icon('play', 14)}`;
     playBtn.onclick = startPreview;
