@@ -239,7 +239,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 - [x] R-011c：startPreview / stopPreview / _playPreviewSegment 控制逻辑
 - [x] R-011d：player.ontimeupdate + onended 接入预览自动推进
 
-## 需求 R-012：预览进度条与交互控制
+## ✅ 需求 R-012：预览进度条与交互控制
 
 **背景**：R-011 实现了 segment 自动跳转播放，但用户无法看到整体进度，也无法手动跳到某个 segment。
 
@@ -526,6 +526,12 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `5029ba1` | feat(ui): play/pause toggle for preview, stop no longer resets to segment 0 |
+| `e4818af` | fix(ui): preview bar blocks start preview when inactive |
+| `0d322c2` | fix(ui): two-row preview bar, buttons work without clicking segment first, fix MouseEvent leak |
+| `67d8b0d` | feat(ui): preview bar blocks show seg number + tooltip with title and time window |
+| `de03cc2` | fix(ui): plan segment click integrates with preview system |
+| `298a729` | fix(ui): correct $() calls - use IDs without # prefix |
 | `d410c4e` | fix(compress): fix closure late-binding trap in progress callback |
 | `129de90` | feat(ai): add structured validation for AI responses (P2-1) |
 | `eb93573` | fix(analyze): clean up stale existing files on source_file mismatch (P2-6) |

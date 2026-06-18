@@ -185,7 +185,7 @@ ai:
 
 ## 7. 项目当前状态
 
-最后更新：2026-06-17（2026-06-17 全面分析报告修复：10 个 commit 覆盖 P0-5、P1-2、P2-1、P2-2、P2-3、P2-5、P2-6、P2-7、Q-2、Q-6 + atomic writes）。已上线：
+最后更新：2026-06-18（R-012 预览进度条：6 个 commit 覆盖显示/交互/play-pause）。已上线：
 - GitHub Actions CI（Ubuntu，Windows，Python 3.11/3.12）
 - 412 个 pytest 用例：transcribe(18) / tasks_transcribe(11) / processing_state(8) / whisper_cli(6) / main(7) / config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(12) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / 等
 - 依赖版本锁定 `requirements-locked.txt`
@@ -245,6 +245,12 @@ ai:
 146. `eb93573` `fix(analyze): clean up stale existing files on source_file mismatch`  ← P2-6
 147. `129de90` `feat(ai): add structured validation for AI responses`  ← P2-1
 148. `d410c4e` `fix(compress): fix closure late-binding trap in progress callback`  ← Q-2
+149. `298a729` `fix(ui): correct $() calls - use IDs without # prefix`  ← R-012
+150. `de03cc2` `fix(ui): plan segment click integrates with preview system`  ← R-012
+151. `67d8b0d` `feat(ui): preview bar blocks show seg number + tooltip with title and time window`  ← R-012
+152. `0d322c2` `fix(ui): two-row preview bar, buttons work without clicking segment first, fix MouseEvent leak`  ← R-012
+153. `e4818af` `fix(ui): preview bar blocks start preview when inactive`  ← R-012
+154. `5029ba1` `feat(ui): play/pause toggle for preview, stop no longer resets to segment 0`  ← R-012
 
 最近代码审查修复（2026-06-16 第二次审查，5 S0 + 5 S1 + 1 S2 项）：
 - **S0-1** `runner.js`: `prog` undefined → `$('run-progress')`
@@ -264,7 +270,7 @@ ai:
 项目文档状态：
 - 2026-06-16 全面代码审查（5 路平行 subagent）：发现 **6 Critical + 12 Important + 36 Minor**，已修复 6+12+5，剩余 31 Minor 待处理
 - 2026-06-16 第二次审查（逐项 review）：5 S0 + 5 S1 + 1 S2 全部修复
-- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012/ R-013（✓）/ R-014/ R-015（a[✓] d[✓]）+ Bug 跟踪（B-001~B-085）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）+ 代码审查 P0~P3（14 项修了 12 项）
+- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012（✓）/ R-013（✓）/ R-014/ R-015（a[✓] d[✓]）+ Bug 跟踪（B-001~B-085）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）+ 代码审查 P0~P3（14 项修了 12 项）
 - Whisper ASR 已完全接入：独立 CLI（transcribe / whisper install / whisper check）+ pipeline 步骤 + UI 转录 tab + delete/edit/seek + 10% 进度 + CUDA 回退 CPU + 每视频 rerun + 完整 UT 覆盖（18 个测试）
 - CI 兼容性修复：ctranslate2 mock 模块、config_path 参数传递、Linux 大小写感知、F821 lint
 - 新增 ProcessingState UT（8 个测试全面覆盖 mark/reset_step/持久化/损坏回退）
@@ -277,6 +283,7 @@ ai:
 - 安全修复：rerun/cut 路径遍历防御（`_is_safe_basename`），4xx 非重试错误立即失败，`index_prefix` 消毒
 - 配置修复：YAML 未知字段静默忽略，`project.yaml` CLI 生效，`FFMPEG_HOME` 环境变量支持
 - 2026-06-17 全面分析报告修复：10 个 commit 覆盖可用性（plan 状态/原子写入/max_tokens/验证）到代码质量（closure/transcript 中文/prompts 校验），详见 ROADMAP 已完成表
+- 2026-06-18 R-012 预览进度条完成：两行布局（控制栏 + 进度条），播放/暂停切换（不再是停止+重置），segment 块显示序号 + hover 提示标题/时间窗，点击/拖拽跳段，plan segment 点击集成预览系统
 
 ## 8. Gotchas（踩过的坑）
 

@@ -36,7 +36,7 @@ The `serve` subcommand starts a local web server, default `http://127.0.0.1:8765
 | ![pipeline](docs/screenshots/pipeline.png) | ![plan](docs/screenshots/plan.png) |
 
 - **Left**: video list (scans `output/compressed/`), each row shows whether `texts` / `voiceover` JSON exists
-- **Center**: HTML5 player (drag / seek), clicking a segment on the right auto-seeks
+- **Center**: HTML5 player (drag / seek), clicking a segment on the right auto-seeks. In plan mode, a preview progress bar appears below the player (click/drag to jump segments, play/pause, prev/next).
 - **Right**: three tabs
   - **Analysis (texts)** — edit `title` / `location` / `mood` / `summary`, per-segment timeline descriptions
   - **Voiceover (scripts)** — edit `voiceover` text / `edit_tip` / `duration_hint_sec`
@@ -645,5 +645,5 @@ Use the looser `requirements.txt` for daily development.
 
 - [ ] Auto-group multi-day vlogs by folder/date
 - [ ] Export to 剪映 draft format
-- [ ] Web UI for timeline preview
+- [x] Web UI for timeline preview
 - [x] Local Whisper transcription for clips with live commentary

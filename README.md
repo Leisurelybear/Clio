@@ -38,7 +38,7 @@
 | ![pipeline](docs/screenshots/pipeline.png) | ![plan](docs/screenshots/plan.png) |
 
 - 左侧：视频列表（自动扫描 `output/compressed/`），每条标注是否已有 `texts` / `voiceover` JSON
-- 中间：HTML5 视频播放器（支持拖动 / 跳跃），点右侧 segment 自动跳转
+- 中间：HTML5 视频播放器（支持拖动 / 跳跃），点右侧 segment 自动跳转；plan 模式下播放器下方显示预览进度条（点击/拖拽跳段、播放/暂停、上下段切换）
 - 右侧：三个 Tab
   - **分析 (texts)** — 编辑 `title` / `location` / `mood` / `summary`，每段 timeline 描述
   - **口播 (scripts)** — 编辑 `voiceover` 文案 / `edit_tip` / `duration_hint_sec`
@@ -710,7 +710,7 @@ Hook 会在每次 `git commit` 前自动运行 `ruff format` 并重新 stage 格
 - [x] 分布式改进：server.py / app.js 拆模块（Phase 1a~1d）
 - [ ] 按文件夹/日期自动分组多天 vlog
 - [ ] 剪映草稿导出格式
-- [ ] Web UI 预览时间轴（R-012）
+- [x] Web UI 预览时间轴（R-012）
 - [ ] Web UI 单步执行：选目录 → 选文件 → 跑步骤 → 进度 → 自动刷新（R-008）
 - [x] 支持 Whisper 本地语音转写（有口播的素材）（R-013）
 - [ ] AI token 用量统计面板（R-014）
