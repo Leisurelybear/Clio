@@ -37,6 +37,107 @@ async function init() {
     state.currentProjectName = urlProject;
   }
 
+  // 新建/打开项目模态框（必须在 try 之前绑定，空状态时也会用到）
+  const newModal = $('modal-new-project');
+  $('btn-new-project').onclick = () => { newModal.style.display = 'flex'; };
+  $('np-cancel').onclick = () => { newModal.style.display = 'none'; };
+  newModal.querySelector('.modal-backdrop').onclick = () => { newModal.style.display = 'none'; };
+  $('np-create').onclick = async () => {
+    const name = $('np-name').value.trim();
+    const inputDir = $('np-input-dir').value.trim();
+    const outputDir = $('np-output-dir').value.trim();
+    if (!name || !inputDir) { setStatus('Please fill in name and input directory', 'warn'); return; }
+    try {
+      const body = { name, input_dir: inputDir };
+      if (outputDir) body.output_dir = outputDir;
+      const r = await api('POST', '/api/project/create', body);
+      if (r.ok) {
+        newModal.style.display = 'none';
+        window.location.search = `?project=${encodeURIComponent(name)}`;
+      } else {
+        setStatus('Create failed: ' + (r.error || 'unknown error'), 'err');
+      }
+    } catch (e) {
+      setStatus('Create failed: ' + e.message, 'err');
+    }
+  };
+
+  const openModal = $('modal-open-project');
+  $('btn-open-project').onclick = async () => {
+    openModal.style.display = 'flex';
+    try {
+      const r = await api('GET', '/api/projects');
+      const allProjects = r.projects || [];
+      const openList = $('project-list-modal');
+      openList.innerHTML = allProjects.length
+        ? allProjects.map(p => `
+          <div class="project-card ${p.is_current ? 'active' : ''}" data-name="${escapeHtml(p.name)}" data-input-dir="${escapeHtml(p.input_dir)}">
+            <div class="project-card-header">
+              <span class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(current)' : ''}</span>
+              <button class="project-card-remove" title="Remove from project list">✕</button>
+            </div>
+            <div class="project-card-meta">
+              Input: ${escapeHtml(p.input_dir)}<br>
+              Output: ${escapeHtml(p.output_dir)}<br>
+              Steps: ${[['compress','compress'],['analyze','analyze'],['scripts','scripts'],['plan','plan'],['label','label'],['cut','cut']]
+                .map(([k,l]) => p.steps?.[k] ? `<span class="step-dot done" title="${l} done">${l}</span>` : `<span class="step-dot" title="${l} pending">${l}</span>`)
+                .join(' ')}
+            </div>
+          </div>
+        `).join('')
+        : '<p class="muted">No projects yet. Create one first.</p>';
+      openList.querySelectorAll('.project-card').forEach(card => {
+        card.onclick = (e) => {
+          if (e.target.closest('.project-card-remove')) return;
+          const name = card.dataset.name;
+          const removeBtn = card.querySelector('.project-card-remove');
+          if (removeBtn) {
+            removeBtn.onclick = async (e) => {
+              e.stopPropagation();
+              if (!confirm(`Remove "${name}" from project list?`)) return;
+              const r2 = await api('POST', '/api/project/remove', { input_dir: card.dataset.inputDir });
+              if (r2.ok) {
+                if (name === state.currentProject?.name) {
+                  openModal.style.display = 'none';
+                  window.location.search = '';
+                } else {
+                  $('btn-open-project').click();
+                }
+              }
+            };
+          }
+          if (name === state.currentProject?.name) { openModal.style.display = 'none'; return; }
+          if (state.dirty && !confirm('Switch project? Unsaved changes will be lost.')) return;
+          openModal.style.display = 'none';
+          window.location.search = `?project=${encodeURIComponent(name)}`;
+        };
+      });
+    } catch (e) {
+      $('project-list-modal').innerHTML = '<p class="err">Failed to load projects: ' + escapeHtml(e.message) + '</p>';
+    }
+  };
+  $('op-cancel').onclick = () => { openModal.style.display = 'none'; };
+  openModal.querySelector('.modal-backdrop').onclick = () => { openModal.style.display = 'none'; };
+  $('op-open-path').onclick = async () => {
+    const path = $('op-custom-path').value.trim();
+    if (!path) { setStatus('Please enter a project directory path', 'warn'); return; }
+    try {
+      const r = await api('POST', '/api/project/add', { input_dir: path });
+      if (r.ok) {
+        openModal.style.display = 'none';
+        const name = r.project?.name || path.split(/[\\/]/).pop();
+        window.location.search = `?project=${encodeURIComponent(name)}`;
+      } else {
+        setStatus('Open failed: ' + (r.error || 'unknown error'), 'err');
+      }
+    } catch (e) {
+      setStatus('Open failed: ' + e.message, 'err');
+    }
+  };
+  $('op-custom-path').onkeydown = (e) => {
+    if (e.key === 'Enter') $('op-open-path').click();
+  };
+
   try {
     await loadProjects();
     // 如果没有 URL 指定项目，也没有上次使用的项目，显示打开界面
@@ -164,117 +265,6 @@ async function init() {
   window.addEventListener('beforeunload', (e) => {
     if (state.dirty) { e.preventDefault(); e.returnValue = '有未保存的修改'; }
   });
-
-  // New project modal
-  const newModal = $('modal-new-project');
-  $('btn-new-project').onclick = () => { newModal.style.display = 'flex'; };
-  $('np-cancel').onclick = () => { newModal.style.display = 'none'; };
-  newModal.querySelector('.modal-backdrop').onclick = () => { newModal.style.display = 'none'; };
-  $('np-create').onclick = async () => {
-    const name = $('np-name').value.trim();
-    const inputDir = $('np-input-dir').value.trim();
-    const outputDir = $('np-output-dir').value.trim();
-    if (!name || !inputDir) { setStatus('请填写项目名称和素材目录', 'warn'); return; }
-    try {
-      const body = { name, input_dir: inputDir };
-      if (outputDir) body.output_dir = outputDir;
-      const r = await api('POST', '/api/project/create', body);
-      if (r.ok) {
-        newModal.style.display = 'none';
-        window.location.search = `?project=${encodeURIComponent(name)}`;
-      } else {
-        setStatus('创建失败: ' + (r.error || '未知错误'), 'err');
-      }
-    } catch (e) {
-      setStatus('创建失败: ' + e.message, 'err');
-    }
-  };
-
-  // Open project modal
-  const openModal = $('modal-open-project');
-  const openList = $('project-list-modal');
-  $('btn-open-project').onclick = async () => {
-    openModal.style.display = 'flex';
-    // 刷新项目列表
-    try {
-      const r = await api('GET', '/api/projects');
-      const allProjects = r.projects || [];
-      openList.innerHTML = allProjects.length
-        ? allProjects.map(p => `
-          <div class="project-card ${p.is_current ? 'active' : ''}" data-name="${escapeHtml(p.name)}" data-input-dir="${escapeHtml(p.input_dir)}">
-            <div class="project-card-header">
-              <span class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(current)' : ''}</span>
-              <button class="project-card-remove" title="Remove from project list">✕</button>
-            </div>
-            <div class="project-card-meta">
-              Input: ${escapeHtml(p.input_dir)}<br>
-              Output: ${escapeHtml(p.output_dir)}<br>
-              Steps: ${[['compress','compress'],['analyze','analyze'],['scripts','scripts'],['plan','plan'],['label','label'],['cut','cut']]
-                .map(([k,l]) => p.steps?.[k] ? `<span class="step-dot done" title="${l} done">${l}</span>` : `<span class="step-dot" title="${l} pending">${l}</span>`)
-                .join(' ')}
-            </div>
-          </div>
-        `).join('')
-        : '<p class="muted">暂无项目，请先新建</p>';
-      // 点击卡片切换项目
-      openList.querySelectorAll('.project-card').forEach(card => {
-        const removeBtn = card.querySelector('.project-card-remove');
-        if (removeBtn) {
-          removeBtn.onclick = async (e) => {
-            e.stopPropagation();
-            const name = card.dataset.name;
-            if (!confirm(`Remove "${name}" from project list?`)) return;
-            const r = await api('POST', '/api/project/remove', { input_dir: card.dataset.inputDir });
-            if (r.ok) {
-              if (name === state.currentProject?.name) {
-                openModal.style.display = 'none';
-                window.location.search = '';
-              } else {
-                await loadProjects();
-                $('btn-open-project').click();
-              }
-            }
-          };
-        }
-        card.onclick = (e) => {
-          if (e.target.closest('.project-card-remove')) return;
-          const name = card.dataset.name;
-          if (name === state.currentProject?.name) {
-            openModal.style.display = 'none';
-            return;
-          }
-          if (state.dirty && !confirm('Switch project? Unsaved changes will be lost.')) return;
-          openModal.style.display = 'none';
-          window.location.search = `?project=${encodeURIComponent(name)}`;
-        };
-      });
-    } catch (e) {
-      openList.innerHTML = '<p class="err">加载项目列表失败: ' + escapeHtml(e.message) + '</p>';
-    }
-  };
-  $('op-cancel').onclick = () => { openModal.style.display = 'none'; };
-  openModal.querySelector('.modal-backdrop').onclick = () => { openModal.style.display = 'none'; };
-  // 自定义路径打开项目
-  $('op-open-path').onclick = async () => {
-    const path = $('op-custom-path').value.trim();
-    if (!path) { setStatus('请输入项目目录路径', 'warn'); return; }
-    try {
-      const r = await api('POST', '/api/project/add', { input_dir: path });
-      if (r.ok) {
-        openModal.style.display = 'none';
-        const name = r.project?.name || path.split(/[\\/]/).pop();
-        window.location.search = `?project=${encodeURIComponent(name)}`;
-      } else {
-        setStatus('打开项目失败: ' + (r.error || '未知错误'), 'err');
-      }
-    } catch (e) {
-      setStatus('打开项目失败: ' + e.message, 'err');
-    }
-  };
-  // Enter 键触发打开
-  $('op-custom-path').onkeydown = (e) => {
-    if (e.key === 'Enter') $('op-open-path').click();
-  };
 
   // Browse modal backdrop close
   const browseModal = $('modal-browse-dir');
