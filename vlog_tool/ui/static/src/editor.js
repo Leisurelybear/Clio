@@ -11,7 +11,7 @@ import {
   setDeep,
 } from './utils.js';
 import { api, icon } from './api.js';
-import { playVideoSegment } from './viewer.js';
+import { playVideoSegment, renderPreviewBar } from './viewer.js';
 
 // ── Rendering ──────────────────────────────────────────────────
 
@@ -226,7 +226,7 @@ function renderPlan() {
   const p = state.plan;
   const pane = $('tab-plan');
   $('player-pane').classList.add('plan-mode');
-  import('./viewer.js').then(mod => mod.renderPreviewBar());
+  renderPreviewBar();
   if (!p) {
     pane.innerHTML = `
       <h3>vlog 剪辑规划</h3>
