@@ -104,10 +104,13 @@ def run_pipeline_steps(
                 tracker.update(phase=step, current=0, total=1, message=f"{label}...")
             with timed(f"=== {label} ==="):
                 fn = _STEP_FUNCS[step]
+                kwargs: dict = {}
+                if cancel_event and step in ("compress", "transcribe"):
+                    kwargs["cancel_event"] = cancel_event
                 if step in _STEP_DAY_ARG:
-                    fn(config, day_label, tracker)
+                    fn(config, day_label, tracker, **kwargs)
                 else:
-                    fn(config, tracker)
+                    fn(config, tracker, **kwargs)
         if not (cancel_event and cancel_event.is_set()):
             tracker.done(f"完成！输出目录: {config.paths.output_dir}")
     except Exception as e:
