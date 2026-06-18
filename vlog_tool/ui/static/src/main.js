@@ -138,6 +138,77 @@ async function init() {
     if (e.key === 'Enter') $('op-open-path').click();
   };
 
+  // ---- Always register event handlers (before first async, so they work in empty state) ----
+  $$('.source-toggle button').forEach(b => {
+    b.onclick = () => setSource(b.dataset.source);
+  });
+  $$('.project-item').forEach(p => {
+    p.onclick = (e) => {
+      if (p.classList.contains('disabled')) {
+        const name = p.querySelector('.name').textContent;
+        setStatus(`「${name}」功能待对应 R-XXX 实现`, 'warn');
+        return;
+      }
+      if (e.target.tagName === 'SELECT') return;
+      if (p.dataset.entity === 'plan') selectPlan();
+      else if (p.dataset.entity === 'run') selectRun();
+      else if (p.dataset.entity === 'config') selectConfig();
+      else if (p.dataset.entity === 'logs') selectLogs();
+    };
+  });
+  document.body.addEventListener('click', e => {
+    const btn = e.target.closest('.browse-btn');
+    if (btn) openBrowseDir(btn.dataset.target);
+  });
+  const browseSelect = $('browse-select');
+  if (browseSelect) {
+    browseSelect.onclick = () => {
+      const pathEl = $('browse-path');
+      if (!pathEl || !window._browseResolve) return;
+      window._browseResolve(pathEl.textContent);
+      window._browseResolve = null;
+      $('modal-browse-dir').style.display = 'none';
+    };
+  }
+  const browseCancel = $('browse-cancel');
+  if (browseCancel) {
+    browseCancel.onclick = () => {
+      window._browseResolve = null;
+      $('modal-browse-dir').style.display = 'none';
+    };
+  }
+  $('btn-reload').onclick = async () => {
+    try {
+      const cur = state.currentVideo;
+      await loadProject();
+      renderSteps();
+      await loadVideos();
+      if (cur && state.videos.find(x => x.file === cur)) {
+        await selectVideo(cur);
+      } else if (state.videos.length) {
+        await selectVideo(state.videos[0].file);
+      }
+      setStatus('已重新加载', 'ok');
+    } catch (e) { setStatus('重载失败: ' + e.message, 'err'); }
+  };
+  $('btn-save').onclick = save;
+  $$('.tab').forEach(t => t.onclick = () => { state.currentTab = t.dataset.tab; renderActiveTab(); });
+  setupPlayer();
+  document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && (e.key === 's' || e.key === 'S')) { e.preventDefault(); save(); }
+  });
+  window.addEventListener('beforeunload', (e) => {
+    if (state.dirty) { e.preventDefault(); e.returnValue = '有未保存的修改'; }
+  });
+  const browseModal = $('modal-browse-dir');
+  if (browseModal) {
+    const backdrop = browseModal.querySelector('.modal-backdrop');
+    if (backdrop) backdrop.onclick = () => { window._browseResolve = null; browseModal.style.display = 'none'; };
+  }
+  const rerunClose = $('rerun-close');
+  if (rerunClose) rerunClose.onclick = hideRerunProgress;
+  // ---- End event handlers ----
+
   try {
     await loadProjects();
     // 如果没有 URL 指定项目，也没有上次使用的项目，显示打开界面
@@ -195,87 +266,6 @@ async function init() {
   } catch (e) {
     setStatus('Init failed: ' + e.message, 'err');
   }
-
-  $$('.source-toggle button').forEach(b => {
-    b.onclick = () => setSource(b.dataset.source);
-  });
-
-  $$('.project-item').forEach(p => {
-    p.onclick = (e) => {
-      if (p.classList.contains('disabled')) {
-        const name = p.querySelector('.name').textContent;
-        setStatus(`「${name}」功能待对应 R-XXX 实现`, 'warn');
-        return;
-      }
-      // 点中 select 下拉框时不切换实体（由 select.onchange 处理）
-      if (e.target.tagName === 'SELECT') return;
-      if (p.dataset.entity === 'plan') selectPlan();
-      else if (p.dataset.entity === 'run') selectRun();
-      else if (p.dataset.entity === 'config') selectConfig();
-      else if (p.dataset.entity === 'logs') selectLogs();
-    };
-  });
-
-  // Browse buttons — 事件委托以覆盖动态创建的按钮
-  document.body.addEventListener('click', e => {
-    const btn = e.target.closest('.browse-btn');
-    if (btn) openBrowseDir(btn.dataset.target);
-  });
-  const browseSelect = $('browse-select');
-  if (browseSelect) {
-    browseSelect.onclick = () => {
-      const pathEl = $('browse-path');
-      if (!pathEl || !window._browseResolve) return;
-      window._browseResolve(pathEl.textContent);
-      window._browseResolve = null;
-      $('modal-browse-dir').style.display = 'none';
-    };
-  }
-  const browseCancel = $('browse-cancel');
-  if (browseCancel) {
-    browseCancel.onclick = () => {
-      window._browseResolve = null;
-      $('modal-browse-dir').style.display = 'none';
-    };
-  }
-
-  $('btn-reload').onclick = async () => {
-    try {
-      const cur = state.currentVideo;
-      await loadProject();
-      renderSteps();
-      await loadVideos();
-      if (cur && state.videos.find(x => x.file === cur)) {
-        await selectVideo(cur);
-      } else if (state.videos.length) {
-        await selectVideo(state.videos[0].file);
-      }
-      setStatus('已重新加载', 'ok');
-    } catch (e) { setStatus('重载失败: ' + e.message, 'err'); }
-  };
-  $('btn-save').onclick = save;
-  $$('.tab').forEach(t => t.onclick = () => { state.currentTab = t.dataset.tab; renderActiveTab(); });
-
-  setupPlayer();
-
-  document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && (e.key === 's' || e.key === 'S')) { e.preventDefault(); save(); }
-  });
-
-  window.addEventListener('beforeunload', (e) => {
-    if (state.dirty) { e.preventDefault(); e.returnValue = '有未保存的修改'; }
-  });
-
-  // Browse modal backdrop close
-  const browseModal = $('modal-browse-dir');
-  if (browseModal) {
-    const backdrop = browseModal.querySelector('.modal-backdrop');
-    if (backdrop) backdrop.onclick = () => { window._browseResolve = null; browseModal.style.display = 'none'; };
-  }
-
-  // Rerun close button
-  const rerunClose = $('rerun-close');
-  if (rerunClose) rerunClose.onclick = hideRerunProgress;
 }
 
 init();
