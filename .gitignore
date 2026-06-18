@@ -16,3 +16,4 @@ opencode_session_import.json
 # Whisper model cache
 /models/
 
+.idea/

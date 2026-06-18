@@ -1,5 +1,5 @@
-# 核心依赖（宽松版本，兼容已有环境）
-# 如需精确可重复构建，使用 requirements-locked.txt
+# Core dependencies (loose pins, compatible with existing envs)
+# For exact reproducible builds, use requirements-locked.txt
 google-genai>=2.7.0
 httpx[socks]>=0.28.1
 pyyaml>=6.0.3

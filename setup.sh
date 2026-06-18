@@ -46,6 +46,17 @@ else
 fi
 
 # 1. Python 虚拟环境
+if [ -f ".venv/bin/python" ]; then
+    venvVer=$(.venv/bin/python --version 2>&1)
+    if [[ $venvVer =~ Python\ ([0-9]+)\.([0-9]+) ]]; then
+        vmajor=${BASH_REMATCH[1]}
+        vminor=${BASH_REMATCH[2]}
+        if [[ $vmajor -lt 3 || ($vmajor -eq 3 && $vminor -lt 11) ]]; then
+            echo "     虚拟环境 Python 版本过旧 ($vmajor.$vminor)，正在重建..."
+            rm -rf ".venv"
+        fi
+    fi
+fi
 if [ ! -f ".venv/bin/python" ]; then
     echo "[1/4] 创建 Python 虚拟环境..."
     python3 -m venv .venv
@@ -80,7 +91,13 @@ if [ "$whisperAnswer" = "y" ] || [ "$whisperAnswer" = "Y" ]; then
     else
         if command -v nvidia-smi &>/dev/null; then
             echo "     检测到 NVIDIA GPU，安装 CUDA 运行时加速..."
-            if ! .venv/bin/python -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 -q; then
+            free_kb=$(df -k . | awk 'NR==2{print $4}' 2>/dev/null || echo 0)
+            cuda_args=""
+            if [ "$free_kb" -gt 0 ] && [ "$free_kb" -lt $((5*1024*1024)) ]; then
+                echo "     磁盘仅剩 $((free_kb/1024/1024))GB，使用无缓存模式安装..."
+                cuda_args="--no-cache-dir"
+            fi
+            if ! .venv/bin/python -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 $cuda_args -q; then
                 echo "     CUDA 运行时安装失败，将使用 CPU 运行（速度较慢）"
             fi
         else

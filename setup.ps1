@@ -88,6 +88,16 @@ if (-not $pyOk) {
 }
 
 # 1. Python 虚拟环境
+if (Test-Path ".venv\Scripts\python.exe") {
+    $venvVer = & ".venv\Scripts\python.exe" --version 2>&1
+    if ($venvVer -match 'Python (\d+)\.(\d+)') {
+        $vmajor = [int]$Matches[1]; $vminor = [int]$Matches[2]
+        if ($vmajor -lt 3 -or ($vmajor -eq 3 -and $vminor -lt 11)) {
+            Write-Host "     虚拟环境 Python 版本过旧 ($vmajor.$vminor)，正在重建..." -ForegroundColor Yellow
+            Remove-Item ".venv" -Recurse -Force
+        }
+    }
+}
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
     Write-Host "[1/4] 创建 Python 虚拟环境..."
     Invoke-Expression "$pyCmdStr -m venv .venv"
@@ -129,14 +139,22 @@ if ($whisperAnswer -eq 'y' -or $whisperAnswer -eq 'Y') {
         Write-Host "     Whisper 依赖安装失败，跳过后续步骤" -ForegroundColor Red
     } else {
         # 检测 CUDA 显卡
-        $cudaAvail = $false
         try {
             $nvidiaSmi = Get-Command nvidia-smi -ErrorAction Stop
-            $cudaAvail = $true
             Write-Host "     检测到 NVIDIA GPU，安装 CUDA 运行时加速..." -ForegroundColor Green
-            .\.venv\Scripts\python.exe -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 -q
+            # CUDA 包 ~3GB，检查磁盘空间
+            $cudaArgs = @()
+            $drive = (Get-PSDrive -Name ($pwd.Drive.Name) -ErrorAction SilentlyContinue)
+            if ($drive -and $drive.Free -lt 5GB) {
+                Write-Host "     C 盘仅剩 $([math]::Round($drive.Free/1GB, 1))GB，使用无缓存模式安装..." -ForegroundColor Yellow
+                $cudaArgs = @("--no-cache-dir")
+            }
+            .\.venv\Scripts\python.exe -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 @cudaArgs -q
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "     CUDA 运行时安装失败，将使用 CPU 运行（速度较慢）" -ForegroundColor DarkYellow
+                if ($LASTEXITCODE -eq 28) {
+                    Write-Host "     原因：磁盘空间不足，请清理磁盘后重试，或跳过 CUDA 直接使用 CPU" -ForegroundColor DarkYellow
+                }
             }
         } catch {
             Write-Host "     未检测到 NVIDIA GPU，将使用 CPU 运行（速度较慢）" -ForegroundColor DarkYellow

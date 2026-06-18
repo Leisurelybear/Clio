@@ -70,10 +70,12 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
     status("ffprobe", bool(ffprobe), ffprobe or "未找到")
 
     check_dir = input_dir or config.paths.input_dir
-    status("素材目录", check_dir.is_dir(), str(check_dir))
     if check_dir.is_dir():
         videos = find_videos(check_dir, recursive=config.paths.recursive)
-        print(f"       发现 {len(videos)} 个视频文件")
+        print(f"  [OK] 素材目录 ({len(videos)} 个视频) - {check_dir}")
+    else:
+        print(f"  [WARN] 素材目录未设置，使用 -i/--input 指定目录")
+        print(f"         config.yaml 默认: {check_dir}")
 
     print("\nAI 任务配置:")
     for task_name, task_cfg in config.ai.tasks.items():
@@ -91,8 +93,11 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
         config.proxy.url if config.proxy.enabled else "未启用",
     )
 
-    print(f"\n默认输入: {config.paths.input_dir}")
-    print(f"默认输出: {config.paths.output_dir}")
+    if not check_dir.is_dir():
+        print()
+        print("用法: python main.py <命令> -i <素材目录>")
+        print("      例如: python main.py run -i G:\\素材\\巴黎行")
+    print(f"\ndone (exit code: {0 if ok else 1})")
     return 0 if ok else 1
 
 
