@@ -46,9 +46,10 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
         cfg.plan.use_transcripts = obj["use_transcripts"]
 
     def _run():
+        handler.__class__._cancel_event.clear()
         tracker = ProgressTracker(cfg.paths.output_dir)
         try:
-            run_pipeline_steps(cfg, day_label, steps, tracker=tracker)
+            run_pipeline_steps(cfg, day_label, steps, tracker=tracker, cancel_event=handler.__class__._cancel_event)
         except Exception:
             tracker.error("pipeline failed")
             traceback.print_exc()
@@ -60,6 +61,12 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
         handler._run_thread.start()
     label = "+".join(steps) if steps else "all"
     handler._send_json({"ok": True, "message": f"pipeline started ({label})"})
+
+
+def handle_post_run_cancel(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
+    """Handle POST /api/run/cancel."""
+    handler.__class__._cancel_event.set()
+    handler._send_json({"ok": True, "message": "取消请求已发送"})
 
 
 def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
@@ -126,7 +133,9 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
         original_video=original_video,
         texts_json=texts_json,
         proj_out=proj_out,
+        cancel_event=handler.__class__._cancel_event,
     ):
+        cancel_event.clear()
         # Deep-copy config, force redo (user clicked rerun => regenerate everything)
         cfg = copy.deepcopy(cfg)
         cfg.analyze.skip_existing = False
@@ -138,32 +147,43 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
 
         try:
             _log(f"▶ Starting rerun {task} — {video_basename}")
-            if task in ("compress", "all"):
-                _log("Step: compressing video...")
-                run_compress_all(cfg, tracker=tracker, single_file=original_video)
-                _log("✓ compression complete")
-            if task in ("analyze", "all"):
-                _log("Step: AI analyzing video...")
-                run_analyze_all(cfg, tracker=tracker, single_file=original_video)
-                _log("✓ analysis complete")
-            if task in ("voiceover", "all"):
-                _log("Step: generating voiceover script...")
-                run_generate_scripts(cfg, tracker=tracker, single_file=texts_json)
-                _log("✓ voiceover generation complete")
+            for step_name, step_fn, step_label in [
+                ("compress", lambda: run_compress_all(cfg, tracker=tracker, single_file=original_video, cancel_event=cancel_event), "压缩视频"),
+                ("analyze", lambda: run_analyze_all(cfg, tracker=tracker, single_file=original_video), "AI 分析"),
+                ("voiceover", lambda: run_generate_scripts(cfg, tracker=tracker, single_file=texts_json), "生成口播"),
+            ]:
+                if task not in (step_name, "all"):
+                    continue
+                if cancel_event.is_set():
+                    _log(f"✗ 取消: {step_label}")
+                    raise RuntimeError(f"rerun 被用户取消（{step_label}）")
+                _log(f"Step: {step_label}...")
+                step_fn()
+                _log(f"✓ {step_label} complete")
             if task in ("transcribe", "all"):
+                if cancel_event.is_set():
+                    _log("✗ 取消: 转录")
+                    raise RuntimeError("rerun 被用户取消（转录）")
                 _log("Step: transcribing audio...")
                 from vlog_tool.transcribe import check_whisper
 
                 if not check_whisper():
                     raise RuntimeError("faster-whisper 未安装。执行: python main.py whisper install")
                 _log(f"original_video={original_video}, exists={original_video.is_file()}")
-                result = run_transcribe_one(cfg, original_video)
+                result = run_transcribe_one(cfg, original_video, cancel_event=cancel_event)
                 if "error" in result:
                     _log(f"✗ transcription failed: {result['error']}")
                     raise RuntimeError(result["error"])
                 _log(f"✓ transcription complete, output_dir={cfg.paths.output_dir}")
             tracker.done(f"{task} → {video_basename} complete")
             print(f"  [rerun] ✓ {task} -> {video_basename} complete")
+        except RuntimeError as e:
+            msg = str(e)
+            if "被用户取消" in msg:
+                tracker.cancelled(msg)
+            else:
+                tracker.error(f"rerun failed: {e}")
+            print(f"  [rerun] ✗ {msg}")
         except Exception as e:
             print(f"  [rerun] ✗ rerun failed: {e}")
             tracker.error(f"rerun failed: {e}")

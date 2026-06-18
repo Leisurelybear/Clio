@@ -45,6 +45,7 @@ from vlog_tool.ui.routes.projects import (
 from vlog_tool.ui.routes.run import (
     handle_get_run_status,
     handle_post_rerun,
+    handle_post_run_cancel,
     handle_post_run_start,
 )
 from vlog_tool.ui.routes.static_files import handle_favicon, handle_index, handle_static
@@ -102,6 +103,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         # Shared state (class-level, across instances)
         _run_lock = threading.Lock()
         _run_thread: threading.Thread | None = None
+        _cancel_event = threading.Event()
         _config_cache: dict[str, AppConfig] = {}
         _config_cache_lock = threading.Lock()
         DEFAULT_PROJECT: dict = {}
@@ -414,6 +416,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
             if path == "/api/run/start":
                 return handle_post_run_start(self, qs, obj)
+            if path == "/api/run/cancel":
+                return handle_post_run_cancel(self, qs, obj)
             if path == "/api/config/init":
                 return handle_post_config_init(self, qs, obj)
             if path == "/api/cut":

@@ -3,6 +3,8 @@ All public symbols are re-exported for backward compatibility."""
 
 from __future__ import annotations
 
+import threading
+
 # Keep these orchestration-specific items in pipeline.py
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
@@ -72,6 +74,7 @@ def run_pipeline_steps(
     day_label: str = "day1",
     steps: list[str] | None = None,
     tracker: ProgressTracker | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     """运行指定步骤列表（可选的进度跟踪）。
 
@@ -90,6 +93,12 @@ def run_pipeline_steps(
 
     try:
         for step in steps:
+            if cancel_event and cancel_event.is_set():
+                msg = f"[取消] pipeline 被用户终止（步骤: {_STEP_LABELS.get(step, step)}）"
+                print(msg)
+                if tracker:
+                    tracker.cancelled(msg)
+                break
             label = _STEP_LABELS.get(step, step)
             if tracker:
                 tracker.update(phase=step, current=0, total=1, message=f"{label}...")
@@ -99,7 +108,8 @@ def run_pipeline_steps(
                     fn(config, day_label, tracker)
                 else:
                     fn(config, tracker)
-        tracker.done(f"完成！输出目录: {config.paths.output_dir}")
+        if not (cancel_event and cancel_event.is_set()):
+            tracker.done(f"完成！输出目录: {config.paths.output_dir}")
     except Exception as e:
         tracker.error(str(e))
         raise

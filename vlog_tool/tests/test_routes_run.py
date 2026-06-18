@@ -8,17 +8,18 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vlog_tool.ui.routes.run import handle_get_run_status, handle_post_rerun, handle_post_run_start
+from vlog_tool.ui.routes.run import handle_get_run_status, handle_post_rerun, handle_post_run_cancel, handle_post_run_start
 
 
 @pytest.fixture
 def _handler():
-    """Create a mock handler with _run_lock and _run_thread."""
-    from threading import Lock
+    """Create a mock handler with _run_lock, _run_thread, and _cancel_event."""
+    from threading import Event, Lock
 
     handler = MagicMock()
     handler.__class__._run_lock = Lock()
     handler.__class__._run_thread = None
+    handler.__class__._cancel_event = Event()
     return handler
 
 
@@ -123,3 +124,14 @@ class TestHandlePostRerun:
 
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args[0][0]["ok"] is True
+
+
+class TestHandlePostRunCancel:
+    def test_cancel_sets_event(self, _handler):
+        handler = _handler
+        assert not handler.__class__._cancel_event.is_set()
+
+        handle_post_run_cancel(handler, {}, {})
+
+        assert handler.__class__._cancel_event.is_set()
+        handler._send_json.assert_called_once_with({"ok": True, "message": "取消请求已发送"})
