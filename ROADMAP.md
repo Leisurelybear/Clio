@@ -309,13 +309,32 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 **子任务**：
 - [x] R-015a：`POST /api/config/raw` 全局保存后调 `_config_cache.clear()` ← `e21373e`
-- [ ] R-015b：`_get_config()` 加 mtime 缓存失效
+- [x] R-015b：`_get_config()` 加 mtime 缓存失效
 - [ ] R-015c：前端区分项目级 vs 全局保存提示信息
 - [x] R-015d：`_config_cache` 添加 maxsize 限制（LRU cap 20） ← `e21373e`
 
 ## 暂存 / WIP
 
 - （暂无）
+
+## 需求 R-016：可拖拽调整 UI 布局
+
+**背景**：当前 UI 三栏布局（侧栏 / 播放器 / 编辑区）宽高固定，无法适应不同屏幕尺寸或用户偏好。
+
+**验收**：
+- 侧栏、播放器、编辑区之间的分割线可拖拽调整宽度
+- 播放器区域高度可拖拽调整
+- 布局状态持久化到 `project.json` 或 localStorage
+
+## 需求 R-017：Plan 面板时间轴拖拽浏览
+
+**背景**：当前 plan 面板只显示 segment 列表，点击跳转视频。用户期望在时间轴上拖拽查看不同 segment 对应的视频内容。
+
+**验收**：
+- Plan 面板顶部显示整体时间轴（表示 plan 的 sequence[]）
+- 每个 segment 在时间轴上以不同颜色的区块显示
+- 用户可拖拽时间轴上的滑块/点击区块来跳转到对应 segment
+- 时间轴同步：预览播放时时间轴高亮跟随当前 segment
 
 ## 文档维护（来自 2026-06-10 全面 review）
 

@@ -148,7 +148,13 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
         try:
             _log(f"▶ Starting rerun {task} — {video_basename}")
             for step_name, step_fn, step_label in [
-                ("compress", lambda: run_compress_all(cfg, tracker=tracker, single_file=original_video, cancel_event=cancel_event), "压缩视频"),
+                (
+                    "compress",
+                    lambda: run_compress_all(
+                        cfg, tracker=tracker, single_file=original_video, cancel_event=cancel_event
+                    ),
+                    "压缩视频",
+                ),
                 ("analyze", lambda: run_analyze_all(cfg, tracker=tracker, single_file=original_video), "AI 分析"),
                 ("voiceover", lambda: run_generate_scripts(cfg, tracker=tracker, single_file=texts_json), "生成口播"),
             ]:
