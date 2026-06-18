@@ -297,19 +297,30 @@ aside, section { overflow-y: auto; }
   max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .preview-seg-bar {
-  display: flex; flex: 1; height: 8px;
+  display: flex; flex: 1; height: 22px;
   background: var(--bg-surface-2); border-radius: 4px;
   cursor: pointer; overflow: hidden; min-width: 80px;
 }
 .preview-seg-block {
   height: 100%; transition: background var(--transition-fast);
   border-right: 1px solid var(--bg-surface);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; position: relative;
 }
 .preview-seg-block:last-child { border-right: none; }
-.preview-seg-block:hover { opacity: 0.8; }
+.preview-seg-block:hover { opacity: 0.85; }
 .preview-seg-block.done { background: var(--text-tertiary); }
 .preview-seg-block.active { background: var(--accent); }
 .preview-seg-block.pending { background: var(--border); }
+.preview-seg-label {
+  font-size: 9px; line-height: 1; white-space: nowrap;
+  overflow: hidden; text-overflow: ellipsis; max-width: 100%;
+  color: var(--text-primary); opacity: 0.85; pointer-events: none;
+  padding: 0 2px;
+}
+.preview-seg-block.done .preview-seg-label,
+.preview-seg-block.pending .preview-seg-label { color: var(--text-muted); }
+.preview-seg-block.active .preview-seg-label { color: #fff; font-weight: 600; }
 
 .player-tip { color: var(--text-muted); font-size: var(--text-xs); padding: var(--space-1); }
 

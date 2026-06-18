@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { $, parseTimecode, fmtTime, setStatus } from './utils.js';
+import { $, parseTimecode, fmtTime, setStatus, escapeHtml } from './utils.js';
 import { icon } from './api.js';
 
 function playVideoSegment(file, seekTo) {
@@ -51,7 +51,9 @@ function renderPreviewBar() {
     const cls = i < state.previewIndex ? 'done'
       : i === state.previewIndex && state.previewActive ? 'active'
       : 'pending';
-    return `<div class="preview-seg-block ${cls}" data-seg="${i}" style="width:${w}%"></div>`;
+    const label = `${i + 1}`;
+    const tooltip = `${seg.title || ''} [${seg.use_timeline || ''}]`.trim();
+    return `<div class="preview-seg-block ${cls}" data-seg="${i}" style="width:${w}%" title="${escapeHtml(tooltip)}"><span class="preview-seg-label">${label}</span></div>`;
   }).join('');
 
   segBar.innerHTML = segHtml;
