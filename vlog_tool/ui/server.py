@@ -105,6 +105,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         _run_thread: threading.Thread | None = None
         _cancel_event = threading.Event()
         _config_cache: dict[str, AppConfig] = {}
+        _config_meta: dict[str, tuple[float | None, float | None]] = {}
         _config_cache_lock = threading.Lock()
         DEFAULT_PROJECT: dict = {}
         server: Any  # set by HTTPServer
@@ -113,18 +114,46 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             """Return project-specific config (deep-merged with project.yaml), cached.
 
             Cache is LRU-style: capped at 20 entries, evicts oldest when full.
+            On each access, checks config file mtime to detect external edits.
             """
-            if project_input is None:
-                return config
-            key = str(project_input.resolve())
+            _GLOBAL_KEY = "__global__"
+            key = _GLOBAL_KEY if project_input is None else str(project_input.resolve())
+
+            # Read current mtimes
+            try:
+                cfg_mtime = config_path.stat().st_mtime
+            except OSError:
+                cfg_mtime = 0.0
+            project_yaml = None if project_input is None else (project_input / "project.yaml")
+            try:
+                proj_mtime = project_yaml.stat().st_mtime if project_yaml else 0.0
+            except OSError:
+                proj_mtime = 0.0
+
             with self.__class__._config_cache_lock:
                 cache = self.__class__._config_cache
-                if key not in cache:
-                    if len(cache) >= 20:
-                        # Evict the first (oldest) entry
-                        cache.pop(next(iter(cache)), None)
-                    cache[key] = load_config(config_path, project_dir=project_input)
-                return copy.deepcopy(cache[key])
+                meta = self.__class__._config_meta
+
+                if key in cache:
+                    old_cfg_mtime, old_proj_mtime = meta.get(key, (0, 0))
+                    if cfg_mtime == old_cfg_mtime and proj_mtime == old_proj_mtime:
+                        return copy.deepcopy(cache[key])
+                    # Stale — evict and reload
+                    del cache[key]
+                    meta.pop(key, None)
+
+                # Load fresh config
+                new_config = load_config(config_path, project_dir=project_input)
+
+                # LRU eviction if at capacity
+                if len(cache) >= 20:
+                    oldest_key = next(iter(cache))
+                    cache.pop(oldest_key)
+                    meta.pop(oldest_key, None)
+
+                cache[key] = new_config
+                meta[key] = (cfg_mtime, proj_mtime)
+                return copy.deepcopy(new_config)
 
         def log_message(self, fmt, *args):
             print(f"  [serve] {self.address_string()} - {fmt % args}")
