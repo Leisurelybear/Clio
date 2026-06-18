@@ -41,6 +41,8 @@ async function init() {
     await loadProjects();
     // 如果没有 URL 指定项目，也没有上次使用的项目，显示打开界面
     if (!urlProject && !state.lastProject && !state.currentProject) {
+      $('proj-name').textContent = '—';
+      $('proj-name-sidebar').textContent = '—';
       $('btn-open-project').click();
       setStatus('No project loaded. Select a project to begin.', 'warn');
       return;
