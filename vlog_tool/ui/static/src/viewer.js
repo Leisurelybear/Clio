@@ -61,9 +61,12 @@ function renderPreviewBar() {
   segBar.querySelectorAll('.preview-seg-block').forEach(el => {
     el.onclick = () => {
       const i = parseInt(el.dataset.seg);
-      if (state.previewActive && i >= 0 && i < p.sequence.length) {
+      if (i < 0 || i >= p.sequence.length) return;
+      if (state.previewActive) {
         state.previewIndex = i;
         _playPreviewSegment();
+      } else {
+        startPreview(i);
       }
     };
   });
