@@ -42,13 +42,18 @@ function renderRun() {
         <span>使用语音转录优化剪辑规划</span>
       </label>
     </div>
-    <button id="btn-run-start" class="btn-primary">${icon('play', 16)} 运行选中步骤</button>
+    <div style="display:flex;gap:8px;align-items:center">
+      <button id="btn-run-start" class="btn-primary">${icon('play', 16)} 运行选中步骤</button>
+      <button id="btn-run-cancel" class="btn-secondary" style="display:none">取消</button>
+    </div>
     <div id="run-progress" style="margin-top:12px">
       <p class="muted">尚未运行</p>
     </div>
     <div id="run-state-container"></div>
   `;
   $('btn-run-start').onclick = startRun;
+  const cancelBtn = $('btn-run-cancel');
+  if (cancelBtn) cancelBtn.onclick = cancelRun;
   if (_runPollTimer) clearInterval(_runPollTimer);
   _runPollTimer = setInterval(pollRunStatus, 2000);
   pollRunStatus();
@@ -89,6 +94,18 @@ async function startRun() {
   }
 }
 
+async function cancelRun() {
+  const btn = $('btn-run-cancel');
+  if (btn) { btn.disabled = true; btn.innerHTML = '⏹ 正在取消...'; }
+  try {
+    const r = await api('POST', '/api/run/cancel', {});
+    setStatus(r.message || '取消请求已发送', 'warn');
+  } catch (e) {
+    setStatus('取消失败: ' + e.message, 'err');
+    if (btn) { btn.disabled = false; btn.innerHTML = '取消'; }
+  }
+}
+
 async function pollRunStatus() {
   const prog = $('run-progress');
   const btn = $('btn-run-start');
@@ -98,6 +115,8 @@ async function pollRunStatus() {
     if (s.rerun) return;
     if (s.status === 'idle' || s.status === 'unknown') {
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+      const cancelBtn = $('btn-run-cancel');
+      if (cancelBtn) cancelBtn.style.display = 'none';
       if (!s.running) {
         prog.innerHTML = '<p class="muted">尚未运行</p>';
         renderProcessingState($('run-state-container'));
@@ -108,6 +127,8 @@ async function pollRunStatus() {
       const stale = !s.running;
       if (stale) {
         if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+        const cancelBtn = $('btn-run-cancel');
+        if (cancelBtn) cancelBtn.style.display = 'none';
         const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
         prog.innerHTML = `
           <p class="warn">⚠ 上次运行时意外中断，以下为残留进度（已失效）</p>
@@ -119,6 +140,8 @@ async function pollRunStatus() {
         renderProcessingState($('run-state-container'));
       } else {
         if (btn) { btn.disabled = true; btn.textContent = '运行中...'; }
+        const cancelBtn = $('btn-run-cancel');
+        if (cancelBtn) { cancelBtn.style.display = ''; cancelBtn.disabled = false; }
         const pct = s.total > 0 ? Math.round(s.current / s.total * 100) : 0;
         const eta = s.eta_sec ? `，预计剩余 ${Math.round(s.eta_sec)} 秒` : '';
         const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
@@ -135,6 +158,8 @@ async function pollRunStatus() {
     } else if (s.status === 'done') {
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+      const cancelBtn = $('btn-run-cancel');
+      if (cancelBtn) cancelBtn.style.display = 'none';
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="ok">✓ 流水线完成</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线完成', 'ok');
@@ -148,9 +173,20 @@ async function pollRunStatus() {
       try { state.plan = await api('GET', `/api/plan?day=${_lastRunDay}`); } catch {}
       await import('./sidebar.js').then(mod => mod.loadVideos());
       if (state.currentEntity === 'plan') import('./sidebar.js').then(mod => mod.selectPlan());
+    } else if (s.status === 'cancelled') {
+      _stopRunPoll();
+      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+      const cancelBtn = $('btn-run-cancel');
+      if (cancelBtn) cancelBtn.style.display = 'none';
+      const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
+      prog.innerHTML = `<p class="warn">⏹ 流水线已取消</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
+      setStatus('流水线已取消', 'warn');
+      renderProcessingState($('run-state-container'));
     } else     if (s.status === 'error') {
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+      const cancelBtn = $('btn-run-cancel');
+      if (cancelBtn) cancelBtn.style.display = 'none';
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="err">✗ 流水线出错</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线出错', 'err');
