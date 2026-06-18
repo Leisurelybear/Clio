@@ -39,6 +39,12 @@ async function init() {
 
   try {
     await loadProjects();
+    // 如果没有 URL 指定项目，也没有上次使用的项目，显示打开界面
+    if (!urlProject && !state.lastProject && !state.currentProject) {
+      $('btn-open-project').click();
+      setStatus('No project loaded. Select a project to begin.', 'warn');
+      return;
+    }
     // 如果 URL 没有指定项目，但有上次使用的项目，自动跳转
     if (!urlProject && state.lastProject && state.lastProject !== state.currentProject?.name) {
       window.location.search = `?project=${encodeURIComponent(state.lastProject)}`;
@@ -59,11 +65,11 @@ async function init() {
         if (check.needs_init) {
           // 在状态栏显示可操作的提示
           const el = $('status');
-          el.innerHTML = `该项目无专属配置，<button onclick="initProjectConfig()" style="background:none;border:1px solid currentColor;border-radius:3px;padding:2px 8px;cursor:pointer;color:inherit;font:inherit">立即创建 project.yaml</button>`;
+          el.innerHTML = `Project has no project.yaml, <button onclick="initProjectConfig()" style="background:none;border:1px solid currentColor;border-radius:3px;padding:2px 8px;cursor:pointer;color:inherit;font:inherit">create one now</button>`;
           el.className = 'status warn';
         }
       } catch {
-        // 静默忽略
+        // ignore
       }
     })();
     await loadPlans();
@@ -80,11 +86,11 @@ async function init() {
     if (state.videos.length) {
       await selectVideo(state.videos[0].file);
     } else {
-      setStatus('项目目录下没有视频文件', 'warn');
+      setStatus('No video files in project directory', 'warn');
       renderVideoList(); // 显示空状态
     }
   } catch (e) {
-    setStatus('初始化失败: ' + e.message, 'err');
+    setStatus('Init failed: ' + e.message, 'err');
   }
 
   $$('.source-toggle button').forEach(b => {
@@ -193,13 +199,16 @@ async function init() {
       const allProjects = r.projects || [];
       openList.innerHTML = allProjects.length
         ? allProjects.map(p => `
-          <div class="project-card ${p.is_current ? 'active' : ''}" data-name="${escapeHtml(p.name)}">
-            <div class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(当前)' : ''}</div>
+          <div class="project-card ${p.is_current ? 'active' : ''}" data-name="${escapeHtml(p.name)}" data-input-dir="${escapeHtml(p.input_dir)}">
+            <div class="project-card-header">
+              <span class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(current)' : ''}</span>
+              <button class="project-card-remove" title="Remove from project list">✕</button>
+            </div>
             <div class="project-card-meta">
-              素材目录: ${escapeHtml(p.input_dir)}<br>
-              输出目录: ${escapeHtml(p.output_dir)}<br>
-              步骤: ${[['compress','压缩'],['analyze','分析'],['scripts','口播'],['plan','规划'],['label','标号'],['cut','裁剪']]
-                .map(([k,l]) => p.steps?.[k] ? `<span class="step-dot done" title="${l}已完成">✓${l}</span>` : `<span class="step-dot" title="${l}未完成">○${l}</span>`)
+              Input: ${escapeHtml(p.input_dir)}<br>
+              Output: ${escapeHtml(p.output_dir)}<br>
+              Steps: ${[['compress','compress'],['analyze','analyze'],['scripts','scripts'],['plan','plan'],['label','label'],['cut','cut']]
+                .map(([k,l]) => p.steps?.[k] ? `<span class="step-dot done" title="${l} done">${l}</span>` : `<span class="step-dot" title="${l} pending">${l}</span>`)
                 .join(' ')}
             </div>
           </div>
@@ -207,13 +216,32 @@ async function init() {
         : '<p class="muted">暂无项目，请先新建</p>';
       // 点击卡片切换项目
       openList.querySelectorAll('.project-card').forEach(card => {
-        card.onclick = () => {
+        const removeBtn = card.querySelector('.project-card-remove');
+        if (removeBtn) {
+          removeBtn.onclick = async (e) => {
+            e.stopPropagation();
+            const name = card.dataset.name;
+            if (!confirm(`Remove "${name}" from project list?`)) return;
+            const r = await api('POST', '/api/project/remove', { input_dir: card.dataset.inputDir });
+            if (r.ok) {
+              if (name === state.currentProject?.name) {
+                openModal.style.display = 'none';
+                window.location.search = '';
+              } else {
+                await loadProjects();
+                $('btn-open-project').click();
+              }
+            }
+          };
+        }
+        card.onclick = (e) => {
+          if (e.target.closest('.project-card-remove')) return;
           const name = card.dataset.name;
           if (name === state.currentProject?.name) {
             openModal.style.display = 'none';
             return;
           }
-          if (state.dirty && !confirm('切换项目将丢弃当前修改，确定吗？')) return;
+          if (state.dirty && !confirm('Switch project? Unsaved changes will be lost.')) return;
           openModal.style.display = 'none';
           window.location.search = `?project=${encodeURIComponent(name)}`;
         };

@@ -14,6 +14,7 @@ from vlog_tool.ui.services.project_service import (
     _list_projects,
     _project_output_dir,
     _registry_path,
+    _remove_from_registry,
     _save_last_project,
 )
 
@@ -165,3 +166,33 @@ def handle_post_project_add(handler: BaseHTTPRequestHandler, obj: dict) -> None:
             return handler._send_json({"ok": False, "error": f"无法读取 project.json: {e}"}, 400)
     _add_to_registry(str(input_path), config_path)
     handler._send_json({"ok": True, "project": {"name": name, "input_dir": str(input_path)}})
+
+
+def handle_post_project_remove(handler: BaseHTTPRequestHandler, obj: dict) -> None:
+    """Handle POST /api/project/remove."""
+    config_path = handler.config_path
+    project_name = (obj.get("name") or "").strip()
+    input_dir_raw = (obj.get("input_dir") or "").strip()
+    if not project_name and not input_dir_raw:
+        return handler._send_json({"ok": False, "error": "name or input_dir required"}, 400)
+    if input_dir_raw:
+        _remove_from_registry(input_dir_raw, config_path)
+    elif project_name:
+        reg_file = _registry_path(config_path)
+        if reg_file.is_file():
+            try:
+                reg = json.loads(reg_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                reg = {"projects": []}
+            for p_str in reg.get("projects", []):
+                p = Path(p_str)
+                proj_file = p / "project.json"
+                if proj_file.is_file():
+                    try:
+                        data = json.loads(proj_file.read_text(encoding="utf-8"))
+                        if data.get("name") == project_name:
+                            _remove_from_registry(p_str, config_path)
+                            break
+                    except (json.JSONDecodeError, OSError):
+                        continue
+    handler._send_json({"ok": True})

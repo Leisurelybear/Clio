@@ -42,6 +42,7 @@ from vlog_tool.ui.routes.projects import (
     handle_get_projects,
     handle_post_project_add,
     handle_post_project_create,
+    handle_post_project_remove,
     handle_put_project,
 )
 from vlog_tool.ui.routes.run import (
@@ -464,6 +465,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_post_project_create(self, obj)
             if path == "/api/project/add":
                 return handle_post_project_add(self, obj)
+            if path == "/api/project/remove":
+                return handle_post_project_remove(self, obj)
             if path == "/api/rerun":
                 return handle_post_rerun(self, qs, obj)
             if path == "/api/logs/clear":

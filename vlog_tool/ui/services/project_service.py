@@ -83,6 +83,26 @@ def _registry_path(config_path: Path | None) -> Path:
     return Path("projects.json")
 
 
+def _remove_from_registry(dir_path: str, config_path: Path | None) -> None:
+    """Remove a project from the registry."""
+    registry_file = _registry_path(config_path)
+    if not registry_file.is_file():
+        return
+    try:
+        reg = json.loads(registry_file.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return
+    normalized = str(Path(dir_path).resolve())
+    paths = reg.get("projects", [])
+    if normalized not in paths:
+        return
+    paths.remove(normalized)
+    data: dict[str, Any] = {"projects": paths}
+    if reg.get("last_project") and reg["last_project"] in {Path(p).name for p in paths}:
+        data["last_project"] = reg["last_project"]
+    _save_atomic(registry_file, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
+
+
 def _add_to_registry(dir_path: str, config_path: Path | None) -> None:
     registry_file = _registry_path(config_path)
     paths: list[str] = []
@@ -201,31 +221,32 @@ def _list_projects(
                 }
             )
 
-    # 3. Always include current input_dir (fallback)
-    cur_resolved = str(input_dir.resolve())
-    if cur_resolved not in seen_dirs:
-        proj_file = input_dir / "project.json"
-        if proj_file.is_file():
-            try:
-                data = json.loads(proj_file.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
+    # 3. Include current input_dir fallback only when an explicit project was requested
+    if current_project_name:
+        cur_resolved = str(input_dir.resolve())
+        if cur_resolved not in seen_dirs:
+            proj_file = input_dir / "project.json"
+            if proj_file.is_file():
+                try:
+                    data = json.loads(proj_file.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    data = {}
+            else:
                 data = {}
-        else:
-            data = {}
-        name = data.get("name") or input_dir.name
-        proj_out = _project_output_dir(input_dir)
-        projects.append(
-            {
-                "name": name,
-                "input_dir": str(input_dir),
-                "output_dir": str(proj_out),
-                "currentDay": data.get("currentDay", "day1"),
-                "source": data.get("source", "compressed"),
-                "steps": _detect_steps(proj_out),
-                "createdAt": data.get("createdAt"),
-                "updatedAt": data.get("updatedAt"),
-                "is_current": name == current_project_name if current_project_name else True,
-            }
-        )
+            name = data.get("name") or input_dir.name
+            proj_out = _project_output_dir(input_dir)
+            projects.append(
+                {
+                    "name": name,
+                    "input_dir": str(input_dir),
+                    "output_dir": str(proj_out),
+                    "currentDay": data.get("currentDay", "day1"),
+                    "source": data.get("source", "compressed"),
+                    "steps": _detect_steps(proj_out),
+                    "createdAt": data.get("createdAt"),
+                    "updatedAt": data.get("updatedAt"),
+                    "is_current": name == current_project_name if current_project_name else True,
+                }
+            )
 
     return projects

@@ -575,6 +575,9 @@ button .icon { width: 12px; height: 12px; }
 .project-card-meta { font-size: var(--text-xs); color: var(--text-tertiary); }
 .step-dot { display: inline-block; margin-right: 3px; font-size: var(--text-xs); }
 .step-dot.done { color: var(--success); }
+.project-card-header { display: flex; justify-content: space-between; align-items: center; }
+.project-card-remove { background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 3px; line-height: 1; }
+.project-card-remove:hover { background: var(--bg-hover); color: var(--danger, #e74c3c); }
 
 /* ── Rerun Overlay ─────────────────────────────────────────── */
 #rerun-overlay {
