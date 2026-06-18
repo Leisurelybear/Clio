@@ -252,6 +252,16 @@ ai:
 153. `e4818af` `fix(ui): preview bar blocks start preview when inactive`  ← R-012
 154. `5029ba1` `feat(ui): play/pause toggle for preview, stop no longer resets to segment 0`  ← R-012
 
+2026-06-18 审查修复（基于 `docs/analysis/2026-06-18-vlog-editing-helper-review.md`，详见 `docs/analysis/2026-06-18-review-fix-result.md`）：
+- **P0-1** `cut.py`: 改用 `write_json_atomic` / `write_text_atomic`（漏掉的原子写入）
+- **P0-2** `server.py`: project.json 迁移改用 `write_json_atomic`
+- **P0-4** `plan.py`: transcript 加载追加 `config.plan.use_transcripts` 检查
+- **R-2** `compress.py`: 用 `_get_audio_bitrate()` (ffprobe 探测) 替代 128kbps 硬编码
+- **R-3** `tasks/analyze.py`: `run_analyze_all` 一次性 `_build_stem_to_path` 缓存，避免每视频 rglob
+- **R-4** `tasks/cut.py` + `cut.py`: `run_cut_all` / `cut_one` 添加 `cancel_event` 支持
+- **Q-2** `pipeline.py`: 增加 `"cut"` 到 cancel_event 传递列表
+- 已确认 P0-3 (conftest 缓存清理)、R-1 (AI 响应校验)、Q-1 (compress closure) **均已提前修复**
+
 最近代码审查修复（2026-06-16 第二次审查，5 S0 + 5 S1 + 1 S2 项）：
 - **S0-1** `runner.js`: `prog` undefined → `$('run-progress')`
 - **S0-2** `analyze.py`: transcript 不绑 source_stem → clip 携带 source_stem，仅匹配对应 transcript

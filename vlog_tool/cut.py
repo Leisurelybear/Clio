@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 
 from vlog_tool.log import format_duration, timed
@@ -41,6 +42,7 @@ def cut_one(
     end_sec: float,
     ffmpeg: str,
     reencode: bool = False,
+    cancel_event: threading.Event | None = None,
 ) -> Path:
     """用 ffmpeg 从 video_path 中裁剪 [start_sec, end_sec] 区间到 output_path。"""
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -62,5 +64,5 @@ def cut_one(
     args.extend(["-y", str(output_path)])
 
     with timed(label):
-        run_ffmpeg(args, ffmpeg)
+        run_ffmpeg(args, ffmpeg, cancel_event=cancel_event)
     return output_path

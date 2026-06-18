@@ -65,6 +65,7 @@ from vlog_tool.ui.routes.videos import handle_get_video, handle_get_videos
 from vlog_tool.ui.routes.whisper_routes import handle_get_whisper_check
 from vlog_tool.ui.services.file_service import _find_texts_dirs, _is_safe_basename
 from vlog_tool.ui.services.project_service import _project_output_dir, _registry_path
+from vlog_tool.utils import write_json_atomic
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -88,7 +89,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             cur = json.loads(project_path.read_text(encoding="utf-8"))
             if cur.get("name") == output_dir.name and input_dir.name != output_dir.name:
                 cur["name"] = input_dir.name
-                project_path.write_text(json.dumps(cur, ensure_ascii=False, indent=2), encoding="utf-8")
+                write_json_atomic(project_path, cur)
         except (json.JSONDecodeError, OSError):
             pass
 

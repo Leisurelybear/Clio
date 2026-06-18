@@ -59,7 +59,7 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
     # 加载 transcript 数据
     transcripts_map: dict[str, dict] = {}
     trans_dir = config.paths.output_dir / config.whisper.transcripts_subdir
-    if trans_dir.is_dir() and config.whisper.enabled:
+    if trans_dir.is_dir() and config.whisper.enabled and config.plan.use_transcripts:
         for tf in sorted(trans_dir.glob("*_transcript.json")):
             try:
                 data = json.loads(tf.read_text(encoding="utf-8"))

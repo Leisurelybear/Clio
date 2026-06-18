@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -12,7 +13,7 @@ from vlog_tool.config import AppConfig
 from vlog_tool.cut import cut_one, parse_time_range
 from vlog_tool.log import format_duration, timed
 from vlog_tool.tasks._helpers import _eta_line
-from vlog_tool.utils import get_duration_sec, resolve_binary, sanitize_name
+from vlog_tool.utils import get_duration_sec, resolve_binary, sanitize_name, write_json_atomic, write_text_atomic
 
 _SEG_RE = re.compile(r"^(.+)_seg(\d+)$")
 
@@ -48,6 +49,7 @@ def run_cut_all(
     output_dir: Path | None = None,
     reencode: bool = False,
     source: str = "compressed",
+    cancel_event: threading.Event | None = None,
 ) -> list[dict]:
     """根据 plan 按时间区间裁剪视频片段。
 
@@ -100,6 +102,9 @@ def run_cut_all(
 
     with timed(f"run_cut_all {day_label}（{len(seq)} 段）"):
         for i, seg in enumerate(seq, start=1):
+            if cancel_event and cancel_event.is_set():
+                print(f"  [取消] 裁剪阶段被用户终止（第 {i} 段）")
+                break
             idx = seg.get("index", "")
             title = seg.get("title", "").strip()
             timeline = (seg.get("use_timeline") or "").strip()
@@ -109,9 +114,8 @@ def run_cut_all(
 
             video_path = _resolve_video_path(idx)
             if video_path is None:
-                print(
-                    f"  [跳过] 找不到 index={idx} 的视频（{'original' if source == 'original' else 'compressed'}）: {seg.get('title', '')}"
-                )
+                src = "compressed" if source != "original" else "original"
+                print(f"  [跳过] 找不到 index={idx} 的视频（{src}）: {seg.get('title', '')}")
                 continue
 
             try:
@@ -136,7 +140,7 @@ def run_cut_all(
 
             print(_eta_line("裁剪", i, len(seq), clip_stem, completed, elapsed_total))
             t0 = time.monotonic()
-            cut_one(video_path, clip_path, start, end, ffmpeg, reencode=reencode)
+            cut_one(video_path, clip_path, start, end, ffmpeg, reencode=reencode, cancel_event=cancel_event)
             elapsed_total += time.monotonic() - t0
             completed += 1
 
@@ -153,7 +157,7 @@ def run_cut_all(
                     "end_sec": round(end, 2),
                 }
                 dst = out_root / f"{clip_stem}.json"
-                dst.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+                write_json_atomic(dst, data)
                 text_json = dst.name
                 print(f"  -> texts: {dst.name}")
 
@@ -188,7 +192,7 @@ def run_cut_all(
             f"| {c['timeline']} | {format_duration(c['duration_sec'])} "
             f"| {c['output_file']} | {c['text_file'] or '-'} |"
         )
-    manifest_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_text_atomic(manifest_path, "\n".join(lines) + "\n")
     print(f"  -> manifest: {manifest_path.name}")
     print(f"完成！共裁剪 {len(clips)} 段，输出目录: {out_root}")
     return clips

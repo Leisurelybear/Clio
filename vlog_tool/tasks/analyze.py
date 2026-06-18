@@ -23,7 +23,17 @@ from vlog_tool.tasks._helpers import (
 from vlog_tool.utils import get_duration_sec, resolve_binary, write_json_atomic
 
 
-def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
+def _build_stem_to_path(input_dir: Path) -> dict[str, Path]:
+    """Build a one-time {stem_lower: path} map from input_dir (recursive)."""
+    mapping: dict[str, Path] = {}
+    exts = (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv")
+    for p in input_dir.rglob("*"):
+        if p.is_file() and p.suffix.lower() in exts:
+            mapping[p.stem.lower()] = p
+    return mapping
+
+
+def _resolve_original(input_dir: Path, compressed_stem: str, stem_cache: dict[str, Path] | None = None) -> Path | None:
     """Resolve original video path from a compressed file stem.
 
     Handles:
@@ -31,6 +41,8 @@ def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
     - Segment match: '001_GL010683_seg01' → strip _segXX → GL010683.mp4
     - Recursive search: scans subdirectories for all above cases.
     - No index prefix: 'GL010683' → GL010683.mp4
+
+    stem_cache: pre-built {stem_lower: path} map for O(1) lookup.
     """
     if "_" not in compressed_stem:
         orig_stem = compressed_stem
@@ -38,6 +50,9 @@ def _resolve_original(input_dir: Path, compressed_stem: str) -> Path | None:
         _, orig_stem = compressed_stem.split("_", 1)
 
     def _try_find(stem: str) -> Path | None:
+        key = stem.lower()
+        if stem_cache is not None:
+            return stem_cache.get(key)
         for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
             candidate = input_dir / f"{stem}{ext}"
             if candidate.is_file():
@@ -69,6 +84,9 @@ def run_analyze_all(
     config.texts_dir.mkdir(parents=True, exist_ok=True)
     records: list[ClipRecord] = []
 
+    # Build one-time stem→path cache to avoid per-video rglob
+    stem_cache = _build_stem_to_path(config.paths.input_dir)
+
     def _list_compressed(d: Path) -> list[Path]:
         return sorted(p for p in d.iterdir() if p.suffix.lower() in VIDEO_EXTS and p.is_file())
 
@@ -87,7 +105,7 @@ def run_analyze_all(
             parts = p.stem.split("_", 1)
             if len(parts) != 2 or not parts[0].isdigit():
                 continue
-            orig_path = _resolve_original(config.paths.input_dir, p.stem)
+            orig_path = _resolve_original(config.paths.input_dir, p.stem, stem_cache)
             if orig_path is None:
                 print(f"[警告] 找不到 {p.name} 对应的原始视频，跳过")
                 continue
