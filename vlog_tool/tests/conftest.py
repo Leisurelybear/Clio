@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from vlog_tool import session_log
 from vlog_tool.ai.factory import _clear_provider_cache
 from vlog_tool.config import AppConfig, ProviderConfig, ProxyConfig, load_config
 
@@ -25,6 +26,12 @@ def _mock_ctranslate2() -> None:
 def _clear_ai_cache() -> None:
     """Clear the AI provider cache between tests to avoid cross-test pollution."""
     _clear_provider_cache()
+
+
+@pytest.fixture(autouse=True)
+def _clear_session_log() -> None:
+    """Clear session log buffer between tests to avoid cross-test pollution."""
+    session_log.clear()
 
 
 @pytest.fixture

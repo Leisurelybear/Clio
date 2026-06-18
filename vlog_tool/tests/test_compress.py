@@ -115,3 +115,24 @@ class TestCompressVideo:
         args = ffmpeg_calls[0]
         bv_idx = args.index("-b:v")
         assert int(args[bv_idx + 1]) >= 100_000
+
+    def test_cancel_during_compress(self, monkeypatch, tmp_path: Path):
+        """cancel_event 被设置时 run_ffmpeg 应抛出 InterruptedError"""
+        from threading import Event
+
+        src = tmp_path / "input.mp4"
+        src.write_bytes(b"\x00" * 100_000)
+        out = tmp_path / "out.mp4"
+        monkeypatch.setattr("vlog_tool.compress.resolve_binary", lambda *a: "ffmpeg")
+        monkeypatch.setattr("vlog_tool.compress.get_duration_sec", lambda *a: 60.0)
+        cancel_event = Event()
+        cancel_event.set()
+
+        def _raise_on_cancel(args, ffmpeg, progress_callback=None, cancel_event=None, **kw):
+            if cancel_event and cancel_event.is_set():
+                raise InterruptedError("ffmpeg 被用户取消")
+            # Should not reach here
+
+        monkeypatch.setattr("vlog_tool.compress.run_ffmpeg", _raise_on_cancel)
+        with pytest.raises(InterruptedError, match="ffmpeg 被用户取消"):
+            compress_video(src, out, _default_config(), cancel_event=cancel_event)

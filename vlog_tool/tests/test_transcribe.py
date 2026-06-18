@@ -242,3 +242,36 @@ class TestRunTranscribeAll:
         with patch("builtins.print"):
             result = run_transcribe_all(config)
             assert result == 0
+
+    def test_cancel_during_extract_marks_cancelled(self):
+        """_extract_audio 因取消返回 None 时标记为 cancelled 并中止"""
+        from threading import Event
+
+        cancel_event = Event()
+        config = AppConfig(
+            paths=MagicMock(),
+            whisper=WhisperConfig(enabled=True, model_size="small", language="zh", device="cpu"),
+        )
+        config.analyze.skip_existing = False
+        config.paths.output_dir = MagicMock()
+        config.paths.input_dir = MagicMock()
+
+        mock_state = MagicMock()
+
+        def _extract_and_cancel(*a, **kw):
+            cancel_event.set()
+            return None
+
+        with (
+            patch("vlog_tool.tasks.transcribe.check_whisper", return_value=True),
+            patch("vlog_tool.tasks.transcribe.find_videos", return_value=[Path("test.mp4")]),
+            patch("vlog_tool.tasks.transcribe._extract_audio", _extract_and_cancel),
+            patch("vlog_tool.tasks.transcribe.ProcessingState", return_value=mock_state),
+            patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffmpeg"),
+            patch("builtins.print"),
+        ):
+            run_transcribe_all(config, cancel_event=cancel_event)
+
+        # Verify state.mark() was called with "cancelled", not "skipped"
+        state_calls = [c for c in mock_state.mark.call_args_list if c[0][1] == "transcribe"]
+        assert any(c[0][2] == "cancelled" for c in state_calls), f"Expected 'cancelled' state, got: {state_calls}"
