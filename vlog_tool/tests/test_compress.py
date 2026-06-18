@@ -29,7 +29,7 @@ def _default_config() -> SimpleNamespace:
 def _mock_ffmpeg(ffmpeg_calls: list) -> callable:
     """Create a mock run_ffmpeg that records calls and creates the output file."""
 
-    def _run(args, ff, progress_callback=None):
+    def _run(args, ff, progress_callback=None, **kwargs):
         ffmpeg_calls.append(args)
         # Create the output file (last arg after -y) so stat() works
         if "-y" in args:

@@ -47,7 +47,7 @@ class TestRunCompressAll:
         monkeypatch.setattr("vlog_tool.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
         monkeypatch.setattr("vlog_tool.tasks.compress.find_videos", lambda *a, **kw: [src])
 
-        def _mock_compress(inp, outp, cfg):
+        def _mock_compress(inp, outp, c, **kw):
             outp.write_bytes(b"\x00" * 100)
             return outp
 
@@ -70,7 +70,7 @@ class TestRunCompressAll:
 
         call_count = 0
 
-        def _mock_compress(inp, outp, c):
+        def _mock_compress(inp, outp, c, **kw):
             nonlocal call_count
             call_count += 1
             outp.write_bytes(b"\x00" * 60_000)  # > MIN_VALID_SIZE (50KB)
@@ -108,7 +108,7 @@ class TestRunCompressAll:
 
         call_count = 0
 
-        def _mock_compress(inp, outp, c):
+        def _mock_compress(inp, outp, c, **kw):
             nonlocal call_count
             call_count += 1
             return outp
@@ -130,7 +130,7 @@ class TestRunCompressAll:
 
         monkeypatch.setattr("vlog_tool.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
 
-        def _mock_compress(inp, outp, c):
+        def _mock_compress(inp, outp, c, **kw):
             outp.write_bytes(b"\x00" * 300)
             return outp
 

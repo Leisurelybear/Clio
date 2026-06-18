@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -15,6 +16,7 @@ def compress_video(
     output_path: Path,
     config: AppConfig,
     progress_callback: ProgressCB | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> Path:
     """压缩视频：去声音、降分辨率，尽量接近目标大小。"""
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
@@ -62,7 +64,7 @@ def compress_video(
     cmd_preview = f"ffmpeg {' '.join(args)}"
     print(f"  ffmpeg: {cmd_preview}")
     with timed(f"压缩 {input_path.name} -> {output_path.name}"):
-        run_ffmpeg(args, ffmpeg, progress_callback=_on_ffmpeg_progress)
+        run_ffmpeg(args, ffmpeg, progress_callback=_on_ffmpeg_progress, cancel_event=cancel_event)
     new_size = output_path.stat().st_size
     ratio = (1 - new_size / orig_size) * 100 if orig_size > 0 else 0
     print(

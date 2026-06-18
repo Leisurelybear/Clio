@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 
@@ -17,7 +18,10 @@ from vlog_tool.utils import find_videos, format_index, resolve_binary
 
 
 def run_compress_all(
-    config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None
+    config: AppConfig,
+    tracker: ProgressTracker | None = None,
+    single_file: Path | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> list[ClipRecord]:
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
     ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
@@ -114,17 +118,13 @@ def run_compress_all(
             t0 = time.monotonic()
             if tracker:
 
-                def _on_progress(
-                    _sec: float, total_dur: float, _i: int = i, _name: str = label_name
-                ):
+                def _on_progress(_sec: float, total_dur: float, _i: int = i, _name: str = label_name):
                     pct = int(_sec / total_dur * 100) if total_dur > 0 else 0
-                    tracker.update(
-                        phase="compress", current=_i, total=len(items), message=f"压缩 {_name} ({pct}%)"
-                    )
+                    tracker.update(phase="compress", current=_i, total=len(items), message=f"压缩 {_name} ({pct}%)")
 
-                compress_video(source, use_out, config, progress_callback=_on_progress)
+                compress_video(source, use_out, config, progress_callback=_on_progress, cancel_event=cancel_event)
             else:
-                compress_video(source, use_out, config)
+                compress_video(source, use_out, config, cancel_event=cancel_event)
             state.mark(original.stem, "compress", "done")
             elapsed_total += time.monotonic() - t0
             completed += 1
