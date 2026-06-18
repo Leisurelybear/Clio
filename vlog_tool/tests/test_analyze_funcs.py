@@ -72,7 +72,6 @@ class TestWrapWithContext:
         analyze_mod._trip_context_cache.clear()
         orig_is_file = Path.is_file
         orig_read_text = Path.read_text
-        orig_stat = Path.stat
 
         def mock_is_file(self):
             if self.name == "trip_context.md":
@@ -85,7 +84,6 @@ class TestWrapWithContext:
             return orig_read_text(self, **kw)
 
         def mock_stat(self):
-            import os
             from unittest.mock import MagicMock
 
             st = MagicMock()

@@ -8,7 +8,12 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from vlog_tool.ui.routes.run import handle_get_run_status, handle_post_rerun, handle_post_run_cancel, handle_post_run_start
+from vlog_tool.ui.routes.run import (
+    handle_get_run_status,
+    handle_post_rerun,
+    handle_post_run_cancel,
+    handle_post_run_start,
+)
 
 
 @pytest.fixture

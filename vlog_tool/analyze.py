@@ -293,7 +293,7 @@ def refine_text(analysis: dict, config: AppConfig, fix: str | None = None, conte
     )
     result = extract_json(text)
     if not isinstance(result, dict) or "index" not in result:
-        print(f"  [警告] refine_text: AI 返回结构异常，使用原始数据")
+        print("  [警告] refine_text: AI 返回结构异常，使用原始数据")
         return analysis
     return result
 
@@ -333,6 +333,6 @@ def refine_script(
     )
     result = extract_json(text)
     if not isinstance(result, dict) or "voiceover" not in result:
-        print(f"  [警告] refine_script: AI 返回结构异常，使用原始数据")
+        print("  [警告] refine_script: AI 返回结构异常，使用原始数据")
         return script
     return result
