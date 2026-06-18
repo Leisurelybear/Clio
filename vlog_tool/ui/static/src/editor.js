@@ -11,7 +11,7 @@ import {
   setDeep,
 } from './utils.js';
 import { api, icon } from './api.js';
-import { playVideoSegment, renderPreviewBar } from './viewer.js';
+import { playVideoSegment, renderPreviewBar, startPreview, stopPreview, _playPreviewSegment } from './viewer.js';
 
 // ── Rendering ──────────────────────────────────────────────────
 
@@ -288,8 +288,12 @@ function renderPlan() {
       if (e.target.matches('input, textarea')) return;
       const v = state.videos.find(x => x.index === seg.index);
       if (!v) { setStatus(`找不到视频 [${seg.index}]，请重新生成规划`, 'warn'); return; }
-      const seekTo = parseTimecode((seg.use_timeline || '').split('-')[0].trim()) + (v.offset_sec || 0);
-      playVideoSegment(v.file, seekTo);
+      if (state.previewActive) {
+        state.previewIndex = i;
+        _playPreviewSegment();
+      } else {
+        startPreview(i);
+      }
     };
     li.querySelectorAll('[data-k]').forEach(inp => {
       inp.oninput = (e) => {

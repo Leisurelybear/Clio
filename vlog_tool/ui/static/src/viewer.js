@@ -127,12 +127,12 @@ function _setupPreviewBarDrag() {
 }
 
 // ── Preview playback ─────────────────────────────────────────
-function startPreview() {
+function startPreview(startIndex) {
   const p = state.plan;
   if (!p || !p.sequence || !p.sequence.length) return;
   if (state.previewActive) stopPreview();
   state.previewActive = true;
-  state.previewIndex = 0;
+  state.previewIndex = startIndex ?? 0;
   setStatus(`预览播放`, 'ok');
 
   renderPreviewBar();
