@@ -122,10 +122,13 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             key = _GLOBAL_KEY if project_input is None else str(project_input.resolve())
 
             # Read current mtimes
-            try:
-                cfg_mtime = config_path.stat().st_mtime
-            except OSError:
+            if config_path is None:
                 cfg_mtime = 0.0
+            else:
+                try:
+                    cfg_mtime = config_path.stat().st_mtime
+                except OSError:
+                    cfg_mtime = 0.0
             project_yaml = None if project_input is None else (project_input / "project.yaml")
             try:
                 proj_mtime = project_yaml.stat().st_mtime if project_yaml else 0.0
