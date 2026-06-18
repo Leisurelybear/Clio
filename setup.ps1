@@ -7,12 +7,113 @@ Set-Location $ProjectRoot
 
 Write-Host "=== Vlog 剪辑辅助工具 - 环境配置 ===" -ForegroundColor Cyan
 
+# ---- Python 版本检查（项目要求 3.11+）----
+$pyCmdStr = "python"
+$pyOk = $false
+$major = $null; $minor = $null
+
+# 先看 python 命令是否存在（避免 CommandNotFoundException）
+if (Get-Command python -ErrorAction SilentlyContinue) {
+    $pyVer = python --version 2>&1
+    if ($LASTEXITCODE -eq 0 -and $pyVer -match 'Python (\d+)\.(\d+)') {
+        $major = [int]$Matches[1]
+        $minor = [int]$Matches[2]
+        if ($major -ge 3 -and ($major -gt 3 -or $minor -ge 11)) {
+            Write-Host "     Python $major.$minor - 版本检查通过" -ForegroundColor Green
+            $pyOk = $true
+        } else {
+            Write-Host "     当前系统默认 Python 为 $major.$minor（需 3.11+），尝试 Python Launcher..." -ForegroundColor Yellow
+        }
+    }
+} else {
+    Write-Host "     系统默认 python 不可用，尝试 Python Launcher..." -ForegroundColor Yellow
+}
+
+# 如果默认 python 不达标或不可用，用 Python Launcher 找高版本
+if (-not $pyOk) {
+    $found = $false
+    # py 也不是一定存在，先确认
+    if (Get-Command py -ErrorAction SilentlyContinue) {
+        foreach ($tryVer in @("3.13", "3.12", "3.11")) {
+            $v = & py "-$tryVer" --version 2>$null
+            if ($LASTEXITCODE -eq 0 -and $v -match "Python $tryVer") {
+                Write-Host "     找到 Python $tryVer（通过 Python Launcher），将使用 py -$tryVer" -ForegroundColor Green
+                $pyCmdStr = "py -$tryVer"
+                $found = $true
+                break
+            }
+        }
+    }
+    # 还是没有，直接扫常见安装目录
+    if (-not $found) {
+        Write-Host "     尝试在常见安装目录中查找..." -ForegroundColor Yellow
+        $searchDirs = @(
+            "$env:LOCALAPPDATA\Programs\Python",
+            "C:\Program Files\Python",
+            "C:\Python",
+            "$env:ProgramFiles\Python"
+        )
+        foreach ($dir in $searchDirs) {
+            if (Test-Path $dir) {
+                $exes = Get-ChildItem "$dir\Python3*\python.exe" -ErrorAction SilentlyContinue
+                foreach ($exe in $exes) {
+                    $v = & $exe.FullName --version 2>&1
+                    if ($v -match 'Python (\d+)\.(\d+)') {
+                        $mv = [int]$Matches[1]; $nv = [int]$Matches[2]
+                        if ($mv -ge 3 -and ($mv -gt 3 -or $nv -ge 11)) {
+                            Write-Host "     找到 Python $mv.$nv（位于 $($exe.FullName)）" -ForegroundColor Green
+                            $pyCmdStr = "& """ + $exe.FullName + """"
+                            $found = $true
+                            break
+                        }
+                    }
+                }
+            }
+            if ($found) { break }
+        }
+    }
+
+    if (-not $found) {
+        Write-Host "错误：未检测到 Python 3.11+" -ForegroundColor Red
+        Write-Host "      下载: https://python.org/downloads/" -ForegroundColor Cyan
+        Write-Host "      推荐安装包（64 位）:" -ForegroundColor Cyan
+        Write-Host "      https://python.org/ftp/python/3.12.5/python-3.12.5-amd64.exe" -ForegroundColor Cyan
+        Write-Host "      （注意：Microsoft Store 版可能缺少 ensurepip，请用官网安装包）" -ForegroundColor Yellow
+        $choice = Read-Host "      是否在浏览器中打开下载页面? (Y/n)"
+        if ($choice -ne 'n' -and $choice -ne 'N') {
+            Start-Process "https://python.org/downloads/"
+        }
+        exit 1
+    }
+}
+
 # 1. Python 虚拟环境
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
     Write-Host "[1/4] 创建 Python 虚拟环境..."
-    python -m venv .venv
+    Invoke-Expression "$pyCmdStr -m venv .venv"
 } else {
     Write-Host "[1/4] 虚拟环境已存在，跳过"
+}
+
+# 确保虚拟环境中有 pip（某些 Windows Python 安装不会自带）
+& ".venv\Scripts\python.exe" -c "import pip" 2>$null
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "     正在通过 ensurepip 安装 pip..." -ForegroundColor Yellow
+    & ".venv\Scripts\python.exe" -m ensurepip --upgrade --default-pip
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "     ensurepip 不可用，下载 get-pip.py..." -ForegroundColor Yellow
+        $getPip = "$env:TEMP\get-pip.py"
+        try {
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $getPip -UseBasicParsing -TimeoutSec 30
+            & ".venv\Scripts\python.exe" $getPip
+        } catch {
+            Write-Host "     无法安装 pip，请检查网络或手动安装: python -m ensurepip --upgrade" -ForegroundColor Red
+            exit 1
+        } finally {
+            if (Test-Path $getPip) { Remove-Item $getPip -Force }
+        }
+    }
 }
 
 Write-Host "[2/4] 安装 Python 依赖..."
@@ -53,7 +154,12 @@ if (-not $ffmpeg) {
         Write-Host "[3/4] 检测到 WinGet 安装的 ffmpeg: $($wingetFfmpeg.FullName)"
     } else {
         Write-Host "[3/4] 未检测到 ffmpeg，尝试通过 winget 安装..."
-        winget install --id Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements
+        winget install --id Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "     winget 安装失败，请手动下载安装:" -ForegroundColor Yellow
+            Write-Host "     https://ffmpeg.org/download.html#build-windows" -ForegroundColor Cyan
+            Write-Host "     下载后请将 bin 目录加入 PATH 环境变量" -ForegroundColor DarkYellow
+        }
     }
 } else {
     Write-Host "[3/4] ffmpeg 已就绪: $($ffmpeg.Source)"
