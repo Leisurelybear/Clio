@@ -134,7 +134,7 @@ function startPreview(startIndex) {
   if (!p || !p.sequence || !p.sequence.length) return;
   if (state.previewActive) stopPreview();
   state.previewActive = true;
-  state.previewIndex = startIndex ?? 0;
+  state.previewIndex = typeof startIndex === 'number' ? startIndex : 0;
   setStatus(`预览播放`, 'ok');
 
   renderPreviewBar();
@@ -247,9 +247,9 @@ function setupPlayer() {
     prevBtn.innerHTML = `${icon('chevron_right', 14)}`;
     prevBtn.style.transform = 'scaleX(-1)';
     prevBtn.onclick = () => {
-      if (!state.previewActive) return;
       const p = state.plan;
       if (!p || !p.sequence || !p.sequence.length) return;
+      if (!state.previewActive) { startPreview(0); return; }
       state.previewIndex = Math.max(0, state.previewIndex - 1);
       _playPreviewSegment();
     };
@@ -258,9 +258,9 @@ function setupPlayer() {
   if (nextBtn) {
     nextBtn.innerHTML = `${icon('chevron_right', 14)}`;
     nextBtn.onclick = () => {
-      if (!state.previewActive) return;
       const p = state.plan;
       if (!p || !p.sequence || !p.sequence.length) return;
+      if (!state.previewActive) { startPreview(0); return; }
       state.previewIndex = Math.min(p.sequence.length - 1, state.previewIndex + 1);
       _playPreviewSegment();
     };

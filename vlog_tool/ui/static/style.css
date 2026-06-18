@@ -274,11 +274,14 @@ aside, section { overflow-y: auto; }
 
 /* ── Preview Bar (R-012) ───────────────────────────────────── */
 #preview-bar {
-  display: none; align-items: center; gap: var(--space-2);
-  padding: 2px var(--space-1); flex-wrap: wrap;
-  font-size: var(--text-xs);
+  display: none; flex-direction: column; gap: 3px;
+  padding: 2px var(--space-1); font-size: var(--text-xs);
 }
 #player-pane.plan-mode #preview-bar { display: flex; }
+
+.preview-bar-row {
+  display: flex; align-items: center; gap: var(--space-2);
+}
 
 .preview-controls { display: flex; gap: 2px; align-items: center; }
 .preview-bar-btn {
