@@ -132,6 +132,13 @@ def run_transcribe_all(
         ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
         wav_path = _extract_audio(orig_video, ffmpeg, cancel_event=cancel_event)
         if wav_path is None:
+            if cancel_event and cancel_event.is_set():
+                print(f"  [取消] {stem}: 音频提取被用户中断")
+                state.mark(stem, "transcribe", "cancelled")
+                if tracker:
+                    tracker.next(message=f"取消 {stem}")
+                    tracker.log(f"取消 {stem}")
+                break
             print(f"  [跳过] {stem}: 音频提取失败（可能无音轨）")
             state.mark(stem, "transcribe", "skipped")
             if tracker:
