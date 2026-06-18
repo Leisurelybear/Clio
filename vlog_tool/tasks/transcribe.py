@@ -28,25 +28,31 @@ def _extract_audio(
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp.close()
     tmp_path = Path(tmp.name)
+    cmd = [
+        ffmpeg,
+        "-y",
+        "-i",
+        str(video_path),
+        "-vn",
+        "-acodec",
+        "pcm_s16le",
+        "-ar",
+        "16000",
+        "-ac",
+        "1",
+        str(tmp_path),
+    ]
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
+    time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
+    last_pct = 0
     try:
-        cmd = [
-            ffmpeg,
-            "-y",
-            "-i",
-            str(video_path),
-            "-vn",
-            "-acodec",
-            "pcm_s16le",
-            "-ar",
-            "16000",
-            "-ac",
-            "1",
-            str(tmp_path),
-        ]
-        proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
-        time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
-        last_pct = 0
         for line in proc.stderr or []:
+            if cancel_event and cancel_event.is_set():
+                proc.terminate()
+                proc.wait()
+                print("  [提取音频] 被用户取消")
+                tmp_path.unlink(missing_ok=True)
+                return None
             m = time_pat.search(line)
             if m:
                 sec = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
@@ -62,7 +68,14 @@ def _extract_audio(
             tmp_path.unlink(missing_ok=True)
             return None
         return tmp_path
-    except Exception:
+    except BaseException:
+        if proc.poll() is None:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
         tmp_path.unlink(missing_ok=True)
         raise
 
@@ -71,6 +84,7 @@ def run_transcribe_all(
     config: AppConfig,
     tracker: ProgressTracker | None = None,
     single_file: Path | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> int:
     if not config.whisper.enabled:
         print("Whisper 转录未启用（whisper.enabled=false），跳过")
@@ -111,8 +125,11 @@ def run_transcribe_all(
                     tracker.next(message=f"跳过 {stem}")
                 continue
 
+        if cancel_event and cancel_event.is_set():
+            print("  [取消] 转录阶段被终止")
+            break
         ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
-        wav_path = _extract_audio(orig_video, ffmpeg)
+        wav_path = _extract_audio(orig_video, ffmpeg, cancel_event=cancel_event)
         if wav_path is None:
             print(f"  [跳过] {stem}: 音频提取失败（可能无音轨）")
             state.mark(stem, "transcribe", "skipped")
@@ -155,7 +172,7 @@ def run_transcribe_all(
     return 0
 
 
-def run_transcribe_one(config: AppConfig, video_path: Path) -> dict:
+def run_transcribe_one(config: AppConfig, video_path: Path, cancel_event: threading.Event | None = None) -> dict:
     """单文件转录（供 UI rerun 使用）。"""
     import time
 
@@ -163,9 +180,11 @@ def run_transcribe_one(config: AppConfig, video_path: Path) -> dict:
     print(f"  [transcribe_one] 开始处理: {video_path.name}")
     if not video_path.is_file():
         return {"error": f"文件不存在: {video_path}"}
+    if cancel_event and cancel_event.is_set():
+        return {"error": "转录被用户取消"}
     print("  [transcribe_one] 提取音频...")
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
-    wav_path = _extract_audio(video_path, ffmpeg)
+    wav_path = _extract_audio(video_path, ffmpeg, cancel_event=cancel_event)
     if wav_path is None:
         return {"error": "音频提取失败"}
     wav_size = wav_path.stat().st_size
