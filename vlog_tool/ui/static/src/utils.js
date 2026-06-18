@@ -79,6 +79,7 @@ function updateEntityUI() {
   const cls = state.currentEntity === 'plan' ? 'entity-plan'
     : state.currentEntity === 'run' ? 'entity-run'
     : state.currentEntity === 'config' ? 'entity-config'
+    : state.currentEntity === 'logs' ? 'entity-logs'
     : 'entity-video';
   $('editor').className = cls;
   $$('.project-item').forEach(p => p.classList.remove('active'));
@@ -90,6 +91,9 @@ function updateEntityUI() {
     $$('.video-item').forEach(v => v.classList.remove('active'));
   } else if (state.currentEntity === 'config') {
     document.querySelector('.project-item[data-entity="config"]').classList.add('active');
+    $$('.video-item').forEach(v => v.classList.remove('active'));
+  } else if (state.currentEntity === 'logs') {
+    document.querySelector('.project-item[data-entity="logs"]').classList.add('active');
     $$('.video-item').forEach(v => v.classList.remove('active'));
   }
 }

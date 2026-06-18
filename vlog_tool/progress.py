@@ -96,6 +96,9 @@ class ProgressTracker:
             if len(self._data["logs"]) > 100:
                 self._data["logs"] = self._data["logs"][-100:]
             self._flush()
+        from vlog_tool import session_log as _sl
+
+        _sl.write(line)
 
     def done(self, message: str = "") -> None:
         self.update(phase="done", current=0, total=0, message=message or "完成", status="done")

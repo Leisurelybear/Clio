@@ -21,6 +21,8 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from vlog_tool.config import AppConfig, load_config
+from vlog_tool.session_log import clear as clear_session_log
+from vlog_tool.session_log import read as read_session_log
 from vlog_tool.ui.routes.config_routes import (
     handle_get_config,
     handle_get_config_raw,
@@ -399,6 +401,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_get_transcripts(self, qs)
             if path == "/api/whisper/check":
                 return handle_get_whisper_check(self)
+            if path == "/api/logs":
+                offset = int(qs.get("offset", ["0"])[0])
+                return self._send_json(read_session_log(offset))
 
             return self.send_error(HTTPStatus.NOT_FOUND)
 
@@ -457,6 +462,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_post_project_add(self, obj)
             if path == "/api/rerun":
                 return handle_post_rerun(self, qs, obj)
+            if path == "/api/logs/clear":
+                clear_session_log()
+                return self._send_json({"ok": True})
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 

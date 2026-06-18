@@ -15,6 +15,7 @@ import {
   selectPlan,
   selectRun,
   selectConfig,
+  selectLogs,
   setSource,
   openBrowseDir,
   loadBrowseDir,
@@ -102,6 +103,7 @@ async function init() {
       if (p.dataset.entity === 'plan') selectPlan();
       else if (p.dataset.entity === 'run') selectRun();
       else if (p.dataset.entity === 'config') selectConfig();
+      else if (p.dataset.entity === 'logs') selectLogs();
     };
   });
 

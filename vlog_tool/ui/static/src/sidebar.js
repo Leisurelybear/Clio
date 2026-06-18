@@ -65,7 +65,7 @@ async function loadProject() {
     }
     state.steps = proj.steps || {};
     state.projectName = proj.name || '';
-    if (proj.lastEntity && ['video', 'plan', 'run', 'config'].includes(proj.lastEntity)) {
+    if (proj.lastEntity && ['video', 'plan', 'run', 'config', 'logs'].includes(proj.lastEntity)) {
       state.lastEntity = proj.lastEntity;
     }
     if (proj.lastVideo) state.lastVideo = proj.lastVideo;
@@ -393,6 +393,17 @@ async function selectConfig() {
   import('./editor.js').then(mod => mod.renderActiveTab());
 }
 
+async function selectLogs() {
+  if (state.dirty) {
+    if (!confirm('当前 tab 有未保存的修改，确定切换到日志吗？')) return;
+  }
+  if (state.previewActive) stopPreview();
+  state.currentEntity = 'logs';
+  state.dirty = false;
+  updateEntityUI();
+  import('./editor.js').then(mod => mod.renderActiveTab());
+}
+
 async function setSource(source) {
   if (source === state.source) return;
   if (state.dirty) {
@@ -655,6 +666,7 @@ export {
   selectPlan,
   selectRun,
   selectConfig,
+  selectLogs,
   setSource,
   openBrowseDir,
   loadBrowseDir,

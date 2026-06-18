@@ -302,6 +302,9 @@ aside, section { overflow-y: auto; }
 #editor.entity-config .tabs { display: none; }
 #editor.entity-config .tab-pane:not(#tab-config) { display: none; }
 #editor.entity-config #tab-config { display: block; }
+#editor.entity-logs .tabs { display: none; }
+#editor.entity-logs .tab-pane:not(#tab-logs) { display: none; }
+#editor.entity-logs #tab-logs { display: flex; flex-direction: column; height: 100%; }
 #editor.entity-video #tab-plan,
 #editor.entity-video #tab-config { display: none; }
 

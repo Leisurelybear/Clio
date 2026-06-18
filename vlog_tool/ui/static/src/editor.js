@@ -28,6 +28,10 @@ function renderActiveTab() {
     renderConfig();
     return;
   }
+  if (state.currentEntity === 'logs') {
+    renderLogs();
+    return;
+  }
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === state.currentTab));
   $$('.tab-pane').forEach(p => p.classList.toggle('active', p.id === `tab-${state.currentTab}`));
   if (state.currentTab === 'texts') renderTexts();
@@ -555,8 +559,63 @@ function renderConfig() {
   });
 }
 
+let _logsTimer = null;
+let _logsOffset = 0;
+let _logsAutoScroll = true;
+
+function renderLogs() {
+  const pane = $('tab-logs');
+  _logsOffset = 0;
+  if (_logsTimer) { clearInterval(_logsTimer); _logsTimer = null; }
+  pane.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--border);flex-shrink:0">
+      <span style="font-weight:600">会话日志</span>
+      <label style="margin-left:auto;display:flex;align-items:center;gap:4px;cursor:pointer">
+        <input type="checkbox" id="logs-autoscroll" checked> 自动滚动
+      </label>
+      <button class="btn-secondary" id="btn-logs-clear">清空</button>
+    </div>
+    <div id="logs-view" style="flex:1;overflow-y:auto;padding:8px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,12px);line-height:1.6;background:#1a1a1a;white-space:pre-wrap;word-break:break-all"></div>
+  `;
+  const view = $('logs-view');
+  const cb = $('logs-autoscroll');
+  if (cb) cb.onchange = () => { _logsAutoScroll = cb.checked; };
+  $('btn-logs-clear').onclick = async () => {
+    try {
+      await api('POST', '/api/logs/clear', {});
+      view.innerHTML = '';
+      _logsOffset = 0;
+    } catch { /* ignore */ }
+  };
+  _logsTimer = setInterval(async () => {
+    try {
+      const r = await api('GET', `/api/logs?offset=${_logsOffset}`);
+      if (!r || !r.logs) return;
+      for (const line of r.logs) {
+        const d = document.createElement('div');
+        d.textContent = line;
+        view.appendChild(d);
+      }
+      _logsOffset = r.total;
+      if (_logsAutoScroll) view.scrollTop = view.scrollHeight;
+    } catch { /* ignore */ }
+  }, 2000);
+  // Initial fetch
+  (async () => {
+    try {
+      const r = await api('GET', '/api/logs?offset=0');
+      if (r && r.logs) {
+        view.innerHTML = r.logs.map(l => `<div>${escapeHtml(l)}</div>`).join('');
+        _logsOffset = r.total;
+        if (_logsAutoScroll) view.scrollTop = view.scrollHeight;
+      }
+    } catch { /* ignore */ }
+  })();
+}
+
 export {
   renderActiveTab,
+  renderLogs,
   renderTexts,
   renderVoiceover,
   renderPlan,
