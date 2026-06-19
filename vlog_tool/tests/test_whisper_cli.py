@@ -121,7 +121,7 @@ class TestRunWhisperInstall:
         with (
             patch("vlog_tool.whisper_cli._resolve_cache_dir") as mock_cache,
             patch("vlog_tool.whisper_cli.PROJECT_ROOT", config_file.parent),
-            patch("huggingface_hub.snapshot_download", mock_dl),
+            patch("vlog_tool.whisper_cli._snapshot_download", mock_dl),
             patch("ctranslate2.get_cuda_device_count", return_value=0),
         ):
             mock_cache.return_value = config_file.parent / "models"

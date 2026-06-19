@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Pre-commit hook: auto-format staged .py files with ruff."""
+
 import subprocess
 import sys
 from pathlib import Path
@@ -8,8 +9,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Locate ruff via project venv
 ruff_candidates = [
-    REPO_ROOT / ".venv" / "Scripts" / "ruff.exe",   # Windows
-    REPO_ROOT / ".venv" / "bin" / "ruff",             # Unix
+    REPO_ROOT / ".venv" / "Scripts" / "ruff.exe",  # Windows
+    REPO_ROOT / ".venv" / "bin" / "ruff",  # Unix
 ]
 RUFF = next((p for p in ruff_candidates if p.is_file()), None)
 if RUFF is None:
@@ -18,8 +19,7 @@ if RUFF is None:
     if not python.is_file():
         python = REPO_ROOT / ".venv" / "bin" / "python"
     if python.is_file():
-        result = subprocess.run([str(python), "-m", "ruff", "--version"],
-                                capture_output=True, text=True, cwd=REPO_ROOT)
+        result = subprocess.run([str(python), "-m", "ruff", "--version"], capture_output=True, text=True, cwd=REPO_ROOT)
         if result.returncode == 0:
             # We'll use python -m ruff as the command
             RUFF = [str(python), "-m", "ruff"]
@@ -36,7 +36,9 @@ if not isinstance(RUFF, list):
 # Get staged .py files (excluding deletions)
 result = subprocess.run(
     ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM", "--", "*.py"],
-    capture_output=True, text=True, cwd=REPO_ROOT,
+    capture_output=True,
+    text=True,
+    cwd=REPO_ROOT,
 )
 if result.returncode != 0 or not result.stdout.strip():
     sys.exit(0)

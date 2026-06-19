@@ -22,8 +22,7 @@ def _get_video_duration(video_path: Path, ffprobe: str) -> float:
     """Use ffprobe to get video duration in seconds."""
     import subprocess as _subprocess
 
-    cmd = [ffprobe, "-v", "error", "-show_entries", "format=duration",
-           "-of", "csv=p=0", str(video_path)]
+    cmd = [ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(video_path)]
     try:
         r = _subprocess.run(cmd, capture_output=True, text=True, timeout=30)
         if r.returncode == 0 and r.stdout.strip():
@@ -162,7 +161,13 @@ def run_transcribe_all(
             if tracker:
                 tracker.update(phase="transcribe", current=pct, total=100, message=f"{stem}: Whisper 转录 ({pct}%)")
 
-        wav_path = _extract_audio(orig_video, ffmpeg, progress_callback=_on_extract_progress, cancel_event=cancel_event, total_duration=audio_dur)
+        wav_path = _extract_audio(
+            orig_video,
+            ffmpeg,
+            progress_callback=_on_extract_progress,
+            cancel_event=cancel_event,
+            total_duration=audio_dur,
+        )
         if wav_path is None:
             if cancel_event and cancel_event.is_set():
                 print(f"  [取消] {stem}: 音频提取被用户中断")

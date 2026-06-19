@@ -93,7 +93,9 @@ def _get_model(config: AppConfig):
                 if device != "cuda" and is_last:
                     print(f"  [错误] 模型加载失败: {e}")
                     print("  [提示] 请执行 `python main.py whisper install` 预下载模型到本地缓存")
-                    print(f"  [提示] 国内用户需在设置中配置 hf_endpoint（当前: {config.whisper.hf_endpoint or '未设置（使用官方地址）'}）")
+                    print(
+                        f"  [提示] 国内用户需在设置中配置 hf_endpoint（当前: {config.whisper.hf_endpoint or '未设置（使用官方地址）'}）"
+                    )
                     raise
                 print(f"  [警告] {device} {ct} 加载失败 ({e})，尝试下一个 compute type")
                 continue

@@ -8,6 +8,11 @@ from vlog_tool.config import load_config
 from vlog_tool.transcribe import PROJECT_ROOT, _resolve_cache_dir
 from vlog_tool.utils import run_subprocess
 
+try:
+    from huggingface_hub import snapshot_download as _snapshot_download
+except ImportError:
+    _snapshot_download = None
+
 
 def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
     print("正在安装 faster-whisper...")
@@ -43,6 +48,7 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
         cuda_avail = False
     if cuda_avail:
         import shutil
+
         cuda_size_mb = 2800
         tmp_free = shutil.disk_usage(tempfile.gettempdir()).free // (1024 * 1024)
         if tmp_free < cuda_size_mb:
@@ -72,10 +78,12 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
     print(f"正在预下载模型 '{model_name}' 到 {cache_dir}...")
     print(f"  模型仓库: {repo_id}")
     print("  模型大小约 1~2 GB，下载时间取决于网络速度")
-    from huggingface_hub import snapshot_download
+    if _snapshot_download is None:
+        print("  [错误] huggingface_hub 未安装，无法下载模型")
+        return 1
 
     try:
-        snapshot_download(
+        _snapshot_download(
             repo_id=repo_id,
             cache_dir=str(cache_dir),
             resume_download=True,
