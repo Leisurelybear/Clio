@@ -101,14 +101,14 @@ plan:
   target_duration_sec: 180
 #   use_transcripts: true
 
-# Whisper ASR 语音转录（独立步骤，需要额外安装 faster-whisper）
-# 默认关闭，启用后需执行 `python main.py whisper install` 安装依赖
-# whisper:
-#   enabled: false       # true=启用转录步骤
-#   model_size: medium   # small | medium | large-v3
-#   language: zh         # zh | en | auto（auto=自动检测语言；per-project 可覆盖）
-#   device: auto         # auto | cpu | cuda
-#   max_segments_per_clip: 5   # plan 注入时每段视频最多取 N 条
-#   cache_dir: null      # null=默认 <程序根目录>/models/；可指定共享目录
-#   transcripts_subdir: transcripts
-#   hf_endpoint: ''       # 设为 '' 使用 HuggingFace 官方地址；国内可设 https://hf-mirror.com
+# Whisper ASR 语音转录（需要额外安装 faster-whisper: python main.py whisper install）
+# 运行时检测安装，未安装则自动跳过，不会报错
+whisper:
+  enabled: true        # 默认已启用（运行时检测 faster-whisper 是否安装）
+  model_size: medium   # small | medium | large-v3
+  language: zh         # zh | en | auto（auto=自动检测语言；per-project 可覆盖）
+  device: auto         # auto | cpu | cuda
+  max_segments_per_clip: 5   # plan 注入时每段视频最多取 N 条
+  cache_dir: null      # null=默认 <程序根目录>/models/；可指定共享目录
+  transcripts_subdir: transcripts
+  hf_endpoint: https://hf-mirror.com   # 国内推荐 hf-mirror.com，留空=HuggingFace 官方
