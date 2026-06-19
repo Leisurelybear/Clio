@@ -57,13 +57,28 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
     cache_dir.mkdir(parents=True, exist_ok=True)
 
     if _model_in_cache(cache_dir, model_name):
-        print(f"模型 '{model_name}' 已在缓存中（{cache_dir}），跳过下载")
+        print(f"模型 '{model_name}' 已在缓存中，跳过下载")
         return 0
 
+    repo_id = f"Systran/faster-whisper-{model_name}"
     print(f"正在预下载模型 '{model_name}' 到 {cache_dir}...")
-    from faster_whisper import WhisperModel
+    print(f"  模型仓库: {repo_id}")
+    print(f"  模型大小约 1~2 GB，下载时间取决于网络速度")
+    from huggingface_hub import snapshot_download
 
-    WhisperModel(model_name, device="cpu", download_root=str(cache_dir))
+    try:
+        snapshot_download(
+            repo_id=repo_id,
+            cache_dir=str(cache_dir),
+            resume_download=True,
+            local_dir_use_symlinks=False,
+            ignore_patterns=["*.h5", "*.ot", "*.pt"],
+        )
+    except Exception as e:
+        print(f"  [错误] 下载失败: {e}")
+        print("  [提示] 检查 hf_endpoint 配置或网络连接")
+        return 1
+
     print(f"模型 '{model_name}' 已就绪")
     return 0
 

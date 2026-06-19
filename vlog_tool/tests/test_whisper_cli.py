@@ -117,12 +117,11 @@ class TestRunWhisperInstall:
         mock_load_config.return_value.whisper.model_size = "small"
         mock_load_config.return_value.whisper.cache_dir = None
 
-        fake_fw = MagicMock()
-        fake_fw.WhisperModel = MagicMock()
+        mock_dl = MagicMock(return_value=str(config_file.parent / "models" / "snapshots"))
         with (
-            patch.dict("sys.modules", {"faster_whisper": fake_fw}),
             patch("vlog_tool.whisper_cli._resolve_cache_dir") as mock_cache,
             patch("vlog_tool.whisper_cli.PROJECT_ROOT", config_file.parent),
+            patch("huggingface_hub.snapshot_download", mock_dl),
             patch("ctranslate2.get_cuda_device_count", return_value=0),
         ):
             mock_cache.return_value = config_file.parent / "models"
@@ -130,7 +129,9 @@ class TestRunWhisperInstall:
             req.write_text("faster-whisper==1.0.0")
             result = run_whisper_install(str(config_file))
             assert result == 0
-            fake_fw.WhisperModel.assert_called_once()
+            mock_dl.assert_called_once()
+            args, kwargs = mock_dl.call_args
+            assert "Systran/faster-whisper-small" in str(kwargs["repo_id"])
 
     @patch("vlog_tool.whisper_cli.load_config")
     @patch("builtins.print")
