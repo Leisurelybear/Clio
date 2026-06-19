@@ -29,6 +29,7 @@ from vlog_tool.ui.routes.config_routes import (
     handle_post_config_init,
     handle_put_config_raw,
 )
+from vlog_tool.ui.routes.env_routes import handle_get_env, handle_put_env
 from vlog_tool.ui.routes.fs import handle_get_fs_dirs
 from vlog_tool.ui.routes.plan import (
     handle_get_plan,
@@ -406,6 +407,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_get_transcripts(self, qs)
             if path == "/api/whisper/check":
                 return handle_get_whisper_check(self)
+            if path == "/api/env":
+                return handle_get_env(self, qs)
             if path == "/api/logs":
                 offset = int(qs.get("offset", ["0"])[0])
                 return self._send_json(read_session_log(offset))
@@ -437,6 +440,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_put_plan(self, qs, obj)
             if path == "/api/transcripts":
                 return handle_put_transcripts(self, qs, obj)
+            if path == "/api/env":
+                return handle_put_env(self, qs, obj)
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 

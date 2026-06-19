@@ -460,7 +460,7 @@ function _renderConfigForm(obj, path) {
       }
       return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <textarea data-path="${path}" rows="4">${escapeHtml(obj)}</textarea>${hint}</label>`;
     }
-    const isPwd = path.endsWith('api_key') || path.endsWith('api_key_env');
+    const isPwd = path.endsWith('api_key');
     return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <input type="${isPwd ? 'password' : 'text'}" data-path="${path}" value="${escapeHtml(obj)}"></label>`;
   }
   if (Array.isArray(obj)) {
@@ -509,7 +509,17 @@ function renderConfig() {
       <span style="font-size:18px;line-height:1">⚠️</span>
       <span>当前显示的是全局配置（回退）。该项目没有专属 <code>project.yaml</code>，修改将影响所有项目。建议<a href="#" onclick="initProjectConfig();return false" style="text-decoration:underline;color:var(--accent)">创建专属配置</a>。</span>
     </div>
-  ` : '') + `<div class="config-form">${_renderConfigForm(configData, '')}</div>`;
+  ` : '') + `<div class="config-form">${_renderConfigForm(configData, '')}</div>
+  <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+    <button id="btn-env-toggle" class="btn-secondary" style="font-size:var(--text-sm)">${icon('file-text', 14)} 编辑 .env 文件</button>
+    <div id="env-editor" style="display:none;margin-top:8px">
+      <textarea id="env-textarea" style="width:100%;min-height:160px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,12px);padding:8px;background:var(--bg-surface);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-sm)" spellcheck="false"></textarea>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <button id="btn-env-save" class="btn-primary" style="font-size:var(--text-sm)">${icon('check', 14)} 保存 .env</button>
+        <span id="env-save-msg" class="muted" style="font-size:var(--text-xs);align-self:center"></span>
+      </div>
+    </div>
+  </div>`;
   // ai.context 空时显示"添加默认模板"按钮
   const ctxTextarea = pane.querySelector('textarea[data-path="ai.context"]');
   if (ctxTextarea && !ctxTextarea.value.trim()) {
@@ -550,6 +560,45 @@ function renderConfig() {
       el.oninput = onchange;
     }
   });
+
+  // ---- .env file editor ----
+  const envToggle = $('btn-env-toggle');
+  const envEditor = $('env-editor');
+  const envTextarea = $('env-textarea');
+  const envSave = $('btn-env-save');
+  const envMsg = $('env-save-msg');
+  let envData = { content: '' };
+  if (envToggle && envEditor) {
+    envToggle.onclick = async () => {
+      const visible = envEditor.style.display !== 'none';
+      envEditor.style.display = visible ? 'none' : 'block';
+      envToggle.innerHTML = visible ? `${icon('file-text', 14)} 编辑 .env 文件` : `${icon('x', 14)} 收起`;
+      if (!visible && !envData.content) {
+        try {
+          envData = await api('GET', '/api/env');
+          envTextarea.value = envData.content || '';
+        } catch (e) {
+          envMsg.textContent = '加载失败';
+        }
+      }
+    };
+  }
+  if (envSave && envTextarea && envMsg) {
+    envSave.onclick = async () => {
+      envMsg.textContent = '保存中...';
+      try {
+        const r = await api('PUT', '/api/env', { content: envTextarea.value });
+        if (r.ok) {
+          envMsg.textContent = `✓ 已保存到 ${r.path}`;
+          envData.content = envTextarea.value;
+        } else {
+          envMsg.textContent = `✗ ${r.error || '保存失败'}`;
+        }
+      } catch (e) {
+        envMsg.textContent = `✗ 保存失败: ${e.message || e}`;
+      }
+    };
+  }
 }
 
 let _logsTimer = null;
