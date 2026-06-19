@@ -109,7 +109,7 @@ class TestRunWhisperCheck:
 
 class TestRunWhisperInstall:
     @patch("vlog_tool.whisper_cli.load_config")
-    @patch("vlog_tool.whisper_cli.subprocess.run")
+    @patch("vlog_tool.whisper_cli.run_subprocess")
     @patch("builtins.print")
     def test_success(self, mock_print, mock_subproc, mock_load_config, config_file):
         mock_subproc.return_value = MagicMock(returncode=0)
@@ -146,7 +146,7 @@ class TestRunWhisperInstall:
             assert any("未找到依赖文件" in p for p in printed)
 
     @patch("vlog_tool.whisper_cli.load_config")
-    @patch("vlog_tool.whisper_cli.subprocess.run")
+    @patch("vlog_tool.whisper_cli.run_subprocess")
     @patch("builtins.print")
     def test_pip_failure(self, mock_print, mock_subproc, mock_load_config, config_file):
         mock_subproc.return_value = MagicMock(returncode=1, stderr="pip error")

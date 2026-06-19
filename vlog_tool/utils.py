@@ -15,6 +15,31 @@ from vlog_tool._constants import VIDEO_EXTENSIONS
 
 T = TypeVar("T")
 
+# ---- subprocess wrappers for cross-platform encoding safety ----
+# On Chinese Windows text=True defaults to GBK, which crashes on UTF-8
+# filenames in ffmpeg stderr.  These wrappers force utf-8 + errors=replace.
+
+
+def run_subprocess(
+    cmd: list[str],
+    **kwargs,
+) -> subprocess.CompletedProcess:
+    """subprocess.run() wrapper — auto-adds errors=replace in text mode."""
+    in_text = kwargs.get("text") or kwargs.get("universal_newlines") or kwargs.get("encoding")
+    if in_text:
+        kwargs.setdefault("errors", "replace")
+    return subprocess.run(cmd, **kwargs)
+
+
+def popen_subprocess(
+    cmd: list[str],
+    **kwargs,
+) -> subprocess.Popen:
+    """subprocess.Popen() wrapper — auto-adds errors=replace in text mode."""
+    if kwargs.get("text") or kwargs.get("universal_newlines"):
+        kwargs.setdefault("errors", "replace")
+    return subprocess.Popen(cmd, **kwargs)
+
 
 def with_retry(
     fn: Callable[[], T],
@@ -144,7 +169,7 @@ def get_duration_sec(video_path: Path, ffprobe: str) -> float:
         "default=noprint_wrappers=1:nokey=1",
         str(video_path),
     ]
-    result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+    result = run_subprocess(cmd, capture_output=True, text=True, check=True)
     raw = result.stdout.strip()
     if raw in ("N/A", "inf", "-inf", ""):
         raise ValueError(f"ffprobe 返回无效时长 '{raw}' for {video_path}")
@@ -198,7 +223,7 @@ def run_ffmpeg(
     cancel_event: threading.Event | None = None,
 ) -> None:
     cmd = [ffmpeg, *args]
-    process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
+    process = popen_subprocess(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
     stderr_lines: list[str] = []
     time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
     try:

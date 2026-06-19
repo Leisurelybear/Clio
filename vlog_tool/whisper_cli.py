@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import subprocess
 import sys
 from pathlib import Path
 
 from vlog_tool.config import load_config
 from vlog_tool.transcribe import PROJECT_ROOT, _resolve_cache_dir
+from vlog_tool.utils import run_subprocess
 
 
 def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
@@ -24,7 +24,7 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
     if not req.is_file():
         print(f"未找到依赖文件: {req}")
         return 1
-    result = subprocess.run(
+    result = run_subprocess(
         [sys.executable, "-m", "pip", "install", "-r", str(req)],
         capture_output=True,
         text=True,
@@ -42,7 +42,7 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
         cuda_avail = False
     if cuda_avail:
         print("检测到 NVIDIA GPU，安装 CUDA 运行时加速...")
-        r = subprocess.run(
+        r = run_subprocess(
             [sys.executable, "-m", "pip", "install", "nvidia-cublas-cu12", "nvidia-cudnn-cu12", "-q"],
         )
         if r.returncode == 0:

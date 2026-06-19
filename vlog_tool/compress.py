@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import subprocess
 import threading
 from collections.abc import Callable
 from pathlib import Path
 
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_size, timed
-from vlog_tool.utils import get_duration_sec, resolve_binary, run_ffmpeg
+from vlog_tool.utils import get_duration_sec, resolve_binary, run_ffmpeg, run_subprocess
 
 ProgressCB = Callable[[float, float], None]  # (current_sec, total_sec)
 
@@ -27,7 +26,7 @@ def _get_audio_bitrate(input_path: Path, ffprobe: str) -> int:
         str(input_path),
     ]
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        result = run_subprocess(cmd, capture_output=True, text=True, check=True)
         raw = result.stdout.strip()
         if raw and raw != "N/A":
             return int(raw)
