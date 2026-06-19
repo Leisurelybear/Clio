@@ -7,7 +7,20 @@
 
 ## 进行中
 
-（暂无）
+### R-016: UI 化 Whisper 模型下载
+
+**背景**：用户在中国地区无法直接访问 HuggingFace Hub，依赖 `hf_endpoint` 镜像。转录失败时只能跑 CLI `whisper install` 手动下载，体验割裂。
+
+**验收**：
+- UI 转录进度区/错误提示区显示「下载模型」按钮（当模型未缓存时）
+- 点击按钮在后端线程下载模型，UI 显示进度（下载速度 / 百分比 / 剩余时间）
+- 下载完成后自动重试转录
+- 后端复用 `whisper_cli.run_whisper_install` 的预下载逻辑
+
+**子任务**：
+- [ ] R-016a：后端 `POST /api/whisper/install`（daemon 线程 + 进度写入 `.progress.json`）
+- [ ] R-016b：前端转录错误时显示「下载模型」按钮 + 进度反馈
+- [ ] R-016c：下载完成后自动触发当前视频重新转录
 
 ## 需求 R-004：UI 读取和编辑 config
 
