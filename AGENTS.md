@@ -45,10 +45,19 @@ vlog-video-analysis/
 │   │   ├── routes/              #   路由处理
 │   │   │   ├── transcripts.py   #   Transcript GET/PUT API
 │   │   │   └── whisper_routes.py#   Whisper check API
-│   │   └── static/              #   前端三件套（无构建步骤）
+│   │   └── static/              #   前端无构建步骤，ES modules
 │   │       ├── index.html
-│   │       ├── app.js
-│   │       └── style.css
+│   │       ├── style.css
+│   │       └── src/
+│   │           ├── main.js
+│   │           ├── layout.js        #   可拖拽面板、折叠、持久化
+│   │           ├── sidebar.js
+│   │           ├── runner.js
+│   │           ├── editor.js
+│   │           ├── viewer.js
+│   │           ├── api.js
+│   │           ├── state.js
+│   │           └── utils.js
 │   └── ai/
 │       ├── base.py            # TaskName 枚举、Provider Protocol
 │       ├── factory.py         # 按名字查找 provider
@@ -185,7 +194,7 @@ ai:
 
 ## 7. 项目当前状态
 
-最后更新：2026-06-18（R-012 预览进度条：6 个 commit 覆盖显示/交互/play-pause）。已上线：
+最后更新：2026-06-19（UI 空状态修复：项目移除、空项目占位符、事件绑定提前注册）。已上线：
 - GitHub Actions CI（Ubuntu，Windows，Python 3.11/3.12）
 - 412 个 pytest 用例：transcribe(18) / tasks_transcribe(11) / processing_state(8) / whisper_cli(6) / main(7) / config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(12) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / 等
 - 依赖版本锁定 `requirements-locked.txt`
@@ -251,6 +260,14 @@ ai:
 152. `0d322c2` `fix(ui): two-row preview bar, buttons work without clicking segment first, fix MouseEvent leak`  ← R-012
 153. `e4818af` `fix(ui): preview bar blocks start preview when inactive`  ← R-012
 154. `5029ba1` `feat(ui): play/pause toggle for preview, stop no longer resets to segment 0`  ← R-012
+155. `7f5c0d6` `feat(ui): layout overhaul - resizable panels, dark OLED theme, run step sub-options`  ← 布局大改
+156. `3a5eaed` `fix(setup): improve idempotency, input dir check, and CUDA disk space handling`  ← 设置脚本健壮性
+157. `12c314e` `feat(ui): project remove, empty state, no default input_dir`  ← 项目移除+空状态
+158. `360b91a` `fix(ui): show placeholder instead of 'loading...' when no project loaded`  ← 空状态占位符
+159. `fcbccf5` `feat(serve): add quick-launch scripts for web UI`  ← serve 快捷脚本
+160. `aa720d8` `fix(ui): move modal event binding before init early return; remove duplicate code`  ← 模态框修复
+161. `c1584df` `fix(ui): move all event handlers before try block so they work in empty state`  ← 事件绑定修复
+162. `fe45f53` `fix: lint F541 f-string and UT assertion after empty-state changes`  ← lint + UT 修复
 
 2026-06-18 审查修复（基于 `docs/analysis/2026-06-18-vlog-editing-helper-review.md`，详见 `docs/analysis/2026-06-18-review-fix-result.md`）：
 - **P0-1** `cut.py`: 改用 `write_json_atomic` / `write_text_atomic`（漏掉的原子写入）
@@ -276,6 +293,13 @@ ai:
 
 用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
 已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
+
+2026-06-19 UI 空状态修复（项目移除、空项目占位符、事件绑定提前注册）：
+- **设置脚本**：`setup.ps1`/`setup.sh` 增加 venv 版本检测（<3.11 时重建）、CUDA 磁盘空间检查、setup.ps1 Python 三层发现（PATH → py launcher → 扫描安装目录）
+- **项目移除**：后端 `POST /api/project/remove` + `_remove_from_registry`；前端项目卡片的 ✕ 按钮
+- **空状态**：UI 默认不再加载 `input_dir` 作为项目；空项目显示 `—` 占位符而非 "loading..."
+- **事件绑定提前**：所有事件处理器（模态框、浏览按钮、保存、重载、tabs、播放器、快捷键）移到 `try` 之前注册，确保空状态下也不缺失
+- **快捷启动**：新增 `serve.ps1` / `serve.sh` 一键启动 Web UI
 
 项目文档状态：
 - 2026-06-16 全面代码审查（5 路平行 subagent）：发现 **6 Critical + 12 Important + 36 Minor**，已修复 6+12+5，剩余 31 Minor 待处理

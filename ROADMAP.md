@@ -526,6 +526,14 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 
 | Commit | 简述 |
 | --- | --- |
+| `fe45f53` | fix: lint F541 f-string and UT assertion after empty-state changes |
+| `c1584df` | fix(ui): move all event handlers before try block so they work in empty state |
+| `aa720d8` | fix(ui): move modal event binding before init early return; remove duplicate code |
+| `fcbccf5` | feat(serve): add quick-launch scripts for web UI |
+| `360b91a` | fix(ui): show placeholder instead of 'loading...' when no project loaded |
+| `12c314e` | feat(ui): project remove, empty state, no default input_dir |
+| `3a5eaed` | fix(setup): improve idempotency, input dir check, and CUDA disk space handling |
+| `7f5c0d6` | feat(ui): layout overhaul - resizable panels, dark OLED theme, run step sub-options |
 | `5029ba1` | feat(ui): play/pause toggle for preview, stop no longer resets to segment 0 |
 | `e4818af` | fix(ui): preview bar blocks start preview when inactive |
 | `0d322c2` | fix(ui): two-row preview bar, buttons work without clicking segment first, fix MouseEvent leak |
