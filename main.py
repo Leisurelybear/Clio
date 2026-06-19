@@ -74,7 +74,7 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
         videos = find_videos(check_dir, recursive=config.paths.recursive)
         print(f"  [OK] 素材目录 ({len(videos)} 个视频) - {check_dir}")
     else:
-        print(f"  [WARN] 素材目录未设置，使用 -i/--input 指定目录")
+        print("  [WARN] 素材目录未设置，使用 -i/--input 指定目录")
         print(f"         config.yaml 默认: {check_dir}")
 
     print("\nAI 任务配置:")

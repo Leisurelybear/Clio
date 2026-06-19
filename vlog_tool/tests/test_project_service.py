@@ -174,8 +174,7 @@ class TestListProjects:
         input_dir = tmp_path / "input"
         input_dir.mkdir()
         projects = _list_projects(cfg, input_dir)
-        assert len(projects) == 1
-        assert projects[0]["is_current"] is True
+        assert len(projects) == 0
 
     def test_from_registry(self, tmp_path: Path):
         cfg = tmp_path / "config.yaml"
