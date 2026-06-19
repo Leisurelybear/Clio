@@ -193,15 +193,12 @@ if (-not $ffmpeg) {
         $env:PATH = "$(Split-Path $foundFfmpeg.Path);$env:PATH"
     } else {
         Write-Host "[3/4] 未检测到 ffmpeg，尝试通过 winget 安装..."
-        $oldErrAction = $ErrorActionPreference
-        $ErrorActionPreference = "Stop"
-        try {
-            winget install --id Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements
-        } catch {
+        winget install --id Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements 2>$null
+        if ($LASTEXITCODE -ne 0) {
             Write-Host "     winget 安装失败，请手动下载安装:" -ForegroundColor Yellow
             Write-Host "     https://ffmpeg.org/download.html#build-windows" -ForegroundColor Cyan
             Write-Host "     下载后请将 bin 目录加入 PATH 环境变量，或设置 FFMPEG_HOME" -ForegroundColor DarkYellow
-        } finally { $ErrorActionPreference = $oldErrAction }
+        }
     }
 } else {
     Write-Host "[3/4] ffmpeg 已就绪: $($ffmpeg.Source)"
