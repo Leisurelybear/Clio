@@ -55,10 +55,10 @@ def _get_model(config: AppConfig):
     import os
 
     if config.whisper.hf_endpoint:
-        os.environ.setdefault("HF_ENDPOINT", config.whisper.hf_endpoint)
+        os.environ["HF_ENDPOINT"] = config.whisper.hf_endpoint
     if config.proxy.enabled and isinstance(config.proxy.url, str) and config.proxy.url.strip():
-        os.environ.setdefault("HTTP_PROXY", config.proxy.url)
-        os.environ.setdefault("HTTPS_PROXY", config.proxy.url)
+        os.environ["HTTP_PROXY"] = config.proxy.url
+        os.environ["HTTPS_PROXY"] = config.proxy.url
 
     cache_dir = _resolve_cache_dir(config)
     device = _resolve_device(config)
@@ -74,6 +74,9 @@ def _get_model(config: AppConfig):
             )
         except (ValueError, RuntimeError, OSError) as e:
             if device != "cuda":
+                print(f"  [错误] 模型加载失败: {e}")
+                print("  [提示] 请执行 `python main.py whisper install` 预下载模型到本地缓存")
+                print(f"  [提示] 国内用户需在设置中配置 hf_endpoint（当前: {config.whisper.hf_endpoint or '未设置（使用官方地址）'}）")
                 raise
             print(f"  [警告] CUDA 加载失败 ({e})，回退到 CPU")
             device = "cpu"

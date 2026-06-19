@@ -15,7 +15,7 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
     import os
 
     if cfg.whisper.hf_endpoint:
-        os.environ.setdefault("HF_ENDPOINT", cfg.whisper.hf_endpoint)
+        os.environ["HF_ENDPOINT"] = cfg.whisper.hf_endpoint
         print(f"HF_ENDPOINT 已设置为: {cfg.whisper.hf_endpoint}")
     else:
         print("HF_ENDPOINT: 使用 HuggingFace 官方默认地址")
