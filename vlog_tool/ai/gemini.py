@@ -107,7 +107,11 @@ class GeminiProvider:
         return uploaded
 
     def close(self) -> None:
-        pass
+        if self._client is not None:
+            try:
+                self._client.close()
+            except Exception:
+                pass
 
     def generate_text(self, prompt: str, model: str) -> str:
         rl_ctx = self._rl or nullcontext()

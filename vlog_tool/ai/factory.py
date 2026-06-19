@@ -39,6 +39,10 @@ def _build_provider(config: AppConfig, provider_name: str):
         raise ValueError(f"不支持的厂家类型 '{provider_cfg.type}'，可选: {', '.join(_PROVIDER_TYPES)}")
     provider = cls(provider_cfg, config.proxy)
     with _provider_cache_lock:
+        existing = _provider_cache.get(cache_key)
+        if existing is not None:
+            provider.close()
+            return existing
         _provider_cache[cache_key] = provider
     return provider
 
@@ -46,12 +50,13 @@ def _build_provider(config: AppConfig, provider_name: str):
 def _clear_provider_cache() -> None:
     """Close all cached providers and clear the cache (for testing / config reload)."""
     with _provider_cache_lock:
-        for p in _provider_cache.values():
-            try:
-                p.close()
-            except Exception:
-                pass
+        providers = list(_provider_cache.values())
         _provider_cache.clear()
+    for p in providers:
+        try:
+            p.close()
+        except Exception:
+            pass
 
 
 def get_task_config(config: AppConfig, task: TaskName | str) -> TaskConfig:
