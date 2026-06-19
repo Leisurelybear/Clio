@@ -10,7 +10,7 @@ from vlog_tool.tasks.transcribe import run_transcribe_all
 from vlog_tool.transcribe import (
     _get_model,
     _resolve_cache_dir,
-    _resolve_compute_type,
+    _resolve_compute_types,
     _resolve_device,
     transcribe_audio,
 )
@@ -56,10 +56,10 @@ class TestResolveDevice:
 
 class TestResolveComputeType:
     def test_cpu(self):
-        assert _resolve_compute_type("cpu") == "int8"
+        assert _resolve_compute_types("cpu") == ["int8", "default"]
 
     def test_cuda(self):
-        assert _resolve_compute_type("cuda") == "int8_float16"
+        assert _resolve_compute_types("cuda") == ["int8_float16", "float16", "default"]
 
 
 class TestGetModel:
@@ -100,9 +100,11 @@ class TestGetModel:
 
     @patch("vlog_tool.transcribe.WhisperModel")
     def test_cuda_fallback_on_value_error(self, mock_whisper_cls):
-        """CUDA 加载失败时回退到 CPU"""
+        """CUDA 所有 compute type 失败后回退到 CPU"""
         mock_whisper_cls.side_effect = [
-            ValueError("CUDA error"),
+            ValueError("int8_float16 error"),
+            ValueError("float16 error"),
+            ValueError("default error"),
             MagicMock(),
         ]
         cfg = MagicMock(whisper=WhisperConfig(model_size="small", cache_dir="/cache"))
@@ -112,9 +114,9 @@ class TestGetModel:
             patch("vlog_tool.transcribe._resolve_device", return_value="cuda"),
         ):
             result = _get_model(cfg)
-            assert mock_whisper_cls.call_count == 2
-            _, second_kwargs = mock_whisper_cls.call_args
-            assert second_kwargs["device"] == "cpu"
+            assert mock_whisper_cls.call_count == 4
+            _, last_kwargs = mock_whisper_cls.call_args
+            assert last_kwargs["device"] == "cpu"
             assert result is not None
 
     @patch("vlog_tool.transcribe.WhisperModel")
