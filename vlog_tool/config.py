@@ -209,6 +209,7 @@ def _parse_providers(raw: dict) -> dict[str, ProviderConfig]:
             poll_interval_sec=cfg.get("poll_interval_sec", 5),
             retry_attempts=cfg.get("retry_attempts", 2),
             requests_per_minute=cfg.get("requests_per_minute", 0),
+            max_tokens=cfg.get("max_tokens", 4096),
         )
     return providers
 
