@@ -10,6 +10,7 @@ import { api, icon } from './api.js';
 let _runPollTimer = null;
 let _lastRunDay = 'day1';
 let _pollErrorCount = 0;
+let _runActive = false;  // true while a pipeline is running; prevents double-click + stale render
 
 const STEPS_KEY = 'vlog_ui_run_steps';
 
@@ -107,7 +108,9 @@ function renderRun() {
 
   togglePlanSubOptions();
 
-  $('btn-run-start').onclick = startRun;
+  const runBtn = $('btn-run-start');
+  runBtn.onclick = startRun;
+  if (_runActive) { runBtn.disabled = true; runBtn.textContent = '运行中...'; }
   const cancelBtn = $('btn-run-cancel');
   if (cancelBtn) cancelBtn.onclick = cancelRun;
   if (_runPollTimer) clearInterval(_runPollTimer);
@@ -145,6 +148,7 @@ async function startRun() {
       use_transcripts: $('run-use-transcripts').checked,
     });
     if (r.ok) {
+      _runActive = true;
       setStatus(r.message || '流水线已启动', 'ok');
       $('run-progress').innerHTML = '<p class="muted">流水线已启动，等待进度...</p>';
       _runPollTimer = setInterval(pollRunStatus, 2000);
@@ -179,6 +183,7 @@ async function pollRunStatus() {
     const s = await api('GET', '/api/run/status');
     if (s.rerun) return;
     if (s.status === 'idle' || s.status === 'unknown') {
+      _runActive = false;
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       const cancelBtn = $('btn-run-cancel');
       if (cancelBtn) cancelBtn.style.display = 'none';
@@ -191,6 +196,7 @@ async function pollRunStatus() {
     if (s.status === 'running') {
       const stale = !s.running;
       if (stale) {
+        _runActive = false;
         if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
         const cancelBtn = $('btn-run-cancel');
         if (cancelBtn) cancelBtn.style.display = 'none';
@@ -221,6 +227,7 @@ async function pollRunStatus() {
         `;
       }
     } else if (s.status === 'done') {
+      _runActive = false;
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       const cancelBtn = $('btn-run-cancel');
@@ -239,6 +246,7 @@ async function pollRunStatus() {
       await import('./sidebar.js').then(mod => mod.loadVideos());
       if (state.currentEntity === 'plan') import('./sidebar.js').then(mod => mod.selectPlan());
     } else if (s.status === 'cancelled') {
+      _runActive = false;
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       const cancelBtn = $('btn-run-cancel');
@@ -248,6 +256,7 @@ async function pollRunStatus() {
       setStatus('流水线已取消', 'warn');
       renderProcessingState($('run-state-container'));
     } else if (s.status === 'error') {
+      _runActive = false;
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       const cancelBtn = $('btn-run-cancel');
@@ -261,6 +270,7 @@ async function pollRunStatus() {
   } catch (e) {
     _pollErrorCount++;
     if (_pollErrorCount >= 5) {
+      _runActive = false;
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       prog.innerHTML = `<p class="err">✗ 状态更新失败（连续 5 次错误）</p><p>${escapeHtml(e.message)}</p>`;
