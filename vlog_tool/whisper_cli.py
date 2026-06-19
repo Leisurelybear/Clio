@@ -92,7 +92,7 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
 
 
 def _model_in_cache(cache_dir: Path, model_name: str) -> bool:
-    """Check if a model is already cached in download_root."""
+    """Check if a model is completely cached and valid."""
     if not cache_dir.is_dir():
         return False
     for entry in cache_dir.iterdir():
@@ -101,9 +101,30 @@ def _model_in_cache(cache_dir: Path, model_name: str) -> bool:
         name = entry.name.lower()
         if "whisper" in name and model_name.lower() in name:
             snapshots = entry / "snapshots"
-            if snapshots.is_dir() and any(snapshots.iterdir()):
-                return True
+            if not snapshots.is_dir():
+                continue
+            for snap_dir in snapshots.iterdir():
+                if not snap_dir.is_dir():
+                    continue
+                model_file_size = _find_model_file_size(snap_dir)
+                if model_file_size > 100 * 1024 * 1024:
+                    return True
+                print(f"  缓存不完整（{snap_dir.name}: 模型文件仅 {model_file_size // 1024 // 1024} MB），重新下载")
     return False
+
+
+def _find_model_file_size(dir_path: Path) -> int:
+    """Find the largest file in a directory (likely the model binary)."""
+    max_size = 0
+    for f in dir_path.rglob("*"):
+        if f.is_file():
+            try:
+                sz = f.stat().st_size
+                if sz > max_size:
+                    max_size = sz
+            except OSError:
+                pass
+    return max_size
 
 
 def run_whisper_check(config_path: str | Path = "config.yaml") -> int:
