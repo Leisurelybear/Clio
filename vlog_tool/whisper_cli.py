@@ -55,12 +55,32 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
     model_name = cfg.whisper.model_size
     cache_dir = _resolve_cache_dir(cfg)
     cache_dir.mkdir(parents=True, exist_ok=True)
+
+    if _model_in_cache(cache_dir, model_name):
+        print(f"模型 '{model_name}' 已在缓存中（{cache_dir}），跳过下载")
+        return 0
+
     print(f"正在预下载模型 '{model_name}' 到 {cache_dir}...")
     from faster_whisper import WhisperModel
 
     WhisperModel(model_name, device="cpu", download_root=str(cache_dir))
     print(f"模型 '{model_name}' 已就绪")
     return 0
+
+
+def _model_in_cache(cache_dir: Path, model_name: str) -> bool:
+    """Check if a model is already cached in download_root."""
+    if not cache_dir.is_dir():
+        return False
+    for entry in cache_dir.iterdir():
+        if not entry.is_dir():
+            continue
+        name = entry.name.lower()
+        if "whisper" in name and model_name.lower() in name:
+            snapshots = entry / "snapshots"
+            if snapshots.is_dir() and any(snapshots.iterdir()):
+                return True
+    return False
 
 
 def run_whisper_check(config_path: str | Path = "config.yaml") -> int:
