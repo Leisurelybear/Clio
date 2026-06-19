@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 from pathlib import Path
 
 from vlog_tool.config import load_config
@@ -41,14 +42,21 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
     except (ImportError, OSError):
         cuda_avail = False
     if cuda_avail:
-        print("检测到 NVIDIA GPU，安装 CUDA 运行时加速...")
-        r = run_subprocess(
-            [sys.executable, "-m", "pip", "install", "nvidia-cublas-cu12", "nvidia-cudnn-cu12", "-q"],
-        )
-        if r.returncode == 0:
-            print("CUDA 运行时安装完成")
+        import shutil
+        cuda_size_mb = 2800
+        tmp_free = shutil.disk_usage(tempfile.gettempdir()).free // (1024 * 1024)
+        if tmp_free < cuda_size_mb:
+            print(f"  [跳过] 磁盘空间不足（临时目录剩余 {tmp_free} MB，需要 ~{cuda_size_mb} MB），CUDA 加速跳过")
+            print("  [提示] 如需 CUDA 加速，请手动执行: pip install nvidia-cublas-cu12 nvidia-cudnn-cu12")
         else:
-            print(f"  [警告] CUDA 运行时安装失败（返回码 {r.returncode}），将使用 CPU 运行")
+            print("检测到 NVIDIA GPU，安装 CUDA 运行时加速...")
+            r = run_subprocess(
+                [sys.executable, "-m", "pip", "install", "nvidia-cublas-cu12", "nvidia-cudnn-cu12", "-q"],
+            )
+            if r.returncode == 0:
+                print("CUDA 运行时安装完成")
+            else:
+                print(f"  [警告] CUDA 运行时安装失败（返回码 {r.returncode}），将使用 CPU 运行")
     else:
         print("CUDA: 不可用（使用 CPU）")
 
@@ -63,7 +71,7 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
     repo_id = f"Systran/faster-whisper-{model_name}"
     print(f"正在预下载模型 '{model_name}' 到 {cache_dir}...")
     print(f"  模型仓库: {repo_id}")
-    print(f"  模型大小约 1~2 GB，下载时间取决于网络速度")
+    print("  模型大小约 1~2 GB，下载时间取决于网络速度")
     from huggingface_hub import snapshot_download
 
     try:
