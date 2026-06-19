@@ -11,6 +11,8 @@ let _runPollTimer = null;
 let _lastRunDay = 'day1';
 let _pollErrorCount = 0;
 
+const STEPS_KEY = 'vlog_ui_run_steps';
+
 const RUN_STEPS = [
   { key: 'compress', label: '压缩原视频', hint: '将原片压缩为 640p，为 AI 分析做准备' },
   { key: 'analyze', label: 'AI 分析', hint: '提交 Gemini 分析压缩后的视频内容' },
@@ -20,29 +22,57 @@ const RUN_STEPS = [
   { key: 'label', label: '烧录序号', hint: '在压缩视频左上角标上序号便于剪映对照' },
 ];
 
+function loadStepSelection() {
+  try {
+    const raw = localStorage.getItem(STEPS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+}
+
+function saveStepSelection(checks, useTranscripts) {
+  try {
+    localStorage.setItem(STEPS_KEY, JSON.stringify({ steps: checks, use_transcripts: useTranscripts }));
+  } catch { /* ignore */ }
+}
+
 function renderRun() {
-  // 从 state 同步当前分集（避免残留 done 处理器把 day 覆写成硬编码默认值）
   _lastRunDay = state.currentDay || 'day1';
   const pane = $('tab-run');
-  const stepChecks = RUN_STEPS.map(s => `
-    <label class="run-step">
-      <input type="checkbox" class="run-step-cb" data-step="${s.key}" checked>
-      <span class="run-step-label">${s.label}</span>
-      <span class="run-step-hint">${s.hint}</span>
-    </label>
-  `).join('');
+  const saved = loadStepSelection();
+  const savedSteps = saved.steps || {};
+  const savedUseTrans = saved.use_transcripts !== false;
+
+  const stepChecks = RUN_STEPS.map(s => {
+    const checked = savedSteps[s.key] !== false;
+    const isPlan = s.key === 'plan';
+    return `
+      <div class="run-step-wrap">
+        <label class="run-step ${isPlan ? 'run-step-plan' : ''}">
+          <input type="checkbox" class="run-step-cb" data-step="${s.key}" ${checked ? 'checked' : ''}>
+          <span class="run-step-label">${s.label}</span>
+          <span class="run-step-hint">${s.hint}</span>
+        </label>
+        ${isPlan ? `
+        <div class="run-step-sub">
+          <label class="run-option">
+            <span class="run-option-label">分集</span>
+            <input id="run-day" class="run-option-input" value="${escapeHtml(state.currentDay)}">
+          </label>
+          <label class="run-option run-option-check">
+            <input type="checkbox" id="run-use-transcripts" ${savedUseTrans ? 'checked' : ''}>
+            <span>使用语音转录优化剪辑规划</span>
+          </label>
+        </div>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
+
   pane.innerHTML = `
     <h3>运行流水线</h3>
     <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
-    <label>分集 <input id="run-day" value="${escapeHtml(state.currentDay)}"></label>
     <div class="run-step-list">${stepChecks}</div>
-    <div class="run-options" style="margin:8px 0">
-      <label class="run-option" style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:var(--text-sm)">
-        <input type="checkbox" id="run-use-transcripts" checked>
-        <span>使用语音转录优化剪辑规划</span>
-      </label>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
       <button id="btn-run-start" class="btn-primary">${icon('play', 16)} 运行选中步骤</button>
       <button id="btn-run-cancel" class="btn-secondary" style="display:none">取消</button>
     </div>
@@ -51,12 +81,47 @@ function renderRun() {
     </div>
     <div id="run-state-container"></div>
   `;
+
+  // wire step checkbox change → persist
+  document.querySelectorAll('.run-step-cb').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const checks = {};
+      document.querySelectorAll('.run-step-cb').forEach(c => {
+        checks[c.dataset.step] = c.checked;
+      });
+      saveStepSelection(checks, $('run-use-transcripts')?.checked ?? true);
+      togglePlanSubOptions();
+    });
+  });
+  // wire use_transcripts change → persist
+  const useTransCb = $('run-use-transcripts');
+  if (useTransCb) {
+    useTransCb.addEventListener('change', () => {
+      const checks = {};
+      document.querySelectorAll('.run-step-cb').forEach(c => {
+        checks[c.dataset.step] = c.checked;
+      });
+      saveStepSelection(checks, useTransCb.checked);
+    });
+  }
+
+  togglePlanSubOptions();
+
   $('btn-run-start').onclick = startRun;
   const cancelBtn = $('btn-run-cancel');
   if (cancelBtn) cancelBtn.onclick = cancelRun;
   if (_runPollTimer) clearInterval(_runPollTimer);
   _runPollTimer = setInterval(pollRunStatus, 2000);
   pollRunStatus();
+}
+
+function togglePlanSubOptions() {
+  const planCb = document.querySelector('.run-step-cb[data-step="plan"]');
+  const sub = document.querySelector('.run-step-sub');
+  if (!sub) return;
+  const enabled = planCb?.checked ?? true;
+  sub.style.opacity = enabled ? '1' : '0.35';
+  sub.querySelectorAll('input, button').forEach(el => el.disabled = !enabled);
 }
 
 async function startRun() {
@@ -109,7 +174,7 @@ async function cancelRun() {
 async function pollRunStatus() {
   const prog = $('run-progress');
   const btn = $('btn-run-start');
-  if (!prog) return;  // not on run tab
+  if (!prog) return;
   try {
     const s = await api('GET', '/api/run/status');
     if (s.rerun) return;
@@ -182,7 +247,7 @@ async function pollRunStatus() {
       prog.innerHTML = `<p class="warn">⏹ 流水线已取消</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线已取消', 'warn');
       renderProcessingState($('run-state-container'));
-    } else     if (s.status === 'error') {
+    } else if (s.status === 'error') {
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       const cancelBtn = $('btn-run-cancel');

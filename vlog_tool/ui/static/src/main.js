@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { $, $$, escapeHtml, setStatus, updateSidebarDay } from './utils.js';
 import { api } from './api.js';
+import { initLayout } from './layout.js';
 import { setupPlayer } from './viewer.js';
 import { save, initProjectConfig, renderActiveTab } from './editor.js';
 import {
@@ -30,6 +31,8 @@ window.goToRunTab = goToRunTab;
 window.initProjectConfig = initProjectConfig;
 
 async function init() {
+  initLayout();
+
   // 从 URL 读取 project 参数
   const urlParams = new URLSearchParams(window.location.search);
   const urlProject = urlParams.get('project');
@@ -196,6 +199,10 @@ async function init() {
   setupPlayer();
   document.addEventListener('keydown', (e) => {
     if (e.ctrlKey && (e.key === 's' || e.key === 'S')) { e.preventDefault(); save(); }
+    // Close visible modals on Escape
+    if (e.key === 'Escape') {
+      $$('.modal').forEach(m => { if (m.style.display !== 'none') m.style.display = 'none'; });
+    }
   });
   window.addEventListener('beforeunload', (e) => {
     if (state.dirty) { e.preventDefault(); e.returnValue = '有未保存的修改'; }
