@@ -112,7 +112,7 @@ class WhisperDevice(StrEnum):
 
 @dataclass
 class WhisperConfig:
-    enabled: bool = False
+    enabled: bool = True
     model_size: str = "medium"
     language: str = "zh"
     device: str = "auto"

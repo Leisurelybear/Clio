@@ -269,7 +269,7 @@ class TestLoadConfig:
 class TestWhisperConfig:
     def test_defaults(self):
         cfg = WhisperConfig()
-        assert cfg.enabled is False
+        assert cfg.enabled is True
         assert cfg.model_size == "medium"
         assert cfg.language == "zh"
         assert cfg.device == "auto"

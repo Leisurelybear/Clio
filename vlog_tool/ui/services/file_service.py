@@ -96,12 +96,13 @@ def _inject_whisper_defaults(raw: dict) -> None:
     """Inject default whisper fields into a config dict."""
     whisper = raw.setdefault("whisper", {})
     if isinstance(whisper, dict):
-        whisper.setdefault("enabled", False)
+        whisper.setdefault("enabled", True)
         whisper.setdefault("model_size", "medium")
         whisper.setdefault("language", "zh")
         whisper.setdefault("device", "auto")
         whisper.setdefault("max_segments_per_clip", 5)
         whisper.setdefault("transcripts_subdir", "transcripts")
+        whisper.setdefault("hf_endpoint", "")  # 空=官方地址；国内可设 https://hf-mirror.com
 
 
 def _migrate_project_configs(projects_root: Path) -> tuple[int, list[str]]:
