@@ -25,6 +25,9 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
         print(f"HF_ENDPOINT 已设置为: {cfg.whisper.hf_endpoint}")
     else:
         print("HF_ENDPOINT: 使用 HuggingFace 官方默认地址")
+    if cfg.proxy.enabled and isinstance(cfg.proxy.url, str) and cfg.proxy.url.strip():
+        os.environ["HTTP_PROXY"] = cfg.proxy.url
+        os.environ["HTTPS_PROXY"] = cfg.proxy.url
 
     req = PROJECT_ROOT / "requirements-whisper.txt"
     if not req.is_file():

@@ -59,7 +59,13 @@ if [ -f ".venv/bin/python" ]; then
 fi
 if [ ! -f ".venv/bin/python" ]; then
     echo "[1/4] 创建 Python 虚拟环境..."
-    python3 -m venv .venv
+    if ! python3 -m venv .venv 2>/dev/null; then
+        echo "     创建虚拟环境失败，请安装 python3-venv:" >&2
+        echo "       Debian/Ubuntu: sudo apt install python3-venv" >&2
+        echo "       Fedora: sudo dnf install python3-virtualenv" >&2
+        echo "       Arch: sudo pacman -S python-virtualenv" >&2
+        exit 1
+    fi
 else
     echo "[1/4] 虚拟环境已存在，跳过"
 fi
@@ -79,15 +85,16 @@ if ! .venv/bin/python -m pip --version >/dev/null 2>&1; then
 fi
 
 echo "[2/4] 安装 Python 依赖..."
-.venv/bin/python -m pip install --upgrade pip -q
-.venv/bin/python -m pip install -r requirements.txt -q
+.venv/bin/python -m pip install --upgrade pip || echo "     警告: pip 升级失败，继续安装依赖..."
+.venv/bin/python -m pip install -r requirements.txt || { echo "     [错误] 依赖安装失败，请检查网络或代理设置" >&2; exit 1; }
 
 # Whisper 语音转录（可选加速）
 read -rp "是否安装 Whisper 语音转录? (y/N, 默认 N) " whisperAnswer
 if [ "$whisperAnswer" = "y" ] || [ "$whisperAnswer" = "Y" ]; then
     echo "[2b] 安装 faster-whisper 及推理依赖..."
-    if ! .venv/bin/python -m pip install -r requirements-whisper.txt -q; then
+    if ! .venv/bin/python -m pip install -r requirements-whisper.txt; then
         echo "     Whisper 依赖安装失败，跳过后续步骤" >&2
+        echo "     可后续运行 'python main.py whisper install' 单独安装" >&2
     else
         if command -v nvidia-smi &>/dev/null; then
             echo "     检测到 NVIDIA GPU，安装 CUDA 运行时加速..."
@@ -97,7 +104,7 @@ if [ "$whisperAnswer" = "y" ] || [ "$whisperAnswer" = "Y" ]; then
                 echo "     磁盘仅剩 $((free_kb/1024/1024))GB，使用无缓存模式安装..."
                 cuda_args="--no-cache-dir"
             fi
-            if ! .venv/bin/python -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 $cuda_args -q; then
+            if ! .venv/bin/python -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 $cuda_args; then
                 echo "     CUDA 运行时安装失败，将使用 CPU 运行（速度较慢）"
             fi
         else
@@ -114,13 +121,22 @@ if ! command -v ffmpeg &>/dev/null; then
     case "$(uname -s)" in
         Linux)
             if command -v apt-get &>/dev/null; then
-                sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg || echo "     apt 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
+                sudo apt-get update -qq && sudo apt-get install -y ffmpeg || echo "     apt 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
             elif command -v dnf &>/dev/null; then
                 sudo dnf install -y ffmpeg || echo "     dnf 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
+            elif command -v pacman &>/dev/null; then
+                sudo pacman -S --noconfirm ffmpeg || echo "     pacman 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
+            elif command -v zypper &>/dev/null; then
+                sudo zypper install -y ffmpeg || echo "     zypper 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
             elif command -v brew &>/dev/null; then
                 brew install ffmpeg || echo "     brew 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
             else
-                echo "     请手动安装 ffmpeg: https://ffmpeg.org/download.html" >&2
+                echo "     请手动安装 ffmpeg:" >&2
+                echo "       Debian/Ubuntu: sudo apt install ffmpeg" >&2
+                echo "       Fedora: sudo dnf install ffmpeg" >&2
+                echo "       Arch: sudo pacman -S ffmpeg" >&2
+                echo "       macOS: brew install ffmpeg" >&2
+                echo "       https://ffmpeg.org/download.html" >&2
             fi
             ;;
         Darwin)
@@ -160,7 +176,8 @@ fi
 
 echo ""
 echo "=== 环境检查 ==="
-.venv/bin/python main.py check
+echo "  注意: 请先编辑 .env 填入 API Key，再运行环境检查"
+echo "  .venv/bin/python main.py check"
 
 echo ""
 echo "配置完成后运行:"

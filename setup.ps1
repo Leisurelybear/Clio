@@ -127,20 +127,27 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "[2/4] 安装 Python 依赖..."
-.\.venv\Scripts\python.exe -m pip install --upgrade pip -q
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt -q
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+if ($LASTEXITCODE -ne 0) { Write-Host "     警告: pip 升级失败，继续安装依赖..." -ForegroundColor Yellow }
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+if ($LASTEXITCODE -ne 0) { Write-Host "     [错误] 依赖安装失败，请检查网络或代理设置" -ForegroundColor Red; exit 1 }
 
 # Whisper 语音转录（可选加速）
 $whisperAnswer = Read-Host "是否安装 Whisper 语音转录? (y/N, 默认 N)"
 if ($whisperAnswer -eq 'y' -or $whisperAnswer -eq 'Y') {
     Write-Host "[2b] 安装 faster-whisper 及推理依赖..." -ForegroundColor Yellow
-    .\.venv\Scripts\python.exe -m pip install -r requirements-whisper.txt -q
+    .\.venv\Scripts\python.exe -m pip install -r requirements-whisper.txt
     if ($LASTEXITCODE -ne 0) {
         Write-Host "     Whisper 依赖安装失败，跳过后续步骤" -ForegroundColor Red
+        Write-Host "     可后续运行 'python main.py whisper install' 单独安装" -ForegroundColor DarkYellow
     } else {
-        # 检测 CUDA 显卡
-        try {
-            $nvidiaSmi = Get-Command nvidia-smi -ErrorAction Stop
+        # 检测 CUDA 显卡（nvidia-smi 可能在非标准路径）
+        $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
+        if (-not $nvidiaSmi) {
+            $nvidiaSmi = Get-ChildItem "C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe" -ErrorAction SilentlyContinue
+            if ($nvidiaSmi) { $nvidiaSmi = $nvidiaSmi.FullName }
+        }
+        if ($nvidiaSmi) {
             Write-Host "     检测到 NVIDIA GPU，安装 CUDA 运行时加速..." -ForegroundColor Green
             # CUDA 包 ~3GB，检查磁盘空间
             $cudaArgs = @()
@@ -149,7 +156,7 @@ if ($whisperAnswer -eq 'y' -or $whisperAnswer -eq 'Y') {
                 Write-Host "     C 盘仅剩 $([math]::Round($drive.Free/1GB, 1))GB，使用无缓存模式安装..." -ForegroundColor Yellow
                 $cudaArgs = @("--no-cache-dir")
             }
-            .\.venv\Scripts\python.exe -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 @cudaArgs -q
+            .\.venv\Scripts\python.exe -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 @cudaArgs
             if ($LASTEXITCODE -ne 0) {
                 Write-Host "     CUDA 运行时安装失败，将使用 CPU 运行（速度较慢）" -ForegroundColor DarkYellow
                 if ($LASTEXITCODE -eq 28) {
@@ -167,17 +174,34 @@ if ($whisperAnswer -eq 'y' -or $whisperAnswer -eq 'Y') {
 # 2. ffmpeg
 $ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
 if (-not $ffmpeg) {
-    $wingetFfmpeg = Get-ChildItem "$env:LOCALAPPDATA\Microsoft\WinGet\Packages" -Filter ffmpeg.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($wingetFfmpeg) {
-        Write-Host "[3/4] 检测到 WinGet 安装的 ffmpeg: $($wingetFfmpeg.FullName)"
+    # 检查常见安装路径
+    $ffmpegCandidates = @(
+        "$env:LOCALAPPDATA\Microsoft\WinGet\Packages\*\ffmpeg.exe",
+        "C:\ProgramData\chocolatey\lib\ffmpeg\tools\ffmpeg\bin\ffmpeg.exe",
+        "$env:USERPROFILE\scoop\apps\ffmpeg\current\bin\ffmpeg.exe",
+        "C:\Program Files\ffmpeg\bin\ffmpeg.exe",
+        "C:\Tools\ffmpeg\bin\ffmpeg.exe"
+    )
+    $foundFfmpeg = $null
+    foreach ($p in $ffmpegCandidates) {
+        $foundFfmpeg = Resolve-Path $p -ErrorAction SilentlyContinue
+        if ($foundFfmpeg) { break }
+    }
+    if ($foundFfmpeg) {
+        Write-Host "[3/4] 检测到 ffmpeg: $($foundFfmpeg.Path)"
+        # 将 bin 目录临时加入 PATH
+        $env:PATH = "$(Split-Path $foundFfmpeg.Path);$env:PATH"
     } else {
         Write-Host "[3/4] 未检测到 ffmpeg，尝试通过 winget 安装..."
-        winget install --id Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements 2>$null
-        if ($LASTEXITCODE -ne 0) {
+        $oldErrAction = $ErrorActionPreference
+        $ErrorActionPreference = "Stop"
+        try {
+            winget install --id Gyan.FFmpeg -e --accept-package-agreements --accept-source-agreements
+        } catch {
             Write-Host "     winget 安装失败，请手动下载安装:" -ForegroundColor Yellow
             Write-Host "     https://ffmpeg.org/download.html#build-windows" -ForegroundColor Cyan
-            Write-Host "     下载后请将 bin 目录加入 PATH 环境变量" -ForegroundColor DarkYellow
-        }
+            Write-Host "     下载后请将 bin 目录加入 PATH 环境变量，或设置 FFMPEG_HOME" -ForegroundColor DarkYellow
+        } finally { $ErrorActionPreference = $oldErrAction }
     }
 } else {
     Write-Host "[3/4] ffmpeg 已就绪: $($ffmpeg.Source)"
@@ -208,9 +232,5 @@ if ($hooksPath -ne ".githooks") {
 
 Write-Host ""
 Write-Host "=== 环境检查 ===" -ForegroundColor Cyan
-.\.venv\Scripts\python.exe main.py check
-
-Write-Host ""
-Write-Host "配置完成后运行:" -ForegroundColor Green
-Write-Host "  .\.venv\Scripts\Activate.ps1"
-Write-Host "  python main.py run --day day1"
+Write-Host "  注意: 请先编辑 .env 填入 API Key，再运行环境检查" -ForegroundColor DarkYellow
+Write-Host "  .\.venv\Scripts\python.exe main.py check" -ForegroundColor Cyan

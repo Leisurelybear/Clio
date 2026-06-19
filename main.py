@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -96,7 +97,8 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
     if not check_dir.is_dir():
         print()
         print("用法: python main.py <命令> -i <素材目录>")
-        print("      例如: python main.py run -i G:\\素材\\巴黎行")
+        example_path = "G:\\素材\\巴黎行" if os.name == "nt" else "/path/to/videos"
+        print(f"      例如: python main.py run -i {example_path}")
     print(f"\ndone (exit code: {0 if ok else 1})")
     return 0 if ok else 1
 

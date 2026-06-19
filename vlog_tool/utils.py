@@ -120,8 +120,13 @@ def discover_ffmpeg_bin(name: str) -> str | None:
         return found
 
     local_app = Path(os.environ.get("LOCALAPPDATA", ""))
+    user_home = Path(os.environ.get("USERPROFILE", ""))
     search_roots = [
         local_app / "Microsoft/WinGet/Packages",
+        Path("C:/ProgramData/chocolatey/lib/ffmpeg/tools/ffmpeg/bin"),
+        user_home / "scoop/apps/ffmpeg/current/bin",
+        Path("C:/Program Files/ffmpeg/bin"),
+        Path("C:/Tools/ffmpeg/bin"),
     ]
     ffmpeg_home = os.environ.get("FFMPEG_HOME")
     if ffmpeg_home:
@@ -145,7 +150,8 @@ def resolve_binary(configured: str, fallback: str) -> str:
     found = discover_ffmpeg_bin(fallback)
     if found:
         return found
-    raise FileNotFoundError(f"找不到 {fallback}。请运行 setup.ps1 安装，或在 config.yaml 的 paths 中填写路径。")
+    setup_script = "setup.ps1" if os.name == "nt" else "setup.sh"
+    raise FileNotFoundError(f"找不到 {fallback}。请运行 {setup_script} 安装，或在 config.yaml 的 paths 中填写路径。")
 
 
 def find_videos(directory: Path, recursive: bool = False) -> list[Path]:
