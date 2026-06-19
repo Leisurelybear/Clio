@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import mimetypes
 import time
 from collections.abc import Callable
 from contextlib import nullcontext
+from pathlib import Path
 
 import httpx
 from google import genai
@@ -126,7 +128,18 @@ class GeminiProvider:
             if progress_callback:
                 progress_callback("上传视频到 Gemini...")
             with rl_ctx:
-                uploaded = self._client.files.upload(file=video_path)
+                # 用 BytesIO 避免 google-genai 2.8.0 的 bug：
+                # 非 ASCII 文件名会作为 HTTP header 值发送，导致
+                # UnicodeEncodeError: 'ascii' codec can't encode character
+                p = Path(video_path)
+                if p.stat().st_size > 200 * 1024 * 1024:
+                    raise ValueError(f"文件过大 ({p.stat().st_size / 1024 / 1024:.0f} MB)，请先压缩")
+                mime_type, _ = mimetypes.guess_type(str(p))
+                with open(video_path, "rb") as f:
+                    uploaded = self._client.files.upload(
+                        file=f,
+                        config=types.UploadFileConfig(mime_type=mime_type or "video/mp4"),
+                    )
             if progress_callback:
                 progress_callback("等待 Gemini 处理...")
             uploaded = self._wait_for_file(uploaded, on_progress=progress_callback)
