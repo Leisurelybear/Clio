@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -24,6 +26,7 @@ except ImportError:
 
 _whisper_model = None
 _whisper_cache_key: str | None = None
+_env_lock = threading.Lock()
 
 
 def _resolve_cache_dir(config: AppConfig) -> Path:
@@ -54,52 +57,58 @@ def _get_model(config: AppConfig):
     if WhisperModel is None:
         raise ImportError("faster-whisper is not installed. Run: pip install faster-whisper")
 
-    import os
+    _ENV_KEYS = {"HF_ENDPOINT", "HTTP_PROXY", "HTTPS_PROXY", "OMP_NUM_THREADS", "MKL_NUM_THREADS"}
+    with _env_lock:
+        saved = {k: os.environ.get(k) for k in _ENV_KEYS}
+        try:
+            os.environ.setdefault("OMP_NUM_THREADS", "4")
+            os.environ.setdefault("MKL_NUM_THREADS", "4")
+            if config.whisper.hf_endpoint:
+                os.environ["HF_ENDPOINT"] = config.whisper.hf_endpoint
+            if config.proxy.enabled and isinstance(config.proxy.url, str) and config.proxy.url.strip():
+                os.environ["HTTP_PROXY"] = config.proxy.url
+                os.environ["HTTPS_PROXY"] = config.proxy.url
 
-    os.environ.setdefault("OMP_NUM_THREADS", "4")
-    os.environ.setdefault("MKL_NUM_THREADS", "4")
-
-    if config.whisper.hf_endpoint:
-        os.environ["HF_ENDPOINT"] = config.whisper.hf_endpoint
-    if config.proxy.enabled and isinstance(config.proxy.url, str) and config.proxy.url.strip():
-        os.environ["HTTP_PROXY"] = config.proxy.url
-        os.environ["HTTPS_PROXY"] = config.proxy.url
-
-    cache_dir = _resolve_cache_dir(config)
-    device = _resolve_device(config)
-    attempt = 0
-    while True:
-        compute_types = _resolve_compute_types(device)
-        for ct in compute_types:
-            attempt += 1
-            key = f"{config.whisper.model_size}@{device}@{ct}@{cache_dir}"
-            if _whisper_model is not None and _whisper_cache_key == key:
-                return _whisper_model
-            try:
-                _whisper_model = WhisperModel(
-                    config.whisper.model_size,
-                    device=device,
-                    compute_type=ct,
-                    download_root=str(cache_dir),
-                )
-                _whisper_cache_key = key
-                return _whisper_model
-            except (ValueError, RuntimeError, OSError) as e:
-                is_last = ct == compute_types[-1]
-                if device == "cuda" and is_last:
-                    print(f"  [警告] CUDA 加载失败 ({e})，回退到 CPU")
-                    device = "cpu"
-                    break
-                if device != "cuda" and is_last:
-                    print(f"  [错误] 模型加载失败: {e}")
-                    print("  [提示] 请执行 `python main.py whisper install` 预下载模型到本地缓存")
-                    print(
-                        f"  [提示] 国内用户需在设置中配置 hf_endpoint（当前: {config.whisper.hf_endpoint or '未设置（使用官方地址）'}）"
-                    )
-                    raise
-                print(f"  [警告] {device} {ct} 加载失败 ({e})，尝试下一个 compute type")
-                continue
-    return _whisper_model
+            cache_dir = _resolve_cache_dir(config)
+            device = _resolve_device(config)
+            attempt = 0
+            while True:
+                compute_types = _resolve_compute_types(device)
+                for ct in compute_types:
+                    attempt += 1
+                    key = f"{config.whisper.model_size}@{device}@{ct}@{cache_dir}"
+                    if _whisper_model is not None and _whisper_cache_key == key:
+                        return _whisper_model
+                    try:
+                        _whisper_model = WhisperModel(
+                            config.whisper.model_size,
+                            device=device,
+                            compute_type=ct,
+                            download_root=str(cache_dir),
+                        )
+                        _whisper_cache_key = key
+                        return _whisper_model
+                    except (ValueError, RuntimeError, OSError) as e:
+                        is_last = ct == compute_types[-1]
+                        if device == "cuda" and is_last:
+                            print(f"  [警告] CUDA 加载失败 ({e})，回退到 CPU")
+                            device = "cpu"
+                            break
+                        if device != "cuda" and is_last:
+                            print(f"  [错误] 模型加载失败: {e}")
+                            print("  [提示] 请执行 `python main.py whisper install` 预下载模型到本地缓存")
+                            ep = config.whisper.hf_endpoint or "未设置（使用官方地址）"
+                            print(f"  [提示] 国内用户需在设置中配置 hf_endpoint（当前: {ep}）")
+                            raise
+                        print(f"  [警告] {device} {ct} 加载失败 ({e})，尝试下一个 compute type")
+                        continue
+            return _whisper_model
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
 
 
 def transcribe_audio(

@@ -134,10 +134,16 @@ class TestGetModel:
 
     @patch("vlog_tool.transcribe.WhisperModel")
     def test_sets_hf_endpoint_env(self, mock_whisper_cls):
-        """HF_ENDPOINT 环境变量被正确设置"""
+        """HF_ENDPOINT 环境变量在模型加载期间被正确设置（finally 会恢复）"""
         import os
 
-        mock_whisper_cls.return_value = MagicMock()
+        captured = {}
+
+        def _capture_env(*args, **kwargs):
+            captured["HF_ENDPOINT"] = os.environ.get("HF_ENDPOINT")
+            return MagicMock()
+
+        mock_whisper_cls.side_effect = _capture_env
         cfg = MagicMock(
             whisper=WhisperConfig(model_size="small", cache_dir="/cache", hf_endpoint="https://hf-mirror.com")
         )
@@ -148,7 +154,8 @@ class TestGetModel:
                 patch("vlog_tool.transcribe._whisper_cache_key", None),
             ):
                 _get_model(cfg)
-                assert os.environ["HF_ENDPOINT"] == "https://hf-mirror.com"
+                assert captured.get("HF_ENDPOINT") == "https://hf-mirror.com"
+                assert os.environ.get("HF_ENDPOINT") != "https://hf-mirror.com"  # finally 已恢复
         finally:
             if old_val is not None:
                 os.environ["HF_ENDPOINT"] = old_val
