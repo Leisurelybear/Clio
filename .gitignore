@@ -17,3 +17,5 @@ opencode_session_import.json
 /models/
 
 .idea/
+
+.progress.json

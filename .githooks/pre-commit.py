@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""Pre-commit hook: auto-format staged .py files with ruff."""
+import subprocess
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+# Locate ruff via project venv
+ruff_candidates = [
+    REPO_ROOT / ".venv" / "Scripts" / "ruff.exe",   # Windows
+    REPO_ROOT / ".venv" / "bin" / "ruff",             # Unix
+]
+RUFF = next((p for p in ruff_candidates if p.is_file()), None)
+if RUFF is None:
+    # Fallback: try `python -m ruff`
+    python = REPO_ROOT / ".venv" / "Scripts" / "python.exe"
+    if not python.is_file():
+        python = REPO_ROOT / ".venv" / "bin" / "python"
+    if python.is_file():
+        result = subprocess.run([str(python), "-m", "ruff", "--version"],
+                                capture_output=True, text=True, cwd=REPO_ROOT)
+        if result.returncode == 0:
+            # We'll use python -m ruff as the command
+            RUFF = [str(python), "-m", "ruff"]
+        else:
+            print("⚠️  pre-commit: ruff not found, skipping format check")
+            sys.exit(0)
+    else:
+        print("⚠️  pre-commit: no Python venv found, skipping format check")
+        sys.exit(0)
+
+if not isinstance(RUFF, list):
+    RUFF = [str(RUFF)]
+
+# Get staged .py files (excluding deletions)
+result = subprocess.run(
+    ["git", "diff", "--cached", "--name-only", "--diff-filter=ACM", "--", "*.py"],
+    capture_output=True, text=True, cwd=REPO_ROOT,
+)
+if result.returncode != 0 or not result.stdout.strip():
+    sys.exit(0)
+
+staged = [f for f in result.stdout.splitlines() if f]
+if not staged:
+    sys.exit(0)
+
+print(f"ruff format: {', '.join(staged)}")
+
+# Format staged files
+fmt = subprocess.run([*RUFF, "format", *staged], cwd=REPO_ROOT)
+if fmt.returncode != 0:
+    print("⚠️  ruff format failed, check output above")
+    sys.exit(1)
+
+# Re-stage formatted files
+subprocess.run(["git", "add", *staged], cwd=REPO_ROOT)
+
+# Lint check (only errors, ignore warnings like F811)
+check = subprocess.run([*RUFF, "check", "--select", "F,E,I", *staged], cwd=REPO_ROOT)
+if check.returncode != 0:
+    print("⚠️  ruff check failed — fix errors above before committing")
+    sys.exit(1)
