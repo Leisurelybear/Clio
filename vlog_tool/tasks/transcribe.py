@@ -15,16 +15,32 @@ from vlog_tool.log import format_duration
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.transcribe import check_whisper, transcribe_audio
-from vlog_tool.utils import find_videos, resolve_binary, write_json_atomic
+from vlog_tool.utils import find_videos, popen_subprocess, resolve_binary, write_json_atomic
+
+
+def _get_video_duration(video_path: Path, ffprobe: str) -> float:
+    """Use ffprobe to get video duration in seconds."""
+    import subprocess as _subprocess
+
+    cmd = [ffprobe, "-v", "error", "-show_entries", "format=duration",
+           "-of", "csv=p=0", str(video_path)]
+    try:
+        r = _subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if r.returncode == 0 and r.stdout.strip():
+            return float(r.stdout.strip())
+    except Exception:
+        pass
+    return 0.0
 
 
 def _extract_audio(
     video_path: Path,
     ffmpeg: str,
-    progress_callback: Callable[[float], None] | None = None,
+    progress_callback: Callable[[int], None] | None = None,
     cancel_event: threading.Event | None = None,
+    total_duration: float = 0.0,
 ) -> Path | None:
-    """ffmpeg 提取 16kHz 单声道 WAV，返回临时文件路径。实时输出进度。"""
+    """ffmpeg 提取 16kHz 单声道 WAV，返回临时文件路径。实时输出进度（百分比）。"""
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp.close()
     tmp_path = Path(tmp.name)
@@ -42,9 +58,9 @@ def _extract_audio(
         "1",
         str(tmp_path),
     ]
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
+    proc = popen_subprocess(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
     time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
-    last_pct = 0
+    last_log_pct = -1
     try:
         for line in proc.stderr or []:
             if cancel_event and cancel_event.is_set():
@@ -56,17 +72,19 @@ def _extract_audio(
             m = time_pat.search(line)
             if m:
                 sec = int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3))
-                if progress_callback and sec > 0:
-                    progress_callback(sec)
-                pct = int(sec)
-                if pct >= last_pct + 5:
-                    print(f"  [提取音频] {sec:.0f}s")
-                    last_pct = pct
+                pct = min(int(sec / total_duration * 100), 100) if total_duration > 0 else 0
+                if progress_callback and pct >= 0:
+                    progress_callback(pct)
+                if pct >= last_log_pct + 5:
+                    print(f"  [提取音频] {sec:.0f}s / {total_duration:.0f}s ({pct}%)")
+                    last_log_pct = pct
         proc.wait()
         if proc.returncode != 0:
             print(f"  [ffmpeg] 提取失败 (code {proc.returncode})")
             tmp_path.unlink(missing_ok=True)
             return None
+        if progress_callback:
+            progress_callback(100)
         return tmp_path
     except BaseException:
         if proc.poll() is None:
@@ -88,6 +106,9 @@ def run_transcribe_all(
 ) -> int:
     if not config.whisper.enabled:
         print("Whisper 转录未启用（whisper.enabled=false），跳过")
+        if tracker:
+            tracker.log("Whisper 转录未启用，跳过")
+            tracker.update(phase="transcribe", current=0, total=0, message="Whisper 未启用，跳过")
         return 0
     if not check_whisper():
         msg = "faster-whisper 未安装，跳过转录。执行: python main.py whisper install"
@@ -130,7 +151,18 @@ def run_transcribe_all(
             print("  [取消] 转录阶段被终止")
             break
         ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
-        wav_path = _extract_audio(orig_video, ffmpeg, cancel_event=cancel_event)
+        ffprobe = resolve_binary(config.paths.ffmpeg, "ffprobe")
+        audio_dur = _get_video_duration(orig_video, ffprobe)
+
+        def _on_extract_progress(pct: int) -> None:
+            if tracker:
+                tracker.update(phase="transcribe", current=pct, total=100, message=f"{stem}: 提取音频 ({pct}%)")
+
+        def _on_transcribe_progress(pct: int) -> None:
+            if tracker:
+                tracker.update(phase="transcribe", current=pct, total=100, message=f"{stem}: Whisper 转录 ({pct}%)")
+
+        wav_path = _extract_audio(orig_video, ffmpeg, progress_callback=_on_extract_progress, cancel_event=cancel_event, total_duration=audio_dur)
         if wav_path is None:
             if cancel_event and cancel_event.is_set():
                 print(f"  [取消] {stem}: 音频提取被用户中断")
@@ -147,7 +179,7 @@ def run_transcribe_all(
             continue
 
         try:
-            segments = transcribe_audio(wav_path, config)
+            segments = transcribe_audio(wav_path, config, progress_callback=_on_transcribe_progress)
             transcript = {
                 "source_video": orig_video.name,
                 "source_stem": stem,

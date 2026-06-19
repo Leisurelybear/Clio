@@ -56,6 +56,9 @@ def _get_model(config: AppConfig):
 
     if config.whisper.hf_endpoint:
         os.environ.setdefault("HF_ENDPOINT", config.whisper.hf_endpoint)
+    if config.proxy.enabled and isinstance(config.proxy.url, str) and config.proxy.url.strip():
+        os.environ.setdefault("HTTP_PROXY", config.proxy.url)
+        os.environ.setdefault("HTTPS_PROXY", config.proxy.url)
 
     cache_dir = _resolve_cache_dir(config)
     device = _resolve_device(config)
@@ -89,12 +92,12 @@ def _get_model(config: AppConfig):
 def transcribe_audio(
     audio_path: Path,
     config: AppConfig,
-    progress_callback: Callable[[str], None] | None = None,
+    progress_callback: Callable[[int], None] | None = None,
 ) -> list[dict]:
     lang = config.whisper.language
     model = _get_model(config)
     if progress_callback:
-        progress_callback("transcribing")
+        progress_callback(0)
 
     segments_iter, info = model.transcribe(
         str(audio_path),
@@ -107,13 +110,15 @@ def transcribe_audio(
         temperature=0.0,
     )
     total_duration = info.duration
-    last_log_pct = 0
+    last_pct = 0
     result = []
     for seg in segments_iter:
         pct = int(seg.end / total_duration * 100) if total_duration > 0 else 0
-        if pct >= last_log_pct + 10:
+        if pct >= last_pct + 5:
             print(f"  [whisper] 转录进度: {seg.end:.1f}s / {total_duration:.0f}s ({pct}%)")
-            last_log_pct = pct
+            if progress_callback:
+                progress_callback(pct)
+            last_pct = pct
         if seg.avg_logprob >= -0.8 and seg.no_speech_prob <= 0.1:
             result.append(
                 {
@@ -123,4 +128,6 @@ def transcribe_audio(
                     "avg_logprob": round(seg.avg_logprob, 3),
                 }
             )
+    if progress_callback:
+        progress_callback(100)
     return result

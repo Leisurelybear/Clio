@@ -65,13 +65,14 @@ class TestRunTranscribeAll:
         assert mock_transcribe.call_count == 1
 
     def test_disabled(self, cfg):
-        """whisper.enabled=False 时直接跳过"""
+        """whisper.enabled=False 时打印消息并跳过"""
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
         cfg.whisper.enabled = False
         tracker = MagicMock()
         run_transcribe_all(cfg, tracker)
-        tracker.update.assert_not_called()
+        tracker.update.assert_called_once()
+        assert tracker.update.call_args[1].get("phase") == "transcribe"
 
     @patch("vlog_tool.tasks.transcribe.check_whisper", return_value=False)
     def test_tracker_error_when_whisper_missing(self, mock_check, cfg, tmp_path):
