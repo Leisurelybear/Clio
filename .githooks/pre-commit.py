@@ -24,10 +24,10 @@ if RUFF is None:
             # We'll use python -m ruff as the command
             RUFF = [str(python), "-m", "ruff"]
         else:
-            print("⚠️  pre-commit: ruff not found, skipping format check")
+            print("[pre-commit] ruff not found, skipping format check")
             sys.exit(0)
     else:
-        print("⚠️  pre-commit: no Python venv found, skipping format check")
+        print("[pre-commit] no Python venv found, skipping format check")
         sys.exit(0)
 
 if not isinstance(RUFF, list):
@@ -52,7 +52,7 @@ print(f"ruff format: {', '.join(staged)}")
 # Format staged files
 fmt = subprocess.run([*RUFF, "format", *staged], cwd=REPO_ROOT)
 if fmt.returncode != 0:
-    print("⚠️  ruff format failed, check output above")
+    print("[pre-commit] ruff format failed, check output above")
     sys.exit(1)
 
 # Re-stage formatted files
@@ -61,5 +61,5 @@ subprocess.run(["git", "add", *staged], cwd=REPO_ROOT)
 # Lint check (only errors, ignore warnings like F811)
 check = subprocess.run([*RUFF, "check", "--select", "F,E,I", *staged], cwd=REPO_ROOT)
 if check.returncode != 0:
-    print("⚠️  ruff check failed — fix errors above before committing")
+    print("[pre-commit] ruff check failed - fix errors above before committing")
     sys.exit(1)
