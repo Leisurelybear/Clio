@@ -841,8 +841,8 @@ function renderConfig() {
       <span style="font-size:18px;line-height:1">⚠️</span>
       <span>当前显示的是全局配置（回退）。该项目没有专属 <code>project.yaml</code>，修改将影响所有项目。建议<a href="#" onclick="initProjectConfig();return false" style="text-decoration:underline;color:var(--accent)">创建专属配置</a>。</span>
     </div>
-  ` : '') + `<div class="config-form">${_renderConfigForm(configData, '')}</div>
-  <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:12px">
+  ` : '') + `
+  <div style="margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
     <button id="btn-env-toggle" class="btn-secondary" style="font-size:var(--text-sm)">${icon('file-text', 14)} 编辑 .env 文件</button>
     <div id="env-editor" style="display:none;margin-top:8px">
       <textarea id="env-textarea" style="width:100%;min-height:160px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,12px);padding:8px;background:var(--bg-surface);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-sm)" spellcheck="false"></textarea>
@@ -851,7 +851,8 @@ function renderConfig() {
         <span id="env-save-msg" class="muted" style="font-size:var(--text-xs);align-self:center"></span>
       </div>
     </div>
-  </div>`;
+  </div>
+  <div class="config-form">${_renderConfigForm(configData, '')}</div>`;
   // ai.context 空时显示"添加默认模板"按钮
   const ctxTextarea = pane.querySelector('textarea[data-path="ai.context"]');
   if (ctxTextarea && !ctxTextarea.value.trim()) {

@@ -200,15 +200,6 @@ async function init() {
     } catch (e) { setStatus('重载失败: ' + e.message, 'err'); }
   };
   $('btn-save').onclick = save;
-  $('btn-model-mgmt').onclick = () => {
-    state.currentTab = 'texts';  // 切换到编辑 tab 面板
-    state.currentEntity = 'config';
-    renderActiveTab();
-    requestAnimationFrame(() => {
-      const el = $('whisper-model-mgmt');
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    });
-  };
   $$('.tab').forEach(t => t.onclick = () => { state.currentTab = t.dataset.tab; renderActiveTab(); });
   setupPlayer();
   document.addEventListener('keydown', (e) => {
