@@ -349,7 +349,6 @@ function renderModelManagement() {
       <p class="muted">加载中...</p>
     </div>
   `;
-  _loadModelMgmt();
   return div;
 }
 
@@ -935,6 +934,7 @@ function renderConfig() {
 
   // Append Whisper model management section at the bottom of config tab
   pane.appendChild(renderModelManagement());
+  _loadModelMgmt();
 }
 
 let _logsTimer = null;
