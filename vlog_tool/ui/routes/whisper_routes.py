@@ -131,6 +131,22 @@ def _get_model_file_size(repo_id: str, cfg) -> int:
         return 0
 
 
+def _download_error_detail(e: Exception, cfg) -> str:
+    """Build a user-friendly error message for download failures."""
+    proxy_url = cfg.proxy.url if (cfg.proxy.enabled and cfg.proxy.url) else None
+    endpoint = cfg.whisper.hf_endpoint or "https://huggingface.co"
+    msg = [f"模型下载失败: {e}"]
+    msg.append(f"  Endpoint: {endpoint}")
+    msg.append(f"  Proxy: {proxy_url or '无'}")
+    if "10061" in str(e) or "refused" in str(e).lower():
+        msg.append("  提示: 连接被拒绝。请检查:")
+        msg.append("    - hf-mirror.com 是否可访问（试试浏览器打开）")
+        msg.append("    - 配置文件中 ai.proxy.url 是否正确设置")
+        msg.append("    - 如果不需要镜像，删除 config.yaml 中的 ai.whisper.hf_endpoint")
+        msg.append("    - 若需代理，在 config.yaml 中配置 proxy: { enabled: true, url: http://127.0.0.1:7890 }")
+    return "\n".join(msg)
+
+
 def _find_model_file(cache_dir: Path, model_name: str) -> Path | None:
     """Scan huggingface cache dir for the model.bin file (including partial downloads)."""
     repo_cache = cache_dir / f"models--Systran--faster-whisper-{model_name}"
@@ -270,7 +286,7 @@ def _run_install(handler, progress_path: Path) -> None:
             )
 
     if exc_info[0]:
-        raise RuntimeError(f"模型下载失败: {exc_info[0]}") from exc_info[0]
+        raise RuntimeError(_download_error_detail(exc_info[0], cfg)) from exc_info[0]
     model_path = result[0]
 
     if not model_path or not model_path.is_file():
