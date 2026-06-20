@@ -19,3 +19,4 @@ opencode_session_import.json
 .idea/
 
 .progress.json
+node_modules/
