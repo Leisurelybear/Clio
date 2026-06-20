@@ -9,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import TextIO
 
+from vlog_tool import session_log
+
 _LOGGER_NAME = "vlog_tool"
 _FORMAT = "%(asctime)s [%(levelname)s] %(message)s"
 _DATEFMT = "%Y-%m-%d %H:%M:%S"
@@ -80,6 +82,7 @@ class _TeeWriter:
             for line in message.splitlines():
                 if line:
                     self._logger.log(self._level, line)
+        session_log.write(message.rstrip())
         try:
             self._original.flush()
         except Exception:

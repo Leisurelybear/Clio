@@ -119,6 +119,7 @@ function renderTranscript() {
   const pane = $('tab-transcript');
   if (!t || !t.ok) {
     pane.innerHTML = '<p class="muted">当前视频没有转录数据。</p><p class="hint">请先运行流水线中的「转录」步骤，或在 CLI 执行 <code>python main.py transcribe</code>。</p>';
+    pane.appendChild(renderModelManagement());
     renderWhisperInstallPrompt(pane);
     // Check if install is already running — show progress immediately
     (async () => {
@@ -143,6 +144,8 @@ function renderTranscript() {
     <p class="hint">点击 segment 跳到对应时间；双击文字框可编辑；修改后需点击「保存」</p>
     <ol id="transcript-list"></ol>
   `;
+  pane.appendChild(renderModelManagement());
+
   const ol = pane.querySelector('#transcript-list');
   for (let i = 0; i < segments.length; i++) {
     const seg = segments[i];
@@ -336,6 +339,182 @@ async function pollWhisperInstall() {
       if (errEl) { errEl.style.display = 'block'; errEl.textContent = s.message || '下载失败'; }
     }
   } catch { /* ignore polling errors */ }
+}
+
+function renderModelManagement() {
+  const div = document.createElement('div');
+  div.id = 'whisper-model-mgmt';
+  div.style.cssText = 'margin-top:12px;padding:12px;background:var(--bg-surface,#1e1e1e);border:1px solid var(--border,#333);border-radius:6px';
+  div.innerHTML = `
+    <p style="margin:0 0 8px;font-weight:600">Whisper 模型管理</p>
+    <div id="model-mgmt-content">
+      <p class="muted">加载中...</p>
+    </div>
+  `;
+  _loadModelMgmt();
+  return div;
+}
+
+async function _loadModelMgmt() {
+  const container = $('model-mgmt-content');
+  if (!container) return;
+  try {
+    const data = await api('GET', '/api/whisper/models');
+    if (!data.ok) { container.innerHTML = '<p class="err">加载模型列表失败</p>'; return; }
+
+    const current = data.current_model || 'medium';
+    const avail = data.available || [];
+    const cached = data.cached || [];
+
+    let html = '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">';
+
+    html += '<div style="flex:1;min-width:140px">';
+    html += '<label style="font-size:var(--text-xs);color:var(--text-secondary)">当前模型</label>';
+    html += '<select id="model-size-select" style="width:100%;margin-top:2px">';
+    for (const m of avail) {
+      const sel = m.name === current ? ' selected' : '';
+      const cachedIcon = cached.some(c => c.name === m.name && c.valid) ? ' ✓' : '';
+      html += `<option value="${escapeHtml(m.name)}"${sel}>${escapeHtml(m.label)}${cachedIcon}</option>`;
+    }
+    html += '</select></div>';
+
+    html += '<div>';
+    html += `<button id="btn-model-download" class="btn-primary" style="font-size:var(--text-sm)">${icon('download', 14)} 下载模型</button>`;
+    html += '</div>';
+
+    html += '<div style="font-size:var(--text-xs);color:var(--text-secondary);white-space:nowrap">';
+    html += `可用空间: ${escapeHtml(data.free_display || '?')}`;
+    html += '</div>';
+
+    html += '</div>';
+
+    if (cached.length) {
+      html += '<div style="margin-top:8px">';
+      html += '<p style="font-size:var(--text-xs);color:var(--text-secondary);margin:0 0 4px">已缓存模型:</p>';
+      for (const m of cached) {
+        const validCls = m.valid ? 'ok' : 'err';
+        html += '<div style="display:flex;gap:8px;align-items:center;padding:4px 0;font-size:var(--text-xs)">';
+        html += `<span style="flex:1">${escapeHtml(m.name)} <span class="${validCls}">${m.valid ? '✓' : '✗ (不完整)'}</span> <span class="muted">${escapeHtml(m.size_display)}</span></span>`;
+        html += `<button class="btn-delete-model" data-model="${escapeHtml(m.name)}" style="background:none;border:1px solid var(--err,#c44);color:var(--err,#c44);padding:2px 8px;border-radius:3px;cursor:pointer;font-size:var(--text-xs)">删除</button>`;
+        html += '</div>';
+      }
+      html += '</div>';
+    } else {
+      html += '<p class="muted" style="margin-top:8px;font-size:var(--text-xs)">尚未缓存任何模型。请先下载。</p>';
+    }
+
+    html += '<div id="model-dl-progress" style="display:none;margin-top:8px">';
+    html += '<div style="display:flex;justify-content:space-between;font-size:var(--text-xs);margin-bottom:4px">';
+    html += '<span id="model-dl-msg"></span><span id="model-dl-speed"></span></div>';
+    html += '<div style="background:#333;border-radius:3px;height:6px;overflow:hidden">';
+    html += '<div id="model-dl-bar" style="background:#4a9eff;border-radius:3px;height:100%;width:0%"></div></div>';
+    html += '<p id="model-dl-eta" class="muted" style="font-size:var(--text-xs);margin:2px 0 0"></p>';
+    html += '</div>';
+
+    container.innerHTML = html;
+
+    const sel = $('model-size-select');
+    if (sel) {
+      sel.onchange = async () => {
+        const newModel = sel.value;
+        try {
+          const r = await api('PUT', '/api/whisper/model', { model_size: newModel });
+          if (r.ok) {
+            setStatus(`模型已切换为 ${newModel}`, 'ok');
+            _loadModelMgmt();
+          } else {
+            setStatus('切换模型失败: ' + (r.error || ''), 'err');
+            sel.value = current;
+          }
+        } catch (e) {
+          setStatus('切换模型失败: ' + e.message, 'err');
+          sel.value = current;
+        }
+      };
+    }
+
+    const dlBtn = $('btn-model-download');
+    if (dlBtn) {
+      dlBtn.onclick = async () => {
+        dlBtn.disabled = true;
+        dlBtn.textContent = '启动下载...';
+        const prog = $('model-dl-progress');
+        if (prog) prog.style.display = 'block';
+        try {
+          const r = await api('POST', '/api/whisper/install', {});
+          if (!r.ok) throw new Error(r.error || '启动失败');
+          dlBtn.textContent = '下载中...';
+          if (_installPollTimer) clearInterval(_installPollTimer);
+          _installPollTimer = setInterval(_pollModelDl, 1000);
+          _pollModelDl();
+        } catch (e) {
+          dlBtn.disabled = false;
+          dlBtn.innerHTML = `${icon('download', 14)} 下载模型`;
+          const progMsg = $('model-dl-msg');
+          if (progMsg) progMsg.textContent = '启动失败: ' + e.message;
+        }
+      };
+    }
+
+    container.querySelectorAll('.btn-delete-model').forEach(btn => {
+      btn.onclick = async () => {
+        const modelName = btn.dataset.model;
+        if (!confirm(`确定删除模型 ${modelName}？将释放磁盘空间。`)) return;
+        try {
+          const r = await api('POST', '/api/whisper/models/delete', { name: modelName });
+          if (r.ok) {
+            setStatus(`模型 ${modelName} 已删除`, 'ok');
+            _loadModelMgmt();
+          } else {
+            setStatus('删除失败: ' + (r.error || ''), 'err');
+          }
+        } catch (e) {
+          setStatus('删除失败: ' + e.message, 'err');
+        }
+      };
+    });
+  } catch (e) {
+    if (container) container.innerHTML = `<p class="err">加载失败: ${escapeHtml(e.message)}</p>`;
+  }
+}
+
+async function _pollModelDl() {
+  try {
+    const s = await api('GET', '/api/whisper/install/status');
+    const bar = $('model-dl-bar');
+    const msg = $('model-dl-msg');
+    const speed = $('model-dl-speed');
+    const eta = $('model-dl-eta');
+    const dlBtn = $('btn-model-download');
+    if (!s.running && s.status === 'idle') {
+      if (_installPollTimer) { clearInterval(_installPollTimer); _installPollTimer = null; }
+      return;
+    }
+    if (s.status === 'downloading') {
+      if (bar) bar.style.width = (s.progress_pct || 0) + '%';
+      if (msg) msg.textContent = s.message || '下载中...';
+      if (speed && s.speed) speed.textContent = s.speed;
+      if (eta) {
+        if (s.eta_sec != null) {
+          const m = Math.floor(s.eta_sec / 60);
+          const sec = s.eta_sec % 60;
+          eta.textContent = `预计剩余 ${m} 分 ${sec} 秒`;
+        } else { eta.textContent = ''; }
+      }
+    } else if (s.status === 'done') {
+      if (_installPollTimer) { clearInterval(_installPollTimer); _installPollTimer = null; }
+      if (bar) bar.style.width = '100%';
+      if (msg) msg.textContent = '✔ 下载完成';
+      if (eta) eta.textContent = '';
+      if (dlBtn) { dlBtn.disabled = false; dlBtn.innerHTML = `${icon('download', 14)} 下载模型`; }
+      _loadModelMgmt();
+      retryTranscribe();
+    } else if (s.status === 'error') {
+      if (_installPollTimer) { clearInterval(_installPollTimer); _installPollTimer = null; }
+      if (dlBtn) { dlBtn.disabled = false; dlBtn.innerHTML = `${icon('download', 14)} 重试下载`; }
+      if (msg) msg.textContent = s.message || '下载失败';
+    }
+  } catch { /* ignore */ }
 }
 
 async function retryTranscribe() {
