@@ -64,7 +64,11 @@ from vlog_tool.ui.routes.transcripts import (
     handle_put_transcripts,
 )
 from vlog_tool.ui.routes.videos import handle_get_video, handle_get_videos
-from vlog_tool.ui.routes.whisper_routes import handle_get_whisper_check
+from vlog_tool.ui.routes.whisper_routes import (
+    handle_get_whisper_check,
+    handle_get_whisper_install_status,
+    handle_post_whisper_install,
+)
 from vlog_tool.ui.services.file_service import _find_texts_dirs, _is_safe_basename
 from vlog_tool.ui.services.project_service import _project_output_dir, _registry_path
 from vlog_tool.utils import write_json_atomic
@@ -407,6 +411,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_get_transcripts(self, qs)
             if path == "/api/whisper/check":
                 return handle_get_whisper_check(self)
+            if path == "/api/whisper/install/status":
+                return handle_get_whisper_install_status(self)
             if path == "/api/env":
                 return handle_get_env(self, qs)
             if path == "/api/logs":
@@ -474,6 +480,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_post_project_remove(self, obj)
             if path == "/api/rerun":
                 return handle_post_rerun(self, qs, obj)
+            if path == "/api/whisper/install":
+                return handle_post_whisper_install(self)
             if path == "/api/logs/clear":
                 clear_session_log()
                 return self._send_json({"ok": True})
