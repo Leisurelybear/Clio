@@ -70,7 +70,6 @@ from vlog_tool.ui.routes.whisper_routes import (
     handle_post_whisper_model_delete,
     handle_put_whisper_model,
 )
-from vlog_tool.ui.security import _get_ui_token, _is_lan_mode
 from vlog_tool.ui.services.config_cache import ConfigCache
 from vlog_tool.ui.services.file_service import (
     resolve_in,
@@ -341,13 +340,8 @@ def run(
     print(f"  UI started: {url}")
     print(f"  Project directory: {active_config.paths.input_dir}")
     print(f"  Output directory: {active_config.paths.output_dir}")
-    token = _get_ui_token()
-    if _is_lan_mode(host):
-        if not token:
-            print("  ⚠  WARNING: LAN mode without UI_TOKEN — all endpoints are unprotected!")
-            print("  ⚠  Set UI_TOKEN env var for token-based auth")
-        else:
-            print("  🔑  Token auth active (UI_TOKEN)")
+    if host not in ("127.0.0.1", "localhost", ""):
+        print(f"  ⚠  Listening on {host} — exposed to LAN!")
     print("  Ctrl+C to exit")
     if open_browser:
         threading.Timer(0.5, lambda: _open_browser(url)).start()

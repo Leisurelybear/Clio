@@ -10,18 +10,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from http.server import BaseHTTPRequestHandler
 
-from vlog_tool.ui.security import _check_token
 from vlog_tool.ui.services.file_service import _list_drives
 
 
 def handle_get_fs_dirs(handler: BaseHTTPRequestHandler, qs: dict) -> None:
-    """Handle GET /api/fs/dirs.
-
-    Requires ?token=... when UI_TOKEN env var is set (LAN mode auth).
-    """
-    if not _check_token(qs):
-        return handler._send_json({"error": "unauthorized"}, 401)
-
+    """Handle GET /api/fs/dirs."""
     dir_path = qs.get("path", [""])[0]
     if not dir_path:
         if sys.platform == "win32":
