@@ -7,20 +7,146 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ## In Progress
 
-### R-016: UI Whisper Model Download
+### U-001: Server Handler Extraction (Phase 1 — Immediate)
 
-**Background**: Users in China cannot directly access HuggingFace Hub and rely on the `hf_endpoint` mirror. When transcription fails, they can only run the CLI `whisper install` to download manually — a fragmented experience.
+**Source**: 2026-06-20 code review (`docs/analysis/2026-06-20-REVIEW-part1.md`)
+
+**Background**: 2026-06-20 code review identified `make_handler()` (432-line closure) still contains business logic that should be in services. Already partially addressed (A-001 split routes), but `_resolve_project_input`/`_get_config`/`_send_video_range` remain in Handler.
 
 **Acceptance Criteria**:
-- Show a "Download Model" button in the UI transcription progress/error area (when model is not cached)
-- Clicking the button downloads the model in a backend thread, UI shows progress (download speed / percentage / remaining time)
-- Automatically retry transcription after download completes
-- Backend reuses `whisper_cli.run_whisper_install` pre-download logic
+- `_resolve_project_input` → `project_service.py`
+- `_get_config` (LRU cache + mtime) → new `config_cache.py` service
+- `_send_video_range` → `file_service.py` or new `video_service.py`
+- `_resolve_texts`/`_resolve_in` → `file_service.py`
+- `make_handler` reduced to ≤200 lines, route dispatch only
+- `_resolve_last_project_config` at module level also moved to `project_service.py`
 
 **Sub-tasks**:
-- [x] R-016a: Backend `POST /api/whisper/install` (daemon thread + progress writes to `.whisper_install.json`) `326fe46`
-- [x] R-016b: Frontend shows "Download Model" button on transcription error + progress feedback `e361f7d`
-- [x] R-016c: Auto-trigger re-transcription for current video after download completes `e361f7d`
+- [ ] U-001a: Extract `_get_config` with LRU cache + mtime to `config_cache.py`
+- [ ] U-001b: Extract `_resolve_project_input` + `_resolve_last_project_config` to `project_service.py`
+- [ ] U-001c: Extract `_send_video_range` + `_resolve_texts`/`_resolve_in` to `file_service.py`
+- [ ] U-001d: Verify UI still works (manual test + all pytest pass)
+
+### U-002: ProviderManager (Phase 2 — Short-term)
+
+**Source**: 2026-06-20 code review (`docs/analysis/2026-06-20-REVIEW-part1.md`)
+
+**Background**: Current `_provider_cache` in `factory.py` already has composite key + thread safety (C2/C4 fixed), but no TTL/expiration/hot-reload. Long-running server accumulates HTTP sessions.
+
+**Acceptance Criteria**:
+- `ai/manager.py`: `ProviderManager` class replaces module-level `_provider_cache`
+- TTL-based expiration (default 30min no-access → auto close)
+- `close_all()` for server shutdown cleanup
+- `hot_reload()` for config hot-reload (close old, create new)
+- Maintain existing thread-safety + composite key + test isolation
+
+**Sub-tasks**:
+- [ ] U-002a: Implement `ProviderManager` class with TTL + `close_all` + `hot_reload`
+- [ ] U-002b: Integrate into `factory.py` (backward-compatible)
+- [ ] U-002c: Call `close_all` on `server.py` shutdown
+- [ ] U-002d: Update tests + verify CI
+
+### U-003: Config Module Split (Phase 2 — Short-term)
+
+**Source**: 2026-06-20 code review (`docs/analysis/2026-06-20-REVIEW-part1.md`)
+
+**Background**: `config.py` 406 lines with 14 dataclasses + validation + deep-merge + env resolution. Splitting improves testability and maintainability.
+
+**Acceptance Criteria**:
+- `config/schema.py`: All dataclass definitions
+- `config/loader.py`: `load_config` + `deep_merge` + `_parse_providers`/`_parse_tasks`
+- `config/validator.py`: `_validate_config`
+- `config/defaults.py`: Default values and constants
+- `config/__init__.py` re-exports all public API, zero import changes for callers
+
+**Sub-tasks**:
+- [ ] U-003a: Create `config/` package directory with `__init__.py`
+- [ ] U-003b: Extract schema, loader, validator, defaults
+- [ ] U-003c: Verify all imports still work + all tests pass
+
+### U-005: Pipeline Cancel Coverage for All Steps (Phase 1 — Immediate)
+
+**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
+
+**Background**: `pipeline.py:108` only passes `cancel_event` to `compress`, `transcribe`, `cut`. `analyze`/`scripts`/`plan`/`label` have no cancel support. Users pressing "Cancel" in UI while analyze is running will still burn API quota on remaining videos.
+
+**Sub-tasks**:
+- [ ] U-005a: Add `cancel_event` param to `run_analyze_all` + check at each video loop iteration
+- [ ] U-005b: Add `cancel_event` param to `run_generate_scripts` + check
+- [ ] U-005c: Add `cancel_event` param to `run_plan_vlog` + check
+- [ ] U-005d: Add `cancel_event` param to `run_label_videos` + check
+- [ ] U-005e: Remove step restriction in `pipeline.py:108` so all steps propagate `cancel_event`
+
+### U-006: RateLimiter Lock Refactoring (Phase 2 — Prerequisite for Parallelism)
+
+**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
+
+**Background**: `RateLimiter.__enter__` holds the lock during `time.sleep()`. When P-001 (parallel AI analysis) is implemented, N threads will queue on the same lock, defeating parallelism. Fix: split "compute wait" (locked) from "sleep + call" (unlocked).
+
+**Sub-tasks**:
+- [ ] U-006a: Refactor `RateLimiter` — `acquire()` method returns wait time, sleep outside lock
+- [ ] U-006b: Update `gemini.py` to use new `acquire()` pattern
+- [ ] U-006c: Verify tests + no behavior change in single-threaded mode
+
+### U-007: Whisper Cancel Safety (Phase 2)
+
+**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
+
+**Background**: `whisper_routes.py` uses `ctypes.pythonapi.PyThreadState_SetAsyncExc` to kill download thread — unsafe (C extensions block injection, resource leaks). Replace with chunked download that checks cancel flag per-chunk.
+
+**Sub-tasks**:
+- [ ] U-007a: Replace `hf_hub_download` with chunked `requests.get(stream=True)` + `iter_content`
+- [ ] U-007b: Per-chunk `_INSTALL_CANCEL.is_set()` check for clean interrupt
+- [ ] U-007c: Remove `ctypes` thread-kill code
+- [ ] U-007d: Update tests
+
+### U-009: Whisper Low-Confidence Segment Flag (Phase 2 — Data Quality)
+
+**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
+
+**Background**: `transcribe.py:144` silently drops segments with `avg_logprob < -0.8` or `no_speech_prob > 0.1`. This information loss is invisible to users — they can't tell if a gap is silence or filtered-out speech.
+
+**Sub-tasks**:
+- [ ] U-009a: Change `transcribe.py` to keep all segments, add `low_confidence: bool` flag instead of filtering
+- [ ] U-009b: Count and log dropped segments for diagnostics
+- [ ] U-009c: Update UI transcript display to visually mark low-confidence segments (gray/warning color)
+- [ ] U-009d: Update tests for new behavior
+
+### U-010: Server + fs.py Test Coverage (Phase 3 — Testing)
+
+**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
+
+**Background**: `server.py` has 6% coverage, `fs.py` has 12% coverage. These are security-sensitive and critical files with minimal testing.
+
+**Sub-tasks**:
+- [ ] U-010a: Add integration tests for `server.py` dispatch logic (do_GET/do_PUT/do_POST routing)
+- [ ] U-010b: Add tests for `fs.py` directory browsing (boundary cases, permission errors)
+- [ ] U-010c: Add tests for `whisper_routes.py` install/cancel/model management flows
+
+### U-008: fs.py Path Restriction + Auth for LAN Mode (Phase 1 — Security)
+
+**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
+
+**Background**: `/api/fs/dirs` has no path restriction, exposing full filesystem when `--host 0.0.0.0` is used. All write endpoints lack auth. Requires lightweight token-based protection.
+
+**Sub-tasks**:
+- [ ] U-008a: Restrict `handle_get_fs_dirs` to user home directory or a configurable root
+- [ ] U-008b: Add `UI_TOKEN` env var check — when `--host` is not localhost, require `?token=` on all sensitive endpoints
+- [ ] U-008c: Update README.md with explicit security warning for `--host 0.0.0.0`
+- [ ] U-008d: Add tests for `fs.py` (currently 12% coverage)
+
+### U-004: Resolve `projects.json` Path Inconsistency (Phase 1 — Immediate)
+
+**Source**: Found during 2026-06-20 code review cross-check (review missed this)
+
+**Background**: `server.py:524` uses `config_path.parent / "projects.json"`, but `project_service.py` uses `_registry_path(config_path)` which returns `config_path.parent / "projects.json"` — they happen to be the same value, but this is coincidental and fragile.
+
+**Sub-tasks**:
+- [ ] U-004a: Change `server.py` to call `_registry_path(config_path)` for consistency
+
+## Staging / WIP
+
+- (None)
 
 ## Feature R-004: UI Config Read and Edit
 
@@ -479,6 +605,17 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | B-060 | Original video view split segment index lost — each original file only uses `comp[0]`, plan referencing `002`/`003` returns 404 | Iterate all matches in `comp`, create independent video entries for each split segment | ✅ `c59880d` |
 | B-072 | `tasks/compress.py` corrupted `.mp4` permanently skipped by `skip_existing` without retry | Add file integrity check or fallback retry | 🆕 |
 | B-073 | `routes/videos.py` `_parse_segment_info` only recognizes `001_GL010683_seg01` format | Relax naming convention assumptions, support custom naming | 🆕 |
+| B-086 | `server.py:524` hardcodes `config_path.parent / "projects.json"` instead of calling `_registry_path()` | Use `_registry_path(config_path)` for consistency | 🆕 |
+| B-087 | `serve.ps1`/`serve.sh` hardcodes project directory paths | Remove hardcoded paths, make distributable | 🆕 |
+| B-088 | `ROADMAP.md` 656 lines — completed features not archived | Archive completed `[x]` sections to separate file | 🆕 |
+| B-089 | `AGENTS.md` §7 commit history 100+ entries too long | Trim to ~30 most recent, archive rest | 🆕 |
+| B-090 | `pipeline.py` cancel_event not propagated to analyze/scripts/plan/label | Add `cancel_event` param + loop check to all 4 functions (see U-005) | 🆕 |
+| B-091 | `RateLimiter.__enter__` holds lock during `time.sleep()`, blocks parallel AI calls | Split acquire() from sleep (see U-006) | 🆕 |
+| B-092 | `whisper_routes.py` ctypes thread kill unsafe (C ext blocks injection, resource leak) | Replace with chunked download (see U-007) | 🆕 |
+| B-093 | `transcribe.py` low-confidence segments silently dropped, no record kept | Mark with `low_confidence` flag instead of discard (see U-009) | 🆕 |
+| B-094 | `/api/fs/dirs` no path restriction, exposes full filesystem in LAN mode | Add root restriction + token auth (see U-008) | 🆕 |
+| B-095 | `server.py` only 6% test coverage, no integration tests for dispatch/error paths | Add HTTP-level tests (see U-010) | 🆕 |
+| B-096 | `whisper_routes.py` 48% coverage — new feature, test lagging behind | Add tests for install/cancel/model management flows | 🆕 |
 | B-074 | `analyze.py:_wrap_with_context` reads `trip_context.md` from disk on every AI call | Module-level `_trip_context_cache` | ✅ `fe57a7f` |
 | B-075 | `ui/server.py` Range request doesn't support suffix `bytes=-N` | Empty start + non-empty end → suffix calculation | ✅ `d2591a9` |
 | B-076 | `utils/discover_ffmpeg_bin` hardcoded `G:/ffmpeg` | Remove, use `FFMPEG_HOME` env var instead | ✅ `74c34f5` |
@@ -508,14 +645,14 @@ All B-046~B-052 covered by 163 new tests:
 | B-009 | AI occasionally outputs non-pure JSON, `extract_json` parsing fails | More precise extraction of valid JSON (recursive markdown stripping) | |
 | B-011 | New users `python main.py check` false failure (unfriendly messages) | Optimize check step messages | |
 | B-010 | (Pending further confirmation) | — | |
-| B-019 | `VIDEO_EXTS` duplicate definition (utils.py includes .avi/.mkv, server.py does not) | Move to `vlog_tool/_constants.py` for unified reference | 🆕 |
-| B-020 | `_write_csv` `format_index(rec.index, 3)` hardcoded `3` instead of using config | Use `config.naming.index_width` instead | 🆕 |
+| B-019 | `VIDEO_EXTS` duplicate definition (utils.py includes .avi/.mkv, server.py does not) | Move to `vlog_tool/_constants.py` for unified reference | ✅ `4ac5785` |
+| B-020 | `_write_csv` `format_index(rec.index, 3)` hardcoded `3` instead of using config | Use `config.naming.index_width` instead | ✅ `4ac5785` |
 
 ## Performance Optimizations
 
 | ID | Bottleneck | Optimization Plan | Priority |
 | --- | --- | --- | --- |
-| P-001 | `pipeline.py` video compression and AI analysis run serially, time-consuming | `ThreadPoolExecutor` to parallelize compression + AI analysis | P2 |
+| P-001 | AI analysis (analyze step) is pure serial, each video waits for previous upload+process+generate | `ThreadPoolExecutor(max_workers=3~5)` after RateLimiter refactoring (U-006). See part2 review §P-1 for details | P2 |
 | P-002 | Repeated ffprobe calls to read same video's `duration_sec` / `size_mb` | Cache already-read info, reuse results | P3 |
 | P-003 | `GET /api/videos` iterates directory every time, high I/O cost | Add directory mtime cache, reuse unchanged scan results | P3 |
 

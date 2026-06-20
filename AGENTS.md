@@ -508,6 +508,35 @@ See `vlog_tool/compress.py:24`.
 - Conversion formula: `with_retry(attempts=cfg.retry_attempts + 1)`
 - Both providers (gemini + openai_compat) use the same formula to keep semantics consistent
 
+### 9.15 `cancel_event` Propagation in Pipeline
+
+- `pipeline.py:108` only passes `cancel_event` to `compress`, `transcribe`, `cut`
+- `run_analyze_all` / `run_generate_scripts` / `run_plan_vlog` / `run_label_videos` have **no** `cancel_event` parameter
+- When adding cancel support to a new step, follow the pattern in `cut.py`: accept `cancel_event: threading.Event | None` in function signature, check `if cancel_event and cancel_event.is_set(): break` inside the main loop
+- All steps should propagate `cancel_event`; if a new step is added, add it to the propagation list in `pipeline.py`
+
+### 9.16 `RateLimiter` Lock Reentrancy
+
+- `RateLimiter.__enter__` holds `self._lock` during `time.sleep(wait)` — this blocks all threads even if their rate limit windows haven't expired
+- This is safe for single-threaded use but defeats parallelism when `ThreadPoolExecutor` is used for concurrent AI calls
+- Fix pattern: split into `acquire()` (locked, returns wait time) and let the caller sleep + make the API call outside the lock
+- Any parallelization effort (P-001/Perf-1) must refactor this first
+
+### 9.17 Whisper Download Thread Cancellation
+
+- `whisper_routes.py` uses `ctypes.pythonapi.PyThreadState_SetAsyncExc` to kill the download thread
+- This is unsafe: if the thread is blocked in a C extension (e.g., socket read), the exception injection is silently deferred
+- `SystemExit` may skip `finally` blocks, leaving file locks / `.lock` files in inconsistent state
+- Preferred approach: chunked `requests.get(stream=True)` with per-chunk cancel check, no `ctypes` needed
+- Mark `B-092` / `U-007` for the fix
+
+### 9.18 `/api/fs/dirs` Security
+
+- `fs.py` has no path restriction — full filesystem is browseable
+- When combined with `--host 0.0.0.0`, any device on LAN can read directory structure, video files, and write config
+- Fix: restrict to user home directory by default, add `UI_TOKEN` env var for LAN mode
+- The file has only 12% test coverage — a security-sensitive untested surface
+
 ## 10. Verification Flow
 
 Minimal verification:
@@ -523,7 +552,54 @@ Run through a media directory:
 .\.venv\Scripts\python.exe main.py serve --no-browser  # Verify UI starts (then Ctrl+C to exit)
 ```
 
-## 11. Communication Template
+## 11. Optimization Plan (2026-06-20 Code Review)
+
+Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cross-referenced against actual project state.
+
+### What both reviews got right (still actionable)
+
+| Finding | Action | Phase |
+|---------|--------|-------|
+| `make_handler` closure too large (432 lines) | Extract business logic to services | **U-001** |
+| config.py 406 lines, 14 dataclasses | Split into `config/` package | **U-003** |
+| File system as database | Repository layer (long-term) | Phase 3 |
+| Config cache not true LRU | Fix in U-001a | **U-001** |
+| No domain models | `@dataclass VideoAnalysis/Segment/VoiceoverScript` | Phase 3 |
+| No token cost tracking | `ai/cost_tracker.py` | Phase 3 |
+| Pipeline cancel not covering analyze/scripts/plan/label | Add cancel_event to all loop steps | **U-005** |
+| `RateLimiter` lock blocks parallel AI calls | Split acquire from sleep | **U-006** |
+| Whisper download ctypes thread kill unsafe | Replace with chunked download | **U-007** |
+| `/api/fs/dirs` no auth/restriction for LAN mode | Add root restriction + token | **U-008** |
+| Whisper low-confidence segments silently dropped | Mark `low_confidence` flag | **U-009** |
+
+### What reviews got wrong (already fixed)
+
+| Claim | Actual fix | Commit |
+|-------|-----------|--------|
+| server.py 547-line God Object | Split into 13 routes + 2 services (A-001 ✅) | `0918da0` |
+| Provider cache no lifecycle | Composite key + lock + `_clear_provider_cache` (C2/C4 ✅) | `71659aa` + `ef68308` |
+| UI contains business logic | `project_service.py` + `file_service.py` exist | `0918da0` |
+| VIDEO_EXTS duplicate (B-019) | Centralized in `_constants.py` | ✅ |
+| `format_index` hardcoded `3` (B-020) | All calls use `config.naming.index_width` | ✅ |
+
+### What reviews missed (real issues found during cross-check)
+
+| Issue | Detail | Fix |
+|-------|--------|-----|
+| `server.py:524` hardcodes `config_path.parent / "projects.json"` instead of `_registry_path()` | Fragile duplicate path logic | **U-004** |
+| `serve.ps1`/`serve.sh` has hardcoded project paths | Not distributable | Needs de-localization |
+| ROADMAP.md 656 lines — completed features not archived | Maintenance burden | Periodic cleanup |
+| AGENTS.md §7 commit history overly long (100+ entries) | Should trim to ~30 | Periodic cleanup |
+| `transcribe.py` low-confidence segs silently dropped | Information loss for downstream | **U-009** |
+| `server.py` 6% coverage + `fs.py` 12% coverage | Security-sensitive untested surface | **U-010** |
+
+### Tracking
+
+See `ROADMAP.md` section "In Progress" — entries **U-001** through **U-010**.
+
+---
+
+## 12. Communication Template
 
 If an AI assistant takes over, upon seeing `AGENTS.md` it should:
 
