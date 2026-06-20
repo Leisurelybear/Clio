@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 import yaml
 
-from vlog_tool.config import deep_merge, load_config
+from vlog_tool.config import CONFIG_DESCRIPTIONS, deep_merge, load_config
 from vlog_tool.ui.services.file_service import (
     _coerce_config_types,
     _create_project_yaml,
@@ -68,6 +68,7 @@ def handle_get_config_raw(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     # 确保 ai.context 始终存在（前端需要该字段渲染编辑框）
     raw.setdefault("ai", {})
     raw["ai"].setdefault("context", "")
+    raw["_descriptions"] = CONFIG_DESCRIPTIONS
     handler._send_json(raw)
 
 

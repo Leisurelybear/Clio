@@ -820,16 +820,25 @@ function labelFromPath(path) {
   return path ? path.split('.').pop() : 'config';
 }
 
-function _renderConfigForm(obj, path) {
+function _renderTooltip(path, desc) {
+  if (!desc) return '';
+  return `<span class="config-desc-icon" data-desc-path="${path}" tabindex="0">
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="currentColor"><circle cx="8" cy="8" r="7"/><text x="8" y="10" text-anchor="middle" font-size="9" fill="white" font-weight="bold">?</text></svg>
+    <span class="config-desc-tooltip">${escapeHtml(desc)}</span>
+  </span>`;
+}
+
+function _renderConfigForm(obj, path, descriptions = null) {
   if (obj === null || obj === undefined) {
     return `<span class="config-null">(空)</span>`;
   }
+  const tip = (descriptions && descriptions[path]) ? _renderTooltip(path, descriptions[path]) : '';
   if (typeof obj === 'boolean') {
-    return `<label class="config-field config-bool"><span class="config-key">${labelFromPath(path)}</span> <input type="checkbox" data-path="${path}" ${obj ? 'checked' : ''}></label>`;
+    return `<label class="config-field config-bool"><span class="config-key">${labelFromPath(path)}${tip}</span> <input type="checkbox" data-path="${path}" ${obj ? 'checked' : ''}></label>`;
   }
   if (typeof obj === 'number') {
     const isInt = Number.isInteger(obj);
-    return `<label class="config-field config-num"><span class="config-key">${labelFromPath(path)}</span> <input type="number" data-path="${path}" step="${isInt ? '1' : 'any'}" value="${obj}"></label>`;
+    return `<label class="config-field config-num"><span class="config-key">${labelFromPath(path)}${tip}</span> <input type="number" data-path="${path}" step="${isInt ? '1' : 'any'}" value="${obj}"></label>`;
   }
   if (typeof obj === 'string') {
     const multiline = path === 'ai.context' || obj.length > 80 || obj.includes('\n');
@@ -838,10 +847,10 @@ function _renderConfigForm(obj, path) {
       if (path === 'ai.context') {
         hint = '<br><span class="hint">项目特定背景（如拍摄地点、行程安排），将追加到默认模板 <code>trip_context.md</code> 之后。留空则仅使用默认模板。</span>';
       }
-      return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <textarea data-path="${path}" rows="4">${escapeHtml(obj)}</textarea>${hint}</label>`;
+      return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}${tip}</span> <textarea data-path="${path}" rows="4">${escapeHtml(obj)}</textarea>${hint}</label>`;
     }
     const isPwd = path.endsWith('api_key');
-    return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}</span> <input type="${isPwd ? 'password' : 'text'}" data-path="${path}" value="${escapeHtml(obj)}"></label>`;
+    return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}${tip}</span> <input type="${isPwd ? 'password' : 'text'}" data-path="${path}" value="${escapeHtml(obj)}"></label>`;
   }
   if (Array.isArray(obj)) {
     const allStr = obj.every(x => typeof x === 'string');
@@ -849,14 +858,14 @@ function _renderConfigForm(obj, path) {
       return `<fieldset class="config-fieldset"><legend>${labelFromPath(path)}</legend><label class="config-field config-str"><textarea data-path="${path}" rows="${Math.max(2, obj.length)}">${escapeHtml(obj.join('\n'))}</textarea><span class="hint">每行一项</span></label></fieldset>`;
     }
     return `<fieldset class="config-fieldset"><legend>${labelFromPath(path)}</legend>${obj.map((item, i) =>
-      `<div class="config-array-item">${_renderConfigForm(item, path + '[' + i + ']')}</div>`
+      `<div class="config-array-item">${_renderConfigForm(item, path + '[' + i + ']', descriptions)}</div>`
     ).join('')}</fieldset>`;
   }
   if (typeof obj === 'object') {
-    let html = `<fieldset class="config-fieldset"><legend>${labelFromPath(path) || '配置'}</legend>`;
+    let html = `<fieldset class="config-fieldset"><legend>${labelFromPath(path) || '配置'}${tip}</legend>`;
     for (const [key, val] of Object.entries(obj)) {
       if (key === 'context_file') continue; // context 已替代，隐藏避免混淆
-      html += _renderConfigForm(val, path ? `${path}.${key}` : key);
+      html += _renderConfigForm(val, path ? `${path}.${key}` : key, descriptions);
     }
     html += '</fieldset>';
     return html;
@@ -883,7 +892,8 @@ function renderConfig() {
   }
   const isFallback = state.configRaw._config_source === 'global_fallback';
   // 排除 meta 字段
-  const { _config_source, _needsConfigInit, ...configData } = state.configRaw;
+  const { _config_source, _needsConfigInit, _descriptions, ...configData } = state.configRaw;
+  const descs = _descriptions || {};
   pane.innerHTML = (isFallback ? `
     <div class="config-fallback-warn" style="background:var(--warning-bg,#fff3cd);border:1px solid var(--warning-border,#ffc107);border-radius:6px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:flex-start;gap:8px;font-size:var(--text-sm);color:var(--text-primary)">
       <span style="font-size:18px;line-height:1">⚠️</span>
@@ -900,7 +910,7 @@ function renderConfig() {
       </div>
     </div>
   </div>
-  <div class="config-form">${_renderConfigForm(configData, '')}</div>`;
+  <div class="config-form">${_renderConfigForm(configData, '', descs)}</div>`;
   // ai.context 空时显示"添加默认模板"按钮
   const ctxTextarea = pane.querySelector('textarea[data-path="ai.context"]');
   if (ctxTextarea && !ctxTextarea.value.trim()) {
@@ -940,6 +950,14 @@ function renderConfig() {
     if (el.tagName === 'TEXTAREA') {
       el.oninput = onchange;
     }
+  });
+
+  // tooltip click toggle for touch devices
+  pane.querySelectorAll('.config-desc-icon').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      el.classList.toggle('show');
+    };
   });
 
   // ---- .env file editor ----
@@ -1050,4 +1068,7 @@ export {
   executeCut,
   save,
   initProjectConfig,
+  _renderConfigForm,
+  labelFromPath,
+  _renderTooltip,
 };

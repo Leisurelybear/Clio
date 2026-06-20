@@ -1,3 +1,4 @@
+from vlog_tool.config.descriptions import CONFIG_DESCRIPTIONS
 from vlog_tool.config.enums import WhisperDevice, WhisperLang, WhisperModelSize
 from vlog_tool.config.loader import (
     _legacy_ai_config,
@@ -31,6 +32,7 @@ from vlog_tool.config.parsers import (
 from vlog_tool.config.validators import _filter_dc, _validate_config
 
 __all__ = [
+    "CONFIG_DESCRIPTIONS",
     "AIConfig",
     "AnalyzeConfig",
     "AppConfig",

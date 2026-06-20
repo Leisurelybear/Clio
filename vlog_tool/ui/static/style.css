@@ -632,6 +632,28 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
 .config-form textarea:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-bg); }
 .config-form .config-bool { display: flex; align-items: center; gap: var(--space-2); }
 .config-form .config-array-item { margin: var(--space-1) 0 var(--space-1) var(--space-3); border-left: 2px solid var(--border); padding-left: var(--space-2); }
+.config-form .config-desc-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--border-light); color: var(--text-secondary);
+  cursor: help; margin-left: 6px;
+  flex-shrink: 0; position: relative; vertical-align: middle;
+  transition: background var(--transition-fast);
+}
+.config-form .config-desc-icon:hover { background: var(--accent); color: #fff; }
+.config-form .config-desc-icon .config-desc-tooltip {
+  display: none; position: absolute; z-index: 1000;
+  bottom: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+  background: var(--bg-surface); color: var(--text-primary);
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 6px 10px; font-size: var(--text-xs); line-height: 1.4;
+  white-space: normal; min-width: 200px; max-width: 320px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15); pointer-events: none;
+  text-align: left;
+}
+.config-form .config-desc-icon:hover .config-desc-tooltip,
+.config-form .config-desc-icon.show .config-desc-tooltip { display: block; }
+.config-form .config-fieldset > legend .config-desc-icon { vertical-align: middle; }
 
 /* ── Run Step List ─────────────────────────────────────────── */
 .run-step-list { margin: var(--space-3) 0; }
