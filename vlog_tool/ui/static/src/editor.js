@@ -154,8 +154,9 @@ function renderTranscript() {
     const confidence = seg.avg_logprob != null
       ? `<span class="muted" title="avg_logprob=${seg.avg_logprob.toFixed(2)}">${Math.round(Math.max(0, Math.min(100, (1 + (seg.avg_logprob || 0)) * 100)))}%</span>`
       : '';
+    const lowIcon = seg.low_confidence ? '<span class="low-conf-icon" title="低置信度，建议复核">⚠</span>' : '';
     li.innerHTML = `
-      <div class="seg-time">${escapeHtml(startStr)} - ${escapeHtml(endStr)} ${confidence}
+      <div class="seg-time">${escapeHtml(startStr)} - ${escapeHtml(endStr)} ${confidence} ${lowIcon}
         <button class="seg-del" data-index="${i}" title="删除此段">×</button>
       </div>
       <div class="seg-text" data-seg-index="${i}">${escapeHtml(seg.text || '')}</div>

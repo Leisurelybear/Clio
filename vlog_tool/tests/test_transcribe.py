@@ -201,10 +201,15 @@ class TestTranscribeAudio:
             callback,
         )
 
-        assert len(result) == 2
+        assert len(result) == 3
         assert result[0]["start"] == 0.0
         assert result[0]["text"] == "今天天气真好"
+        assert "low_confidence" not in result[0]
         assert result[1]["start"] == 2.5
+        assert "low_confidence" not in result[1]
+        assert result[2]["start"] == 5.0
+        assert result[2]["low_confidence"] is True
+        assert result[2]["text"] == "低置信度"
         callback.assert_called()
 
     @patch("vlog_tool.transcribe._get_model")

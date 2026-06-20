@@ -141,15 +141,16 @@ def transcribe_audio(
             if progress_callback:
                 progress_callback(pct)
             last_pct = pct
-        if seg.avg_logprob >= -0.8 and seg.no_speech_prob <= 0.1:
-            result.append(
-                {
-                    "start": round(seg.start, 2),
-                    "end": round(seg.end, 2),
-                    "text": seg.text.strip(),
-                    "avg_logprob": round(seg.avg_logprob, 3),
-                }
-            )
+        is_low = seg.avg_logprob < -0.8 or seg.no_speech_prob > 0.1
+        entry = {
+            "start": round(seg.start, 2),
+            "end": round(seg.end, 2),
+            "text": seg.text.strip(),
+            "avg_logprob": round(seg.avg_logprob, 3),
+        }
+        if is_low:
+            entry["low_confidence"] = True
+        result.append(entry)
     if progress_callback:
         progress_callback(100)
     return result
