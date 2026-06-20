@@ -60,6 +60,15 @@ class ConfigCache:
             self._cache.clear()
             self._meta.clear()
 
+    def invalidate_key(self, key: str) -> None:
+        with self._lock:
+            self._cache.pop(key, None)
+            self._meta.pop(key, None)
+
+    def keys(self) -> list[str]:
+        with self._lock:
+            return list(self._cache.keys())
+
     @staticmethod
     def _read_mtime(path: Path | None) -> float:
         if path is None:

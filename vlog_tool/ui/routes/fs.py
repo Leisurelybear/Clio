@@ -10,15 +10,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from http.server import BaseHTTPRequestHandler
 
-from vlog_tool.ui.security import _check_token, _restrict_path
+from vlog_tool.ui.security import _check_token
 from vlog_tool.ui.services.file_service import _list_drives
 
 
 def handle_get_fs_dirs(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     """Handle GET /api/fs/dirs.
 
-    Restricted to within user home directory.
-    Uses ?token=... for LAN mode authentication.
+    Requires ?token=... when UI_TOKEN env var is set (LAN mode auth).
     """
     if not _check_token(qs):
         return handler._send_json({"error": "unauthorized"}, 401)
@@ -30,9 +29,7 @@ def handle_get_fs_dirs(handler: BaseHTTPRequestHandler, qs: dict) -> None:
             return handler._send_json({"path": "", "dirs": drives, "parent": None, "is_drive_list": True})
         return handler._send_json({"path": "/", "dirs": ["/"], "parent": None, "is_drive_list": True})
     try:
-        resolved = _restrict_path(Path(dir_path))
-        if resolved is None:
-            return handler._send_json({"error": "access denied (path outside home directory)"}, 403)
+        resolved = Path(dir_path).resolve()
         if not resolved.is_dir():
             return handler._send_json({"error": "not a directory"}, 400)
         dirs: list[str] = []

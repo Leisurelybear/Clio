@@ -50,8 +50,7 @@ class TestHandleGetProjects:
         handler.config_path = tmp_path / "config.yaml"
         handler.input_dir = tmp_path / "input"
         handler._send_json = MagicMock()
-        handler.__class__._config_cache = {}
-        handler.__class__._config_cache_lock = MagicMock()
+        handler.__class__._config_cache = MagicMock()
 
         handle_get_projects(handler, {})
 
@@ -113,8 +112,7 @@ class TestHandlePostProjectCreate:
         proj_input = tmp_path / "new_project"
         proj_input.mkdir()
         handler.config_path = tmp_path / "config.yaml"
-        handler.__class__._config_cache = {}
-        handler.__class__._config_cache_lock = MagicMock()
+        handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
 
         handle_post_project_create(handler, {"name": "Paris", "input_dir": str(proj_input)})
@@ -154,8 +152,7 @@ class TestHandlePostProjectAdd:
         proj_input = tmp_path / "new_dir"
         proj_input.mkdir()
         handler.config_path = tmp_path / "config.yaml"
-        handler.__class__._config_cache = {}
-        handler.__class__._config_cache_lock = MagicMock()
+        handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
 
         handle_post_project_add(handler, {"input_dir": str(proj_input)})

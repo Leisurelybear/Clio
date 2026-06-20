@@ -90,7 +90,7 @@ class TestHandlePostConfigInit:
         handler.input_dir = proj_input
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
-        handler.__class__._config_cache_lock = MagicMock()
+        handler.__class__._config_cache = MagicMock()
 
         handle_post_config_init(handler, {}, {})
 
@@ -119,8 +119,7 @@ class TestHandlePutConfigRaw:
         handler.config_path = cfg
         handler.input_dir = tmp_path
         handler._resolve_project_input.return_value = proj_input
-        handler.__class__._config_cache = {}
-        handler.__class__._config_cache_lock = MagicMock()
+        handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
 
         handle_put_config_raw(handler, {}, {"compress": {"target_size_mb": 10}})

@@ -22,7 +22,12 @@ def handle_get_env(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     if env_path and env_path.is_file():
         text = env_path.read_text(encoding="utf-8")
     else:
-        text = "# 在此设置环境变量，每行 KEY=VALUE\n# 示例:\n# DEEPSEEK_API_KEY=your_key_here\n# GEMINI_API_KEY=your_key_here\n"
+        text = (
+            "# 在此设置环境变量，每行 KEY=VALUE\n"
+            "# 示例:\n"
+            "# DEEPSEEK_API_KEY=your_key_here\n"
+            "# GEMINI_API_KEY=your_key_here\n"
+        )
     handler._send_json({"path": str(env_path) if env_path else "", "content": text})
 
 
@@ -36,6 +41,5 @@ def handle_put_env(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None
     # Reload env vars into os.environ so subsequent load_config picks them up
     _load_dotenv(env_path.parent)
     # Clear config cache so next request rebuilds with the new API keys
-    with handler.__class__._config_cache_lock:
-        handler.__class__._config_cache.clear()
+    handler.__class__._config_cache.invalidate_all()
     handler._send_json({"ok": True, "path": str(env_path)})

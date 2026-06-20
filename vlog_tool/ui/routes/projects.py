@@ -63,11 +63,11 @@ def handle_get_projects(handler: BaseHTTPRequestHandler, qs: dict) -> None:
             pass
     projects = _list_projects(config_path, input_dir, req_project, req_input_dir)
     # Prune stale _config_cache entries for projects that no longer exist
+    cache = handler.__class__._config_cache
     valid_dirs = {str(Path(p["input_dir"]).resolve()) for p in projects}
-    with handler.__class__._config_cache_lock:
-        stale = [k for k in handler.__class__._config_cache if k not in valid_dirs]
-        for k in stale:
-            del handler.__class__._config_cache[k]
+    for k in cache.keys():
+        if k not in valid_dirs:
+            cache.invalidate_key(k)
     handler._send_json({"projects": projects, "last_project": last_project_name})
 
 
@@ -125,8 +125,7 @@ def handle_post_project_create(handler: BaseHTTPRequestHandler, obj: dict) -> No
     _save_atomic(proj_file, json.dumps(proj_data, ensure_ascii=False, indent=2).encode("utf-8"))
     # Auto-create project.yaml (silent failure is fine)
     _create_project_yaml(input_path, config_path, proj_out)
-    with handler.__class__._config_cache_lock:
-        handler.__class__._config_cache.pop(str(input_path.resolve()), None)
+    handler.__class__._config_cache.invalidate_key(str(input_path.resolve()))
     _add_to_registry(str(input_path), config_path)
     handler._send_json(
         {"ok": True, "project": {"name": name, "input_dir": str(input_path), "output_dir": str(proj_out)}}
@@ -160,8 +159,7 @@ def handle_post_project_add(handler: BaseHTTPRequestHandler, obj: dict) -> None:
         }
         _save_atomic(proj_file, json.dumps(proj_data, ensure_ascii=False, indent=2).encode("utf-8"))
         _create_project_yaml(input_path, config_path, proj_out)
-        with handler.__class__._config_cache_lock:
-            handler.__class__._config_cache.pop(str(input_path.resolve()), None)
+        handler.__class__._config_cache.invalidate_key(str(input_path.resolve()))
         name = input_path.name
     else:
         try:
