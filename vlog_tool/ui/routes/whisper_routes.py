@@ -240,6 +240,7 @@ def _run_install(handler, progress_path: Path) -> None:
         # Official HF: apply proxy to bypass GFW
         os.environ["HTTP_PROXY"] = cfg.proxy.url
         os.environ["HTTPS_PROXY"] = cfg.proxy.url
+    os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 
     # Step 2: download model
     cache_dir = _resolve_cache_dir(cfg)
@@ -289,6 +290,17 @@ def _run_install(handler, progress_path: Path) -> None:
     last_pct = 0
     while t.is_alive():
         if _INSTALL_CANCEL.is_set():
+            # Forcibly stop the download thread
+            try:
+                import ctypes as _ctypes
+
+                tid = t.ident
+                if tid:
+                    _ctypes.pythonapi.PyThreadState_SetAsyncExc(_ctypes.c_long(tid), _ctypes.py_object(SystemExit))
+            except Exception:
+                pass
+            # Give it a moment to exit
+            t.join(timeout=3)
             # Clean up partial files
             partial = _find_model_file(cache_dir, model_name)
             if partial:
