@@ -19,14 +19,16 @@ async function loadProjects() {
     state.projects = r.projects || [];
     state.lastProject = r.last_project || null;
     state.currentProject = state.projects.find(p => p.is_current) || null;
-    if (state.currentProject && !state.currentProjectName) {
-      state.currentProjectName = state.currentProject.name;
+    if (state.currentProject) {
+      if (!state.currentProjectName) state.currentProjectName = state.currentProject.name;
+      if (!state.currentProjectInputDir) state.currentProjectInputDir = state.currentProject.input_dir;
     }
     updateProjectSidebar();
   } catch (e) {
     state.projects = [];
     state.currentProject = null;
     state.currentProjectName = null;
+    state.currentProjectInputDir = null;
     state.lastProject = null;
     updateProjectSidebar();
   }

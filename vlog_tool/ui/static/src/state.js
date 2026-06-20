@@ -18,6 +18,7 @@ const state = {
   projects: [],
   currentProject: null,
   currentProjectName: null,
+  currentProjectInputDir: null,
   lastProject: null,
   groups: {},
   expandedGroups: {},

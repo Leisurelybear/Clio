@@ -98,8 +98,11 @@ def _remove_from_registry(dir_path: str, config_path: Path | None) -> None:
         return
     paths.remove(normalized)
     data: dict[str, Any] = {"projects": paths}
-    if reg.get("last_project") and reg["last_project"] in {Path(p).name for p in paths}:
-        data["last_project"] = reg["last_project"]
+    last_project = reg.get("last_project")
+    if last_project:
+        last_name = last_project.get("name") if isinstance(last_project, dict) else last_project
+        if last_name in {Path(p).name for p in paths}:
+            data["last_project"] = last_project
     _save_atomic(registry_file, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
 
 
@@ -123,8 +126,11 @@ def _add_to_registry(dir_path: str, config_path: Path | None) -> None:
     _save_atomic(registry_file, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
 
 
-def _save_last_project(name: str, config_path: Path | None) -> None:
-    """Persist the currently active project name for auto-load on next startup."""
+def _save_last_project(name: str, config_path: Path | None, input_dir: str | None = None) -> None:
+    """Persist the currently active project for auto-load on next startup.
+
+    Stores both name and input_dir so same-named projects can be disambiguated.
+    """
     registry_file = _registry_path(config_path)
     paths: list[str] = []
     if registry_file.is_file():
@@ -133,7 +139,8 @@ def _save_last_project(name: str, config_path: Path | None) -> None:
             paths = reg.get("projects", [])
         except (json.JSONDecodeError, OSError):
             paths = []
-    data: dict[str, Any] = {"projects": paths, "last_project": name}
+    last_project: str | dict[str, str] = {"name": name, "input_dir": input_dir} if input_dir else name
+    data: dict[str, Any] = {"projects": paths, "last_project": last_project}
     _save_atomic(registry_file, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
 
 
@@ -141,6 +148,7 @@ def _list_projects(
     config_path: Path | None,
     input_dir: Path,
     current_project_name: str | None = None,
+    current_project_input_dir: str | None = None,
 ) -> list[dict[str, Any]]:
     """List all available projects."""
     projects: list[dict[str, Any]] = []
@@ -178,7 +186,9 @@ def _list_projects(
                 "createdAt": data.get("createdAt"),
                 "updatedAt": data.get("updatedAt"),
                 "is_current": (
-                    name == current_project_name if current_project_name else p.resolve() == input_dir.resolve()
+                    str(p.resolve()) == current_project_input_dir
+                    if current_project_input_dir
+                    else (name == current_project_name if current_project_name else p.resolve() == input_dir.resolve())
                 ),
             }
         )
@@ -245,7 +255,11 @@ def _list_projects(
                     "steps": _detect_steps(proj_out),
                     "createdAt": data.get("createdAt"),
                     "updatedAt": data.get("updatedAt"),
-                    "is_current": name == current_project_name if current_project_name else True,
+                    "is_current": (
+                        str(input_dir.resolve()) == current_project_input_dir
+                        if current_project_input_dir
+                        else (name == current_project_name if current_project_name else True)
+                    ),
                 }
             )
 

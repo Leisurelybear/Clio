@@ -33,11 +33,15 @@ window.initProjectConfig = initProjectConfig;
 async function init() {
   initLayout();
 
-  // 从 URL 读取 project 参数
+  // 从 URL 读取 project + input_dir 参数
   const urlParams = new URLSearchParams(window.location.search);
   const urlProject = urlParams.get('project');
+  const urlInputDir = urlParams.get('input_dir');
   if (urlProject) {
     state.currentProjectName = urlProject;
+  }
+  if (urlInputDir) {
+    state.currentProjectInputDir = urlInputDir;
   }
 
   // 新建/打开项目模态框（必须在 try 之前绑定，空状态时也会用到）
@@ -56,7 +60,7 @@ async function init() {
       const r = await api('POST', '/api/project/create', body);
       if (r.ok) {
         newModal.style.display = 'none';
-        window.location.search = `?project=${encodeURIComponent(name)}`;
+        window.location.search = `?project=${encodeURIComponent(name)}&input_dir=${encodeURIComponent(inputDir)}`;
       } else {
         setStatus('Create failed: ' + (r.error || 'unknown error'), 'err');
       }
@@ -100,7 +104,7 @@ async function init() {
               if (!confirm(`Remove "${name}" from project list?`)) return;
               const r2 = await api('POST', '/api/project/remove', { input_dir: card.dataset.inputDir });
               if (r2.ok) {
-                if (name === state.currentProject?.name) {
+                if (name === state.currentProject?.name && inputDir === state.currentProjectInputDir) {
                   openModal.style.display = 'none';
                   window.location.search = '';
                 } else {
@@ -109,10 +113,11 @@ async function init() {
               }
             };
           }
-          if (name === state.currentProject?.name) { openModal.style.display = 'none'; return; }
+          const inputDir = card.dataset.inputDir;
+          if (inputDir === state.currentProjectInputDir) { openModal.style.display = 'none'; return; }
           if (state.dirty && !confirm('Switch project? Unsaved changes will be lost.')) return;
           openModal.style.display = 'none';
-          window.location.search = `?project=${encodeURIComponent(name)}`;
+          window.location.search = `?project=${encodeURIComponent(name)}&input_dir=${encodeURIComponent(inputDir)}`;
         };
       });
     } catch (e) {
@@ -129,7 +134,7 @@ async function init() {
       if (r.ok) {
         openModal.style.display = 'none';
         const name = r.project?.name || path.split(/[\\/]/).pop();
-        window.location.search = `?project=${encodeURIComponent(name)}`;
+        window.location.search = `?project=${encodeURIComponent(name)}&input_dir=${encodeURIComponent(path)}`;
       } else {
         setStatus('Open failed: ' + (r.error || 'unknown error'), 'err');
       }
@@ -195,6 +200,16 @@ async function init() {
     } catch (e) { setStatus('重载失败: ' + e.message, 'err'); }
   };
   $('btn-save').onclick = save;
+  $('btn-model-mgmt').onclick = () => {
+    state.currentTab = 'transcript';
+    state.currentEntity = 'video';
+    renderActiveTab();
+    // 等待渲染完成后滚动到模型管理区域
+    requestAnimationFrame(() => {
+      const el = $('whisper-model-mgmt');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+  };
   $$('.tab').forEach(t => t.onclick = () => { state.currentTab = t.dataset.tab; renderActiveTab(); });
   setupPlayer();
   document.addEventListener('keydown', (e) => {
@@ -227,12 +242,17 @@ async function init() {
       return;
     }
     // 如果 URL 没有指定项目，但有上次使用的项目，自动跳转
-    if (!urlProject && state.lastProject && state.lastProject !== state.currentProject?.name) {
-      window.location.search = `?project=${encodeURIComponent(state.lastProject)}`;
+    if (!urlProject && !urlInputDir && state.lastProject && state.lastProject !== state.currentProject?.name) {
+      // Include input_dir from currentProject if available, to avoid ambiguity
+      const inputDirParam = state.currentProjectInputDir ? `&input_dir=${encodeURIComponent(state.currentProjectInputDir)}` : '';
+      window.location.search = `?project=${encodeURIComponent(state.lastProject)}${inputDirParam}`;
       return;
     }
     // 如果 URL 指定了项目，但当前不是该项目，需要重载
-    if (urlProject && (!state.currentProject || state.currentProject.name !== urlProject)) {
+    if (urlInputDir && (!state.currentProject || state.currentProjectInputDir !== urlInputDir)) {
+      state.currentProjectName = urlProject;
+      state.currentProjectInputDir = urlInputDir;
+    } else if (urlProject && (!state.currentProject || state.currentProject.name !== urlProject)) {
       state.currentProjectName = urlProject;
     }
     await loadConfig();

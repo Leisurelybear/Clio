@@ -210,12 +210,18 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         def _resolve_project_input(self, qs: dict) -> Path:
             """Resolve project input directory from query params; default to current input_dir.
 
-            For multiple projects with the same name, priority:
-              1. Exact directory name match (project_name == dir_name)
-              2. Current input_dir
-              3. First match in registry
-              4. First match in sibling directories
+            Priority:
+              1. input_dir query param (direct path, unambiguous)
+              2. project name query param (may be ambiguous)
             """
+            # Direct input_dir param takes priority
+            input_dir_raw = qs.get("input_dir", [None])[0]
+            if input_dir_raw:
+                candidate = Path(input_dir_raw)
+                if candidate.is_dir():
+                    return candidate
+                # Invalid path — fall through to name-based
+
             project_name = qs.get("project", [None])[0]
             if not project_name:
                 return input_dir
@@ -506,7 +512,10 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
 
 def _resolve_last_project_config(config: AppConfig, config_path: Path | None) -> AppConfig:
-    """If registry has a last_project, attempt to load its config instead of default."""
+    """If registry has a last_project, attempt to load its config instead of default.
+
+    Supports both legacy (string name) and new (dict with name+input_dir) formats.
+    """
     if not config_path:
         return config
     reg_file = config_path.parent / "projects.json"
@@ -514,7 +523,21 @@ def _resolve_last_project_config(config: AppConfig, config_path: Path | None) ->
         return config
     try:
         reg = json.loads(reg_file.read_text(encoding="utf-8"))
-        last_name = reg.get("last_project")
+        last_project = reg.get("last_project")
+        if not last_project:
+            return config
+
+        # New format: dict with input_dir — resolve directly
+        if isinstance(last_project, dict):
+            input_dir_raw = last_project.get("input_dir")
+            if input_dir_raw:
+                p = Path(input_dir_raw)
+                if p.is_dir():
+                    cfg = load_config(config_path, project_dir=p)
+                    return cfg
+
+        # Legacy format: string name — match by project.json name
+        last_name = last_project.get("name") if isinstance(last_project, dict) else last_project
         if not last_name:
             return config
         for p_str in reg.get("projects", []):

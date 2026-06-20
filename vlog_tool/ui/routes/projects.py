@@ -36,7 +36,7 @@ def handle_get_project(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     qs_project = qs.get("project", [None])[0]
     config_path = handler.config_path
     if qs_project:
-        _save_last_project(qs_project, config_path)
+        _save_last_project(qs_project, config_path, input_dir=str(proj_input))
     merged = {**handler.DEFAULT_PROJECT, **data}
     proj_out = _project_output_dir(proj_input)
     merged["steps"] = _detect_steps(proj_out)
@@ -46,24 +46,29 @@ def handle_get_project(handler: BaseHTTPRequestHandler, qs: dict) -> None:
 def handle_get_projects(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     """Handle GET /api/projects."""
     req_project = qs.get("project", [None])[0]
+    req_input_dir = qs.get("input_dir", [None])[0]
     config_path = handler.config_path
     input_dir = handler.input_dir
     reg_file = _registry_path(config_path)
-    last_project = None
+    last_project_name = None
     if reg_file.is_file():
         try:
             reg = json.loads(reg_file.read_text(encoding="utf-8"))
             last_project = reg.get("last_project")
+            if isinstance(last_project, dict):
+                last_project_name = last_project.get("name")
+            else:
+                last_project_name = last_project
         except (json.JSONDecodeError, OSError):
             pass
-    projects = _list_projects(config_path, input_dir, req_project)
+    projects = _list_projects(config_path, input_dir, req_project, req_input_dir)
     # Prune stale _config_cache entries for projects that no longer exist
     valid_dirs = {str(Path(p["input_dir"]).resolve()) for p in projects}
     with handler.__class__._config_cache_lock:
         stale = [k for k in handler.__class__._config_cache if k not in valid_dirs]
         for k in stale:
             del handler.__class__._config_cache[k]
-    handler._send_json({"projects": projects, "last_project": last_project})
+    handler._send_json({"projects": projects, "last_project": last_project_name})
 
 
 def handle_put_project(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
@@ -83,7 +88,7 @@ def handle_put_project(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> 
     proj_input.mkdir(parents=True, exist_ok=True)
     _save_atomic(proj_file, json.dumps(merged, ensure_ascii=False, indent=2).encode("utf-8"))
     config_path = handler.config_path
-    _save_last_project(merged.get("name") or proj_input.name, config_path)
+    _save_last_project(merged.get("name") or proj_input.name, config_path, input_dir=str(proj_input))
     handler._send_json({"ok": True})
 
 
@@ -178,13 +183,14 @@ def handle_post_project_remove(handler: BaseHTTPRequestHandler, obj: dict) -> No
     if input_dir_raw:
         _remove_from_registry(input_dir_raw, config_path)
     elif project_name:
+        # Remove ALL matches (not just first) to handle same-name projects in different dirs.
         reg_file = _registry_path(config_path)
         if reg_file.is_file():
             try:
                 reg = json.loads(reg_file.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 reg = {"projects": []}
-            for p_str in reg.get("projects", []):
+            for p_str in list(reg.get("projects", [])):
                 p = Path(p_str)
                 proj_file = p / "project.json"
                 if proj_file.is_file():
@@ -192,7 +198,6 @@ def handle_post_project_remove(handler: BaseHTTPRequestHandler, obj: dict) -> No
                         data = json.loads(proj_file.read_text(encoding="utf-8"))
                         if data.get("name") == project_name:
                             _remove_from_registry(p_str, config_path)
-                            break
                     except (json.JSONDecodeError, OSError):
                         continue
     handler._send_json({"ok": True})
