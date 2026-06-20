@@ -119,7 +119,6 @@ function renderTranscript() {
   const pane = $('tab-transcript');
   if (!t || !t.ok) {
     pane.innerHTML = '<p class="muted">当前视频没有转录数据。</p><p class="hint">请先运行流水线中的「转录」步骤，或在 CLI 执行 <code>python main.py transcribe</code>。</p>';
-    pane.appendChild(renderModelManagement());
     renderWhisperInstallPrompt(pane);
     // Check if install is already running — show progress immediately
     (async () => {
@@ -144,7 +143,6 @@ function renderTranscript() {
     <p class="hint">点击 segment 跳到对应时间；双击文字框可编辑；修改后需点击「保存」</p>
     <ol id="transcript-list"></ol>
   `;
-  pane.appendChild(renderModelManagement());
 
   const ol = pane.querySelector('#transcript-list');
   for (let i = 0; i < segments.length; i++) {
@@ -357,7 +355,16 @@ function renderModelManagement() {
 
 async function _loadModelMgmt() {
   const container = $('model-mgmt-content');
-  if (!container) return;
+  if (!container) {
+    setStatus('模型管理: DOM 未就绪', 'warn');
+    return;
+  }
+  // 防止无限「加载中...」: 10 秒后显示超时提示
+  const timeoutId = setTimeout(() => {
+    if (container && container.querySelector('.muted')) {
+      container.innerHTML = '<p class="err">请求超时 — 请确认后端服务运行正常。</p>';
+    }
+  }, 10000);
   try {
     const data = await api('GET', '/api/whisper/models');
     if (!data.ok) { container.innerHTML = '<p class="err">加载模型列表失败</p>'; return; }
@@ -473,7 +480,9 @@ async function _loadModelMgmt() {
         }
       };
     });
+    clearTimeout(timeoutId);
   } catch (e) {
+    clearTimeout(timeoutId);
     if (container) container.innerHTML = `<p class="err">加载失败: ${escapeHtml(e.message)}</p>`;
   }
 }
@@ -923,6 +932,9 @@ function renderConfig() {
       }
     };
   }
+
+  // Append Whisper model management section at the bottom of config tab
+  pane.appendChild(renderModelManagement());
 }
 
 let _logsTimer = null;

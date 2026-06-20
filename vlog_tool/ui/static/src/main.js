@@ -201,10 +201,9 @@ async function init() {
   };
   $('btn-save').onclick = save;
   $('btn-model-mgmt').onclick = () => {
-    state.currentTab = 'transcript';
-    state.currentEntity = 'video';
+    state.currentTab = 'texts';  // 切换到编辑 tab 面板
+    state.currentEntity = 'config';
     renderActiveTab();
-    // 等待渲染完成后滚动到模型管理区域
     requestAnimationFrame(() => {
       const el = $('whisper-model-mgmt');
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
