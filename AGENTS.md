@@ -1,56 +1,56 @@
-# AGENTS.md — AI 维护手册 & 项目记忆
+# AGENTS.md — AI Maintenance Manual & Project Memory
 
-> 这份文档是给**未来接手维护的 AI 助手**看的快速参考。
-> 内容会随着项目演化更新；和 `README.md`（面向最终用户）分工不同。
-> 用户偏好：中文对话界面，commit message 和这份文档用**英文**。
+> This document is a quick reference for **future AI assistants taking over maintenance**.
+> Contents will evolve with the project; it has a different role from `README.md` (which is end-user facing).
+> User preference: Chinese for conversation, **English** for commit messages and this document.
 
-## 1. 项目一句话
+## 1. Project in One Sentence
 
-一个 **AI 预处理流水线**：旅行 vlog 原始素材 → ffmpeg 压缩 → Gemini 看视频 + DeepSeek 写文案 → 剪映手工剪辑。
-最终用户是单人 vlogger，先压缩丢给 AI，再在剪映里加特效/对口型。
+An **AI preprocessing pipeline**: raw travel vlog footage → ffmpeg compression → Gemini reviews video + DeepSeek writes script → JianYing (CapCut) manual editing.
+The end user is a solo vlogger: first compress and feed to AI, then add effects/lip-sync in JianYing (CapCut).
 
-## 2. 技术栈
+## 2. Tech Stack
 
-- **Python 3.11+**（用了 PEP 604 的 `X | None` 和 dataclass）
-- **ffmpeg / ffprobe**（视频处理；GoPro 4K 源文件 → 640p 5MB 压缩版）
-- **google-genai**（Gemini 2.5 Flash 的视频 File API）
-- **httpx**（DeepSeek / OpenAI 兼容调用）
-- **PyYAML**（config 解析）
-- **pytest**（单元测试，CI 自动跑；核心纯函数已覆盖 128 个测试用例）
+- **Python 3.11+** (uses PEP 604 `X | None` and dataclass)
+- **ffmpeg / ffprobe** (video processing; GoPro 4K source → 640p 5MB compressed)
+- **google-genai** (Gemini 2.5 Flash's video File API)
+- **httpx** (DeepSeek / OpenAI compatible calls)
+- **PyYAML** (config parsing)
+- **pytest** (unit tests, auto-run in CI; currently **587 test cases**)
 
-依赖列表在 `requirements.txt`，`setup.ps1` 一键建 venv + 装 ffmpeg + 拷 `.env`。
+Dependencies in `requirements.txt`; `setup.ps1` (Windows) / `setup.sh` (Linux/macOS) creates venv + installs ffmpeg + copies `.env` in one click.
 
-## 3. 目录结构
+## 3. Directory Structure
 
 ```
 vlog-video-analysis/
-├── main.py                    # CLI 入口，所有 subcommand 在这里注册
+├── main.py                    # CLI entry, all subcommands registered here
 ├── vlog_tool/
 │   ├── config.py              # AppConfig dataclass + load_config
-│   ├── pipeline.py            # 高层流水线函数（run_analyze_all 等）
-│   ├── analyze.py             # AI 交互（analyze_video, generate_voiceover, plan_daily_vlog, refine_*）
-│   ├── compress.py            # ffmpeg 包装
-│   ├── prompts.py             # 所有 prompt 模板（常量）
-│   ├── transcribe.py          # Whisper ASR 转录核心
+│   ├── pipeline.py            # High-level pipeline functions (run_analyze_all, etc.)
+│   ├── analyze.py             # AI interaction (analyze_video, generate_voiceover, plan_daily_vlog, refine_*)
+│   ├── compress.py            # ffmpeg wrapper
+│   ├── prompts.py             # All prompt templates (constants)
+│   ├── transcribe.py          # Whisper ASR transcription core
 │   ├── whisper_cli.py         # whisper install/check CLI
-│   ├── utils.py               # ffmpeg 路径发现、文件 IO、mask_if_looks_like_key、extract_json
-│   ├── log.py                 # 日志：按小时切文件 + _TeeWriter + timed/format_size/format_duration
-│   │                           #     + sys.excepthook 把未捕获异常整成一条 ERROR 日志
-│   ├── tasks/                 # pipeline 步骤（拆分自 pipeline.py）
+│   ├── utils.py               # ffmpeg path discovery, file IO, mask_if_looks_like_key, extract_json
+│   ├── log.py                 # Logging: hourly rotating files + _TeeWriter + timed/format_size/format_duration
+│   │                           #     + sys.excepthook turns uncaught exceptions into a single ERROR log
+│   ├── tasks/                 # Pipeline steps (split from pipeline.py)
 │   │   ├── transcribe.py        # Pipeline task: run_transcribe_all
 │   │   └── ...
-│   ├── ui/                    # 本地 Web UI（可视化编辑 AI 输出；stdib http.server，零新依赖）
-│   │   ├── server.py            #   UIHandler（BaseHTTPRequestHandler）+ make_handler + run
-│   │   ├── README.md            #   UI 使用文档
-│   │   ├── routes/              #   路由处理
+│   ├── ui/                    # Local Web UI (visual editing of AI output; stdlib http.server, zero new deps)
+│   │   ├── server.py            #   UIHandler (BaseHTTPRequestHandler) + make_handler + run
+│   │   ├── README.md            #   UI usage documentation
+│   │   ├── routes/              #   Route handlers
 │   │   │   ├── transcripts.py   #   Transcript GET/PUT API
 │   │   │   └── whisper_routes.py#   Whisper check API
-│   │   └── static/              #   前端无构建步骤，ES modules
+│   │   └── static/              #   Frontend, no build step, ES modules
 │   │       ├── index.html
 │   │       ├── style.css
 │   │       └── src/
 │   │           ├── main.js
-│   │           ├── layout.js        #   可拖拽面板、折叠、持久化
+│   │           ├── layout.js        #   Draggable panels, collapse, persistence
 │   │           ├── sidebar.js
 │   │           ├── runner.js
 │   │           ├── editor.js
@@ -59,101 +59,132 @@ vlog-video-analysis/
 │   │           ├── state.js
 │   │           └── utils.js
 │   └── ai/
-│       ├── base.py            # TaskName 枚举、Provider Protocol
-│       ├── factory.py         # 按名字查找 provider
-│       ├── gemini.py          # 多模态：File API 上传 + 轮询 PROCESSING（已包 with_retry）
-│       └── openai_compat.py   # OpenAI 兼容：DeepSeek / OpenAI / 通义 / Moonshot（已包 with_retry）
+│       ├── base.py            # TaskName enum, Provider Protocol
+│       ├── factory.py         # Look up provider by name
+│       ├── gemini.py          # Multimodal: File API upload + poll PROCESSING (wrapped with_retry)
+│       └── openai_compat.py   # OpenAI compatible: DeepSeek / OpenAI / Tongyi Qianwen (通义) / Moonshot (Kimi) (wrapped with_retry)
 ├── templates/
-│   ├── vlog_template.md       # 口播风格模板（用户可改）
-│   └── trip_context.md        # trip 背景与 AI 规范（自动注入到所有 prompt）
-├── config.example.yaml        # 提交到 git 的配置模板
-├── .env.example               # 提交到 git 的环境变量模板
-├── config.yaml / .env         # 用户本地真实配置，gitignore
-├── requirements.txt           # 开发期宽松依赖
-├── requirements-locked.txt    # 可重现构建锁定版本
-├── .github/workflows/test.yml # GitHub Actions CI（pushes + PRs）
-├── vlog_tool/tests/           # 单元测试（pytest，381 用例）
-│   ├── conftest.py            #   共享 fixtures
-│   ├── test_config.py         #   34 tests - config 加载/合并/校验
-│   ├── test_utils.py          #   34 tests - extract_json/mask_key/sanitize/find_videos
-│   ├── test_cut.py            #   25 tests - 时间解析/文件名生成
-│   ├── test_log.py            #   13 tests - TeeWriter/size&duration 格式化
-│   ├── test_progress.py       #   12 tests - ProgressTracker read/write/init
-│   ├── test_transcribe.py     #   15 tests - transcribe enabled/disabled/deps
-│   └── test_routes_transcripts.py #  7 tests - transcript/whisper API routes
+│   ├── vlog_template.md       # Voice-over style template (user-customizable)
+│   └── trip_context.md        # Trip background & AI rules (auto-injected into all prompts)
+├── config.example.yaml        # Config template committed to git
+├── .env.example               # Env variable template committed to git
+├── config.yaml / .env         # User's local real config, gitignored
+├── requirements.txt           # Loose dev dependencies
+├── requirements-locked.txt    # Reproducible build with pinned versions
+├── .github/workflows/test.yml # GitHub Actions CI (pushes + PRs)
+├── vlog_tool/tests/           # Unit tests (pytest, 587 cases)
+│   ├── conftest.py            #   Shared fixtures
+│   ├── test_ai.py             #   11 tests - factory dispatch / TaskName / provider instantiation
+│   ├── test_ai_gemini.py      #   25 tests - Gemini client / retry / upload / wait
+│   ├── test_ai_openai_compat.py#  17 tests - OpenAI compat / retry / close
+│   ├── test_analyze.py        #   10 tests - _resolve_original file matching
+│   ├── test_analyze_funcs.py  #    9 tests - _wrap_with_context / plan filtering
+│   ├── test_compress.py       #    7 tests - compress_video bitrate / params / cancel
+│   ├── test_config.py         #   34 tests - config loading/merging/validation
+│   ├── test_cut.py            #   25 tests - time parsing / filename generation / cutting
+│   ├── test_file_service.py   #   60 tests - safe basename / atomic save / segment matching
+│   ├── test_helpers.py        #   20 tests - _next_index / _write_csv / _rewrite_text_file
+│   ├── test_log.py            #   13 tests - TeeWriter / format_size / format_duration
+│   ├── test_main.py           #    7 tests - CLI subcommand dispatch
+│   ├── test_pipeline.py       #    4 tests - cancel_event propagation
+│   ├── test_plan.py           #    2 tests - plan prompt transcript injection
+│   ├── test_processing_state.py#   8 tests - mark / reset / persistence / corruption recovery
+│   ├── test_progress.py       #   14 tests - ProgressTracker read/write/ETA/atomic write
+│   ├── test_project_service.py#   22 tests - output dir / registry / step detection
+│   ├── test_ratelimit.py      #   12 tests - RateLimiter interval/logging
+│   ├── test_routes_config.py  #    5 tests - config GET/PUT/INIT routes
+│   ├── test_routes_plan.py    #    6 tests - plan GET/PUT/cut routes
+│   ├── test_routes_projects.py#    9 tests - project CRUD routes
+│   ├── test_routes_run.py     #    8 tests - run start/status/rerun/cancel routes
+│   ├── test_routes_texts.py   #    8 tests - texts/voiceover GET/PUT routes
+│   ├── test_routes_transcripts.py# 18 tests - transcript/whisper API routes
+│   ├── test_routes_videos.py  #    8 tests - videos GET routes
+│   ├── test_split.py          #    7 tests - split_video segment calculation
+│   ├── test_tasks_analyze.py  #    6 tests - run_analyze_all orchestration/duration gate
+│   ├── test_tasks_compress.py #    4 tests - run_compress_all orchestration
+│   ├── test_tasks_cut.py      #   11 tests - run_cut_all / offset calculation / cancel
+│   ├── test_tasks_label.py    #    6 tests - run_label_videos orchestration
+│   ├── test_tasks_refine.py   #   11 tests - run_refine_texts / scripts / fix mode
+│   ├── test_tasks_scripts.py  #    8 tests - run_generate_scripts orchestration
+│   ├── test_tasks_transcribe.py#  11 tests - run_transcribe_all / one orchestration
+│   ├── test_transcribe.py     #   19 tests - transcribe toggle / device / model / CUDA fallback
+│   ├── test_utils.py          #   34 tests - extract_json / mask_key / sanitize / find_videos / with_retry
+│   ├── test_utils_expanded.py #   20 tests - run_subprocess / discover_ffmpeg / atomic_io / run_ffmpeg
+│   └── test_whisper_cli.py    #    6 tests - whisper check/install status
 ```
 
-## 4. 关键约定
+## 4. Key Conventions
 
 ### 4.1 Commit
 
-- **英文** message，**Conventional Commits** 风格：`type(scope): subject`
-- **每个 commit 尽可能小**，覆盖一个独立的小功能/修复模块，方便后续分支开发和回滚
-- **不要把多个独立功能合在一个 commit 里**
-- 常见 type：`feat` / `fix` / `refactor` / `docs` / `chore`
-- rebase 改历史时优先用 `git rebase -i --root`；Windows 下交互式 editor 容易卡，用 `git filter-branch --msg-filter` 走字节级 Python 脚本（见 [§8 Gotchas](#8-gotchas)）
+- **English** message, **Conventional Commits** style: `type(scope): subject`
+- **Each commit as small as possible**, covering a single independent feature/fix module, to facilitate future branching and rollback
+- **Do not bundle multiple independent features in one commit**
+- Common types: `feat` / `fix` / `refactor` / `docs` / `chore`
+- For rebase history rewriting, prefer `git rebase -i --root`; on Windows the interactive editor can hang, use `git filter-branch --msg-filter` with a byte-level Python script (see [§9 Gotchas](#9-gotchas))
 
-### 4.2 工作流程
+### 4.2 Workflow
 
-- **先规划再实现**：任何功能改动前，先在 AGENTS.md 或 ROADMAP.md 记录规划，确定方案后再写代码
-- **功能模块记录**：每个新增功能模块必须在文档中记录（README.md 面向用户，AGENTS.md 面向 AI），包括用途、入口、关键约定
+- **Plan first, then implement**: before any feature change, record the plan in AGENTS.md or ROADMAP.md, confirm the approach, then write code
+- **Document new modules**: every new feature module must be documented (README.md for users, AGENTS.md for AI), including purpose, entry point, and key conventions
 
-### 4.3 代码风格
+### 4.3 Code Style
 
-- 不要写注释，除非解释**为什么**（WHAT 自己看得见）
-- 中文 user-facing 文案（CLI 提示、错误信息、README 中文版）
-- 默认 `skip_existing=True` 的策略被所有 step 共享（改 `analyze` 这一个开关就行）
-- AI 返回的 JSON 用 `extract_json()` 容错（先 `json.loads`，再正则抓 `{}`）
+- Do not write comments unless explaining **why** (WHAT is self-evident in code)
+- Chinese for user-facing copy (CLI prompts, error messages, Chinese README version)
+- Default `skip_existing=True` policy is shared by all steps (just change the `analyze` toggle)
+- AI-returned JSON uses `extract_json()` for fault tolerance (first `json.loads`, then regex for `{}`)
 
-### 4.4 配置
+### 4.4 Configuration
 
-- 仓库提交 `config.example.yaml` 和 `.env.example`；真实 `config.yaml` 和 `.env` 在 `.gitignore` 里
-- 任何含**本地路径、代理 IP、API key** 的字段都不要进 example（用占位符）
-- 配置文件改动后建议同时更新 example 和 README/en
+- Repository commits `config.example.yaml` and `.env.example`; real `config.yaml` and `.env` are in `.gitignore`
+- Any field containing **local paths, proxy IPs, API keys** must not go into examples (use placeholders)
+- After config file changes, it is recommended to update both the example and README/en
 
-### 4.5 提示词
+### 4.5 Prompts
 
-- 全部放在 `vlog_tool/prompts.py`，用常量
-- trip 上下文通过 `_wrap_with_context()` 在所有 prompt 前面统一注入；**不要**在每个 prompt 里手写 prefix
-- 输出格式必须是 JSON（不是 markdown 代码块），`extract_json()` 才能解析
+- All placed in `vlog_tool/prompts.py`, as constants
+- Trip context is uniformly injected via `_wrap_with_context()` before all prompts; **do not** manually write prefixes in each prompt
+- Output format must be JSON (not markdown code blocks) so `extract_json()` can parse it
 
-### 4.6 未来重构方向
+### 4.6 Future Refactoring Directions
 
-- **模块拆分**：当前 `server.py` / `app.js` 集中了 UI 层所有逻辑，后续应该拆成不同文件/目录，每个负责独立功能
-- **去本地化**：移除所有代码中硬编码的本机路径、机器名、特定目录结构等，方便项目通用化/开源
-- **两阶段计划已定稿**，见 `docs/superpowers/specs/2026-06-09-architecture-cleanup-and-r008-design.md`
-  - Phase 1：server.py 拆 routes/ + services.py，app.js 拆 state/api/viewer，.gitignore 补漏，去本地化，修 bug — **已完成**
-  - Phase 2：R-008 UI 单步执行（选目录 → 选文件 → 跑步骤 → 进度 → 自动刷新）
-- **FFMPEG_HOME** 环境变量取代硬编码路径；`discover_ffmpeg_bin` 搜索链：`shutil.which` → WinGet Packages → `FFMPEG_HOME`
-- **Provider 缓存**：`ai/factory.py` `_provider_cache` 按名缓存，`_provider_cache_lock` 线程安全，`_clear_provider_cache()` 测试隔离
-- **Config 未知字段**：`_filter_dc()` 过滤 YAML 未知字段再送入 dataclass 构造器，静默忽略拼写错误
+- **Module splitting**: currently `server.py` / `app.js` centralize all UI logic; they should be split into separate files/directories, each responsible for an independent function
+- **De-localization**: remove all hardcoded local paths, machine names, specific directory structures from the code to make the project general-purpose / open-source ready
+- **Two-phase plan finalized**, see `docs/superpowers/specs/2026-06-09-architecture-cleanup-and-r008-design.md`
+  - Phase 1: Split server.py into routes/ + services.py, app.js into state/api/viewer, fill .gitignore gaps, de-localize, fix bugs — **completed**
+  - Phase 2: R-008 UI single-step execution (select directory → select files → run steps → progress → auto-refresh)
+- **FFMPEG_HOME** environment variable replaces hardcoded paths; `discover_ffmpeg_bin` search chain: `shutil.which` → WinGet Packages (Windows only) → `FFMPEG_HOME`
+- **Provider cache**: `ai/factory.py` `_provider_cache` by name, `_provider_cache_lock` thread-safe, `_clear_provider_cache()` for test isolation
+- **Config unknown fields**: `_filter_dc()` filters unknown YAML fields before passing to dataclass constructors, silently ignores typos
 
-## 5. 添加新功能的标准做法
+## 5. Standard Practices for Adding New Features
 
-> **先在 `ROADMAP.md` 录一条需求，拆成 sub-task，再开干。** 完成时把对应 sub-task 标 `[x]`
-> 并把 commit hash 写到"已完成"表里。AGENTS.md 里的 commit 列表会定期跟 ROADMAP 对齐。
+> **First record a requirement in `ROADMAP.md`, break it into sub-tasks, then start.**
+> Mark the corresponding sub-task as `[x]` when done and write the commit hash in the "Completed" table.
+> The commit list in AGENTS.md will be periodically aligned with ROADMAP.
 
-### 加一个新的 AI 厂家
+### Adding a New AI Provider
 
-1. `vlog_tool/ai/newprovider.py` 实现 `TextAIProvider` 和/或 `VideoAIProvider`
-2. `vlog_tool/ai/factory.py:_PROVIDER_TYPES` 注册
-3. `config.example.yaml` 加 example；`main.py:check` 会自动列出
-4. README（CN/EN）补一句用法
+1. `vlog_tool/ai/newprovider.py` implement `TextAIProvider` and/or `VideoAIProvider`
+2. `vlog_tool/ai/factory.py:_PROVIDER_TYPES` register
+3. `config.example.yaml` add example; `main.py:check` will auto-list it
+4. README (CN/EN) add a line about usage
 
-### 加一个新的 AI 任务（如"字幕翻译"）
+### Adding a New AI Task (e.g. "subtitle translation")
 
-1. `vlog_tool/ai/base.py:TaskName` 加枚举值
-2. `vlog_tool/prompts.py` 加 prompt 常量
-3. `vlog_tool/analyze.py` 加 `task_xxx()` 函数，复用 `_wrap_with_context()`
-4. `vlog_tool/pipeline.py` 加 `run_xxx_all()`
-5. `main.py` 注册 subcommand
-6. 更新 READMEs
+1. `vlog_tool/ai/base.py:TaskName` add enum value
+2. `vlog_tool/prompts.py` add prompt constant
+3. `vlog_tool/analyze.py` add `task_xxx()` function, reuse `_wrap_with_context()`
+4. `vlog_tool/pipeline.py` add `run_xxx_all()`
+5. `main.py` register subcommand
+6. Update READMEs
 
-### 改 refine 阶段用的 AI
+### Changing the AI Used for the Refine Stage
 
-`refine_text` 默认回退到 `video_analyze`（texts 和 scripts 审阅共用这一个）
-（逻辑在 `vlog_tool/config.py:_parse_tasks`）。要切到更便宜的纯文本模型，
-在 `ai.tasks` 里显式加：
+`refine_text` defaults to falling back to `video_analyze` (both texts and scripts review share this one)
+(Logic in `vlog_tool/config.py:_parse_tasks`). To switch to a cheaper pure-text model,
+explicitly add under `ai.tasks`:
 
 ```yaml
 ai:
@@ -163,61 +194,61 @@ ai:
       model: deepseek-chat
 ```
 
-### refine 加定向修正模式（`--fix`）
+### Adding Targeted Fix Mode to Refine (`--fix`)
 
-对已知的具体错误（地名拼错、编号错了等），`refine --fix '...'` 比
-让 AI 自由审阅更可靠：
+For known specific errors (misspelled place names, wrong numbering, etc.), `refine --fix '...'` is
+more reliable than letting AI freely review:
 
-- 必须配合 `-i` 指定**单个** json 文件（避免误伤）
-- 切换 prompt 到「按用户意见定向修正」，AI 只改意见中提到的字段
-- `_changelog` 第一条固定写"按用户意见修改了 XXX"，方便审计
-- 实现：`vlog_tool/prompts.py` 的 `REFINE_TEXT_FIX_PROMPT` /
-  `REFINE_SCRIPT_FIX_PROMPT`，`analyze.py` 的 `refine_text(refine_script)` 多一个 `fix` 参数
+- Must be used with `-i` specifying a **single** json file (to avoid collateral damage)
+- Switches prompt to "Targeted fix based on user feedback," AI only changes fields mentioned in the feedback
+- `_changelog` first entry is always written as "Modified XXX per user feedback" for auditability
+- Implementation: `vlog_tool/prompts.py`'s `REFINE_TEXT_FIX_PROMPT` /
+  `REFINE_SCRIPT_FIX_PROMPT`, `analyze.py`'s `refine_text(refine_script)` with an additional `fix` parameter
 
-### 加一个新的 CLI subcommand
+### Adding a New CLI Subcommand
 
-1. `main.py` 加 `p_X = sub.add_parser(...)` 和 dispatch 分支
-2. 复用 `_add_io_args()` 拿到 `-i/-o`
-3. 用 `config.analyze.skip_existing` 控制是否跳过（保持和其它 step 一致）
-4. 更新 READMEs
+1. `main.py` add `p_X = sub.add_parser(...)` and dispatch branch
+2. Reuse `_add_io_args()` to obtain `-i/-o`
+3. Use `config.analyze.skip_existing` to control whether to skip (consistent with other steps)
+4. Update READMEs
 
-## 6. 用户偏好（持久化记忆）
+## 6. User Preferences (Persistent Memory)
 
-- **语言**：对话用中文，commit/PR/AGENTS.md 用**英文**
-- **Commit 粒度**：一功能一 commit，**不要**攒
-- **历史改写**：用户接受 force-push 改 commit message（rebase / filter-branch）
-- **不要**在配置文件里留真实 API key / 代理 IP / 本地路径
-- **不要**写测试代码（除非用户明确要求）
-- 看到 `<system-reminder>` 里的工作目录、当前时间等信息时，不要在回答里复述
-- **Push 之前必须显式向用户确认**。本地 commit 可以做（实现完一个功能就 commit），
-  但 `git push` 永远要先停下问一句"是否 push"，等用户点头再执行。
+- **Language**: conversation in Chinese, commits/PRs/AGENTS.md in **English**
+- **Commit granularity**: one feature per commit, **do not batch**
+- **History rewriting**: user accepts force-push to change commit messages (rebase / filter-branch)
+- **Do not** leave real API keys / proxy IPs / local paths in config files
+- **Do not** write test code (unless explicitly requested by the user)
+- When seeing working directory, current time, etc. in `<system-reminder>`, do not repeat them in responses
+- **Push must be explicitly confirmed with the user beforehand**. Local commits are fine (commit after finishing a feature),
+  but `git push` should always pause and ask "should I push?", then wait for user approval.
 
-## 7. 项目当前状态
+## 7. Project Current Status
 
-最后更新：2026-06-20（代码审查修复 + R-016 Whisper 模型 UI 下载完成）。已上线：
-- GitHub Actions CI（Ubuntu，Windows，Python 3.11/3.12）
-- 564 个 pytest 用例：transcribe(19) / tasks_transcribe(11) / processing_state(8) / whisper_cli(6) / main(7) / config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(12) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / 等
-- 依赖版本锁定 `requirements-locked.txt`
-- Whisper ASR 独立 `requirements-whisper.txt`（faster-whisper，不污染主依赖）
-最近做的 commit 顺序：
+Last updated: 2026-06-20 (code review fixes + R-016 Whisper model UI download completed). Live:
+- GitHub Actions CI (Ubuntu, Windows, Python 3.11/3.12)
+- **587 pytest cases** (coverage table below)
+- Dependency version locked in `requirements-locked.txt`
+- Whisper ASR separate `requirements-whisper.txt` (faster-whisper, does not pollute main deps)
+Recent commit history:
 1. `chore: scaffold initial Vlog editing helper project`
-2. `fix(compress): escape comma in scale expression`  ← Windows ffmpeg filter 逗号转义
-...（#3~#98 同上）...
+2. `fix(compress): escape comma in scale expression`  ← Windows ffmpeg filter comma escaping
+... (#3~#98 same as above) ...
 98. `bcfbe04` `feat(ui): add transcripts tab, sidebar badge, and run step`  ← Task 8
-99. `c6e01ec` `feat(whisper): reorder pipeline, add per-video transcribe rerun, plan toggle, and UI error handling`  ← 综合增强
-100. `1d1b46a` `fix(whisper): replace torch with ctranslate2 for CUDA detection (no torch dependency)`  ← 去掉 torch
-101. `306f349` `feat(compress): real-time stderr progress with progress_callback for tracker`  ← 实进度
-102. `11ea035` `fix(compress): skip_existing now matches existing files by stem instead of by path`  ← stem 匹配
-103. `c600840` `fix(ui): pollRunStatus shows progress when s.status==='running' even without live thread`  ← 进度面板
-104. `417aa0a` `fix(ui): keep btn enabled when stale progress from interrupted run`  ← 按钮状态
-105. `eff8fce` `feat(ui): per-file compress log in run tab panel`  ← 压缩日志
-106. `31abfac` `feat(processing-state): per-file pipeline state matrix with UI table`  ← 状态矩阵
-107. `8412e03` `fix(config): hf_endpoint defaults to empty, only overrides when configured`  ← 配置修复
-108. `1c5d681` `fix(cli): lazy imports prevent google-genai loading on whisper install`  ← 惰性导入
-109. `fe1a078` `fix(compress): filter partial files (<256B) from existing_map`  ← 过滤残损文件
-110. `6a56eaf` `fix: batch fix 19 review issues from project-wide code audit`  ← 批量修复
-111. `d0d0847` `fix(compress): fallback skip when split segments exist but source is original`  ← compress 分支
-112. `1b53499` `fix(transcribe): resolve rerun 404, CUDA fallback, UI transcript display and seek`  ← 综合修复
+99. `c6e01ec` `feat(whisper): reorder pipeline, add per-video transcribe rerun, plan toggle, and UI error handling`  ← Comprehensive enhancement
+100. `1d1b46a` `fix(whisper): replace torch with ctranslate2 for CUDA detection (no torch dependency)`  ← Remove torch
+101. `306f349` `feat(compress): real-time stderr progress with progress_callback for tracker`  ← Real-time progress
+102. `11ea035` `fix(compress): skip_existing now matches existing files by stem instead of by path`  ← Stem matching
+103. `c600840` `fix(ui): pollRunStatus shows progress when s.status==='running' even without live thread`  ← Progress panel
+104. `417aa0a` `fix(ui): keep btn enabled when stale progress from interrupted run`  ← Button state
+105. `eff8fce` `feat(ui): per-file compress log in run tab panel`  ← Compress log
+106. `31abfac` `feat(processing-state): per-file pipeline state matrix with UI table`  ← State matrix
+107. `8412e03` `fix(config): hf_endpoint defaults to empty, only overrides when configured`  ← Config fix
+108. `1c5d681` `fix(cli): lazy imports prevent google-genai loading on whisper install`  ← Lazy imports
+109. `fe1a078` `fix(compress): filter partial files (<256B) from existing_map`  ← Filter damaged files
+110. `6a56eaf` `fix: batch fix 19 review issues from project-wide code audit`  ← Batch fix
+111. `d0d0847` `fix(compress): fallback skip when split segments exist but source is original`  ← Compress branch
+112. `1b53499` `fix(transcribe): resolve rerun 404, CUDA fallback, UI transcript display and seek`  ← Comprehensive fix
 113. `41abe5b` `fix(security): add _is_safe_basename guard to POST /api/rerun`  ← C1
 114. `89614a4` `fix(ui): delegate switchToOriginalThenCompress to setSource`  ← C2
 115. `bce09ce` `fix(ui): replace addEventListener with onloadedmetadata`  ← C3
@@ -236,19 +267,19 @@ ai:
 128. `60d765f` `fix(cli): pass project_dir to load_config`  ← I10
 129. `947a320` `fix(log): block destructive calls on _TeeWriter`  ← I11
 130. `ef2311d` `fix(ai): use configurable retry_attempts`  ← I12
-131. `ef68308` `fix(review): align Gemini retry_attempts, thread-safe provider cache, test isolation`  ← 审查反馈
-132. `bebf21f` `fix(save): capture data refs at entry; sanitize index_prefix in rerun`  ← 审查反馈
-133. `8688a85` `fix(tests): mock ctranslate2 module for CI where it's not installed`  ← CI 修复
-134. `f51e7b9` `fix(tests): return int from mock ctranslate2.get_cuda_device_count`  ← CI 修复
-135. `88cbf4c` `fix(ci): pass config_path to whisper subcommands, lowercase .mp4 for Linux`  ← CI 修复
-136. `4abc241` `fix(whisper_cli): add missing Path import for F821`  ← Lint 修复
-137. `f4a6a71` `test: add 27 high-value unit tests for whisper, processing_state, and CLI`  ← 27 新测试
+131. `ef68308` `fix(review): align Gemini retry_attempts, thread-safe provider cache, test isolation`  ← Review feedback
+132. `bebf21f` `fix(save): capture data refs at entry; sanitize index_prefix in rerun`  ← Review feedback
+133. `8688a85` `fix(tests): mock ctranslate2 module for CI where it's not installed`  ← CI fix
+134. `f51e7b9` `fix(tests): return int from mock ctranslate2.get_cuda_device_count`  ← CI fix
+135. `88cbf4c` `fix(ci): pass config_path to whisper subcommands, lowercase .mp4 for Linux`  ← CI fix
+136. `4abc241` `fix(whisper_cli): add missing Path import for F821`  ← Lint fix
+137. `f4a6a71` `test: add 27 high-value unit tests for whisper, processing_state, and CLI`  ← 27 new tests
 138. `a29a53c` `fix(plan): record ProcessingState after generating plan`  ← P0-5
 139. `3660fea` `fix(ai): add max_tokens + temperature to OpenAI API calls`  ← P1-2
 140. `78a0b69` `fix(compress): raise MIN_VALID_SIZE 256→50KB`  ← P2-7
 141. `6d23de3` `fix(transcribe): use find_videos for recursive scanning`  ← P2-5
 142. `cdcc873` `fix(ai): include file mtime in trip_context_cache key`  ← P2-3
-143. `3ce9ef3` `fix(prompts): TRANSCRIPT_CONTEXT 英文→中文`  ← Q-6
+143. `3ce9ef3` `fix(prompts): TRANSCRIPT_CONTEXT English→Chinese`  ← Q-6
 144. `123c84f` `fix(tasks): use atomic writes for scripts/refine output`  ← P0-3
 145. `097a6ff` `fix(split): clean up partial segments + atomic manifest`  ← P2-2
 146. `eb93573` `fix(analyze): clean up stale existing files on source_file mismatch`  ← P2-6
@@ -260,191 +291,247 @@ ai:
 152. `0d322c2` `fix(ui): two-row preview bar, buttons work without clicking segment first, fix MouseEvent leak`  ← R-012
 153. `e4818af` `fix(ui): preview bar blocks start preview when inactive`  ← R-012
 154. `5029ba1` `feat(ui): play/pause toggle for preview, stop no longer resets to segment 0`  ← R-012
-155. `7f5c0d6` `feat(ui): layout overhaul - resizable panels, dark OLED theme, run step sub-options`  ← 布局大改
-156. `3a5eaed` `fix(setup): improve idempotency, input dir check, and CUDA disk space handling`  ← 设置脚本健壮性
-157. `12c314e` `feat(ui): project remove, empty state, no default input_dir`  ← 项目移除+空状态
-158. `360b91a` `fix(ui): show placeholder instead of 'loading...' when no project loaded`  ← 空状态占位符
-159. `fcbccf5` `feat(serve): add quick-launch scripts for web UI`  ← serve 快捷脚本
-160. `aa720d8` `fix(ui): move modal event binding before init early return; remove duplicate code`  ← 模态框修复
-161. `c1584df` `fix(ui): move all event handlers before try block so they work in empty state`  ← 事件绑定修复
-162. `fe45f53` `fix: lint F541 f-string and UT assertion after empty-state changes`  ← lint + UT 修复
+155. `7f5c0d6` `feat(ui): layout overhaul - resizable panels, dark OLED theme, run step sub-options`  ← Major layout overhaul
+156. `3a5eaed` `fix(setup): improve idempotency, input dir check, and CUDA disk space handling`  ← Setup script robustness
+157. `12c314e` `feat(ui): project remove, empty state, no default input_dir`  ← Project remove + empty state
+158. `360b91a` `fix(ui): show placeholder instead of 'loading...' when no project loaded`  ← Empty state placeholder
+159. `fcbccf5` `feat(serve): add quick-launch scripts for web UI`  ← Serve quick-launch scripts
+160. `aa720d8` `fix(ui): move modal event binding before init early return; remove duplicate code`  ← Modal fix
+161. `c1584df` `fix(ui): move all event handlers before try block so they work in empty state`  ← Event binding fix
+162. `fe45f53` `fix: lint F541 f-string and UT assertion after empty-state changes`  ← lint + UT fix
 163. `dc3ad72` `fix(config): propagate max_tokens from YAML to ProviderConfig`  ← C3
 164. `45e09e3` `fix(ai): fix TOCTOU race in provider cache and close Gemini client properly`  ← C2+C4
 165. `9ef45e2` `fix(transcribe): thread-safe os.environ with save/restore pattern`  ← C1
 166. `326fe46` `feat(whisper): add POST /api/whisper/install with progress for UI model download`  ← R-016a
 167. `e361f7d` `feat(ui): add whisper model download button + progress in transcript tab`  ← R-016b/c
 
-2026-06-18 审查修复（基于 `docs/analysis/2026-06-18-vlog-editing-helper-review.md`，详见 `docs/analysis/2026-06-18-review-fix-result.md`）：
-- **P0-1** `cut.py`: 改用 `write_json_atomic` / `write_text_atomic`（漏掉的原子写入）
-- **P0-2** `server.py`: project.json 迁移改用 `write_json_atomic`
-- **P0-4** `plan.py`: transcript 加载追加 `config.plan.use_transcripts` 检查
-- **R-2** `compress.py`: 用 `_get_audio_bitrate()` (ffprobe 探测) 替代 128kbps 硬编码
-- **R-3** `tasks/analyze.py`: `run_analyze_all` 一次性 `_build_stem_to_path` 缓存，避免每视频 rglob
-- **R-4** `tasks/cut.py` + `cut.py`: `run_cut_all` / `cut_one` 添加 `cancel_event` 支持
-- **Q-2** `pipeline.py`: 增加 `"cut"` 到 cancel_event 传递列表
-- 已确认 P0-3 (conftest 缓存清理)、R-1 (AI 响应校验)、Q-1 (compress closure) **均已提前修复**
+2026-06-18 Review fixes (based on `docs/analysis/2026-06-18-vlog-editing-helper-review.md`, see `docs/analysis/2026-06-18-review-fix-result.md`):
+- **P0-1** `cut.py`: switched to `write_json_atomic` / `write_text_atomic` (missed atomic writes)
+- **P0-2** `server.py`: project.json migration switched to `write_json_atomic`
+- **P0-4** `plan.py`: transcript loading now checks `config.plan.use_transcripts`
+- **R-2** `compress.py`: use `_get_audio_bitrate()` (ffprobe detection) instead of hardcoded 128kbps
+- **R-3** `tasks/analyze.py`: `run_analyze_all` one-time `_build_stem_to_path` cache, avoids rglob per video
+- **R-4** `tasks/cut.py` + `cut.py`: added `cancel_event` support to `run_cut_all` / `cut_one`
+- **Q-2** `pipeline.py`: added `"cut"` to cancel_event propagation list
+- Confirmed P0-3 (conftest cache cleanup), R-1 (AI response validation), Q-1 (compress closure) **were already fixed in advance**
 
-最近代码审查修复（2026-06-16 第二次审查，5 S0 + 5 S1 + 1 S2 项）：
+Recent code review fixes (2026-06-16 second review, 5 S0 + 5 S1 + 1 S2 items):
 - **S0-1** `runner.js`: `prog` undefined → `$('run-progress')`
-- **S0-2** `analyze.py`: transcript 不绑 source_stem → clip 携带 source_stem，仅匹配对应 transcript
-- **S0-3** `split.py`: 缺 manifest → 输出 `_split_manifest.json` 含 source_stem/offset/duration
-- **S0-4** pipeline 恢复: 新增 `write_json_atomic`/`write_text_atomic`（tmp+rename）+ JSON 校验跳过
-- **S1-1** `/api/cut`: 忽略 project query → 接收 qs 参数
-- **S1-2** transcript UI: `_resolve_stem` 没切 `_segNN` → 加 `_SEG_SUFFIX_RE` 剥离
-- **S1-3** `_extract_audio`: 硬编码 "ffmpeg" → 接收 ffmpeg 参数
-- **S1-4** Whisper batch 受 `max_analyze_duration_min` → 移除该检查
-- **S1-5** AI provider 缓存: 仅按名缓存 → 复合 key（name+api_key+base_url+proxy）
-- **S2-3** Whisper 模型缓存 key: 缺 device/compute_type → 加入 key；CUDA 回退 CPU 时更新 key
+- **S0-2** `analyze.py`: transcript not bound to source_stem → clip carries source_stem, only matches corresponding transcript
+- **S0-3** `split.py`: missing manifest → outputs `_split_manifest.json` with source_stem/offset/duration
+- **S0-4** pipeline recovery: added `write_json_atomic`/`write_text_atomic` (tmp+rename) + skip on JSON validation failure
+- **S1-1** `/api/cut`: ignoring project query → accepts qs parameter
+- **S1-2** transcript UI: `_resolve_stem` didn't strip `_segNN` → added `_SEG_SUFFIX_RE` to strip
+- **S1-3** `_extract_audio`: hardcoded "ffmpeg" → accepts ffmpeg parameter
+- **S1-4** Whisper batch was gated by `max_analyze_duration_min` → removed that check
+- **S1-5** AI provider cache: by name only → composite key (name+api_key+base_url+proxy)
+- **S2-3** Whisper model cache key: missing device/compute_type → added to key; update key on CUDA→CPU fallback
 
-用户当前行程：**2025 年国庆节法国巴黎 7 日自由行**（`templates/trip_context.md`）
-已知 AI 误判坑：把戴高乐机场 RER 认成曼谷素万那普 → context 第 5 节已写明。
+User's current trip: **2025 National Day holiday, 7-day independent travel in Paris, France** (`templates/trip_context.md`)
+Known AI misidentification pitfall: mistaking Charles de Gaulle airport RER for Bangkok's Suvarnabhumi → section 5 of context already documents this.
 
-2026-06-19 UI 空状态修复（项目移除、空项目占位符、事件绑定提前注册）：
-- **设置脚本**：`setup.ps1`/`setup.sh` 增加 venv 版本检测（<3.11 时重建）、CUDA 磁盘空间检查、setup.ps1 Python 三层发现（PATH → py launcher → 扫描安装目录）
-- **项目移除**：后端 `POST /api/project/remove` + `_remove_from_registry`；前端项目卡片的 ✕ 按钮
-- **空状态**：UI 默认不再加载 `input_dir` 作为项目；空项目显示 `—` 占位符而非 "loading..."
-- **事件绑定提前**：所有事件处理器（模态框、浏览按钮、保存、重载、tabs、播放器、快捷键）移到 `try` 之前注册，确保空状态下也不缺失
-- **快捷启动**：新增 `serve.ps1` / `serve.sh` 一键启动 Web UI
+2026-06-19 UI empty state fixes (project removal, empty project placeholder, event binding early registration):
+- **Setup scripts**: `setup.ps1`/`setup.sh` added venv version detection (rebuild if <3.11), CUDA disk space check, setup.ps1 Python three-layer discovery (PATH → py launcher → scan install directories)
+- **Project removal**: backend `POST /api/project/remove` + `_remove_from_registry`; frontend project card ✕ button
+- **Empty state**: UI no longer loads `input_dir` as default project; empty project shows `—` placeholder instead of "loading..."
+- **Event binding early**: all event handlers (modal, browse button, save, reload, tabs, player, keyboard shortcuts) moved before `try` block registration, ensuring they work even in empty state
+- **Quick-launch**: added `serve.ps1` / `serve.sh` one-click Web UI startup
 
-项目文档状态：
-- 2026-06-16 全面代码审查（5 路平行 subagent）：发现 **6 Critical + 12 Important + 36 Minor**，已修复 6+12+5，剩余 31 Minor 待处理
-- 2026-06-16 第二次审查（逐项 review）：5 S0 + 5 S1 + 1 S2 全部修复
-- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012（✓）/ R-013（✓）/ R-014/ R-015（a[✓] d[✓]）/ R-016（a[✓] b[✓] c[✓]）+ Bug 跟踪（B-001~B-085）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）+ 代码审查 P0~P3（14 项修了 12 项）
-- Whisper ASR 已完全接入：独立 CLI（transcribe / whisper install / whisper check）+ pipeline 步骤 + UI 转录 tab + delete/edit/seek + 10% 进度 + CUDA 回退 CPU + 每视频 rerun + 完整 UT 覆盖（18 个测试）
-- CI 兼容性修复：ctranslate2 mock 模块、config_path 参数传递、Linux 大小写感知、F821 lint
-- 新增 ProcessingState UT（8 个测试全面覆盖 mark/reset_step/持久化/损坏回退）
-- 新增 whisper_cli UT（6 个测试覆盖 check/install/未安装/CUDA/依赖缺失/pip 失败）
-- per-project 配置已实现：每个项目目录下可选 `project.yaml`，deep-merge 覆盖全局 config.yaml
-- 视频分段压缩已实现（split.py + compress Phase 1/2），默认 15 分钟分割阈值
-- UI compressed view 已支持 `_segNN` 分组树；原视频视图下 split 段独立条目 + offset_sec 换算
-- AI 分析进度已细化：`progress_callback` 贯穿分析全流程
-- Provider 缓存：factory 按名缓存，线程安全，测试隔离自动清理
-- 安全修复：rerun/cut 路径遍历防御（`_is_safe_basename`），4xx 非重试错误立即失败，`index_prefix` 消毒
-- 配置修复：YAML 未知字段静默忽略，`project.yaml` CLI 生效，`FFMPEG_HOME` 环境变量支持
-- 2026-06-17 全面分析报告修复：10 个 commit 覆盖可用性（plan 状态/原子写入/max_tokens/验证）到代码质量（closure/transcript 中文/prompts 校验），详见 ROADMAP 已完成表
-- 2026-06-18 R-012 预览进度条完成：两行布局（控制栏 + 进度条），播放/暂停切换（不再是停止+重置），segment 块显示序号 + hover 提示标题/时间窗，点击/拖拽跳段，plan segment 点击集成预览系统
+Project documentation status:
+- 2026-06-16 comprehensive code review (5 parallel subagents): found **6 Critical + 12 Important + 36 Minor**, fixed 6+12+5, 31 Minor remaining
+- 2026-06-16 second review (item-by-item): 5 S0 + 5 S1 + 1 S2 all fixed
+- `ROADMAP.md` current tracking: R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012（✓）/ R-013（✓）/ R-014/ R-015（a[✓] d[✓]）/ R-016（a[✓] b[✓] c[✓]）+ Bug tracking（B-001~B-085）+ Performance optimization（P-001~P-003）+ Documentation upkeep（D-001~D-004）+ Architecture improvements（A-001~A-006）+ Code review P0~P3（14 items, 12 fixed）
+- Whisper ASR fully integrated: standalone CLI (transcribe / whisper install / whisper check) + pipeline step + UI transcript tab + delete/edit/seek + 10% progress + CUDA fallback CPU + per-video rerun + full UT coverage (18 tests)
+- CI compatibility fixes: ctranslate2 mock module, config_path parameter passing, Linux case sensitivity, F821 lint
+- New ProcessingState UT (8 tests covering mark/reset_step/persistence/corruption recovery)
+- New whisper_cli UT (6 tests covering check/install/not-installed/CUDA/missing-deps/pip failure)
+- Per-project config implemented: optional `project.yaml` under each project directory, deep-merge overrides global config.yaml
+- Video segment compression implemented (split.py + compress Phase 1/2), default 15-minute split threshold
+- UI compressed view supports `_segNN` grouping tree; under original video view, split segments are independent entries with offset_sec conversion
+- AI analysis progress refined: `progress_callback`贯穿整个分析流程
+- Provider cache: factory caches by name, thread-safe, test isolation auto-cleanup
+- Security fixes: rerun/cut path traversal defense (`_is_safe_basename`), non-retryable 4xx errors fail immediately, `index_prefix` sanitized
+- Config fixes: unknown YAML fields silently ignored, `project.yaml` works via CLI, `FFMPEG_HOME` environment variable support
+- 2026-06-17 comprehensive analysis report fixes: 10 commits covering usability (plan state/atomic writes/max_tokens/validation) through code quality (closure/transcript Chinese/prompts validation), see ROADMAP completed table
+- 2026-06-18 R-012 preview progress bar completed: two-row layout (control bar + progress bar), play/pause toggle (no longer stop+reset), segment blocks show index + hover tooltip with title/time window, click/drag to jump segments, plan segment click integrates with preview system
 
-2026-06-20 代码审查修复 + R-016 Whisper 模型 UI 下载：
-- **C3 修复**：`config.py:_parse_providers` 漏传 `max_tokens`，用户配置被静默忽略始终 4096
-- **C2 修复**：`factory.py` provider 缓存 TOCTOU 竞态，双线程同 key 时泄漏 HTTP 连接池
-- **C4 修复**：`gemini.py` `close()` 空操作，`_clear_provider_cache` 不释放 HTTP 连接
-- **C1 修复**：`transcribe.py` 全局 `os.environ` 多线程无锁污染，save/restore 模式 + `_env_lock`
-- **R-016a**：后端 `POST /api/whisper/install` + `GET /api/whisper/install/status`，daemon 线程 + huggingface_hub callback 实时进度
-- **R-016b**：前端转录错误区显示"下载模型"按钮 + 进度条/速度/ETA 轮询
-- **R-016c**：下载完成后自动 rerun transcribe，轮询等待结果后刷新
+2026-06-20 Code review fixes + R-016 Whisper model UI download:
+- **C3 fix**: `config.py:_parse_providers` was missing `max_tokens` propagation, user config was silently ignored and always 4096
+- **C2 fix**: `factory.py` provider cache TOCTOU race, two threads with the same key would leak HTTP connection pools
+- **C4 fix**: `gemini.py` `close()` was a no-op, `_clear_provider_cache` didn't release HTTP connections
+- **C1 fix**: `transcribe.py` global `os.environ` unsynchronized multi-thread pollution, save/restore pattern + `_env_lock`
+- **R-016a**: backend `POST /api/whisper/install` + `GET /api/whisper/install/status`, daemon thread + huggingface_hub callback for real-time progress
+- **R-016b**: frontend shows "Download model" button in transcript error area + progress bar/speed/ETA polling
+- **R-016c**: auto-rerun transcribe after download completes, poll for results and refresh
 
-## 8. Gotchas（踩过的坑）
+## 8. Testing & Development
 
-### 8.1 ffmpeg filter 表达式里的逗号
+### 8.1 Running Tests
 
-`scale=min(640,iw):-2` 里 `,` 会被 ffmpeg 解析为 filter 链分隔符。
-**必须**写成 `scale=min(640\,iw):-2`（Python 源码里 `\\,`）。
-详见 `vlog_tool/compress.py:24`。
-
-### 8.2 Windows + `git filter-branch --msg-filter`
-
-- `cmd /c` 调用 git 时，路径里的 `\` 会被 shell 当转义符吃掉 → 统一用正斜杠
-- 中国版 Windows 的 `sys.stdin.encoding` 默认 **GBK**，UTF-8 输入会被解码成 `?` → Python 过滤脚本**必须**用 `sys.stdin.buffer.read()` 按字节匹配，**不要**用 `sys.stdin.read()` 文本模式
-- PowerShell 调用 bat 文件时，`%1` 之类参数里包含空格的路径会被拆分 → 在 bat 文件里用 `%~nx1` 只取文件名做判断
-
-### 8.3 Gemini File API
-
-- 上传后文件状态是 `PROCESSING`，必须轮询到 `ACTIVE` 才能调 generate_content
-- 轮询间隔在 `ai.providers.gemini.poll_interval_sec`（默认 5 秒）
-- 国内访问需要走 SOCKS5 代理；用 google-genai 的 `HttpOptions(transport=httpx.HTTPTransport(proxy=...))`
-
-### 8.4 DeepSeek 模型名
-
-- 标准模型：`deepseek-chat`（V3）、`deepseek-reasoner`（R1）
-- 三方 API 网关可能支持自定义名如 `deepseek-v4-flash`，按实际可用名填写即可
-- 如遇 `404` 或 `model not found`，先回退到官网标准模型名验证
-
-### 8.5 `api_key_env` 字段
-
-- 这是**环境变量名**（如 `DEEPSEEK_API_KEY`），不是 key 本身
-- 旧代码错误地把 key 填到 `api_key_env` 字段，错误信息会把 key 露出来
-- 修复：`vlog_tool/utils.py:mask_if_looks_like_key()` 检测 `sk-` / `AIza` 等前缀并遮蔽
-
-### 8.6 `analyze.skip_existing` 名字误导
-
-- 字段名虽然叫 `skip_existing`，实际是**所有 step 共享的跳过开关**
-- 不要新建一个 `scripts.skip_existing` —— 复用这一个
-
-### 8.7 Gemini Files API 上传未清理
-
-- `gemini.py` 中 `ensure_file_active` 上传视频到 File API 后，调用完成后**不会**请求删除文件
-- 多次 analyze 会累积大量文件，最终耗尽配额（每分钟/每天上传次数限制）
-- 修复：在 `finally` 块调用 `client.files.delete(name=file.name)` 确保清理
-- 注意：`with_retry` 不应包裹上传操作（否则重试时重复上传），上传成功后只重试 `wait` 和 `generate_content`
-
-### 8.8 临时文件残留
-
-- 项目中多处使用 `NamedTemporaryFile(delete=False)` 后忘记 `os.unlink`
-- `interrupt` / `KeyboardInterrupt` 时 .tmp 文件不会自动清理
-- 排查：检查 `server.py` / `utils.py` 中的临时文件用法，优先用 `delete=True` 或 `try/finally`
-
-### 8.9 函数副作用
-
-- `analyze_video` / `generate_voiceover` 等函数会修改传入的 dict 字段（如添加 `_file_path` 等标记）
-- 调用方如果复用了同一个 dict 会出现非预期的副作用
-- 修复：在修改前对入参做 `copy.deepcopy()`
-
-### 8.10 文件排序跨平台不一致
-
-- `Path.iterdir()` 在 Windows 上按文件系统顺序（近似创建时间），Linux 上不保证顺序
-- 这会导致 `index` 分配在不同系统上不一致
-- 修复：总是用 `sorted(Path.iterdir())` 保证统一顺序
-
-### 8.11 Pre-commit hook
-
-- 项目在 `.githooks/pre-commit` 提供了一个 Python 脚本，自动对暂存的 `.py` 文件执行 `ruff format` 后重新 stage
-- `setup.ps1` 会自动设置 `git config core.hooksPath .githooks`
-- 手动配置：`git config core.hooksPath .githooks`
-- hook 依赖 `.venv` 中的 ruff，找不到时静默跳过（不阻塞 commit）
-
-### 8.12 `_filter_dc()` 与 dataclass 构造
-
-- YAML 中拼写错误的字段名（如 `whisper.modle_size`）会导致 `TypeError: unexpected keyword argument`
-- 修复：所有 `**raw` 解包前调用 `_filter_dc(raw, DataclassType)` 过滤未知键
-- 注意：`ScriptConfig` 使用显式 kwargs 构造，不需过滤；`_parse_providers`/`_parse_tasks` 用 `.get()` 安全读取
-
-### 8.13 Provider 缓存与测试隔离
-
-- `ai/factory.py` 的 `_provider_cache` 是模块级全局变量，跨测试持续存在
-- 如果测试 A 缓存了一个 provider，测试 B 的 `monkeypatch` 修改配置后仍可能拿到旧 provider
-- 修复：`_clear_provider_cache()` + `conftest.py` 的 `autouse` fixture 每个测试前自动清理
-
-### 8.14 `retry_attempts` 语义
-
-- `ProviderConfig.retry_attempts` 表示**额外重试次数**（不含首次），默认 `2`
-- `with_retry(attempts=N)` 的 `attempts` 表示**总调用次数**（含首次）
-- 转换公式：`with_retry(attempts=cfg.retry_attempts + 1)`
-- 两个 provider（gemini + openai_compat）都用同一个公式，保持语义一致
-
-## 9. 验证流程
-
-最小验证：
 ```bash
-.\.venv\Scripts\python.exe main.py check    # 环境检查
+# Full run
+python -m pytest vlog_tool/tests/ -v
+
+# Single module
+python -m pytest vlog_tool/tests/test_utils.py -v
 ```
 
-跑通一个素材目录：
+GitHub Actions automatically runs all tests on Python 3.11 / 3.12 (Ubuntu + Windows).
+
+### 8.2 Coverage Details
+
+| Module | Test Count | Coverage Content |
+|--------|-----------|-----------------|
+| `test_config.py` | 34 | Config loading / deep-merge / validation |
+| `test_utils.py` | 34 | extract_json / mask_if_looks_like_key / sanitize_name / find_videos |
+| `test_utils_expanded.py` | 20 | run_subprocess / discover_ffmpeg / atomic_io / run_ffmpeg |
+| `test_cut.py` | 25 | Time parsing / filename generation |
+| `test_log.py` | 13 | TeeWriter / format_size / format_duration |
+| `test_progress.py` | 14 | ProgressTracker read/write/ETA/atomic write |
+| `test_ai.py` | 11 | factory dispatch / provider instantiation / TaskName |
+| `test_ai_gemini.py` | 25 | Gemini client / retry / upload / wait |
+| `test_ai_openai_compat.py` | 17 | OpenAI compat / retry / close |
+| `test_analyze.py` | 10 | `_resolve_original` file matching |
+| `test_analyze_funcs.py` | 9 | `_wrap_with_context` / plan filtering |
+| `test_split.py` | 7 | split_video segment calculation |
+| `test_compress.py` | 7 | compress_video bitrate / params / cancel |
+| `test_file_service.py` | 60 | Safe basename / atomic save / segment matching / config type conversion |
+| `test_helpers.py` | 20 | `_next_index` / `_write_csv` / `_rewrite_text_file` |
+| `test_project_service.py` | 22 | output dir / registry / step detection |
+| `test_routes_*.py` | 48 | Video / plan / config / run / project / transcript route handlers |
+| `test_tasks_*.py` | 12 | run_compress_all / run_analyze_all / run_transcribe_all orchestration |
+| `test_transcribe.py` | 19 | Transcribe toggle / device / model / CUDA fallback |
+| `test_routes_transcripts.py` | 18 | Transcript / whisper API routes |
+| Others | 148 | pipeline / plan / processing_state / main / ratelimit / tasks_analyze/compress/cut/label/refine/scripts/transcribe / whisper_cli |
+
+### 8.3 Code Formatting
+
+Uses `ruff` for lint and formatting. The project includes a pre-commit hook that auto-formats before commit (see [§9.11](#911-pre-commit-hook)).
+
 ```bash
-.\.venv\Scripts\python.exe main.py analyze --force    # 全跑一次
-.\.venv\Scripts\python.exe main.py analyze             # 验证 skip 生效（应全跳过）
-.\.venv\Scripts\python.exe main.py refine              # 验证 trip context 注入
-.\.venv\Scripts\python.exe main.py serve --no-browser  # 验证 UI 起得来（再 Ctrl+C 退出）
+ruff format .
+ruff check .
 ```
 
-## 10. 沟通模板
+### 8.4 Dependency Version Locking
 
-如果是 AI 助手接手，看到 `AGENTS.md` 后应该：
+`requirements-locked.txt` records exact version numbers, used for CI and reproducible builds.
+Daily development uses the looser `requirements.txt`.
 
-1. `git log --oneline -10` 了解最近改动
-2. `git status` 看是否有未提交改动
-3. 读 `config.example.yaml` 了解配置结构
-4. 读 `templates/trip_context.md` 了解当前行程背景
-5. 询问用户具体要做什么，不要假设
+---
 
-如果是新功能：**先讨论方案 → 用户确认 → 实现 → 一个 commit → push**。
-**不要**自动 commit / push（除非用户明确说"帮我提交"）。
+## 9. Gotchas (Pitfalls Encountered)
+
+### 9.1 Commas in ffmpeg Filter Expressions
+
+In `scale=min(640,iw):-2`, the `,` is parsed by ffmpeg as a filter chain separator.
+**Must** be written as `scale=min(640\,iw):-2` (in Python source: `\\,`).
+See `vlog_tool/compress.py:24`.
+
+### 9.2 Windows + `git filter-branch --msg-filter`
+
+- When calling git via `cmd /c`, backslashes in paths are eaten by the shell as escape characters → always use forward slashes
+- Chinese Windows' `sys.stdin.encoding` defaults to **GBK**, UTF-8 input gets decoded to `?` → Python filter scripts **must** use `sys.stdin.buffer.read()` for byte-level matching, **do not** use `sys.stdin.read()` text mode
+- When PowerShell calls a bat file, paths containing spaces in parameters like `%1` get split → use `%~nx1` in the bat file to extract just the filename for comparison
+
+### 9.3 Gemini File API
+
+- After upload, file status is `PROCESSING`; must poll until `ACTIVE` before calling generate_content
+- Poll interval is in `ai.providers.gemini.poll_interval_sec` (default 5 seconds)
+- Access from mainland China requires a SOCKS5 proxy; use google-genai's `HttpOptions(transport=httpx.HTTPTransport(proxy=...))`
+
+### 9.4 DeepSeek Model Names
+
+- Standard models: `deepseek-chat` (V3), `deepseek-reasoner` (R1)
+- Third-party API gateways may support custom names like `deepseek-v4-flash`; just fill in the actual available name
+- If you encounter `404` or `model not found`, first fall back to the official standard model name for verification
+
+### 9.5 `api_key_env` Field
+
+- This is the **environment variable name** (e.g. `DEEPSEEK_API_KEY`), not the key itself
+- Old code incorrectly filled the actual key into the `api_key_env` field, causing error messages to leak the key
+- Fix: `vlog_tool/utils.py:mask_if_looks_like_key()` detects `sk-` / `AIza` prefixes and masks them
+
+### 9.6 Misleading Name `analyze.skip_existing`
+
+- Although the field is named `skip_existing`, it is actually a **skip toggle shared by all steps**
+- Do not create a new `scripts.skip_existing` — reuse this one
+
+### 9.7 Gemini Files API Upload Not Cleaned Up
+
+- In `gemini.py`, `ensure_file_active` uploads video to File API, but **does not** request file deletion after the call completes
+- Multiple analyze runs accumulate many files, eventually exhausting quotas (per-minute/daily upload limits)
+- Fix: call `client.files.delete(name=file.name)` in a `finally` block to ensure cleanup
+- Note: `with_retry` should not wrap the upload operation (otherwise retries re-upload), only wrap `wait` and `generate_content` after successful upload
+
+### 9.8 Temporary File Residue
+
+- Multiple places in the project use `NamedTemporaryFile(delete=False)` and forget to call `os.unlink`
+- `.tmp` files are not automatically cleaned up on `interrupt` / `KeyboardInterrupt`
+- Investigation: check temporary file usage in `server.py` / `utils.py`, prefer `delete=True` or `try/finally`
+
+### 9.9 Function Side Effects
+
+- Functions like `analyze_video` / `generate_voiceover` modify fields of the input dict (e.g. adding `_file_path` markers)
+- If the caller reuses the same dict, unexpected side effects occur
+- Fix: apply `copy.deepcopy()` to input parameters before modification
+
+### 9.10 Cross-Platform File Ordering Inconsistency
+
+- `Path.iterdir()` on Windows follows filesystem order (approximate creation time), on Linux the order is not guaranteed
+- This causes `index` assignment to differ across systems
+- Fix: always use `sorted(Path.iterdir())` to ensure consistent ordering
+
+### 9.11 Pre-commit Hook
+
+- The project provides a Python script at `.githooks/pre-commit` that auto-runs `ruff format` on staged `.py` files and re-stages them
+- `setup.ps1` auto-sets `git config core.hooksPath .githooks`
+- Manual config: `git config core.hooksPath .githooks`
+- The hook depends on `ruff` in `.venv`; if not found, it silently skips (does not block the commit)
+
+### 9.12 `_filter_dc()` and Dataclass Construction
+
+- Misspelled field names in YAML (e.g. `whisper.modle_size`) cause `TypeError: unexpected keyword argument`
+- Fix: call `_filter_dc(raw, DataclassType)` to filter unknown keys before all `**raw` unpacking
+- Note: `ScriptConfig` uses explicit kwargs construction, no filtering needed; `_parse_providers`/`_parse_tasks` use `.get()` for safe reading
+
+### 9.13 Provider Cache and Test Isolation
+
+- `_provider_cache` in `ai/factory.py` is a module-level global variable, persisting across tests
+- If test A caches a provider, test B's `monkeypatch` config changes may still get the old provider
+- Fix: `_clear_provider_cache()` + `conftest.py`'s `autouse` fixture auto-clears before each test
+
+### 9.14 `retry_attempts` Semantics
+
+- `ProviderConfig.retry_attempts` means **extra retry attempts** (excluding the first), default `2`
+- `with_retry(attempts=N)`'s `attempts` means **total call count** (including the first)
+- Conversion formula: `with_retry(attempts=cfg.retry_attempts + 1)`
+- Both providers (gemini + openai_compat) use the same formula to keep semantics consistent
+
+## 10. Verification Flow
+
+Minimal verification:
+```bash
+.\.venv\Scripts\python.exe main.py check    # Environment check
+```
+
+Run through a media directory:
+```bash
+.\.venv\Scripts\python.exe main.py analyze --force    # Run everything once
+.\.venv\Scripts\python.exe main.py analyze             # Verify skip works (should all be skipped)
+.\.venv\Scripts\python.exe main.py refine              # Verify trip context injection
+.\.venv\Scripts\python.exe main.py serve --no-browser  # Verify UI starts (then Ctrl+C to exit)
+```
+
+## 11. Communication Template
+
+If an AI assistant takes over, upon seeing `AGENTS.md` it should:
+
+1. `git log --oneline -10` to understand recent changes
+2. `git status` to check for uncommitted changes
+3. Read `config.example.yaml` to understand config structure
+4. Read `templates/trip_context.md` to understand the current trip background
+5. Ask the user what they specifically want to do, don't assume
+
+For new features: **discuss plan first → user confirms → implement → one commit → push**.
+**Do not** auto-commit / push (unless the user explicitly says "help me commit").

@@ -1,543 +1,527 @@
 # Roadmap
 
-需求追踪。每条需求拆成最小可执行 sub-task（per `AGENTS.md` §6.1 "一个功能一个 commit"），
-完成时把 `[ ]` 改成 `[x]`，进行中用 `[~]`，阻塞用 `[!]`。
-
-设计讨论 / 决策历史见 `AGENTS.md`，具体实现见 git log。
-
-## 进行中
-
-### R-016: UI 化 Whisper 模型下载
-
-**背景**：用户在中国地区无法直接访问 HuggingFace Hub，依赖 `hf_endpoint` 镜像。转录失败时只能跑 CLI `whisper install` 手动下载，体验割裂。
-
-**验收**：
-- UI 转录进度区/错误提示区显示「下载模型」按钮（当模型未缓存时）
-- 点击按钮在后端线程下载模型，UI 显示进度（下载速度 / 百分比 / 剩余时间）
-- 下载完成后自动重试转录
-- 后端复用 `whisper_cli.run_whisper_install` 的预下载逻辑
-
-**子任务**：
-- [x] R-016a：后端 `POST /api/whisper/install`（daemon 线程 + 进度写入 `.whisper_install.json`）`326fe46`
-- [x] R-016b：前端转录错误时显示「下载模型」按钮 + 进度反馈 `e361f7d`
-- [x] R-016c：下载完成后自动触发当前视频重新转录 `e361f7d`
-
-## 需求 R-004：UI 读取和编辑 config
-
-**背景**：现在 UI 只读 paths（output_dir / compressed_dir / texts_dirs / scripts_dir / plans_dir / input_dir）
-用于定位文件。要改 config 必须手开 `config.yaml` 改完再重启服务。
-AI provider / context / tasks 切换在 UI 里完成能省一次重启外的来回。
-
-**验收**：
-- UI 新增「设置」tab（与 texts/voiceover/plan 并列）
-- 显示完整 config 树：paths / ai.providers / ai.tasks / ai.context[_file] / compress / analyze 等所有 section
-- 表单可改（dict 嵌套结构 → 嵌套 form）
-- 改完点保存 → 写回 `config.yaml`（先 .bak 备份）→ 弹「需重启服务生效」提示
-- 校验：路径是否存在、provider 名字是否注册、tasks.provider 是否引用已注册 provider
-- 失败/重名校验不通过 → 表单内红字提示，不写文件
-
-**子任务**：
-- [x] R-004a：后端 `GET /api/config/raw` 返回 config 原始 dict；`PUT /api/config/raw` 校验并写回（带 .bak 备份）
-- [x] R-004b：UI 加「设置」tab；渲染完整 config 为嵌套 form（dict / list / scalar）
-- [x] R-004c：UI 表单编辑 + 保存（弹确认 → PUT → 提示重启 + 校验失败红字）
-- [x] R-004d：文档：`vlog_tool/ui/README.md` 加「设置」tab 用法
-
-## 需求 R-005：UI 化 analyze 流水线
-
-**背景**：现在 `main.py analyze` 是 CLI（compress → analyze → voiceover → plan）。
-要全跑流水线必须开终端。UI 化让「从把视频放进去到能编辑 AI 输出」一气呵成，
-全部在浏览器里点完。
-
-**验收**：
-- UI 头部「运行」按钮 + 进度面板（弹窗 / 抽屉 / 新 tab，暂定 header 按钮 + 底部状态栏）
-- 点按钮触发整条流水线（默认行为与 `main.py analyze` 一致）
-- 每个 task × 每个 video 实时显示 `[i/N]` + ETA
-- 跑完 / 出错有 toast 通知
-- 不锁 texts/voiceover/plan tab 的编辑（同时打开也没问题）
-- 进度数据存 `output/.progress.json`；UI 轮询读（2s 间隔）
-- 走后台线程；UI 不能因为 analyze 卡住而冻结
-
-**子任务**：
-- [x] R-005a：`vlog_tool/progress.py` ProgressTracker：写 `output/.progress.json`（phase / current / total / message / started_at / eta / status）  ← `29bcb35`
-- [x] R-005b：接入 `pipeline.run_analyze_all`：compress / analyze / scripts / plan / label 关键节点调 `tracker.update`  ← `29bcb35`
-- [x] R-005c：后端 `POST /api/run/start`（daemon 线程 + lock 防并发）；`GET /api/run/status` 读 `.progress.json`  ← `29bcb35`
-- [x] R-005d：UI 头部「运行」按钮 + 进度面板（轮询 2s，渲染 phase / [i/N] / ETA / status）  ← `29bcb35`
-- [x] R-005e：文档：`vlog_tool/ui/README.md` 加运行面板  ← `29bcb35`
-- [x] R-005f：运行面板改 checkbox 选步骤，只跑选中步骤  ← `a8daa63`
-- [x] R-005g：修复 ProgressTracker.done() 传参 bug  ← `a8daa63`
-
-## 需求 R-001：UI 切换展示原视频 vs 压缩视频
-
-**背景**：UI 现在只展示 `output/compressed/` 里的 640p 视频。想看 GoPro 4K 原片时没办法，
-只能翻文件管理器 → 想加个 toggle 切到原片。
-
-**验收**：
-- 顶部 toggle：「压缩版 (640p)」/「原片 (4K)」
-- 切到原片时，视频列表变成 `input_dir/*.mp4`（按 mtime 排序）
-- 播放器能正常 seek / play 原片（Range 复用现有实现）
-- 压缩版 ↔ 原片尽量按 basename 匹配，列表里能看到对应关系
-
-**子任务**：
-- [x] R-001a：后端 `/api/videos?source=compressed|original` 支持双来源  ← `88679ee`
-- [x] R-001b：后端 `/api/video?source=original` 从 `input_dir` 拉原片  ← `88679ee`
-- [x] R-001c：UI 顶部加 source toggle，切换时重新拉列表  ← `f1d09ac`
-- [x] R-001d：`vlog_tool/ui/README.md` 加 toggle 说明 + 边角 case 文档  ← `ec83f48`
-- [x] R-001e：边角：原片没有 `001_` 这样的 index 前缀；UI 用 basename 匹配压缩版，列表里标出哪些匹配上哪些没  ← 拆到 `88679ee`（后端 helper）+ `f1d09ac`（UI match-badge）
-
-## 需求 R-006：UI 侧栏分层（项目级 vs 视频级）
-
-**背景**：现在右栏三个 tab（texts / voiceover / plan）同级，但 plan 跨视频
-（引用 `sequence[].index`），texts/voiceover 是 per-video。层级不对：
-plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar 做成两级
-导航，让 R-004（设置）和 R-005（运行）也有自然的位置。
-
-**验收**：
-- sidebar 分两段：上面「项目」section，下面「视频」section
-- 项目 section 三个入口：`📋 Plan (day1)` / `⚙ 设置`（R-004，未做 → 灰显带 tooltip）/ `▶ 运行`（R-005，未做 → 灰显带 tooltip）
-- 视频 section 保持原样（match 角标 + 计数）
-- 选 video → 右栏 texts/voiceover tab（去掉 plan tab）
-- 选 plan → 右栏隐藏 tab bar，整块渲染 plan 面板 + 保存按钮
-- 选 plan 时 player 保持上一个选中的视频；点 plan 的 segment 仍正常跳转到对应视频 + 时间
-- 灰显入口：`opacity: 0.4; cursor: not-allowed;` + `title="待 R-004 / R-005 实现"`
-
-**子任务**：
-- [x] R-006a：`vlog_tool/ui/static/index.html` + `style.css`：sidebar 两段结构 + 灰显样式  ← `a648e60`
-- [x] R-006b：`vlog_tool/ui/static/app.js`：state.currentEntity + selectPlan + 右栏内容分发；plan 内容从 tab 拆出来作为独立渲染分支  ← `c42d347`
-- [x] R-006c：`vlog_tool/ui/README.md`：界面布局图更新 + 项目级 section 说明  ← `778c44a`
-- [!] R-006d：规划视图切源时，播放器应自动切换到新源的对应视频（而非清空）。当前行为：`setSource` 在 plan 分支只清播放器 —— 用户需再点击左侧视频或 plan segment 才加载。预计修复：在 plan 分支用 `state.currentVideo?.index` 在新 `state.videos` 里查找对应文件并调 `playVideoSegment`。
-
-## 需求 R-007：UI 多项目切换
-
-**背景**：当前 UI 锚定一个 `output_dir`，想看另一个 vlog 项目必须改 `config.yaml` 后重启服务。
-用户期望在页面上切换项目，直接查看其他项目的视频列表和 AI 解析结果。
-
-**验收**：
-- UI 顶部/侧栏显示当前项目名，可点击切换
-- 切换后刷新视频列表 + 编辑内容（texts / scripts / plan 全部切到新项目的文件）
-- 无需重启服务
-- 新项目可在 UI 中创建：输入项目名 + 素材目录 → 自动建项目目录、生成 project.json → 刷新切换
-- 空项目引导：视频列表为空时显示空状态 + 素材目录路径提示
-
-**子任务**：
-- [x] R-007a：后端 `/api/projects` 列出所有 `project.json` 所在目录（含 steps 检测）  ← `c91dc6d`
-- [x] R-007b：后端 `/api/project/create` 新建项目（目录名安全化 + project.json 初始化）  ← `c91dc6d`
-- [x] R-007c：侧栏项目选择器（下拉框）+ 新建项目模态框  ← `c88549e`
-- [x] R-007d：URL `?project=name` 切换项目，页面重载自动加载新项目数据  ← `c88549e`
-- [x] R-007e：空视频列表空状态引导（显示素材目录路径）  ← `c88549e`
-
-## 需求 R-008：UI 单步执行 + 文件夹/文件选择
-
-**背景**：当前 UI 只能看已有产物，要重新跑某个步骤（compress / analyze / voiceover / plan）
-必须开终端。用户期望在 UI 上选文件夹→选视频→点按钮→跑完看结果，不用切到命令行。
-
-**验收**：
-- 侧栏「▶ 运行」启用，作为 R-008 入口
-- 右栏显示运行面板：可选择步骤（compress / analyze / voiceover / plan / 全部）
-- 可单独选择输入目录（不限于 config 里的 `input_dir`，可手动输入路径或浏览选择）
-- 可在所选目录下勾选要处理的文件（而非全部跑）
-- 点击执行后面板显示实时进度 + ETA（复用 R-005 的 `.progress.json` 或直接 SSE）
-- 跑完后自动切到对应视图（如跑完 voiceover 切到口播 tab 刷新）
-
-**子任务**：
-- [ ] R-008a：后端 `/api/run/step` 端点，接受 `{ step: string, input_dir?: string, files?: string[] }`
-- [ ] R-008b：运行面板 UI（步骤选择、进度、结果查看）
-- [ ] R-008c：输入目录选择 + 文件勾选交互
-- [ ] R-008d：跑完后自动刷新对应视图
-- [ ] R-008e：文档 + 侧栏「运行」入口启用
-
-> **F-001 建议**：外部分析建议 R-007（多项目切换）与 R-008（单步执行）合并为统一「项目管理 + 流水线」面板，用 `projects.json` 持久化项目列表。实现时可直接合并实施。
-
-## 需求 R-009：工程健壮性
-
-**背景**：当前项目在依赖管理、跨平台兼容、代码测试方面存在短板。
-固定依赖版本 + 补充 `setup.sh` + 为核心纯函数加单元测试。
-
-**验收**：
-- ✅ `requirements.txt` 锁定所有依赖版本（`requirements-locked.txt`）
-- ✅ 核心纯函数 + 路由 handler + 编排逻辑有单元测试（**381 用例**，GitHub Actions CI）
-- [ ] 补充 Linux/macOS 的 `setup.sh`（与现有 `setup.ps1` 等效）— 项目主要面向 Windows
-- [ ] `main.py check` 对 venv 检测兼容 Linux `bin/` 和 Windows `Scripts/`
-
-**子任务**：
-- [x] R-009a：锁依赖版本 + 迁移指南
-- [ ] R-009b：Linux `setup.sh`（低优先级，项目主要面向 Windows）
-- [x] R-009c：核心纯函数 + 路由 + 编排单元测试（pytest，381 用例，CI Linux + Windows 双平台）
-- [ ] R-009d：venv 检测跨平台修复（B-007，影响 Linux CI）
-
-## 需求 R-010：AI 输出质量与 Prompt 管理
-
-**背景**：AI 分析结果偶尔有误（地点误判、时间轴不准、遗漏亮点），
-且用户无法干预 prompt 细节。支持外部 prompt 覆盖 + 置信度评分 + 多模型对比 + UI 编辑 prompt。
-
-**验收**：
-- 支持外部 prompt 文件覆盖系统默认 prompt（`templates/prompts/` 目录下同名文件，改 prompt 无需改代码）
-- UI 设置 tab 增加「Prompt 管理」面板：列出所有系统 prompt（analyze / voiceover / plan / refine 等）
-- 每个 prompt 可在线编辑、恢复默认、保存到项目级 `project.yaml` 或全局覆盖
-- 保存后下次 AI 调用自动使用修改后的 prompt
-- analyze/texts 输出增加 `_confidence` 字段（AI 自评置信度）
-- CLI 支持对同一视频用多个模型分析并对比结果
-
-**子任务**：
-- [ ] R-010a：外部 prompt 文件覆盖机制（`templates/prompts/` 同名文件优先）
-- [ ] R-010b：置信度评分（修改 prompts 让 AI 输出 `_confidence`）
-- [ ] R-010c：多模型对比 CLI
-- [ ] R-010d：后端 `GET /api/prompts` 返回所有可用 prompt；`PUT /api/prompts/{name}` 保存覆盖
-- [ ] R-010e：UI 设置 tab 内嵌 Prompt 管理面板（列表 + 编辑器 + 恢复默认）
-
-## 需求 R-002：一键剪辑（从 plan 切出所有片段）
-
-**背景**：`plan.json` 的 `sequence[]` 已经给好了 `use_timeline` 范围，用户要在剪映里手动剪 →
-想一键 ffmpeg 切完，输出到指定目录，含进度。
-
-**验收**：
-- 新 CLI 子命令 `cut`，不依赖 UI
-- 读 `plans/day<N>_plan.json`
-- 对 sequence[] 每条用 ffmpeg `-ss <start> -to <end>` 切
-  - 默认 `-c copy`（快，几秒切完一段）；提供 `--reencode` 选 h264 精确剪
-- `--output <dir>` 选保存目录（默认 `output/cuts/<day>/`）
-- 输出：切好的 `.mp4` + 对应 texts JSON 复制到同目录
-- 进度：`[i/N] 切割 002 (01:00-01:15)...` + 剩余 ETA
-- 完成时生成 `manifest.md`：每条 sequence 列出输出文件 / 时间范围 / 标题
-
-**子任务**：
-- [x] R-002a：`vlog_tool/cut.py`：`cut_one(video, start, end, out, *, reencode=False)` 包装 ffmpeg
-- [x] R-002b：`vlog_tool/cut.py`：`parse_time_range("00:00-00:20")` 复用 utils 已有逻辑
-- [x] R-002c：`pipeline.py`：`run_cut_all(config, day, output_dir, reencode=False)` + 进度
-- [x] R-002d：`main.py`：`cut` 子命令（`--day`, `--output`, `--reencode`）
-- [x] R-002e：配套 texts JSON 复制到 `cuts/<day>/`（重命名 `001_xxx_seg_03.json`）
-- [x] R-002f：进度走 `timed()` + `[i/N]` + ETA（与现有 pipeline 一致）
-- [x] R-002g：生成 `manifest.md`（markdown 表格：# / 视频 / 时间 / 输出文件 / 标题）
-- [x] R-002h：文档：`README.md` 加 `cut` 子命令
-
-## 需求 R-003：选择式 compress / analyze / refine
-
-**背景**：现在要重做某个视频的口播必须重跑整个 pipeline；想：
-- 选单个视频做 compress / analyze / texts / voiceover
-- 重新生成某一段（e.g. "只重做 002 的 voiceover"）
-- 给某条文本加临时 context 定向润色（不污染全局 `ai.context`）
-
-**验收**：
-- CLI：`analyze -i single.mp4` 已有 → 审计并补缺
-- CLI：`voiceover -i single.json` 缺 → 加
-- CLI：`refine --context "临时说明"` 新增，临时拼到 prompt（优先级高于 `ai.context`）
-- UI：视频列表每项 dropdown「重跑 texts / voiceover / 全部 / 标记 refine」
-- UI：refine tab 加临时 context textarea
-
-**子任务**：
-- [x] R-003a：审计现有子命令的 `-i` 单文件支持（`compress` / `analyze` / `scripts` / `plan` / `refine`）
-- [x] R-003b：补上 `scripts` 的 `-i` 单 JSON 支持 + `compress`/`analyze` 单文件支持
-- [x] R-003c：`refine --context "..."` 参数：临时追加到 prompt，写在 `ai.context` 之后
-- [x] R-003d：UI 视频列表每项加 dropdown「重跑 texts / voiceover / 全部」
-- [x] R-003f：后端 `POST /api/rerun` 接受 `{video, task, source}`
-- [ ] R-003e：UI refine tab 加临时 context textarea（延后单独做）
-- [ ] R-003g：pipeline `run_rerun_single`（已有单文件支持，无需独立函数）
-
-## ✅ 需求 R-011：规划面板预览播放
-
-**背景**：当前规划面板只能看到 segment 列表，点击单个 segment 跳到对应时间。
-无法快速预览整个编排方案的连贯播放效果。
-
-**验收**：
-- 规划面板新增「▶ 预览播放」按钮
-- 点击后遍历 sequence[] 依次播放每个 segment
-- 每个 segment 按 `use_timeline` 的 start 时间跳转，播到 end 时间后自动推进到下一个
-- 当前播放的 segment 在列表中高亮
-- 面板显示播放进度（Segment 3/11）
-- 支持「■ 停止预览」随时终止
-- 预览结束后自动停止，播放器停在最后一个 segment
-
-**子任务**：
-- [x] R-011a：前端 state 加 previewActive / previewIndex / _previewEndTime
-- [x] R-011b：renderPlan 加预览按钮 + 高亮当前 segment
-- [x] R-011c：startPreview / stopPreview / _playPreviewSegment 控制逻辑
-- [x] R-011d：player.ontimeupdate + onended 接入预览自动推进
-
-## ✅ 需求 R-012：预览进度条与交互控制
-
-**背景**：R-011 实现了 segment 自动跳转播放，但用户无法看到整体进度，也无法手动跳到某个 segment。
-
-**验收**：
-- 预览模式下在视频播放器下方显示进度条（表示整个 sequence），显示当前 segment 位置
-- 进度条可点击拖动跳到对应 segment
-- 预览控制栏显示：上一步 / 播放暂停 / 下一步 / 当前 segment 名称
-- 手动拖动播放器进度条时暂时不触发自动推进（防止误拖导致跳段）
-
-**子任务**：
-- [x] R-012a：预览控制栏 UI（上一步 / 暂停 / 下一步 + segment 名称 + 整体进度条）
-- [x] R-012b：进度条点击/拖动切换到对应 segment
-- [x] R-012c：手动拖动播放器进度时不触发自动推进
-
-## ✅ 需求 R-013：离线语音识别（Whisper ASR → 转录 → 口播参考）
-
-**背景**：当前口播文案完全基于视频画面分析生成（地点、动作、时间轴），但无法知道视频中的人物说了什么。离线 whisper 转录提供语音内容作为口播计划上下文。
-
-**验收**（全部 ✅）：
-- ✅ 新增 pipeline 步骤 `transcribe`（compress → analyze → **transcribe** → voiceover → plan）
-- ✅ 离线 faster-whisper 转录，原始视频绝对时间轴，split 段通过 `offset_sec` 换算
-- ✅ CLI 子命令 `transcribe` / `whisper install` / `whisper check`
-- ✅ UI 转录 tab + delete/edit/seek + 每视频 rerun + 10% 进度
-- ✅ CUDA 自动检测 + CPU 回退（`cublas64_12.dll` 缺失处理）
-- ✅ 独立依赖 `requirements-whisper.txt`，不污染主依赖，惰性导入
-
-**子任务**：
-- [x] R-013a：WhisperConfig dataclass 与模型枚举（Task 1, `f4b84e0`）
-- [x] R-013b：核心转录模块（Task 2, `7263367`）
-- [x] R-013c：pipeline 步骤 `run_transcribe_all`（Task 3, `90da4b3`）
-- [x] R-013d：CLI 子命令 `transcribe` / `whisper`（Task 4, `d2e3924`）
-- [x] R-013e：transcript 注入 PLAN_PROMPT（Task 5, `ef7b033`）
-- [x] R-013f：libs.whisper.package 等配置反序列化（Task 6, `370516c`）
-- [x] R-013g：UI 后端 transcript/whisper 路由（Task 7, `4b1c6e6`）
-- [x] R-013h：UI 前端 transcripts tab / sidebar badge / run step（Task 8, `bcfbe04`）
-- [x] R-013i：CUDA 回退 CPU + 惰性导入 + 无 torch 依赖（`1d1b46a`, `1c5d681`）
-- [x] R-013j：综合修复：rerun 404, UI 显示/seek/delete, 10% 进度, offset_sec 换算（`1b53499`）
-
-## 需求 R-014：AI 模型 Token 用量统计（项目级别）
-
-**背景**：目前所有 AI 调用只打印 prompt 大小和响应大小（字节），没有按 token 统计。用户不知道每个项目消耗了多少 token，也无法对比不同模型的成本。项目级别的 token 统计有助于优化模型选择和成本控制。
-
-**验收**：
-- 每次 AI 调用后记录 token 用量（prompt_tokens / completion_tokens / total_tokens），写入 `output/.token_usage.json`
-- 如果模型 API 未返回 token 数，使用 tiktoken 估算
-- 按项目归总：记录每个项目下各模型的累计 token 数
-- UI 设置 tab 或新 tab 显示 token 统计（项目总览 / 各模型占比 / 按时间）
-- CLI 支持 `main.py tokens` 查看统计
-
-**子任务**：
-- [ ] R-014a：后端 AI 调用统一封装 token 记录（不论 provider 都返回 token 数）
-- [ ] R-014b：写入 `output/.token_usage.json`，按项目/模型/日期聚合
-- [ ] R-014c：UI 显示 token 统计面板
-- [ ] R-014d：CLI `tokens` 子命令
-
-## 需求 R-015：配置热重载
-
-**背景**：当前 UI 保存 `config.yaml`（全局配置）后缓存未失效，必须重启服务才能生效。
-`project.yaml` 保存时虽然会弹出缓存，但前端始终显示"需重启服务生效"。
-外部（CLI / 文本编辑器）修改配置文件也完全不被检测。调研见 `docs/superpowers/specs/2026-06-13-config-hot-reload-audit.md`。
-
-**验收**：
-- 全局 `config.yaml` 保存后清理 `_config_cache`
-- 项目级保存后区分提示（不再统一显示"需重启服务生效"）
-- `_get_config()` 增加 mtime 检查，文件变更时自动重新读取
-- 限制 `_config_cache` 大小上限
-
-**子任务**：
-- [x] R-015a：`POST /api/config/raw` 全局保存后调 `_config_cache.clear()` ← `e21373e`
-- [x] R-015b：`_get_config()` 加 mtime 缓存失效
-- [ ] R-015c：前端区分项目级 vs 全局保存提示信息
-- [x] R-015d：`_config_cache` 添加 maxsize 限制（LRU cap 20） ← `e21373e`
-
-## 暂存 / WIP
-
-- （暂无）
-
-## 需求 R-016：可拖拽调整 UI 布局
-
-**背景**：当前 UI 三栏布局（侧栏 / 播放器 / 编辑区）宽高固定，无法适应不同屏幕尺寸或用户偏好。
-
-**验收**：
-- 侧栏、播放器、编辑区之间的分割线可拖拽调整宽度
-- 播放器区域高度可拖拽调整
-- 布局状态持久化到 `project.json` 或 localStorage
-
-## 需求 R-017：Plan 面板时间轴拖拽浏览
-
-**背景**：当前 plan 面板只显示 segment 列表，点击跳转视频。用户期望在时间轴上拖拽查看不同 segment 对应的视频内容。
-
-**验收**：
-- Plan 面板顶部显示整体时间轴（表示 plan 的 sequence[]）
-- 每个 segment 在时间轴上以不同颜色的区块显示
-- 用户可拖拽时间轴上的滑块/点击区块来跳转到对应 segment
-- 时间轴同步：预览播放时时间轴高亮跟随当前 segment
-
-## 需求 R-018：视频多选 + 选定步骤执行
-
-**背景**：当前运行面板可以选步骤、跑全部视频，或 rerun 单个视频。缺少「勾选多个视频 → 选步骤 → 只跑选中视频」的交互。用户期望在侧栏勾选任意视频后，点击运行只处理选中项。
-
-**验收**：
-- 侧栏视频列表每项前加 checkbox，支持多选
-- 顶部显示「已选 N/N」+「全选/取消全选」
-- 运行面板步骤 checkbox 保持不变，但「运行」按钮联动选中视频
-- 未选任何视频时运行按钮禁用，显示「请先选择视频」
-- 运行进度只反映选中视频的处理进度
-- 选中视频在列表中高亮显示
-
-**子任务**：
-- [ ] R-018a：侧栏视频列表加 checkbox + 全选/取消全选
-- [ ] R-018b：后端 `/api/run/start` 支持 `files: string[]` 过滤参数
-- [ ] R-018c：运行面板根据选中视频调整进度显示（总数 / ETA / message）
-- [ ] R-018d：选中视频高亮样式 + 计数
-- [ ] R-018e：空选择时禁用运行按钮 + 提示文案
-
-## 文档维护（来自 2026-06-10 全面 review）
-
-| ID | 问题 | 说明 | 状态 |
+Feature tracking. Each feature is broken down into minimal executable sub-tasks (per `AGENTS.md` §6.1 "one feature, one commit").
+Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
+
+Design discussions / decision history in `AGENTS.md`, implementation details in git log.
+
+## In Progress
+
+### R-016: UI Whisper Model Download
+
+**Background**: Users in China cannot directly access HuggingFace Hub and rely on the `hf_endpoint` mirror. When transcription fails, they can only run the CLI `whisper install` to download manually — a fragmented experience.
+
+**Acceptance Criteria**:
+- Show a "Download Model" button in the UI transcription progress/error area (when model is not cached)
+- Clicking the button downloads the model in a backend thread, UI shows progress (download speed / percentage / remaining time)
+- Automatically retry transcription after download completes
+- Backend reuses `whisper_cli.run_whisper_install` pre-download logic
+
+**Sub-tasks**:
+- [x] R-016a: Backend `POST /api/whisper/install` (daemon thread + progress writes to `.whisper_install.json`) `326fe46`
+- [x] R-016b: Frontend shows "Download Model" button on transcription error + progress feedback `e361f7d`
+- [x] R-016c: Auto-trigger re-transcription for current video after download completes `e361f7d`
+
+## Feature R-004: UI Config Read and Edit
+
+**Background**: Currently the UI only reads paths (output_dir / compressed_dir / texts_dirs / scripts_dir / plans_dir / input_dir) for file location. To change config, users must manually open `config.yaml`, edit, and restart the service. Switching AI provider / context / tasks from the UI saves a restart round-trip.
+
+**Acceptance Criteria**:
+- Add a "Settings" tab in the UI (alongside texts/voiceover/plan)
+- Display full config tree: paths / ai.providers / ai.tasks / ai.context[_file] / compress / analyze and all other sections
+- Form fields are editable (dict nesting → nested form)
+- Save writes back to `config.yaml` (with .bak backup first) → show "Service restart required" prompt
+- Validation: check paths exist, provider names are registered, tasks.provider references registered providers
+- Validation failure → red text in form, no file written
+
+**Sub-tasks**:
+- [x] R-004a: Backend `GET /api/config/raw` returns config raw dict; `PUT /api/config/raw` validates and writes back (with .bak backup)
+- [x] R-004b: UI adds "Settings" tab; renders full config as nested form (dict / list / scalar)
+- [x] R-004c: UI form editing + save (confirm dialog → PUT → restart prompt + validation error red text)
+- [x] R-004d: Docs: `vlog_tool/ui/README.md` add "Settings" tab usage
+
+## Feature R-005: UI Pipeline Runner
+
+**Background**: Currently `main.py analyze` is CLI-only (compress → analyze → voiceover → plan). Running the full pipeline requires opening a terminal. UI-izing it allows going from "put videos in" to "edit AI output" entirely in the browser with a few clicks.
+
+**Acceptance Criteria**:
+- "Run" button in the UI header + progress panel (modal / drawer / new tab — tentatively header button + bottom status bar)
+- Clicking the button triggers the full pipeline (default behavior matches `main.py analyze`)
+- Real-time `[i/N]` + ETA display for each task × each video
+- Toast notification on completion / error
+- Does not block editing in texts/voiceover/plan tabs (can be open simultaneously)
+- Progress data stored in `output/.progress.json`; UI polls every 2s
+- Runs in a background thread; UI must not freeze due to analyze
+
+**Sub-tasks**:
+- [x] R-005a: `vlog_tool/progress.py` ProgressTracker: writes `output/.progress.json` (phase / current / total / message / started_at / eta / status)  ← `29bcb35`
+- [x] R-005b: Integrate into `pipeline.run_analyze_all`: call `tracker.update` at key nodes of compress / analyze / scripts / plan / label  ← `29bcb35`
+- [x] R-005c: Backend `POST /api/run/start` (daemon thread + lock to prevent concurrency); `GET /api/run/status` reads `.progress.json`  ← `29bcb35`
+- [x] R-005d: UI header "Run" button + progress panel (polls every 2s, renders phase / [i/N] / ETA / status)  ← `29bcb35`
+- [x] R-005e: Docs: `vlog_tool/ui/README.md` add run panel  ← `29bcb35`
+- [x] R-005f: Run panel uses checkboxes to select steps, only runs selected steps  ← `a8daa63`
+- [x] R-005g: Fix ProgressTracker.done() parameter passing bug  ← `a8daa63`
+
+## Feature R-001: UI Toggle Original vs Compressed Video
+
+**Background**: The UI currently only displays 640p videos from `output/compressed/`. There is no way to view GoPro 4K originals without opening the file manager — add a toggle to switch to originals.
+
+**Acceptance Criteria**:
+- Top toggle: "Compressed (640p)" / "Original (4K)"
+- When switching to original, video list shows `input_dir/*.mp4` (sorted by mtime)
+- Player can seek / play original videos normally (Range reuses existing implementation)
+- Compressed ↔ Original should match by basename where possible, show correspondence in the list
+
+**Sub-tasks**:
+- [x] R-001a: Backend `/api/videos?source=compressed|original` supports dual sources  ← `88679ee`
+- [x] R-001b: Backend `/api/video?source=original` serves from `input_dir`  ← `88679ee`
+- [x] R-001c: UI adds source toggle in header, refetches list on switch  ← `f1d09ac`
+- [x] R-001d: `vlog_tool/ui/README.md` add toggle description + edge case docs  ← `ec83f48`
+- [x] R-001e: Edge case: originals have no `001_` index prefix; UI matches by basename, marks matched/unmatched in list  ← split into `88679ee` (backend helper) + `f1d09ac` (UI match-badge)
+
+## Feature R-006: Sidebar Hierarchy (Project-level vs Video-level)
+
+**Background**: Currently the right panel has three tabs (texts / voiceover / plan) all at the same level, but plan is cross-video (references `sequence[].index`) while texts/voiceover are per-video. The hierarchy is wrong: plan is a project-level artifact, texts/voiceover are video-level artifacts. Making the sidebar two-tier navigation gives R-004 (settings) and R-005 (run) a natural home.
+
+**Acceptance Criteria**:
+- Sidebar split into two sections: top "Project" section, bottom "Video" section
+- Project section has three entries: `📋 Plan (day1)` / `⚙ Settings` (R-004, not done → grayed with tooltip) / `▶ Run` (R-005, not done → grayed with tooltip)
+- Video section stays as-is (match badge + count)
+- Select video → right panel shows texts/voiceover tabs (plan tab removed)
+- Select plan → right panel hides tab bar, renders plan panel full-width + save button
+- When plan is selected, player keeps the previously selected video; clicking a plan segment jumps to the corresponding video + time
+- Grayed entries: `opacity: 0.4; cursor: not-allowed;` + `title="Requires R-004 / R-005"`
+
+**Sub-tasks**:
+- [x] R-006a: `vlog_tool/ui/static/index.html` + `style.css`: sidebar two-section structure + grayed styles  ← `a648e60`
+- [x] R-006b: `vlog_tool/ui/static/app.js`: state.currentEntity + selectPlan + right panel content dispatch; plan content extracted from tab as independent rendering branch  ← `c42d347`
+- [x] R-006c: `vlog_tool/ui/README.md`: updated layout diagram + project-level section description  ← `778c44a`
+- [!] R-006d: When switching source in plan view, player should auto-switch to the corresponding video in the new source (not clear the player). Current behavior: `setSource` in plan branch only clears the player — user must click the video in the left sidebar or a plan segment to load. Proposed fix: in plan branch, use `state.currentVideo?.index` to find the corresponding file in `state.videos` and call `playVideoSegment`.
+
+## Feature R-007: Multi-Project Switching in UI
+
+**Background**: The current UI is anchored to a single `output_dir`. To view a different vlog project, users must modify `config.yaml` and restart the service. Users expect to switch projects from the page and directly view other projects' video lists and AI analysis results.
+
+**Acceptance Criteria**:
+- UI header/sidebar shows current project name, clickable to switch
+- Switching refreshes video list + editor content (texts / scripts / plan all switch to the new project's files)
+- No service restart required
+- New projects can be created in the UI: enter project name + media directory → auto-creates project directory, generates project.json → refreshes and switches
+- Empty project guidance: empty video list shows empty state + media directory path hint
+
+**Sub-tasks**:
+- [x] R-007a: Backend `/api/projects` lists all directories containing `project.json` (with step detection)  ← `c91dc6d`
+- [x] R-007b: Backend `/api/project/create` creates new project (sanitized directory name + project.json init)  ← `c91dc6d`
+- [x] R-007c: Sidebar project selector (dropdown) + new project modal  ← `c88549e`
+- [x] R-007d: URL `?project=name` switches project, page reload auto-loads new project data  ← `c88549e`
+- [x] R-007e: Empty video list empty state guidance (shows media directory path)  ← `c88549e`
+
+## Feature R-008: UI Single-Step Execution + Folder/File Selection
+
+**Background**: The current UI can only view existing artifacts. To re-run a step (compress / analyze / voiceover / plan), users must open a terminal. Users expect to select a folder → select videos → click a button → see results, without switching to the command line.
+
+**Acceptance Criteria**:
+- Enable sidebar "▶ Run" as the R-008 entry point
+- Right panel shows run panel: step selection (compress / analyze / voiceover / plan / all)
+- Input directory can be independently selected (not limited to config's `input_dir`, can manually enter path or browse)
+- Files within the selected directory can be checked individually (not "run all")
+- After clicking execute, panel shows real-time progress + ETA (reuses R-005's `.progress.json` or uses SSE)
+- Auto-switch to corresponding view after completion (e.g., after voiceover completes, switch to voiceover tab and refresh)
+
+**Sub-tasks**:
+- [ ] R-008a: Backend `/api/run/step` endpoint, accepts `{ step: string, input_dir?: string, files?: string[] }`
+- [ ] R-008b: Run panel UI (step selection, progress, result viewing)
+- [ ] R-008c: Input directory selection + file checkbox interaction
+- [ ] R-008d: Auto-refresh corresponding view after completion
+- [ ] R-008e: Documentation + enable sidebar "Run" entry
+
+> **F-001 Suggestion**: External analysis suggests merging R-007 (multi-project switching) and R-008 (single-step execution) into a unified "Project Management + Pipeline" panel, using `projects.json` to persist the project list. Can be implemented together.
+
+## Feature R-009: Engineering Robustness
+
+**Background**: The project has gaps in dependency management, cross-platform compatibility, and code testing. Pin dependency versions + add `setup.sh` + add unit tests for core pure functions.
+
+**Acceptance Criteria**:
+- ✅ `requirements.txt` pins all dependency versions (`requirements-locked.txt`)
+- ✅ Core pure functions + route handlers + orchestration logic have unit tests (**381 test cases**, GitHub Actions CI)
+- [ ] Add Linux/macOS `setup.sh` (equivalent to existing `setup.ps1`) — project primarily targets Windows
+- [ ] `main.py check` venv detection compatible with both Linux `bin/` and Windows `Scripts/`
+
+**Sub-tasks**:
+- [x] R-009a: Pin dependency versions + migration guide
+- [ ] R-009b: Linux `setup.sh` (low priority, project primarily targets Windows)
+- [x] R-009c: Core pure functions + routes + orchestration unit tests (pytest, 381 cases, CI Linux + Windows dual platform)
+- [ ] R-009d: Cross-platform venv detection fix (B-007, affects Linux CI)
+
+## Feature R-010: AI Output Quality & Prompt Management
+
+**Background**: AI analysis results are occasionally wrong (mislocated places, inaccurate timeline, missed highlights), and users cannot intervene in prompt details. Support external prompt overrides + confidence scores + multi-model comparison + UI prompt editing.
+
+**Acceptance Criteria**:
+- Support external prompt files overriding system defaults (same-named files in `templates/prompts/` directory, no code changes needed)
+- Add "Prompt Management" panel in UI Settings tab: lists all system prompts (analyze / voiceover / plan / refine, etc.)
+- Each prompt can be edited online, restored to default, saved to project-level `project.yaml` or global override
+- After saving, next AI call automatically uses the modified prompt
+- Add `_confidence` field to analyze/texts output (AI self-assessed confidence)
+- CLI supports analyzing the same video with multiple models and comparing results
+
+**Sub-tasks**:
+- [ ] R-010a: External prompt file override mechanism (`templates/prompts/` same-named file takes priority)
+- [ ] R-010b: Confidence scoring (modify prompts to make AI output `_confidence`)
+- [ ] R-010c: Multi-model comparison CLI
+- [ ] R-010d: Backend `GET /api/prompts` returns all available prompts; `PUT /api/prompts/{name}` saves override
+- [ ] R-010e: UI Settings tab embeds Prompt Management panel (list + editor + restore default)
+
+## Feature R-002: One-Clip Cut (Extract All Segments from Plan)
+
+**Background**: `plan.json`'s `sequence[]` already provides `use_timeline` ranges. Users currently have to manually cut in JianYing (CapCut) — want one-click ffmpeg extraction to a specified directory with progress.
+
+**Acceptance Criteria**:
+- New CLI subcommand `cut`, no UI dependency
+- Reads `plans/day<N>_plan.json`
+- Extracts each entry in sequence[] with ffmpeg `-ss <start> -to <end>`
+  - Default `-c copy` (fast, cuts in seconds); provide `--reencode` for h264 precise cut
+- `--output <dir>` to specify save directory (default `output/cuts/<day>/`)
+- Output: extracted `.mp4` + corresponding texts JSON copied to same directory
+- Progress: `[i/N] cutting 002 (01:00-01:15)...` + remaining ETA
+- Generates `manifest.md` on completion: each sequence lists output file / time range / title
+
+**Sub-tasks**:
+- [x] R-002a: `vlog_tool/cut.py`: `cut_one(video, start, end, out, *, reencode=False)` wraps ffmpeg
+- [x] R-002b: `vlog_tool/cut.py`: `parse_time_range("00:00-00:20")` reuses existing utils logic
+- [x] R-002c: `pipeline.py`: `run_cut_all(config, day, output_dir, reencode=False)` + progress
+- [x] R-002d: `main.py`: `cut` subcommand (`--day`, `--output`, `--reencode`)
+- [x] R-002e: Copy accompanying texts JSON to `cuts/<day>/` (renamed `001_xxx_seg_03.json`)
+- [x] R-002f: Progress uses `timed()` + `[i/N]` + ETA (consistent with existing pipeline)
+- [x] R-002g: Generate `manifest.md` (markdown table: # / video / time / output file / title)
+- [x] R-002h: Docs: `README.md` add `cut` subcommand
+
+## Feature R-003: Selective Compress / Analyze / Refine
+
+**Background**: Currently, to redo a specific video's voiceover, the entire pipeline must be rerun. Goal:
+- Select a single video for compress / analyze / texts / voiceover
+- Regenerate a specific segment (e.g., "only redo 002's voiceover")
+- Add temporary context to a specific text for targeted polishing (without polluting global `ai.context`)
+
+**Acceptance Criteria**:
+- CLI: `analyze -i single.mp4` already exists → audit and fill gaps
+- CLI: `voiceover -i single.json` missing → add
+- CLI: `refine --context "temp note"` new, temporarily appended to prompt (priority higher than `ai.context`)
+- UI: Each video list item has a dropdown "Rerun texts / voiceover / all / mark refine"
+- UI: Refine tab adds temporary context textarea
+
+**Sub-tasks**:
+- [x] R-003a: Audit existing subcommands' `-i` single file support (`compress` / `analyze` / `scripts` / `plan` / `refine`)
+- [x] R-003b: Add `-i` single JSON support for `scripts` + single file support for `compress`/`analyze`
+- [x] R-003c: `refine --context "..."` parameter: temporarily appended to prompt, placed after `ai.context`
+- [x] R-003d: UI: each video list item has dropdown "Rerun texts / voiceover / all"
+- [x] R-003f: Backend `POST /api/rerun` accepts `{video, task, source}`
+- [ ] R-003e: UI refine tab adds temporary context textarea (deferred to separate task)
+- [ ] R-003g: Pipeline `run_rerun_single` (single-file support already exists, no separate function needed)
+
+## ✅ Feature R-011: Plan Panel Preview Playback
+
+**Background**: The current plan panel only shows a segment list; clicking a segment jumps to the corresponding time. There is no way to quickly preview the coherent playback effect of the entire editing plan.
+
+**Acceptance Criteria**:
+- Add "▶ Preview Playback" button to the plan panel
+- After clicking, iterate through sequence[] and play each segment sequentially
+- Each segment jumps to the `use_timeline` start time, automatically advances to the next when reaching the end time
+- The currently playing segment is highlighted in the list
+- Panel shows playback progress (Segment 3/11)
+- Support "■ Stop Preview" at any time
+- Preview stops automatically after completion, player stays at the last segment
+
+**Sub-tasks**:
+- [x] R-011a: Frontend state adds previewActive / previewIndex / _previewEndTime
+- [x] R-011b: renderPlan adds preview button + highlights current segment
+- [x] R-011c: startPreview / stopPreview / _playPreviewSegment control logic
+- [x] R-011d: player.ontimeupdate + onended integrated into preview auto-advance
+
+## ✅ Feature R-012: Preview Progress Bar & Interactive Controls
+
+**Background**: R-011 implemented automatic segment jump playback, but users cannot see overall progress or manually jump to a specific segment.
+
+**Acceptance Criteria**:
+- In preview mode, show a progress bar below the video player (representing the entire sequence), indicating the current segment position
+- Progress bar is clickable/draggable to jump to the corresponding segment
+- Preview control bar shows: previous step / play-pause / next step / current segment name
+- Manually dragging the player progress bar does not trigger auto-advance (prevent accidental segment skip)
+
+**Sub-tasks**:
+- [x] R-012a: Preview control bar UI (previous / pause / next + segment name + overall progress bar)
+- [x] R-012b: Progress bar click/drag switches to corresponding segment
+- [x] R-012c: Manual player progress bar drag does not trigger auto-advance
+
+## ✅ Feature R-013: Offline Speech Recognition (Whisper ASR → Transcription → Voiceover Reference)
+
+**Background**: Currently, voiceover copy is generated entirely from video visual analysis (location, action, timeline), but cannot know what people in the video are saying. Offline Whisper transcription provides speech content as context for the voiceover plan.
+
+**Acceptance Criteria** (all ✅):
+- ✅ New pipeline step `transcribe` (compress → analyze → **transcribe** → voiceover → plan)
+- ✅ Offline faster-whisper transcription, absolute timeline on original video, split segments converted via `offset_sec`
+- ✅ CLI subcommands `transcribe` / `whisper install` / `whisper check`
+- ✅ UI transcript tab + delete/edit/seek + per-video rerun + 10% progress
+- ✅ CUDA auto-detection + CPU fallback (`cublas64_12.dll` missing handling)
+- ✅ Independent dependency `requirements-whisper.txt`, does not pollute main deps, lazy import
+
+**Sub-tasks**:
+- [x] R-013a: WhisperConfig dataclass and model enum (Task 1, `f4b84e0`)
+- [x] R-013b: Core transcription module (Task 2, `7263367`)
+- [x] R-013c: Pipeline step `run_transcribe_all` (Task 3, `90da4b3`)
+- [x] R-013d: CLI subcommands `transcribe` / `whisper` (Task 4, `d2e3924`)
+- [x] R-013e: Transcript injection into PLAN_PROMPT (Task 5, `ef7b033`)
+- [x] R-013f: Deserialize libs.whisper.package config (Task 6, `370516c`)
+- [x] R-013g: UI backend transcript/whisper routes (Task 7, `4b1c6e6`)
+- [x] R-013h: UI frontend transcripts tab / sidebar badge / run step (Task 8, `bcfbe04`)
+- [x] R-013i: CUDA fallback CPU + lazy import + no torch dependency (`1d1b46a`, `1c5d681`)
+- [x] R-013j: Comprehensive fixes: rerun 404, UI display/seek/delete, 10% progress, offset_sec conversion (`1b53499`)
+
+## Feature R-014: AI Model Token Usage Statistics (Project Level)
+
+**Background**: Currently all AI calls only log prompt size and response size (bytes), with no per-token statistics. Users don't know how many tokens each project consumes, and cannot compare costs across models. Project-level token statistics help optimize model selection and cost control.
+
+**Acceptance Criteria**:
+- Record token usage after each AI call (prompt_tokens / completion_tokens / total_tokens), write to `output/.token_usage.json`
+- If the model API does not return token counts, use tiktoken for estimation
+- Aggregate by project: record cumulative token counts per model under each project
+- UI Settings tab or new tab shows token statistics (project overview / per-model breakdown / by time)
+- CLI supports `main.py tokens` to view statistics
+
+**Sub-tasks**:
+- [ ] R-014a: Backend AI calls unified token recording wrapper (returns token count regardless of provider)
+- [ ] R-014b: Write to `output/.token_usage.json`, aggregated by project/model/date
+- [ ] R-014c: UI displays token statistics panel
+- [ ] R-014d: CLI `tokens` subcommand
+
+## Feature R-015: Config Hot Reload
+
+**Background**: Currently, after saving `config.yaml` (global config) in the UI, the cache is not invalidated — the service must be restarted. When `project.yaml` is saved, although the cache is evicted, the frontend always shows "Service restart required." External (CLI / text editor) modifications to config files are entirely undetected. Research in `docs/superpowers/specs/2026-06-13-config-hot-reload-audit.md`.
+
+**Acceptance Criteria**:
+- Global `config.yaml` save clears `_config_cache`
+- Project-level save shows differentiated prompts (no longer always shows "Service restart required")
+- `_get_config()` adds mtime check, auto-re-reads when files change
+- Set an upper limit on `_config_cache` size
+
+**Sub-tasks**:
+- [x] R-015a: `POST /api/config/raw` global save calls `_config_cache.clear()` ← `e21373e`
+- [x] R-015b: `_get_config()` adds mtime-based cache invalidation
+- [ ] R-015c: Frontend differentiates project-level vs global save prompts
+- [x] R-015d: `_config_cache` adds maxsize limit (LRU cap 20) ← `e21373e`
+
+## Staging / WIP
+
+- (None)
+
+## Feature R-016: Draggable UI Layout
+
+**Background**: The current UI three-column layout (sidebar / player / editor area) has fixed width and height, unable to adapt to different screen sizes or user preferences.
+
+**Acceptance Criteria**:
+- Dividers between sidebar, player, and editor areas are draggable to adjust widths
+- Player area height is draggable
+- Layout state persisted to `project.json` or localStorage
+
+## Feature R-017: Plan Panel Timeline Drag-and-Drop Navigation
+
+**Background**: The current plan panel only shows a segment list; clicking jumps to the video. Users want to drag along a timeline to view corresponding video content for different segments.
+
+**Acceptance Criteria**:
+- Plan panel top shows an overall timeline (representing the plan's sequence[])
+- Each segment is displayed as a different-colored block on the timeline
+- Users can drag a slider on the timeline / click blocks to jump to the corresponding segment
+- Timeline sync: during preview playback, the timeline highlight follows the current segment
+
+## Feature R-018: Multi-Video Selection + Step Execution
+
+**Background**: The current run panel allows step selection and running all videos, or rerunning a single video. There is no "select multiple videos → choose steps → run only selected videos" interaction. Users want to select any videos in the sidebar, then click run to process only the selected items.
+
+**Acceptance Criteria**:
+- Add checkbox before each item in sidebar video list, supporting multi-select
+- Show "Selected N/N" + "Select All/Deselect All" at the top
+- Run panel step checkboxes remain unchanged, but the "Run" button links to selected videos
+- Run button disabled when no video is selected, shows "Please select videos first"
+- Run progress only reflects processing progress of selected videos
+- Selected videos are highlighted in the list
+
+**Sub-tasks**:
+- [ ] R-018a: Sidebar video list add checkbox + select all/deselect all
+- [ ] R-018b: Backend `/api/run/start` supports `files: string[]` filter parameter
+- [ ] R-018c: Run panel adjusts progress display based on selected videos (total count / ETA / message)
+- [ ] R-018d: Selected video highlight style + count display
+- [ ] R-018e: Disable run button + hint text when nothing selected
+
+## Documentation Maintenance (from 2026-06-10 Full Review)
+
+| ID | Issue | Description | Status |
 | --- | --- | --- | --- |
-| D-001 | AGENTS.md §7 commit 列表过期 | 最后一条是 R-007，缺 6 个新 commit | ✅ 已更新 |
-| D-002 | vlog_tool/ui/README.md 运行状态描述过期 | "▶ 运行灰显（待 R-005 实现）" — R-005 已完成 | ✅ 已修复 |
-| D-003 | README.md / README.en.md 未提 per-project 配置 | `project.yaml` 分层配置功能未写入用户文档 | ✅ 已补充 |
-| D-004 | config.example.yaml model 名与实际使用不符 | example 写 `deepseek-chat`，config.yaml 用 `deepseek-v4-flash`，应备注说明 | ✅ 已加注释 |
+| D-001 | AGENTS.md §7 commit list out of date | Last entry is R-007, missing 6 new commits | ✅ Updated |
+| D-002 | vlog_tool/ui/README.md run status description outdated | "▶ Run grayed (requires R-005)" — R-005 is complete | ✅ Fixed |
+| D-003 | README.md / README.en.md missing per-project config | `project.yaml` layered config not in user docs | ✅ Added |
+| D-004 | config.example.yaml model name doesn't match actual usage | Example has `deepseek-chat`, config.yaml uses `deepseek-v4-flash`, should add comment note | ✅ Added comment |
 
-## 架构改进（来自 review，与设计文档 Phase 1 对齐）
+## Architecture Improvements (from review, aligned with design doc Phase 1)
 
-| ID | 问题 | 说明 | 状态 |
+| ID | Issue | Description | Status |
 | --- | --- | --- | --- |
-| A-001 | server.py → 1261 行单一闭包 | 拆 routes/ + services/（Phase 1c 完成，454 行） | ✅ |
-| A-002 | app.js → 1509 行全局函数 | 拆 src/ ES 模块（Phase 1d 完成，8 个模块） | ✅ |
-| A-003 | pipeline.py → 789 行堆叠 | 拆 tasks/ 包（Phase 1b 完成，96 行） | ✅ |
-| A-004 | `_write_text_file` / `_rewrite_text_file` 80% 重复 | 提取公共函数（Phase 1b 已移入 _helpers.py） | ✅ |
-| A-005 | `project.json` vs `project.yaml` 不同步 | 两份配置来源不一致，应统一或互相感知 | 🔴 |
-| A-006 | 前端 ES module 动态 import 循环引用 | viewer/editor/runner 三方存在动态 import，长期可重构 | 🟡 |
+| A-001 | server.py → 1261-line single closure | Split into routes/ + services/ (Phase 1c complete, 454 lines) | ✅ |
+| A-002 | app.js → 1509-line global functions | Split into src/ ES modules (Phase 1d complete, 8 modules) | ✅ |
+| A-003 | pipeline.py → 789-line pile | Split into tasks/ package (Phase 1b complete, 96 lines) | ✅ |
+| A-004 | `_write_text_file` / `_rewrite_text_file` 80% duplicate | Extract common function (Phase 1b moved to _helpers.py) | ✅ |
+| A-005 | `project.json` vs `project.yaml` out of sync | Two config sources inconsistent, should unify or make mutually aware | 🔴 |
+| A-006 | Frontend ES module dynamic import circular reference | viewer/editor/runner three-way dynamic import, can be refactored long-term | 🟡 |
 
-## 已知问题（Bug Tracker）
+## Known Issues (Bug Tracker)
 
-按优先级 P0（立即）→ P1（近期）→ P2（中期）→ P3（长期）排列。
+Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (long-term).
 
-### 代码审查发现（2026-06-16，5 路平行 subagent）
+### Found by Code Review (2026-06-16, 5 parallel subagents)
 
-| ID | 优先级 | 问题 | 状态 |
+| ID | Priority | Issue | Status |
 | --- | --- | --- | --- |
-| C1 | P0 | POST /api/rerun path traversal — video_basename 未校验 | ✅ `41abe5b` |
-| C2 | P0 | Empty-state 按钮不刷新视频列表 | ✅ `89614a4` |
-| C3 | P0 | playVideoSegment addEventListener 泄漏 | ✅ `bce09ce` |
-| C4 | P0 | OpenAI 4xx 被静默重试 | ✅ `dba1cd9` |
-| C5 | P0 | YAML 未知字段→dataclass TypeError 崩溃 | ✅ `18ccee4` |
-| C6 | P0 | Provider HTTP 连接泄漏 | ✅ `71659aa` + `ef68308` |
-| I1 | P1 | 转录编辑 onblur 竞态 | ✅ `fe511be` |
-| I2 | P1 | save() 数据引用竞态 | ✅ `8d3b2f8` + `bebf21f` |
-| I3 | P1 | startRun 双击启动两条流水线 | ✅ `1406e0e` |
-| I4 | P1 | Portal 菜单事件监听器泄漏 | ✅ `08d815c` |
-| I5 | P1 | Range 请求不支持 bytes=-N 后缀 | ✅ `d2591a9` |
-| I6 | P1 | POST /api/cut day_label 路径穿越 | ✅ `b072240` |
-| I7 | P1 | 硬编码 G:/ffmpeg | ✅ `74c34f5` |
-| I8 | P1 | _resolve_original 无下划线 stem 的 ValueError 崩溃 | ✅ `e6e7666` |
-| I9 | P1 | run_ffmpeg stdout pipe 死锁 | ✅ `9288216` |
-| I10 | P1 | CLI 不加载 project.yaml 覆盖 | ✅ `60d765f` |
-| I11 | P1 | _TeeWriter.__getattr__ 暴露原始 stdout/stderr 的 close/writelines | ✅ `947a320` |
-| I12 | P1 | openai_compat 重试次数硬编码 | ✅ `ef2311d` + `ef68308` |
-| M1~M36 | P2 | Minor issues — 见 `docs/review/2026-06-16-feat-whisper-full-audit.md` | 🆕 |
+| C1 | P0 | POST /api/rerun path traversal — video_basename not validated | ✅ `41abe5b` |
+| C2 | P0 | Empty-state buttons don't refresh video list | ✅ `89614a4` |
+| C3 | P0 | playVideoSegment addEventListener leak | ✅ `bce09ce` |
+| C4 | P0 | OpenAI 4xx silently retried | ✅ `dba1cd9` |
+| C5 | P0 | YAML unknown fields → dataclass TypeError crash | ✅ `18ccee4` |
+| C6 | P0 | Provider HTTP connection leak | ✅ `71659aa` + `ef68308` |
+| I1 | P1 | Transcription edit onblur race condition | ✅ `fe511be` |
+| I2 | P1 | save() data reference race condition | ✅ `8d3b2f8` + `bebf21f` |
+| I3 | P1 | startRun double-click starts two pipelines | ✅ `1406e0e` |
+| I4 | P1 | Portal menu event listener leak | ✅ `08d815c` |
+| I5 | P1 | Range request doesn't support bytes=-N suffix | ✅ `d2591a9` |
+| I6 | P1 | POST /api/cut day_label path traversal | ✅ `b072240` |
+| I7 | P1 | Hardcoded G:/ffmpeg | ✅ `74c34f5` |
+| I8 | P1 | _resolve_original ValueError crash for stem without underscore | ✅ `e6e7666` |
+| I9 | P1 | run_ffmpeg stdout pipe deadlock | ✅ `9288216` |
+| I10 | P1 | CLI doesn't load project.yaml overrides | ✅ `60d765f` |
+| I11 | P1 | _TeeWriter.__getattr__ exposes original stdout/stderr's close/writelines | ✅ `947a320` |
+| I12 | P1 | openai_compat retry count hardcoded | ✅ `ef2311d` + `ef68308` |
+| M1~M36 | P2 | Minor issues — see `docs/review/2026-06-16-feat-whisper-full-audit.md` | 🆕 |
 
-### P0 — 立即修复
+### P0 — Immediate Fix
 
-| ID | 问题 | 修复思路 | 状态 |
+| ID | Issue | Fix Approach | Status |
 | --- | --- | --- | --- |
-| B-001 | Gemini Files API 上传视频后未清理，耗尽配额 | `try/finally` 确保视频上传后请求删除 | ✅ `a9996a9` |
-| B-002 | with_retry 重试时重复上传同一视频 | 把上传移出重试逻辑，上传不重试 | ✅ `a9996a9` |
-| B-003 | 临时文件残留（中断时 .tmp 文件未被自动清理） | 改用 `with` 语句或 `try/finally` 清理 | ✅ `0533051` |
-| B-012 | `_run()` 静默吞异常 — pipeline 失败 UI 无感知 | `except Exception: pass` → 写 progress.json error 状态 + 打印日志 | ✅ `9c73903` |
-| B-013 | `apply_run_paths` 直接修改入参 config 对象 | 返回新 config 或 `copy.deepcopy()` 再修改 | ✅ `9c73903` |
-| B-014 | `requirements.txt` 无版本号 — breaking change 风险 | `pip freeze` 锁版本，参考 R-009a | ✅ `requirements-locked.txt` |
-| B-021 | `cut.py:51` ffmpeg 用了 `-to` 语义上应为 `-t`（指定时长） | 改 `-to duration_sec` → `-t duration_sec` | ✅ `fix/B-021-cut-to-to-t` |
-| B-022 | `project_service.py:52` `_detect_steps` 中 `any(t.iterdir() for t in texts)` — iterdir() 生成器永远为 truthy，空目录也被判为 analyze 已完成 | 改成 `any(any(True for _ in t.iterdir()) for t in texts)` | ✅ `fix/B-022-detect-steps-empty-dir` |
-| B-023 | `routes/projects.py` 创建/写入 project.json 用 `write_text()` 绕过 `_save_atomic`，崩溃留损坏文件 | 改用 `_save_atomic` | ✅ `fix/B-023-project-json-atomic` |
-| B-053 | `sidebar.js:pollRerunStatus` `statusEl`/`fill`/`logsEl` 在早期 `return` 前未声明，触发 ReferenceError | 变量声明提升到 `return` 之前 | ✅ `c283bb9` |
-| B-061 | `config_routes.py` 全局 config 保存后 `_config_cache` 未失效，新配置无效直到重启 | 写盘后调 `_config_cache.clear()` | ✅ `e21373e` |
-| B-062 | `tasks/analyze.py` `glob("*.mp4")` 仅匹配 `.mp4`，丢失 `.mov`/`.m4v` 等视频格式 | 替换为 `VIDEO_EXTS` 过滤 | ✅ `51f50d7` |
+| B-001 | Gemini Files API uploads not cleaned up, exhausting quota | `try/finally` ensures video deletion is requested after upload | ✅ `a9996a9` |
+| B-002 | with_retry re-uploads the same video on retry | Move upload outside retry logic, do not retry upload | ✅ `a9996a9` |
+| B-003 | Temp file residue (.tmp files not auto-cleaned on interrupt) | Use `with` statement or `try/finally` for cleanup | ✅ `0533051` |
+| B-012 | `_run()` silently swallows exceptions — pipeline failure invisible to UI | `except Exception: pass` → write progress.json error status + log | ✅ `9c73903` |
+| B-013 | `apply_run_paths` directly modifies input config object | Return new config or `copy.deepcopy()` before modification | ✅ `9c73903` |
+| B-014 | `requirements.txt` no version numbers — breaking change risk | `pip freeze` lock versions, see R-009a | ✅ `requirements-locked.txt` |
+| B-021 | `cut.py:51` ffmpeg uses `-to` but should be `-t` (specify duration) | Change `-to duration_sec` → `-t duration_sec` | ✅ `fix/B-021-cut-to-to-t` |
+| B-022 | `project_service.py:52` `_detect_steps` uses `any(t.iterdir() for t in texts)` — iterdir() generator is always truthy, empty dirs marked as analyze complete | Change to `any(any(True for _ in t.iterdir()) for t in texts)` | ✅ `fix/B-022-detect-steps-empty-dir` |
+| B-023 | `routes/projects.py` creates/writes project.json with `write_text()` bypassing `_save_atomic`, crash leaves corrupted file | Use `_save_atomic` instead | ✅ `fix/B-023-project-json-atomic` |
+| B-053 | `sidebar.js:pollRerunStatus` `statusEl`/`fill`/`logsEl` used before declaration in early `return` path, triggering ReferenceError | Hoist variable declarations before `return` | ✅ `c283bb9` |
+| B-061 | `config_routes.py` global config save doesn't invalidate `_config_cache`, new config takes effect only after restart | Call `_config_cache.clear()` after writing to disk | ✅ `e21373e` |
+| B-062 | `tasks/analyze.py` `glob("*.mp4")` only matches `.mp4`, missing `.mov`/`.m4v` etc. | Replace with `VIDEO_EXTS` filtering | ✅ `51f50d7` |
 
-### P1 — 近期
+### P1 — Near-term
 
-| ID | 问题 | 修复思路 | 状态 |
+| ID | Issue | Fix Approach | Status |
 | --- | --- | --- | --- |
-| B-004 | ETA 估算偏低（成功项包含了失败项的时间） | 耗时统计移入 `finally` 块，只算成功项 | |
-| B-007 | venv 跨平台检测只认 Windows `Scripts/`，Linux 是 `bin/` | 同时兼容 `bin/` 和 `Scripts/` | |
-| B-015 | `project.yaml` 写入时只做了 YAML 格式校验，未跑 `_validate_config` | `do_PUT /api/config/raw?project=X` 写前做完整合并校验 | ✅ `9c73903` |
-| B-016 | `config.yaml` 里 `deepseek-v4-flash` 可能是无效模型名（AGENTS §8.4） | 确认实际可用模型名，更新 config 或加备注 | 🆕 |
-| B-024 | `cut.py:9` `parse_time_range` 不校验 end > start，AI 生成反向区间时 ffmpeg 静默出坏文件 | 解析后加 `if end <= start: raise ValueError(...)` | ✅ `fix/B-024-parse-time-range-validate` |
-| B-025 | `tasks/cut.py:80-82` 找不到视频时的报错信息里 source 标签取反 | 修复三目运算 | ✅ `fix/B-025-cut-source-label` |
-| B-026 | `tasks/plan.py:31` `int(raw_idx)` 无保护，文件名前缀非数字时抛未捕获 ValueError | 加 `try/except` 守卫跳过 | ✅ `fix/B-026-plan-int-raw-idx` |
-| B-027 | `prompts.py:38-70` `PLAN_PROMPT` 用 `str.format()` 拼接含 `{...}` 的 JSON | ⚠️ 经测试 `str.format()` 不会处理替换值中的花括号，非真实 crash | ❌ 不可复现 |
-| B-028 | `progress.py:42` `.with_suffix(".progress.tmp")` 生成 `.progress.progress.tmp` | 改用 `parent/name + ".tmp"` | ✅ `fix/B-028-progress-tmp-name` |
-| B-029 | `log.py:101-146` `_initialized` 无锁；`sys.stdout/stderr` 不可恢复 | 加锁 + 保存原始 stream + `teardown_logging()` | ✅ `fix/B-029-log-init-lock` |
-| B-030 | `pyproject.toml:3` `build-backend` 私有 API | 改用 `setuptools.build_meta:__legacy__` | ✅ `fix/B-030-pyproject-backend` |
-| B-031 | `server.py:107-109` `_config_cache` 多线程无锁 | 加 `_config_cache_lock` | ✅ `fix/B-031-config-cache-lock` |
-| B-038 | `server.py:393-395` Phase 1c 重构遗漏 `config_path` 类属性暴露 | 添加 `Handler.config_path = config_path` | ✅ `fix/B-031-config-path-exposure` |
-| B-054 | `routes/run.py` `_run_thread` check-and-set 未受锁保护，`handle_post_run_start` / `handle_post_rerun` 可并发启动两条流水线 | `handler.__class__._run_lock` 包裹读写 | ✅ `dc01300` |
-| B-055 | `server.py` `_config_cache.pop` 未加锁，并发 PUT config 时数据竞争导致缓存不一致 | 用 `_config_cache_lock` 包裹 `.pop()` | ✅ `93eb4f1` |
-| B-056 | `analyze.py:_resolve_original` 只识别 `.mp4`/`.mov`/`.mkv`/`.mts`/`.m2ts`，漏 `.m4v`/`.webm` | 补全扩展名列表 | ✅ `8608d14` |
-| B-057 | `server.py` 视频响应固定 `Content-Type: video/mp4`，`.mov`/`.webm` 等扩展名返回错误 MIME | 按实际文件扩展名选择 Content-Type | ✅ `18f7358` |
-| B-063 | `routes/videos.py` `segment_matches` 字段前端用到但后端从未返回 | 返回 `segment_matches` 数组 | ✅ `7f05ee4` |
-| B-064 | `analyze.py` `trip_context.md` 路径硬编码为包目录，多项目场景下定位错误 | 项目级优先查找 + 读缓存 | ✅ `fe57a7f` |
-| B-065 | `routes/config.py`+`routes/projects.py` 8 处 `hasattr(handler.server,...)` 防御代码 | 统一在 `make_handler` 绑定后直接访问 | ✅ `34c0d3b` |
-| B-066 | `server.py` `_config_cache` 无上限，长期运行内存泄漏 | LRU cap 20 条，超限淘汰最旧条目 | ✅ `e21373e` |
+| B-004 | ETA estimate too low (successful items include failed items' time) | Move timing to `finally` block, only count successes | |
+| B-007 | Cross-platform venv detection only recognizes Windows `Scripts/`, Linux uses `bin/` | Support both `bin/` and `Scripts/` | |
+| B-015 | `project.yaml` write only validates YAML format, no `_validate_config` | Run full merge validation before `do_PUT /api/config/raw?project=X` | ✅ `9c73903` |
+| B-016 | `deepseek-v4-flash` in `config.yaml` may be an invalid model name (AGENTS §8.4) | Confirm actual usable model name, update config or add note | 🆕 |
+| B-024 | `cut.py:9` `parse_time_range` doesn't validate end > start, AI-generated reverse intervals silently produce bad files with ffmpeg | Add `if end <= start: raise ValueError(...)` after parsing | ✅ `fix/B-024-parse-time-range-validate` |
+| B-025 | `tasks/cut.py:80-82` source label in error message when video not found is inverted | Fix ternary operation | ✅ `fix/B-025-cut-source-label` |
+| B-026 | `tasks/plan.py:31` `int(raw_idx)` without protection, uncaught ValueError when filename prefix is non-numeric | Add `try/except` guard to skip | ✅ `fix/B-026-plan-int-raw-idx` |
+| B-027 | `prompts.py:38-70` `PLAN_PROMPT` uses `str.format()` with JSON containing `{...}` | ⚠️ Tested: `str.format()` does not process curly braces in replacement values, not a real crash | ❌ Not reproducible |
+| B-028 | `progress.py:42` `.with_suffix(".progress.tmp")` generates `.progress.progress.tmp` | Use `parent/name + ".tmp"` | ✅ `fix/B-028-progress-tmp-name` |
+| B-029 | `log.py:101-146` `_initialized` without lock; `sys.stdout/stderr` unrecoverable | Add lock + save original stream + `teardown_logging()` | ✅ `fix/B-029-log-init-lock` |
+| B-030 | `pyproject.toml:3` `build-backend` private API | Use `setuptools.build_meta:__legacy__` | ✅ `fix/B-030-pyproject-backend` |
+| B-031 | `server.py:107-109` `_config_cache` multi-thread no lock | Add `_config_cache_lock` | ✅ `fix/B-031-config-cache-lock` |
+| B-038 | `server.py:393-395` Phase 1c refactor missed `config_path` class attribute exposure | Add `Handler.config_path = config_path` | ✅ `fix/B-031-config-path-exposure` |
+| B-054 | `routes/run.py` `_run_thread` check-and-set not protected by lock, `handle_post_run_start` / `handle_post_rerun` can start two pipelines concurrently | Wrap reads/writes with `handler.__class__._run_lock` | ✅ `dc01300` |
+| B-055 | `server.py` `_config_cache.pop` without lock, data race on concurrent PUT config causes cache inconsistency | Wrap `.pop()` with `_config_cache_lock` | ✅ `93eb4f1` |
+| B-056 | `analyze.py:_resolve_original` only recognizes `.mp4`/`.mov`/`.mkv`/`.mts`/`.m2ts`, missing `.m4v`/`.webm` | Complete extension list | ✅ `8608d14` |
+| B-057 | `server.py` video response hardcoded `Content-Type: video/mp4`, returns wrong MIME for `.mov`/`.webm` etc. | Choose Content-Type based on actual file extension | ✅ `18f7358` |
+| B-063 | `routes/videos.py` `segment_matches` field used by frontend but never returned by backend | Return `segment_matches` array | ✅ `7f05ee4` |
+| B-064 | `analyze.py` `trip_context.md` path hardcoded to package directory, wrong location in multi-project scenarios | Project-level priority lookup + cache | ✅ `fe57a7f` |
+| B-065 | `routes/config.py`+`routes/projects.py` 8 places with `hasattr(handler.server,...)` defensive code | Access directly after `make_handler` binding | ✅ `34c0d3b` |
+| B-066 | `server.py` `_config_cache` no upper bound, memory leak on long-running | LRU cap 20 entries, evict oldest on overflow | ✅ `e21373e` |
 
-### P2 — 中期
+### P2 — Mid-term
 
-| ID | 问题 | 修复思路 | 状态 |
+| ID | Issue | Fix Approach | Status |
 | --- | --- | --- | --- |
-| B-005 | Linux 下 `sorted(Path.iterdir())` 顺序不保证（glob 也不保证顺序） | 显式 `sorted()` 后再匹配 | ✅ `a276225` |
-| B-008 | 函数隐式修改入参（如 `analyze_video` 等修改传入的 dict 字段） | 入参 `deepcopy()` 避免副作用 | |
-| B-017 | `_find_texts_dirs` 匹配 `texts*` 太宽 — `texts_backup` 也会匹配 | 用更精确的 glob 或加排除规则 | ✅ `a276225` |
-| B-018 | `_config_cache` 只增不减（仅在 PUT config 时 pop） | 项目列表刷新时清理失效缓存 | ✅ `a276225` |
-| B-032 | `tasks/label.py:29-31` glob 时 idx 可能是整数 1 而非 `"001"`，导致文件匹配失败跳过处理 | `format_index(int(idx), config.naming.index_width)` 统一格式化后再 glob | ✅ |
-| B-033 | `tasks/analyze.py:96` 批量 AI 分析失败直接中断整个批次；`run_refine_texts` 有 try/except/continue 容错而此处没有，行为不一致 | 给 `analyze_video()` 调用加 `try/except` + `continue`，记录失败继续下一个 | ✅ |
-| B-034 | `routes/run.py` rerun 进度文件路径从 `cfg.paths.output_dir` 取，但 `GET /api/run/status` 从 `_project_output_dir()` 取，两个 output_dir 可能不一致导致前端轮询读不到进度 | 统一用 `proj_out`（来自 `_project_output_dir`） | ✅ |
-| B-035 | `sidebar.js:448` `pollRerunStatus` 在 `idle/running` 状态提前 return 无超时兜底，任务失败时进度 overlay 永久卡死 | 加 polling 超时（120s）+ 10s idle 检测 + `_rerunPollError()` | ✅ |
-| B-036 | `compress.py:33-34` 目标码率 `8 * 1024 * 1024 * target_size_mb / duration * 0.92` 未扣音频流，有音频时输出文件超过 `target_size_mb` | `target_bits` 先扣 128kbps 音频估计值 | ✅ |
-| B-037 | `utils.py:139-140` `get_duration_sec` 不处理 ffprobe 输出 `"N/A"`，某些视频格式下 ValueError 无上下文 | 加 `try/except`，报错时附上文件路径 | ✅ |
-| B-039 | `openai_compat.py:28` `httpx.Client` 在 `__init__` 创建后无 `close()`，长服务连接泄漏 | 添加 `close()` 方法 | ✅ |
-| B-040 | `config.py:119` `_path()` 值为空时静默返回 `.`，忘记配置路径时对当前目录执行读写 | 值为空时 raise `ValueError` | ✅ |
-| B-041 | `file_service.py:46` `_save_atomic` 的 `.tmp` 文件名固定，多线程下两请求同时写同一文件互相覆盖 | 加 `os.urandom(4).hex()` 随机后缀 | ✅ |
-| B-058 | `file_service.py:_save_atomic` 跳过已有 `.bak` 不覆盖，旧 `.bak` 与最新内容不符，多次保存后 `.bak` 反映的是最早版本 | 改为每次保存都覆盖 `.bak` | ✅ `7868a95` |
-| B-067 | `tasks/analyze.py:43` lazy `import re` 在热路径中 | 移到文件顶部 | ✅ `51f50d7` |
-| B-068 | `split.py` `-c copy` 按时间切割，非关键帧处片段开头有黑帧，AI 可能误判 | 文档说明；或提供 `--reencode-split` 选项 | 🆕 |
-| B-069 | `progress.py` tmp 文件名固定，多进程下可能冲突 | 改用 `os.urandom(4).hex()` 随机后缀 | ✅ `ea2e79c` |
-| B-070 | `pipeline.py` 未知 step 名导致 `NoneType` 调用崩溃 | 循环前验证 step 名并提前 `raise ValueError` | ✅ `34846df` |
-| B-071 | `server.py` Range 请求 `length=0`（`start=size-1` 时）未保护 | 加 `length <= 0` 边界检查 | ✅ `e21373e` |
+| B-005 | Linux `sorted(Path.iterdir())` order not guaranteed (glob also not ordered) | Explicit `sorted()` before matching | ✅ `a276225` |
+| B-008 | Functions silently modify input parameters (e.g., `analyze_video` modifies passed dict fields) | `deepcopy()` input params to avoid side effects | |
+| B-017 | `_find_texts_dirs` matches `texts*` too broadly — `texts_backup` also matches | Use more precise glob or add exclusion rule | ✅ `a276225` |
+| B-018 | `_config_cache` only grows (only pops on PUT config) | Clean stale cache on project list refresh | ✅ `a276225` |
+| B-032 | `tasks/label.py:29-31` glob idx may be integer 1 instead of `"001"`, causing file match failure and skipped processing | `format_index(int(idx), config.naming.index_width)` consistent formatting before glob | ✅ |
+| B-033 | `tasks/analyze.py:96` batch AI analysis failure immediately aborts entire batch; `run_refine_texts` has try/except/continue tolerance but this doesn't — inconsistent behavior | Add `try/except` + `continue` to `analyze_video()` calls, log failure and continue | ✅ |
+| B-034 | `routes/run.py` rerun progress file path taken from `cfg.paths.output_dir`, but `GET /api/run/status` takes from `_project_output_dir()` — two output_dirs may differ causing frontend poll to miss progress | Unify with `proj_out` (from `_project_output_dir`) | ✅ |
+| B-035 | `sidebar.js:448` `pollRerunStatus` early returns on `idle/running` state without timeout safety net, progress overlay permanently stuck when task fails | Add polling timeout (120s) + 10s idle detection + `_rerunPollError()` | ✅ |
+| B-036 | `compress.py:33-34` target bitrate `8 * 1024 * 1024 * target_size_mb / duration * 0.92` doesn't subtract audio stream, output file exceeds `target_size_mb` when audio present | Subtract 128kbps audio estimate from `target_bits` | ✅ |
+| B-037 | `utils.py:139-140` `get_duration_sec` doesn't handle ffprobe output `"N/A"`, ValueError without context on certain video formats | Add `try/except`, attach file path on error | ✅ |
+| B-039 | `openai_compat.py:28` `httpx.Client` created in `__init__` without `close()`, connection leak on long service | Add `close()` method | ✅ |
+| B-040 | `config.py:119` `_path()` silently returns `.` when value is empty, reads/writes current directory on missing config path | Raise `ValueError` when empty | ✅ |
+| B-041 | `file_service.py:46` `_save_atomic` uses fixed `.tmp` filename, two concurrent requests writing same file overwrite each other | Add `os.urandom(4).hex()` random suffix | ✅ |
+| B-058 | `file_service.py:_save_atomic` skips existing `.bak` without overwriting, old `.bak` doesn't match latest content, after multiple saves `.bak` reflects earliest version | Overwrite `.bak` on every save | ✅ `7868a95` |
+| B-067 | `tasks/analyze.py:43` lazy `import re` in hot path | Move to top of file | ✅ `51f50d7` |
+| B-068 | `split.py` `-c copy` cuts by time, non-keyframe segment start has black frames, AI may misjudge | Document this; or provide `--reencode-split` option | 🆕 |
+| B-069 | `progress.py` tmp filename fixed, may conflict across processes | Use `os.urandom(4).hex()` random suffix | ✅ `ea2e79c` |
+| B-070 | `pipeline.py` unknown step name causes `NoneType` crash | Validate step names before loop and `raise ValueError` early | ✅ `34846df` |
+| B-071 | `server.py` Range request `length=0` (when `start=size-1`) unprotected | Add `length <= 0` boundary check | ✅ `e21373e` |
 
-### P3 — 长期
+### P3 — Long-term
 
-| ID | 问题 | 修复思路 | 状态 |
+| ID | Issue | Fix Approach | Status |
 | --- | --- | --- | --- |
-| B-042 | `gemini.py:41` `_wait_for_file` 无超时，文件处理卡住时永久阻塞 | 加 `timeout` 参数与 `time.monotonic()` 超时检查 | ✅ `a276225` |
-| B-043 | `.githooks/pre-commit:21` `git add` 会误 stage 用户未打算提交的工作区修改 | 只 stage ruff 格式化的文件：`$RUFF format . && git diff --name-only --diff-filter=M` 前检查是否是 ruff 改的 | 🆕 |
-| B-044 | `_helpers.py:51` `_eta_line` `completed=0` 时固定显示 `1/total`，实际可能是第 3、4 条 | 用 `i` 替换硬编码的 `1` | ✅ `a276225` |
-| B-045 | `sidebar.js:177` 视频列表每次渲染都在 `document` 上堆积 `{ once: true }` click 监听器，关闭 dropdown 逻辑失效 | 改用事件委托 + 持久 handler，或渲染前 `removeEventListener` | ✅ `a276225` |
-| B-059 | `_parse_providers` 未读取 `requests_per_minute` 与 `retry_attempts` 从 YAML | `cfg.get("requests_per_minute", 0)` + `retry_attempts` 默认值统一为 2 | ✅ `a276225` |
-| B-060 | 原视频视图下 split 段 index 丢失 — 每个原文件只取 `comp[0]`，plan 引用 `002`/`003` 时找不到对应条目报 404 | 遍历 `comp` 所有匹配，每个 split 段创建独立 video entry | ✅ `c59880d` |
-| B-072 | `tasks/compress.py` 损坏的 `.mp4` 会被 `skip_existing` 永久跳过不重试 | 加文件完整性校验或 fallback 重试 | 🆕 |
-| B-073 | `routes/videos.py` `_parse_segment_info` 只识别 `001_GL010683_seg01` 格式 | 放宽命名格式假设，支持用户自定义命名 | 🆕 |
-| B-074 | `analyze.py:_wrap_with_context` 每次 AI 调用都读 `trip_context.md` 磁盘 | 模块级 `_trip_context_cache` 缓存 | ✅ `fe57a7f` |
-| B-075 | `ui/server.py` Range 请求不支持 suffix `bytes=-N` | 空 start + 非空 end → suffix 计算 | ✅ `d2591a9` |
-| B-076 | `utils/discover_ffmpeg_bin` 硬编码 `G:/ffmpeg` | 移除，改为 `FFMPEG_HOME` 环境变量 | ✅ `74c34f5` |
-| B-077 | `tasks/analyze.py` `_resolve_original` 无 `_` stem 时 ValueError | 前置 `if "_" not in stem:` 检查 | ✅ `e6e7666` |
-| B-078 | `main.py` 不传 `project_dir` 给 `load_config`，project.yaml 被忽略 | 从 `-i` 目录或 cwd 推断 `project_dir` | ✅ `60d765f` |
-| B-079 | `log.py` `_TeeWriter.__getattr__` 透传 `close`/`writelines`/`truncate` | 拦截并 raise AttributeError | ✅ `947a320` |
-| B-080 | `openai_compat.py` 硬编码 `attempts=3` 忽略配置的 `retry_attempts` | 从 `cfg.retry_attempts` 读取 + `+1` 转换 | ✅ `ef2311d` |
-| B-081 | `gemini.py` `retry_attempts` 与 openai_compat 语义不一致（缺 `+1`） | 对齐为 `max(1, cfg.retry_attempts + 1)` | ✅ `ef68308` |
-| B-082 | `ai/factory.py` provider 缓存线程不安全 + 无测试清理机制 | 加锁 + `_clear_provider_cache()` + autouse fixture | ✅ `ef68308` |
-| B-083 | `ui/routes/run.py` `obj.get("index")` 未消毒用作 glob 模式 | `re.sub(r"[^a-zA-Z0-9_-]", "")` 过滤 | ✅ `bebf21f` |
-| B-084 | `ui/static/src/editor.js` `save()` 内部的数据引用未捕获 | 捕获 `planData/textsData/voiceoverData/configRaw` | ✅ `bebf21f` |
-| B-085 | `ui/static/src/editor.js` 转录编辑 onblur 从 `state.currentVideo` 读而非双击时捕获 | `origV` 在 dblclick 时捕获 | ✅ `fe511be` |
+| B-042 | `gemini.py:41` `_wait_for_file` no timeout, permanently blocks when file processing hangs | Add `timeout` parameter with `time.monotonic()` check | ✅ `a276225` |
+| B-043 | `.githooks/pre-commit:21` `git add` may stage workspace changes user didn't intend to commit | Only stage ruff-formatted files: check if ruff changed them before `git add` | 🆕 |
+| B-044 | `_helpers.py:51` `_eta_line` always shows `1/total` when `completed=0`, but actual progress may be 3rd, 4th entry | Use `i` instead of hardcoded `1` | ✅ `a276225` |
+| B-045 | `sidebar.js:177` video list rendering piles up `{ once: true }` click listeners on `document`, close dropdown logic fails | Use event delegation + persistent handler, or `removeEventListener` before rendering | ✅ `a276225` |
+| B-059 | `_parse_providers` doesn't read `requests_per_minute` and `retry_attempts` from YAML | `cfg.get("requests_per_minute", 0)` + `retry_attempts` default unified to 2 | ✅ `a276225` |
+| B-060 | Original video view split segment index lost — each original file only uses `comp[0]`, plan referencing `002`/`003` returns 404 | Iterate all matches in `comp`, create independent video entries for each split segment | ✅ `c59880d` |
+| B-072 | `tasks/compress.py` corrupted `.mp4` permanently skipped by `skip_existing` without retry | Add file integrity check or fallback retry | 🆕 |
+| B-073 | `routes/videos.py` `_parse_segment_info` only recognizes `001_GL010683_seg01` format | Relax naming convention assumptions, support custom naming | 🆕 |
+| B-074 | `analyze.py:_wrap_with_context` reads `trip_context.md` from disk on every AI call | Module-level `_trip_context_cache` | ✅ `fe57a7f` |
+| B-075 | `ui/server.py` Range request doesn't support suffix `bytes=-N` | Empty start + non-empty end → suffix calculation | ✅ `d2591a9` |
+| B-076 | `utils/discover_ffmpeg_bin` hardcoded `G:/ffmpeg` | Remove, use `FFMPEG_HOME` env var instead | ✅ `74c34f5` |
+| B-077 | `tasks/analyze.py` `_resolve_original` ValueError on stem without `_` | Add `if "_" not in stem:` guard | ✅ `e6e7666` |
+| B-078 | `main.py` doesn't pass `project_dir` to `load_config`, project.yaml ignored | Infer `project_dir` from `-i` directory or cwd | ✅ `60d765f` |
+| B-079 | `log.py` `_TeeWriter.__getattr__` passes through `close`/`writelines`/`truncate` | Intercept and raise AttributeError | ✅ `947a320` |
+| B-080 | `openai_compat.py` hardcoded `attempts=3` ignores configured `retry_attempts` | Read from `cfg.retry_attempts` + `+1` conversion | ✅ `ef2311d` |
+| B-081 | `gemini.py` `retry_attempts` semantics inconsistent with openai_compat (missing `+1`) | Align to `max(1, cfg.retry_attempts + 1)` | ✅ `ef68308` |
+| B-082 | `ai/factory.py` provider cache not thread-safe + no test cleanup mechanism | Add lock + `_clear_provider_cache()` + autouse fixture | ✅ `ef68308` |
+| B-083 | `ui/routes/run.py` `obj.get("index")` unsanitized used as glob pattern | `re.sub(r"[^a-zA-Z0-9_-]", "")` filter | ✅ `bebf21f` |
+| B-084 | `ui/static/src/editor.js` `save()` data references not captured at call site | Capture `planData/textsData/voiceoverData/configRaw` | ✅ `bebf21f` |
+| B-085 | `ui/static/src/editor.js` transcript edit onblur reads from `state.currentVideo` instead of captured value at dblclick | Capture `origV` at dblclick time | ✅ `fe511be` |
 
-## ~~测试覆盖盲区~~ ✅ 全部修复（163 新测试，2026-06-13）
+## ~~Test Coverage Gaps~~ ✅ All Fixed (163 New Tests, 2026-06-13)
 
-所有 B-046~B-052 已被 163 个新增测试覆盖：
+All B-046~B-052 covered by 163 new tests:
 
-| ID | 优先级 | 原问题 | 修复 |
+| ID | Priority | Original Issue | Fix |
 | --- | --- | --- | --- |
-| B-046 | 高 | `with_retry` 无测试 | `test_utils.py::TestWithRetry`（5 测试） |
-| B-047 | 高 | `cut_one` 无测试 | `test_cut.py::TestCutOne`（3 测试） |
-| B-048 | 高 | `_TeeWriter` / `setup_logging` 无测试 | `test_log.py::TestTeeWriter` + `TestSetupLogging`（8 测试） |
-| B-049 | 中 | `ProgressTracker.log()` 无测试 | `test_progress.py::test_log_appends` / `test_log_truncates_at_100` |
-| B-050 | 中 | `resolve_binary` 无测试 | `test_utils.py::TestResolveBinary`（3 测试） |
-| B-051 | 中 | ETA 测试依赖 sleep | 已改用 `mock.patch("time.monotonic")` 注入时间 |
-| B-052 | 中 | ETA 断言未验证 None | 已改为 `assert data.get("eta_sec") is None` |
-| B-009 | AI 偶尔输出非纯 JSON，`extract_json` 解析失败 | 更精准提取合法 JSON（递归剥离 markdown） | |
-| B-011 | 新用户 `python main.py check` 误判失败（提示不够友好） | 优化 check 步骤提示信息 | |
-| B-010 | （待进一步确认） | — | |
-| B-019 | `VIDEO_EXTS` 重复定义（utils.py 含 .avi/.mkv，server.py 没有） | 移到 `vlog_tool/_constants.py` 统一引用 | 🆕 |
-| B-020 | `_write_csv` 中 `format_index(rec.index, 3)` 硬编码 `3` 而非使用 config | 改用 `config.naming.index_width` | 🆕 |
+| B-046 | High | `with_retry` no tests | `test_utils.py::TestWithRetry` (5 tests) |
+| B-047 | High | `cut_one` no tests | `test_cut.py::TestCutOne` (3 tests) |
+| B-048 | High | `_TeeWriter` / `setup_logging` no tests | `test_log.py::TestTeeWriter` + `TestSetupLogging` (8 tests) |
+| B-049 | Medium | `ProgressTracker.log()` no tests | `test_progress.py::test_log_appends` / `test_log_truncates_at_100` |
+| B-050 | Medium | `resolve_binary` no tests | `test_utils.py::TestResolveBinary` (3 tests) |
+| B-051 | Medium | ETA tests depend on sleep | Changed to use `mock.patch("time.monotonic")` to inject time |
+| B-052 | Medium | ETA assertion doesn't verify None | Changed to `assert data.get("eta_sec") is None` |
+| B-009 | AI occasionally outputs non-pure JSON, `extract_json` parsing fails | More precise extraction of valid JSON (recursive markdown stripping) | |
+| B-011 | New users `python main.py check` false failure (unfriendly messages) | Optimize check step messages | |
+| B-010 | (Pending further confirmation) | — | |
+| B-019 | `VIDEO_EXTS` duplicate definition (utils.py includes .avi/.mkv, server.py does not) | Move to `vlog_tool/_constants.py` for unified reference | 🆕 |
+| B-020 | `_write_csv` `format_index(rec.index, 3)` hardcoded `3` instead of using config | Use `config.naming.index_width` instead | 🆕 |
 
-## 性能优化
+## Performance Optimizations
 
-| ID | 瓶颈 | 优化方案 | 优先级 |
+| ID | Bottleneck | Optimization Plan | Priority |
 | --- | --- | --- | --- |
-| P-001 | `pipeline.py` 中视频压缩与 AI 分析串行执行，耗时久 | `ThreadPoolExecutor` 并行执行压缩 + AI 分析 | P2 |
-| P-002 | 重复调用 ffprobe 读取同一视频的 `duration_sec` / `size_mb` | 缓存已读取信息，复用结果 | P3 |
-| P-003 | `GET /api/videos` 每次遍历目录 I/O 开销大 | 加目录 mtime 缓存，复用未变更的扫描结果 | P3 |
+| P-001 | `pipeline.py` video compression and AI analysis run serially, time-consuming | `ThreadPoolExecutor` to parallelize compression + AI analysis | P2 |
+| P-002 | Repeated ffprobe calls to read same video's `duration_sec` / `size_mb` | Cache already-read info, reuse results | P3 |
+| P-003 | `GET /api/videos` iterates directory every time, high I/O cost | Add directory mtime cache, reuse unchanged scan results | P3 |
 
-## 已完成（最近，按时间倒序）
+## Completed (Recent, Reverse Chronological)
 
-| Commit | 简述 |
+| Commit | Description |
 | --- | --- |
 | `fe45f53` | fix: lint F541 f-string and UT assertion after empty-state changes |
 | `c1584df` | fix(ui): move all event handlers before try block so they work in empty state |
@@ -558,7 +542,7 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | `eb93573` | fix(analyze): clean up stale existing files on source_file mismatch (P2-6) |
 | `097a6ff` | fix(split): clean up partial segments + atomic manifest (P2-2) |
 | `123c84f` | fix(tasks): use atomic writes for scripts/refine output (P0-3) |
-| `3ce9ef3` | fix(prompts): TRANSCRIPT_CONTEXT 英文→中文 (Q-6) |
+| `3ce9ef3` | fix(prompts): TRANSCRIPT_CONTEXT English→Chinese (Q-6) |
 | `cdcc873` | fix(ai): include file mtime in trip_context_cache key (P2-3) |
 | `6d23de3` | fix(transcribe): use find_videos for recursive scanning (P2-5) |
 | `78a0b69` | fix(compress): raise MIN_VALID_SIZE 256→50KB (P2-7) |
@@ -642,9 +626,9 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | `f9edede` | test(tasks): tests for _helpers.py + _resolve_original |
 | `7e7e138` | test(file_service): 60 tests — basename/segment/atomic/config coercion |
 | `c197496` | test(ai): 12 tests — factory dispatch + provider instantiation |
-| `2f3c86c` | feat(ui): segment group tree in sidebar (方案B frontend) |
-| `0ab6960` | feat(ui): group_key/segment_label/groups in /api/videos (方案B backend) |
-| `539b587` | feat(ui): _segNN matching for compressed-original lookup (方案A) |
+| `2f3c86c` | feat(ui): segment group tree in sidebar (Plan B frontend) |
+| `0ab6960` | feat(ui): group_key/segment_label/groups in /api/videos (Plan B backend) |
+| `539b587` | feat(ui): _segNN matching for compressed-original lookup (Plan A) |
 | `fe2134a` | feat(ai): retry Gemini ClientError 429 with should_retry callback |
 | `9d69a44` | feat(split): video splitting + long-video duration gate |
 | `31c972d` | fix: enable compress step in pipeline runner |
@@ -662,11 +646,11 @@ plan 是项目级产物，texts/voiceover 是视频级产物。提前把 sidebar
 | `29bcb35` | feat(ui): pipeline runner with progress tracking (R-005) |
 | `a3d2fe0` | feat(ui): multi-project switching with create (R-007) |
 | `9c73903` | fix: P0 bugs B-012/B-013/B-015 + lock dependency versions |
-| `a93b5f5` | R-004 UI 配置编辑（后端 raw config API / 递归嵌套表单 / 校验 + .bak 保存 / 文档） |
-| `6706dc3`..`2ad23f5` | R-002 CLI + UI 裁剪（cut.py + POST /api/cut + cut tab + manifest.md） |
-| `0d52cf6`..`439911c` | 本地 Web UI（backend / CLI / frontend / docs / plan-seek fix） |
-| `88679ee`..`ec83f48` | R-001 UI 源切换（后端双 source / 顶部 toggle + match 角标） |
-| `a648e60`..`778c44a` | R-006 sidebar 分层（HTML+CSS / JS state machine / README 布局图） |
+| `a93b5f5` | R-004 UI config editing (backend raw config API / recursive nested form / validation + .bak save / docs) |
+| `6706dc3`..`2ad23f5` | R-002 CLI + UI cut (cut.py + POST /api/cut + cut tab + manifest.md) |
+| `0d52cf6`..`439911c` | Local Web UI (backend / CLI / frontend / docs / plan-seek fix) |
+| `88679ee`..`ec83f48` | R-001 UI source toggle (backend dual source / top toggle + match badge) |
+| `a648e60`..`778c44a` | R-006 sidebar hierarchy (HTML+CSS / JS state machine / README layout diagram) |
 | `d6d62ef` | feat(config): per-project configuration via project.yaml |
 | `a9996a9` | fix(ai): clean up Gemini File API uploads + retry (B-001, B-002) |
 | `25128d1` | feat(ai): retry transient API failures with exponential backoff |
