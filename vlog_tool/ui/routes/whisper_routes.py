@@ -519,7 +519,7 @@ def handle_put_whisper_model(handler, qs: dict, obj: dict) -> None:
     import yaml
 
     if proj_yaml.is_file():
-        with open(proj_yaml, "r", encoding="utf-8") as f:
+        with open(proj_yaml, encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
         raw.setdefault("whisper", {})["model_size"] = model_name
         suffix = os.urandom(4).hex()
