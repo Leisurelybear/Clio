@@ -415,7 +415,10 @@ async function _loadModelMgmt() {
     html += '<span id="model-dl-msg"></span><span id="model-dl-speed"></span></div>';
     html += '<div style="background:#333;border-radius:3px;height:6px;overflow:hidden">';
     html += '<div id="model-dl-bar" style="background:#4a9eff;border-radius:3px;height:100%;width:0%"></div></div>';
-    html += '<p id="model-dl-eta" class="muted" style="font-size:var(--text-xs);margin:2px 0 0"></p>';
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">';
+    html += '<p id="model-dl-eta" class="muted" style="font-size:var(--text-xs);margin:0"></p>';
+    html += '<button id="btn-cancel-dl" style="background:none;border:1px solid var(--err,#c44);color:var(--err,#c44);padding:2px 10px;border-radius:3px;cursor:pointer;font-size:var(--text-xs);display:none">取消下载</button>';
+    html += '</div>';
     html += '</div>';
 
     container.innerHTML = html;
@@ -453,6 +456,8 @@ async function _loadModelMgmt() {
         dlBtn.textContent = '启动下载...';
         const prog = $('model-dl-progress');
         if (prog) prog.style.display = 'block';
+        const cancelBtn = $('btn-cancel-dl');
+        if (cancelBtn) cancelBtn.style.display = '';
         try {
           const r = await api('POST', '/api/whisper/install', {});
           if (!r.ok) throw new Error(r.error || '启动失败');
@@ -466,6 +471,21 @@ async function _loadModelMgmt() {
           const progMsg = $('model-dl-msg');
           if (progMsg) progMsg.textContent = '启动失败: ' + e.message;
         }
+      };
+    }
+
+    const cancelBtn = $('btn-cancel-dl');
+    if (cancelBtn) {
+      cancelBtn.onclick = async () => {
+        try {
+          await api('POST', '/api/whisper/install/cancel', {});
+        } catch { /* ignore */ }
+        if (_installPollTimer) { clearInterval(_installPollTimer); _installPollTimer = null; }
+        const prog = $('model-dl-progress');
+        if (prog) prog.style.display = 'none';
+        cancelBtn.style.display = 'none';
+        const dlBtn = $('btn-model-download');
+        if (dlBtn) { dlBtn.disabled = false; dlBtn.innerHTML = `${icon('download', 14)} 下载模型`; }
       };
     }
 
@@ -493,6 +513,8 @@ async function _loadModelMgmt() {
       if (st.running || st.status === 'downloading') {
         const prog = $('model-dl-progress');
         if (prog) prog.style.display = 'block';
+        const cancelBtn = $('btn-cancel-dl');
+        if (cancelBtn) cancelBtn.style.display = '';
         const dlBtn = $('btn-model-download');
         if (dlBtn) { dlBtn.disabled = true; dlBtn.textContent = '下载中...'; }
         if (_installPollTimer) clearInterval(_installPollTimer);
@@ -514,11 +536,14 @@ async function _pollModelDl() {
     const speed = $('model-dl-speed');
     const eta = $('model-dl-eta');
     const dlBtn = $('btn-model-download');
+    const cancelBtn = $('btn-cancel-dl');
     if (!s.running && s.status === 'idle') {
       if (_installPollTimer) { clearInterval(_installPollTimer); _installPollTimer = null; }
+      if (cancelBtn) cancelBtn.style.display = 'none';
       return;
     }
     if (s.status === 'downloading') {
+      if (cancelBtn) cancelBtn.style.display = '';
       if (bar) bar.style.width = (s.progress_pct || 0) + '%';
       if (msg) msg.textContent = s.message || '下载中...';
       if (speed && s.speed) speed.textContent = s.speed;
@@ -531,6 +556,7 @@ async function _pollModelDl() {
       }
     } else if (s.status === 'done') {
       if (_installPollTimer) { clearInterval(_installPollTimer); _installPollTimer = null; }
+      if (cancelBtn) cancelBtn.style.display = 'none';
       if (bar) bar.style.width = '100%';
       if (msg) msg.textContent = '✔ 下载完成';
       if (eta) eta.textContent = '';
@@ -539,6 +565,7 @@ async function _pollModelDl() {
       retryTranscribe();
     } else if (s.status === 'error') {
       if (_installPollTimer) { clearInterval(_installPollTimer); _installPollTimer = null; }
+      if (cancelBtn) cancelBtn.style.display = 'none';
       if (dlBtn) { dlBtn.disabled = false; dlBtn.innerHTML = `${icon('download', 14)} 重试下载`; }
       if (msg) msg.textContent = s.message || '下载失败';
     }

@@ -51,6 +51,7 @@ def handle_get_whisper_check(handler) -> None:
 
 _INSTALL_LOCK = threading.Lock()
 _INSTALL_THREAD: threading.Thread | None = None
+_INSTALL_CANCEL = threading.Event()
 
 
 def _install_progress_path(handler) -> Path:
@@ -113,6 +114,26 @@ def handle_post_whisper_install(handler) -> None:
         _INSTALL_THREAD.start()
 
     handler._send_json({"ok": True, "message": "whisper install started"})
+
+
+def handle_post_whisper_install_cancel(handler) -> None:
+    """POST /api/whisper/install/cancel — cancel ongoing download."""
+    global _INSTALL_CANCEL
+    _INSTALL_CANCEL.set()
+    # Clean up partial progress state
+    path = _install_progress_path(handler)
+    if path.is_file():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if data.get("status") == "downloading":
+                # Mark as cancelled so frontend shows correct state
+                _write_install_progress(
+                    path,
+                    {"status": "idle", "progress_pct": 0, "message": "下载已取消"},
+                )
+        except (json.JSONDecodeError, OSError):
+            pass
+    handler._send_json({"ok": True, "message": "cancel requested"})
 
 
 _KNOWN_MODEL_SIZES: dict[str, int] = {
@@ -260,12 +281,26 @@ def _run_install(handler, progress_path: Path) -> None:
 
     import threading as _threading
 
+    _INSTALL_CANCEL.clear()
     t = _threading.Thread(target=_dl_thread, daemon=True)
     t.start()
 
     start = time.monotonic()
     last_pct = 0
     while t.is_alive():
+        if _INSTALL_CANCEL.is_set():
+            # Clean up partial files
+            partial = _find_model_file(cache_dir, model_name)
+            if partial:
+                try:
+                    partial.unlink(missing_ok=True)
+                except OSError:
+                    pass
+            _write_install_progress(
+                progress_path,
+                {"status": "idle", "progress_pct": 0, "message": "下载已取消"},
+            )
+            return
         t.join(timeout=1.0)
         elapsed = time.monotonic() - start
         candidate = _find_model_file(cache_dir, model_name) if cache_dir.is_dir() else None

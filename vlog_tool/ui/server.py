@@ -69,6 +69,7 @@ from vlog_tool.ui.routes.whisper_routes import (
     handle_get_whisper_install_status,
     handle_get_whisper_models,
     handle_post_whisper_install,
+    handle_post_whisper_install_cancel,
     handle_post_whisper_model_delete,
     handle_put_whisper_model,
 )
@@ -495,6 +496,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_post_rerun(self, qs, obj)
             if path == "/api/whisper/install":
                 return handle_post_whisper_install(self)
+            if path == "/api/whisper/install/cancel":
+                return handle_post_whisper_install_cancel(self)
             if path == "/api/whisper/models/delete":
                 return handle_post_whisper_model_delete(self, qs, obj)
             if path == "/api/logs/clear":
