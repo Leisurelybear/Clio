@@ -197,9 +197,23 @@ class TestHandleGetWhisperInstallStatus:
         handler = MagicMock()
         handler._get_project_output.return_value = tmp_path
         handler._send_json = MagicMock()
-        handle_get_whisper_install_status(handler)
+        alive = MagicMock()
+        alive.is_alive.return_value = True
+        with patch("vlog_tool.ui.routes.whisper_routes._INSTALL_THREAD", alive):
+            handle_get_whisper_install_status(handler)
         args = handler._send_json.call_args
         assert args[0][0]["progress_pct"] == 42
+
+    def test_detects_stale_download(self, tmp_path: Path):
+        progress = tmp_path / ".whisper_install.json"
+        progress.write_text(json.dumps({"status": "downloading", "progress_pct": 42}), encoding="utf-8")
+        handler = MagicMock()
+        handler._get_project_output.return_value = tmp_path
+        handler._send_json = MagicMock()
+        handle_get_whisper_install_status(handler)
+        args = handler._send_json.call_args
+        assert args[0][0]["status"] == "idle"
+        assert "中断" in args[0][0]["message"]
 
     def test_shows_done(self, tmp_path: Path):
         progress = tmp_path / ".whisper_install.json"

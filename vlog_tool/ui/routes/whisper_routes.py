@@ -80,6 +80,9 @@ def handle_get_whisper_install_status(handler) -> None:
         data = {"status": "idle"}
     with _INSTALL_LOCK:
         running = _INSTALL_THREAD is not None and _INSTALL_THREAD.is_alive()
+    # Detect stale "downloading" state (process killed mid-download)
+    if data.get("status") in ("downloading",) and not running:
+        data = {"status": "idle", "message": "上次下载中断，可重新开始"}
     data["running"] = running
     handler._send_json(data)
 
