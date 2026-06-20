@@ -27,6 +27,26 @@ class RateLimiter:
             self._next_at = time.monotonic() + self._interval
             self._logged = False
 
+    def acquire(self) -> float:
+        """非阻塞获取限流许可。
+
+        快速返回（不 sleep），由调用方在锁外 sleep。
+        适合多线程场景：锁只持有很短时间用于计算等待时长。
+        """
+        wait = 0.0
+        with self._lock:
+            now = time.monotonic()
+            if now < self._next_at:
+                wait = self._next_at - now
+                if not self._logged:
+                    print(f"  [限流] 等待 {wait:.1f}s（每 {self._interval:.1f}s 一次）")
+                    self._logged = True
+                self._next_at += self._interval
+            else:
+                self._next_at = now + self._interval
+                self._logged = False
+        return wait
+
     def __exit__(self, *exc_info) -> None:
         pass
 

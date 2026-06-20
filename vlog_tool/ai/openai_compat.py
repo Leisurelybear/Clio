@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextlib import nullcontext
+import time
 
 import httpx
 
@@ -36,24 +36,28 @@ class OpenAICompatProvider:
     def close(self) -> None:
         self._client.close()
 
-    def generate_text(self, prompt: str, model: str) -> str:
-        rl_ctx = self._rl or nullcontext()
+    def _maybe_wait(self) -> None:
+        if self._rl is not None:
+            wait = self._rl.acquire()
+            if wait:
+                time.sleep(wait)
 
+    def generate_text(self, prompt: str, model: str) -> str:
         def _do() -> str:
-            with rl_ctx:
-                response = self._client.post(
-                    f"{self._base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": model,
-                        "messages": [{"role": "user", "content": prompt}],
-                        "max_tokens": self._max_tokens,
-                        "temperature": 0.3,
-                    },
-                )
+            self._maybe_wait()
+            response = self._client.post(
+                f"{self._base_url}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {self._api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": self._max_tokens,
+                    "temperature": 0.3,
+                },
+            )
             sc = response.status_code
             if sc == 429 or sc >= 500:
                 raise httpx.HTTPStatusError(f"status {sc}", request=response.request, response=response)

@@ -3,7 +3,6 @@ from __future__ import annotations
 import mimetypes
 import time
 from collections.abc import Callable
-from contextlib import nullcontext
 from pathlib import Path
 
 import httpx
@@ -113,12 +112,16 @@ class GeminiProvider:
             except Exception:
                 pass
 
-    def generate_text(self, prompt: str, model: str) -> str:
-        rl_ctx = self._rl or nullcontext()
+    def _maybe_wait(self) -> None:
+        if self._rl is not None:
+            wait = self._rl.acquire()
+            if wait:
+                time.sleep(wait)
 
+    def generate_text(self, prompt: str, model: str) -> str:
         def _do() -> str:
-            with rl_ctx:
-                response = self._client.models.generate_content(model=model, contents=prompt)
+            self._maybe_wait()
+            response = self._client.models.generate_content(model=model, contents=prompt)
             return response.text or ""
 
         return self._call_with_retry(_do, model, model)
@@ -127,23 +130,22 @@ class GeminiProvider:
         self, video_path: str, prompt: str, model: str, progress_callback: Callable[[str], None] | None = None
     ) -> str:
         uploaded = None
-        rl_ctx = self._rl or nullcontext()
         try:
             if progress_callback:
                 progress_callback("上传视频到 Gemini...")
-            with rl_ctx:
-                # 用 BytesIO 避免 google-genai 2.8.0 的 bug：
-                # 非 ASCII 文件名会作为 HTTP header 值发送，导致
-                # UnicodeEncodeError: 'ascii' codec can't encode character
-                p = Path(video_path)
-                if p.stat().st_size > 200 * 1024 * 1024:
-                    raise ValueError(f"文件过大 ({p.stat().st_size / 1024 / 1024:.0f} MB)，请先压缩")
-                mime_type, _ = mimetypes.guess_type(str(p))
-                with open(video_path, "rb") as f:
-                    uploaded = self._client.files.upload(
-                        file=f,
-                        config=types.UploadFileConfig(mime_type=mime_type or "video/mp4"),
-                    )
+            self._maybe_wait()
+            # 用 BytesIO 避免 google-genai 2.8.0 的 bug：
+            # 非 ASCII 文件名会作为 HTTP header 值发送，导致
+            # UnicodeEncodeError: 'ascii' codec can't encode character
+            p = Path(video_path)
+            if p.stat().st_size > 200 * 1024 * 1024:
+                raise ValueError(f"文件过大 ({p.stat().st_size / 1024 / 1024:.0f} MB)，请先压缩")
+            mime_type, _ = mimetypes.guess_type(str(p))
+            with open(video_path, "rb") as f:
+                uploaded = self._client.files.upload(
+                    file=f,
+                    config=types.UploadFileConfig(mime_type=mime_type or "video/mp4"),
+                )
             if progress_callback:
                 progress_callback("等待 Gemini 处理...")
             uploaded = self._wait_for_file(uploaded, on_progress=progress_callback)
@@ -152,11 +154,11 @@ class GeminiProvider:
                 progress_callback("AI 分析中...")
 
             def _do() -> str:
-                with rl_ctx:
-                    response = self._client.models.generate_content(
-                        model=model,
-                        contents=[uploaded, prompt],
-                    )
+                self._maybe_wait()
+                response = self._client.models.generate_content(
+                    model=model,
+                    contents=[uploaded, prompt],
+                )
                 return response.text or ""
 
             return self._call_with_retry(_do, f"视频 {model}", model)
