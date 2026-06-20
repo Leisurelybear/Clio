@@ -112,6 +112,45 @@ def handle_post_whisper_install(handler) -> None:
     handler._send_json({"ok": True, "message": "whisper install started"})
 
 
+def _get_model_file_size(repo_id: str, cfg) -> int:
+    """Get the remote model file size via HEAD request."""
+    import requests as _req
+    from huggingface_hub import hf_hub_url
+
+    proxy_url = cfg.proxy.url if (cfg.proxy.enabled and cfg.proxy.url) else None
+    proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+    try:
+        url = hf_hub_url(repo_id, filename="model.bin")
+        r = _req.head(url, proxies=proxies, timeout=15)
+        r.raise_for_status()
+        return int(r.headers.get("Content-Length", 0))
+    except Exception:
+        return 0
+
+
+def _find_model_file(cache_dir: Path, model_name: str) -> Path | None:
+    """Scan huggingface cache dir for the model.bin file (including partial downloads)."""
+    repo_cache = cache_dir / f"models--Systran--faster-whisper-{model_name}"
+    if not repo_cache.is_dir():
+        return None
+    # Check snapshots first (completed download)
+    snapshots = repo_cache / "snapshots"
+    if snapshots.is_dir():
+        for rev_dir in snapshots.iterdir():
+            model_file = rev_dir / "model.bin"
+            if model_file.is_file():
+                return model_file
+    # Check blobs for partial files
+    blobs = repo_cache / "blobs"
+    if blobs.is_dir():
+        for f in blobs.iterdir():
+            if f.name.endswith(".incomplete") or f.name.startswith("."):
+                return f
+            if f.is_file() and f.stat().st_size > 0:
+                return f
+    return None
+
+
 def _run_install(handler, progress_path: Path) -> None:
     proj_input = handler._resolve_project_input({})
     cfg = handler._get_config(proj_input)
@@ -136,8 +175,6 @@ def _run_install(handler, progress_path: Path) -> None:
         if r.returncode != 0:
             raise RuntimeError(f"安装 huggingface_hub 失败: {r.stderr}")
 
-    from huggingface_hub import hf_hub_download  # noqa
-
     # Set env vars for China mirror
     if cfg.whisper.hf_endpoint:
         os.environ["HF_ENDPOINT"] = cfg.whisper.hf_endpoint
@@ -151,54 +188,90 @@ def _run_install(handler, progress_path: Path) -> None:
     model_name = cfg.whisper.model_size
     repo_id = f"Systran/faster-whisper-{model_name}"
 
+    # Get total file size before download
+    total_size = _get_model_file_size(repo_id, cfg)
+
     _write_install_progress(
         progress_path,
         {
             "status": "downloading",
             "progress_pct": 0,
-            "message": f"正在下载模型 {model_name}...",
+            "message": f"正在下载模型 {model_name} ({_format_bytes(total_size) if total_size else '...'})...",
         },
     )
 
+    from huggingface_hub import hf_hub_download  # noqa
+
+    # hf_hub_download returns the path to the downloaded file.
+    # Run in a thread so we can poll file size for progress.
+    result: list[Path | None] = [None]
+    exc_info: list[BaseException | None] = [None]
+
+    def _dl_thread() -> None:
+        try:
+            p = hf_hub_download(
+                repo_id=repo_id,
+                filename="model.bin",
+                cache_dir=str(cache_dir),
+                resume_download=True,
+                local_dir_use_symlinks=False,
+            )
+            result[0] = Path(p)
+        except BaseException as e:
+            exc_info[0] = e
+
+    import threading as _threading
+
+    t = _threading.Thread(target=_dl_thread, daemon=True)
+    t.start()
+
     start = time.monotonic()
     last_pct = 0
-    last_bytes = 0
-
-    def _callback(current: int, total: int | None) -> None:
-        nonlocal last_pct, last_bytes
-        if total:
-            pct = int(current / total * 100)
-            elapsed = time.monotonic() - start
-            speed_bps = (current - last_bytes) / max(elapsed, 0.1)
-            speed_str = (
-                f"{speed_bps / 1024 / 1024:.1f} MB/s" if speed_bps > 1024 * 1024 else f"{speed_bps / 1024:.0f} KB/s"
-            )
-            eta_sec = int((total - current) / max(speed_bps, 1))
-            if pct >= last_pct + 2 or pct == 100:
-                _write_install_progress(
-                    progress_path,
-                    {
-                        "status": "downloading",
-                        "progress_pct": pct,
-                        "message": f"下载模型 {model_name} ({pct}%)",
-                        "speed": speed_str,
-                        "eta_sec": eta_sec,
-                    },
+    model_path: Path | None = None
+    while t.is_alive():
+        t.join(timeout=1.0)
+        # Poll the expected cache path for progress
+        if total_size and cache_dir.is_dir():
+            candidate = _find_model_file(cache_dir, model_name)
+            if candidate and candidate.is_file():
+                current = candidate.stat().st_size
+                pct = int(current / total_size * 100) if total_size else 0
+                elapsed = time.monotonic() - start
+                speed_bps = current / max(elapsed, 1.0)
+                speed_str = (
+                    f"{speed_bps / 1024 / 1024:.1f} MB/s" if speed_bps > 1024 * 1024 else f"{speed_bps / 1024:.0f} KB/s"
                 )
-                last_pct = pct
-            last_bytes = current
+                eta_sec = int((total_size - current) / max(speed_bps, 1))
+                if pct >= last_pct + 2 or pct == 100:
+                    _write_install_progress(
+                        progress_path,
+                        {
+                            "status": "downloading",
+                            "progress_pct": pct,
+                            "message": f"下载模型 {model_name} ({pct}%)",
+                            "speed": speed_str,
+                            "eta_sec": eta_sec,
+                        },
+                    )
+                    last_pct = pct
+        elif not total_size:
+            # No total size — show alive indicator
+            elapsed = time.monotonic() - start
+            _write_install_progress(
+                progress_path,
+                {
+                    "status": "downloading",
+                    "progress_pct": 0,
+                    "message": f"下载模型 {model_name} ({int(elapsed)}s)",
+                },
+            )
 
-    try:
-        hf_hub_download(
-            repo_id=repo_id,
-            filename="model.bin",
-            cache_dir=str(cache_dir),
-            resume_download=True,
-            local_dir_use_symlinks=False,
-            callback=_callback,
-        )
-    except Exception as e:
-        raise RuntimeError(f"模型下载失败: {e}") from e
+    if exc_info[0]:
+        raise RuntimeError(f"模型下载失败: {exc_info[0]}") from exc_info[0]
+    model_path = result[0]
+
+    if not model_path or not model_path.is_file():
+        raise RuntimeError("模型下载后文件未找到")
 
     _write_install_progress(
         progress_path,

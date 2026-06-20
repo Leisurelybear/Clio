@@ -385,7 +385,8 @@ async function _loadModelMgmt() {
     html += '</select></div>';
 
     html += '<div>';
-    html += `<button id="btn-model-download" class="btn-primary" style="font-size:var(--text-sm)">${icon('download', 14)} 下载模型</button>`;
+    const alreadyCached = cached.some(c => c.name === current && c.valid);
+    html += `<button id="btn-model-download" class="btn-primary" style="font-size:var(--text-sm)"${alreadyCached ? ' disabled' : ''}>${icon('download', 14)} ${alreadyCached ? '已下载' : '下载模型'}</button>`;
     html += '</div>';
 
     html += '<div style="font-size:var(--text-xs);color:var(--text-secondary);white-space:nowrap">';
@@ -423,11 +424,17 @@ async function _loadModelMgmt() {
     if (sel) {
       sel.onchange = async () => {
         const newModel = sel.value;
+        // 立即更新下载按钮状态（不等待后端返回）
+        const dlBtn = $('btn-model-download');
+        const isCached = cached.some(c => c.name === newModel && c.valid);
+        if (dlBtn) {
+          dlBtn.disabled = isCached;
+          dlBtn.innerHTML = isCached ? '已下载' : `${icon('download', 14)} 下载模型`;
+        }
         try {
           const r = await api('PUT', '/api/whisper/model', { model_size: newModel });
           if (r.ok) {
             setStatus(`模型已切换为 ${newModel}`, 'ok');
-            _loadModelMgmt();
           } else {
             setStatus('切换模型失败: ' + (r.error || ''), 'err');
             sel.value = current;
