@@ -194,9 +194,9 @@ ai:
 
 ## 7. 项目当前状态
 
-最后更新：2026-06-19（UI 空状态修复：项目移除、空项目占位符、事件绑定提前注册）。已上线：
+最后更新：2026-06-20（代码审查修复 + R-016 Whisper 模型 UI 下载完成）。已上线：
 - GitHub Actions CI（Ubuntu，Windows，Python 3.11/3.12）
-- 412 个 pytest 用例：transcribe(18) / tasks_transcribe(11) / processing_state(8) / whisper_cli(6) / main(7) / config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(12) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / 等
+- 564 个 pytest 用例：transcribe(19) / tasks_transcribe(11) / processing_state(8) / whisper_cli(6) / main(7) / config(34) / utils(34) / cut(25) / log(13) / progress(12) / file_service(60) / project_service(22) / routes(48) / tasks(12) / split(7) / compress(6) / analyze(15) / ai(12) / helpers(20) / 等
 - 依赖版本锁定 `requirements-locked.txt`
 - Whisper ASR 独立 `requirements-whisper.txt`（faster-whisper，不污染主依赖）
 最近做的 commit 顺序：
@@ -268,6 +268,11 @@ ai:
 160. `aa720d8` `fix(ui): move modal event binding before init early return; remove duplicate code`  ← 模态框修复
 161. `c1584df` `fix(ui): move all event handlers before try block so they work in empty state`  ← 事件绑定修复
 162. `fe45f53` `fix: lint F541 f-string and UT assertion after empty-state changes`  ← lint + UT 修复
+163. `dc3ad72` `fix(config): propagate max_tokens from YAML to ProviderConfig`  ← C3
+164. `45e09e3` `fix(ai): fix TOCTOU race in provider cache and close Gemini client properly`  ← C2+C4
+165. `9ef45e2` `fix(transcribe): thread-safe os.environ with save/restore pattern`  ← C1
+166. `326fe46` `feat(whisper): add POST /api/whisper/install with progress for UI model download`  ← R-016a
+167. `e361f7d` `feat(ui): add whisper model download button + progress in transcript tab`  ← R-016b/c
 
 2026-06-18 审查修复（基于 `docs/analysis/2026-06-18-vlog-editing-helper-review.md`，详见 `docs/analysis/2026-06-18-review-fix-result.md`）：
 - **P0-1** `cut.py`: 改用 `write_json_atomic` / `write_text_atomic`（漏掉的原子写入）
@@ -304,7 +309,7 @@ ai:
 项目文档状态：
 - 2026-06-16 全面代码审查（5 路平行 subagent）：发现 **6 Critical + 12 Important + 36 Minor**，已修复 6+12+5，剩余 31 Minor 待处理
 - 2026-06-16 第二次审查（逐项 review）：5 S0 + 5 S1 + 1 S2 全部修复
-- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012（✓）/ R-013（✓）/ R-014/ R-015（a[✓] d[✓]）+ Bug 跟踪（B-001~B-085）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）+ 代码审查 P0~P3（14 项修了 12 项）
+- `ROADMAP.md` 当前跟踪：R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012（✓）/ R-013（✓）/ R-014/ R-015（a[✓] d[✓]）/ R-016（a[✓] b[✓] c[✓]）+ Bug 跟踪（B-001~B-085）+ 性能优化（P-001~P-003）+ 文档维护（D-001~D-004）+ 架构改进（A-001~A-006）+ 代码审查 P0~P3（14 项修了 12 项）
 - Whisper ASR 已完全接入：独立 CLI（transcribe / whisper install / whisper check）+ pipeline 步骤 + UI 转录 tab + delete/edit/seek + 10% 进度 + CUDA 回退 CPU + 每视频 rerun + 完整 UT 覆盖（18 个测试）
 - CI 兼容性修复：ctranslate2 mock 模块、config_path 参数传递、Linux 大小写感知、F821 lint
 - 新增 ProcessingState UT（8 个测试全面覆盖 mark/reset_step/持久化/损坏回退）
@@ -318,6 +323,15 @@ ai:
 - 配置修复：YAML 未知字段静默忽略，`project.yaml` CLI 生效，`FFMPEG_HOME` 环境变量支持
 - 2026-06-17 全面分析报告修复：10 个 commit 覆盖可用性（plan 状态/原子写入/max_tokens/验证）到代码质量（closure/transcript 中文/prompts 校验），详见 ROADMAP 已完成表
 - 2026-06-18 R-012 预览进度条完成：两行布局（控制栏 + 进度条），播放/暂停切换（不再是停止+重置），segment 块显示序号 + hover 提示标题/时间窗，点击/拖拽跳段，plan segment 点击集成预览系统
+
+2026-06-20 代码审查修复 + R-016 Whisper 模型 UI 下载：
+- **C3 修复**：`config.py:_parse_providers` 漏传 `max_tokens`，用户配置被静默忽略始终 4096
+- **C2 修复**：`factory.py` provider 缓存 TOCTOU 竞态，双线程同 key 时泄漏 HTTP 连接池
+- **C4 修复**：`gemini.py` `close()` 空操作，`_clear_provider_cache` 不释放 HTTP 连接
+- **C1 修复**：`transcribe.py` 全局 `os.environ` 多线程无锁污染，save/restore 模式 + `_env_lock`
+- **R-016a**：后端 `POST /api/whisper/install` + `GET /api/whisper/install/status`，daemon 线程 + huggingface_hub callback 实时进度
+- **R-016b**：前端转录错误区显示"下载模型"按钮 + 进度条/速度/ETA 轮询
+- **R-016c**：下载完成后自动 rerun transcribe，轮询等待结果后刷新
 
 ## 8. Gotchas（踩过的坑）
 

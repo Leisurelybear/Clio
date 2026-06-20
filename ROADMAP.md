@@ -18,9 +18,9 @@
 - 后端复用 `whisper_cli.run_whisper_install` 的预下载逻辑
 
 **子任务**：
-- [ ] R-016a：后端 `POST /api/whisper/install`（daemon 线程 + 进度写入 `.progress.json`）
-- [ ] R-016b：前端转录错误时显示「下载模型」按钮 + 进度反馈
-- [ ] R-016c：下载完成后自动触发当前视频重新转录
+- [x] R-016a：后端 `POST /api/whisper/install`（daemon 线程 + 进度写入 `.whisper_install.json`）`326fe46`
+- [x] R-016b：前端转录错误时显示「下载模型」按钮 + 进度反馈 `e361f7d`
+- [x] R-016c：下载完成后自动触发当前视频重新转录 `e361f7d`
 
 ## 需求 R-004：UI 读取和编辑 config
 
