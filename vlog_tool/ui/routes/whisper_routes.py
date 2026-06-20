@@ -115,8 +115,18 @@ def handle_post_whisper_install(handler) -> None:
     handler._send_json({"ok": True, "message": "whisper install started"})
 
 
+_KNOWN_MODEL_SIZES: dict[str, int] = {
+    "tiny": 151_362_048,
+    "base": 290_574_848,
+    "small": 483_382_016,
+    "medium": 1_536_351_744,
+    "large-v2": 3_076_648_960,
+    "large-v3": 3_076_648_960,
+}
+
+
 def _get_model_file_size(repo_id: str, cfg) -> int:
-    """Get the remote model file size via HEAD request."""
+    """Get the remote model file size via HEAD request, with known-size fallback."""
     import requests as _req
     from huggingface_hub import hf_hub_url
 
@@ -124,11 +134,18 @@ def _get_model_file_size(repo_id: str, cfg) -> int:
     proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
     try:
         url = hf_hub_url(repo_id, filename="model.bin")
-        r = _req.head(url, proxies=proxies, timeout=15)
+        r = _req.head(url, proxies=proxies, timeout=15, allow_redirects=True)
         r.raise_for_status()
-        return int(r.headers.get("Content-Length", 0))
+        size = int(r.headers.get("Content-Length", 0))
+        if size:
+            return size
     except Exception:
-        return 0
+        pass
+    # Fallback: known model sizes
+    for key, sz in _KNOWN_MODEL_SIZES.items():
+        if key in repo_id:
+            return sz
+    return 0
 
 
 def _download_error_detail(e: Exception, cfg) -> str:
@@ -194,10 +211,12 @@ def _run_install(handler, progress_path: Path) -> None:
         if r.returncode != 0:
             raise RuntimeError(f"安装 huggingface_hub 失败: {r.stderr}")
 
-    # Set env vars for China mirror
+    # Set env vars for download
     if cfg.whisper.hf_endpoint:
+        # Mirror mode (e.g. hf-mirror.com): assume direct access, no proxy needed
         os.environ["HF_ENDPOINT"] = cfg.whisper.hf_endpoint
-    if cfg.proxy.enabled and cfg.proxy.url:
+    elif cfg.proxy.enabled and cfg.proxy.url:
+        # Official HF: apply proxy to bypass GFW
         os.environ["HTTP_PROXY"] = cfg.proxy.url
         os.environ["HTTPS_PROXY"] = cfg.proxy.url
 
@@ -246,42 +265,40 @@ def _run_install(handler, progress_path: Path) -> None:
 
     start = time.monotonic()
     last_pct = 0
-    model_path: Path | None = None
     while t.is_alive():
         t.join(timeout=1.0)
-        # Poll the expected cache path for progress
-        if total_size and cache_dir.is_dir():
-            candidate = _find_model_file(cache_dir, model_name)
-            if candidate and candidate.is_file():
-                current = candidate.stat().st_size
-                pct = int(current / total_size * 100) if total_size else 0
-                elapsed = time.monotonic() - start
-                speed_bps = current / max(elapsed, 1.0)
-                speed_str = (
-                    f"{speed_bps / 1024 / 1024:.1f} MB/s" if speed_bps > 1024 * 1024 else f"{speed_bps / 1024:.0f} KB/s"
-                )
-                eta_sec = int((total_size - current) / max(speed_bps, 1))
-                if pct >= last_pct + 2 or pct == 100:
-                    _write_install_progress(
-                        progress_path,
-                        {
-                            "status": "downloading",
-                            "progress_pct": pct,
-                            "message": f"下载模型 {model_name} ({pct}%)",
-                            "speed": speed_str,
-                            "eta_sec": eta_sec,
-                        },
-                    )
-                    last_pct = pct
+        elapsed = time.monotonic() - start
+        candidate = _find_model_file(cache_dir, model_name) if cache_dir.is_dir() else None
+        current = candidate.stat().st_size if candidate and candidate.is_file() else 0
+        pct = int(current / total_size * 100) if total_size else 0
+        speed_bps = current / max(elapsed, 1.0)
+        speed_str = (
+            f"{speed_bps / 1024 / 1024:.1f} MB/s"
+            if speed_bps > 1024 * 1024
+            else f"{speed_bps / 1024:.0f} KB/s"
+            if speed_bps
+            else ""
+        )
+        eta_sec = int((total_size - current) / max(speed_bps, 1)) if total_size and speed_bps else None
+        if total_size and pct >= last_pct + 2:
+            _write_install_progress(
+                progress_path,
+                {
+                    "status": "downloading",
+                    "progress_pct": pct,
+                    "message": f"下载模型 {model_name} ({pct}%)",
+                    "speed": speed_str,
+                    "eta_sec": eta_sec,
+                },
+            )
+            last_pct = pct
         elif not total_size:
-            # No total size — show alive indicator
-            elapsed = time.monotonic() - start
             _write_install_progress(
                 progress_path,
                 {
                     "status": "downloading",
                     "progress_pct": 0,
-                    "message": f"下载模型 {model_name} ({int(elapsed)}s)",
+                    "message": f"下载模型 {model_name} ({int(elapsed)}s, {_format_bytes(current)} 已下载)",
                 },
             )
 

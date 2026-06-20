@@ -487,6 +487,19 @@ async function _loadModelMgmt() {
       };
     });
     clearTimeout(timeoutId);
+    // Resume polling if download is still in progress
+    try {
+      const st = await api('GET', '/api/whisper/install/status');
+      if (st.running || st.status === 'downloading') {
+        const prog = $('model-dl-progress');
+        if (prog) prog.style.display = 'block';
+        const dlBtn = $('btn-model-download');
+        if (dlBtn) { dlBtn.disabled = true; dlBtn.textContent = '下载中...'; }
+        if (_installPollTimer) clearInterval(_installPollTimer);
+        _installPollTimer = setInterval(_pollModelDl, 1000);
+        _pollModelDl();
+      }
+    } catch { /* polling resume not critical */ }
   } catch (e) {
     clearTimeout(timeoutId);
     if (container) container.innerHTML = `<p class="err">加载失败: ${escapeHtml(e.message)}</p>`;
