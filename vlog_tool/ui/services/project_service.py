@@ -7,6 +7,8 @@ Closure functions extracted from server.py's make_handler(), now parameterized:
 - _add_to_registry
 - _save_last_project
 - _list_projects
+- resolve_project_input
+- resolve_last_project_config
 
 All functions take explicit parameters instead of relying on closure variables.
 """
@@ -17,6 +19,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from vlog_tool.config import AppConfig, load_config
 from vlog_tool.ui.services.file_service import _save_atomic
 
 
@@ -264,3 +267,123 @@ def _list_projects(
             )
 
     return projects
+
+
+def _read_project_name(p: Path) -> str | None:
+    """Read project name from project.json."""
+    proj_file = p / "project.json"
+    if not proj_file.is_file():
+        return None
+    try:
+        data = json.loads(proj_file.read_text(encoding="utf-8"))
+        return data.get("name")
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
+def resolve_project_input(qs: dict, input_dir: Path, config_path: Path | None) -> Path:
+    """Resolve project input directory from query params; default to current input_dir.
+
+    Priority:
+      1. input_dir query param (direct path, unambiguous)
+      2. project name query param (may be ambiguous)
+    """
+    input_dir_raw = qs.get("input_dir", [None])[0]
+    if input_dir_raw:
+        candidate = Path(input_dir_raw)
+        if candidate.is_dir():
+            return candidate
+
+    project_name = qs.get("project", [None])[0]
+    if not project_name:
+        return input_dir
+
+    candidates: list[Path] = []
+    seen: set[str] = set()
+
+    def _score(p: Path) -> int:
+        s = 0
+        if p.name == project_name:
+            s += 10
+        if p.resolve() == input_dir.resolve():
+            s += 5
+        return s
+
+    # 1. Registry first (user-added order)
+    registry_file = _registry_path(config_path)
+    if registry_file.is_file():
+        try:
+            reg = json.loads(registry_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            reg = {}
+        for p_str in reg.get("projects", []):
+            p = Path(p_str)
+            resolved = str(p.resolve())
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            name = _read_project_name(p)
+            if name == project_name:
+                candidates.append(p)
+
+    # 2. Sibling directories (auto-discovery)
+    projects_root = input_dir.parent
+    if projects_root.is_dir():
+        for p in sorted(projects_root.iterdir()):
+            if not p.is_dir():
+                continue
+            resolved = str(p.resolve())
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            name = _read_project_name(p)
+            if name == project_name:
+                candidates.append(p)
+
+    if not candidates:
+        return input_dir
+    if len(candidates) == 1:
+        return candidates[0]
+    candidates.sort(key=_score, reverse=True)
+    return candidates[0]
+
+
+def resolve_last_project_config(config: AppConfig, config_path: Path | None) -> AppConfig:
+    """If registry has a last_project, attempt to load its config instead of default.
+
+    Supports both legacy (string name) and new (dict with name+input_dir) formats.
+    """
+    if not config_path:
+        return config
+    reg_file = _registry_path(config_path)
+    if not reg_file.is_file():
+        return config
+    try:
+        reg = json.loads(reg_file.read_text(encoding="utf-8"))
+        last_project = reg.get("last_project")
+        if not last_project:
+            return config
+
+        # New format: dict with input_dir — resolve directly
+        if isinstance(last_project, dict):
+            input_dir_raw = last_project.get("input_dir")
+            if input_dir_raw:
+                p = Path(input_dir_raw)
+                if p.is_dir():
+                    return load_config(config_path, project_dir=p)
+
+        # Legacy format: string name — match by project.json name
+        last_name = last_project.get("name") if isinstance(last_project, dict) else last_project
+        if not last_name:
+            return config
+        for p_str in reg.get("projects", []):
+            p = Path(p_str)
+            proj_file = p / "project.json"
+            if not proj_file.is_file():
+                continue
+            data = json.loads(proj_file.read_text(encoding="utf-8"))
+            if data.get("name") == last_name:
+                return load_config(config_path, project_dir=p)
+        return config
+    except Exception:
+        return config

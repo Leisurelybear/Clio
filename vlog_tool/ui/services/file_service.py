@@ -6,6 +6,8 @@ Module-level helpers extracted from server.py:
 - atomic file writes
 - config type coercion
 - video matching (compressed <-> original)
+- range-based video streaming
+- text/script file resolution
 """
 
 from __future__ import annotations
@@ -15,6 +17,7 @@ import re
 import shutil
 import string
 import sys
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
@@ -230,3 +233,94 @@ def _coerce_config_types(new_val: Any, ref_val: Any) -> Any:
                 result[k] = new_val[k]
         return result
     return new_val
+
+
+_VIDEO_MIME = {
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".webm": "video/webm",
+    ".m4v": "video/x-m4v",
+    ".lrv": "video/mp4",
+}
+
+
+def send_video_range(handler, path: Path) -> None:
+    """Respond to a Range-based video request.
+
+    Supports full and partial (bytes=start-end, bytes=-N) range requests.
+    """
+    try:
+        size = path.stat().st_size
+    except FileNotFoundError:
+        handler.send_error(HTTPStatus.NOT_FOUND)
+        return
+    rng = handler.headers.get("Range")
+    if rng:
+        m = re.match(r"bytes=(\d*)-(\d*)", rng)
+        if not m:
+            handler.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+            return
+        start_s, end_s = m.group(1), m.group(2)
+        if start_s == "" and end_s != "":
+            suffix_len = int(end_s)
+            start = max(0, size - suffix_len)
+            end = size - 1
+        else:
+            start = int(start_s) if start_s else 0
+            end = int(end_s) if end_s else size - 1
+        if start >= size or end >= size or start > end:
+            handler.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+            return
+        length = end - start + 1
+        if length <= 0:
+            handler.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
+            return
+        handler.send_response(206)
+        handler.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+        handler.send_header("Content-Length", str(length))
+    else:
+        start = 0
+        length = size
+        handler.send_response(200)
+        handler.send_header("Content-Length", str(size))
+    handler.send_header("Accept-Ranges", "bytes")
+    handler.send_header("Content-Type", _VIDEO_MIME.get(path.suffix.lower(), "video/mp4"))
+    handler.send_header("Cache-Control", "no-store")
+    handler.end_headers()
+    with path.open("rb") as f:
+        f.seek(start)
+        remaining = length
+        chunk = 64 * 1024
+        try:
+            while remaining > 0:
+                buf = f.read(min(chunk, remaining))
+                if not buf:
+                    break
+                handler.wfile.write(buf)
+                remaining -= len(buf)
+        except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+            pass
+
+
+def resolve_texts(basename: str, proj_out: Path | None, output_dir: Path) -> Path | None:
+    if not _is_safe_basename(basename):
+        return None
+    base = proj_out or output_dir
+    for d in _find_texts_dirs(base):
+        p = d / basename
+        if p.is_file():
+            return p
+    return None
+
+
+def resolve_in(subdir: str, basename: str, proj_out: Path | None, output_dir: Path) -> Path | None:
+    if not _is_safe_basename(basename):
+        return None
+    if subdir == "texts":
+        return resolve_texts(basename, proj_out, output_dir)
+    base = proj_out or output_dir
+    d = base / subdir
+    if not d.is_dir():
+        return None
+    p = d / basename
+    return p if p.is_file() else None

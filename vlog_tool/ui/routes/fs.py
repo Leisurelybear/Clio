@@ -3,42 +3,51 @@
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from http.server import BaseHTTPRequestHandler
 
+from vlog_tool.ui.security import _check_token, _restrict_path
+from vlog_tool.ui.services.file_service import _list_drives
+
 
 def handle_get_fs_dirs(handler: BaseHTTPRequestHandler, qs: dict) -> None:
-    """Handle GET /api/fs/dirs."""
-    import sys
+    """Handle GET /api/fs/dirs.
+
+    Restricted to within user home directory.
+    Uses ?token=... for LAN mode authentication.
+    """
+    if not _check_token(qs):
+        return handler._send_json({"error": "unauthorized"}, 401)
 
     dir_path = qs.get("path", [""])[0]
     if not dir_path:
-        from vlog_tool.ui.services.file_service import _list_drives
-
         if sys.platform == "win32":
             drives = _list_drives()
             return handler._send_json({"path": "", "dirs": drives, "parent": None, "is_drive_list": True})
         return handler._send_json({"path": "/", "dirs": ["/"], "parent": None, "is_drive_list": True})
     try:
-        p = Path(dir_path).resolve()
-        if not p.is_dir():
+        resolved = _restrict_path(Path(dir_path))
+        if resolved is None:
+            return handler._send_json({"error": "access denied (path outside home directory)"}, 403)
+        if not resolved.is_dir():
             return handler._send_json({"error": "not a directory"}, 400)
         dirs: list[str] = []
         try:
-            with os.scandir(p) as it:
+            with os.scandir(resolved) as it:
                 for entry in it:
                     if entry.is_dir() and not entry.name.startswith("."):
                         dirs.append(entry.path)
         except PermissionError:
             pass
         dirs.sort(key=lambda x: Path(x).name.lower())
-        parent = str(p.parent) if p.parent != p else None
+        parent = str(resolved.parent) if resolved.parent != resolved else None
         return handler._send_json(
             {
-                "path": str(p),
+                "path": str(resolved),
                 "dirs": dirs,
                 "parent": parent,
                 "is_drive_list": False,

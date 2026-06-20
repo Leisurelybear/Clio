@@ -8,19 +8,16 @@
 
 from __future__ import annotations
 
-import copy
 import json
 import mimetypes
-import re
 import shutil
 import threading
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
 from urllib.parse import parse_qs, urlparse
 
-from vlog_tool.config import AppConfig, load_config
+from vlog_tool.config import AppConfig
 from vlog_tool.session_log import clear as clear_session_log
 from vlog_tool.session_log import read as read_session_log
 from vlog_tool.ui.routes.config_routes import (
@@ -73,8 +70,18 @@ from vlog_tool.ui.routes.whisper_routes import (
     handle_post_whisper_model_delete,
     handle_put_whisper_model,
 )
-from vlog_tool.ui.services.file_service import _find_texts_dirs, _is_safe_basename
-from vlog_tool.ui.services.project_service import _project_output_dir, _registry_path
+from vlog_tool.ui.security import _get_ui_token, _is_lan_mode
+from vlog_tool.ui.services.config_cache import ConfigCache
+from vlog_tool.ui.services.file_service import (
+    resolve_in,
+    resolve_texts,
+    send_video_range,
+)
+from vlog_tool.ui.services.project_service import (
+    _project_output_dir,
+    resolve_last_project_config,
+    resolve_project_input,
+)
 from vlog_tool.utils import write_json_atomic
 
 STATIC_DIR = Path(__file__).parent / "static"
@@ -117,59 +124,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
         _run_lock = threading.Lock()
         _run_thread: threading.Thread | None = None
         _cancel_event = threading.Event()
-        _config_cache: dict[str, AppConfig] = {}
-        _config_meta: dict[str, tuple[float | None, float | None]] = {}
-        _config_cache_lock = threading.Lock()
+        _config_cache: ConfigCache | None = None
         DEFAULT_PROJECT: dict = {}
-        server: Any  # set by HTTPServer
-
-        def _get_config(self, project_input: Path | None = None) -> AppConfig:
-            """Return project-specific config (deep-merged with project.yaml), cached.
-
-            Cache is LRU-style: capped at 20 entries, evicts oldest when full.
-            On each access, checks config file mtime to detect external edits.
-            """
-            _GLOBAL_KEY = "__global__"
-            key = _GLOBAL_KEY if project_input is None else str(project_input.resolve())
-
-            # Read current mtimes
-            if config_path is None:
-                cfg_mtime = 0.0
-            else:
-                try:
-                    cfg_mtime = config_path.stat().st_mtime
-                except OSError:
-                    cfg_mtime = 0.0
-            project_yaml = None if project_input is None else (project_input / "project.yaml")
-            try:
-                proj_mtime = project_yaml.stat().st_mtime if project_yaml else 0.0
-            except OSError:
-                proj_mtime = 0.0
-
-            with self.__class__._config_cache_lock:
-                cache = self.__class__._config_cache
-                meta = self.__class__._config_meta
-
-                if key in cache:
-                    old_cfg_mtime, old_proj_mtime = meta.get(key, (0, 0))
-                    if cfg_mtime == old_cfg_mtime and proj_mtime == old_proj_mtime:
-                        return copy.deepcopy(cache[key])
-                    # Stale — evict and reload
-                    del cache[key]
-                    meta.pop(key, None)
-
-                # Load fresh config
-                new_config = load_config(config_path, project_dir=project_input)
-
-                # LRU eviction if at capacity
-                if len(cache) >= 20:
-                    oldest_key = next(iter(cache))
-                    cache.pop(oldest_key)
-                    meta.pop(oldest_key, None)
-
-                cache[key] = new_config
-                meta[key] = (cfg_mtime, proj_mtime)
-                return copy.deepcopy(new_config)
+        server: BaseHTTPRequestHandler  # set by HTTPServer
 
         def log_message(self, fmt, *args):
             print(f"  [serve] {self.address_string()} - {fmt % args}")
@@ -208,86 +165,13 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 ct = "text/html; charset=utf-8"
             self._send_bytes(target.read_bytes(), ct)
 
+        def _get_config(self, project_input: Path | None = None) -> AppConfig:
+            return self.__class__._config_cache.get(project_input)
+
         def _resolve_project_input(self, qs: dict) -> Path:
-            """Resolve project input directory from query params; default to current input_dir.
-
-            Priority:
-              1. input_dir query param (direct path, unambiguous)
-              2. project name query param (may be ambiguous)
-            """
-            # Direct input_dir param takes priority
-            input_dir_raw = qs.get("input_dir", [None])[0]
-            if input_dir_raw:
-                candidate = Path(input_dir_raw)
-                if candidate.is_dir():
-                    return candidate
-                # Invalid path — fall through to name-based
-
-            project_name = qs.get("project", [None])[0]
-            if not project_name:
-                return input_dir
-
-            candidates: list[Path] = []
-            seen: set[str] = set()
-
-            def _read_name(p: Path) -> str | None:
-                proj_file = p / "project.json"
-                if not proj_file.is_file():
-                    return None
-                try:
-                    data = json.loads(proj_file.read_text(encoding="utf-8"))
-                    return data.get("name")
-                except (json.JSONDecodeError, OSError):
-                    return None
-
-            def _score(p: Path) -> int:
-                s = 0
-                if p.name == project_name:
-                    s += 10
-                if p.resolve() == input_dir.resolve():
-                    s += 5
-                return s
-
-            # 1. Registry first (user-added order)
-            registry_file = _registry_path(config_path)
-            if registry_file.is_file():
-                try:
-                    reg = json.loads(registry_file.read_text(encoding="utf-8"))
-                except (json.JSONDecodeError, OSError):
-                    reg = {}
-                for p_str in reg.get("projects", []):
-                    p = Path(p_str)
-                    resolved = str(p.resolve())
-                    if resolved in seen:
-                        continue
-                    seen.add(resolved)
-                    name = _read_name(p)
-                    if name == project_name:
-                        candidates.append(p)
-
-            # 2. Sibling directories (auto-discovery)
-            projects_root = input_dir.parent
-            if projects_root.is_dir():
-                for p in sorted(projects_root.iterdir()):
-                    if not p.is_dir():
-                        continue
-                    resolved = str(p.resolve())
-                    if resolved in seen:
-                        continue
-                    seen.add(resolved)
-                    name = _read_name(p)
-                    if name == project_name:
-                        candidates.append(p)
-
-            if not candidates:
-                return input_dir
-            if len(candidates) == 1:
-                return candidates[0]
-            candidates.sort(key=_score, reverse=True)
-            return candidates[0]
+            return resolve_project_input(qs, input_dir, config_path)
 
         def _get_project_output(self, qs_or_proj_dir: dict | Path) -> Path:
-            """Return output_dir for a project. Accepts qs dict or resolved input_dir Path."""
             if isinstance(qs_or_proj_dir, dict):
                 proj_input = self._resolve_project_input(qs_or_proj_dir)
             else:
@@ -295,86 +179,13 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             return _project_output_dir(proj_input)
 
         def _send_video_range(self, path: Path) -> None:
-            try:
-                size = path.stat().st_size
-            except FileNotFoundError:
-                self.send_error(HTTPStatus.NOT_FOUND)
-                return
-            rng = self.headers.get("Range")
-            if rng:
-                m = re.match(r"bytes=(\d*)-(\d*)", rng)
-                if not m:
-                    self.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
-                    return
-                start_s, end_s = m.group(1), m.group(2)
-                if start_s == "" and end_s != "":
-                    suffix_len = int(end_s)
-                    start = max(0, size - suffix_len)
-                    end = size - 1
-                else:
-                    start = int(start_s) if start_s else 0
-                    end = int(end_s) if end_s else size - 1
-                if start >= size or end >= size or start > end:
-                    self.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
-                    return
-                length = end - start + 1
-                if length <= 0:
-                    self.send_error(HTTPStatus.REQUESTED_RANGE_NOT_SATISFIABLE)
-                    return
-                self.send_response(206)
-                self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
-                self.send_header("Content-Length", str(length))
-            else:
-                start = 0
-                length = size
-                self.send_response(200)
-                self.send_header("Content-Length", str(size))
-            self.send_header("Accept-Ranges", "bytes")
-            _VIDEO_MIME = {
-                ".mp4": "video/mp4",
-                ".mov": "video/quicktime",
-                ".webm": "video/webm",
-                ".m4v": "video/x-m4v",
-                ".lrv": "video/mp4",
-            }
-            self.send_header("Content-Type", _VIDEO_MIME.get(path.suffix.lower(), "video/mp4"))
-            self.send_header("Cache-Control", "no-store")
-            self.end_headers()
-            with path.open("rb") as f:
-                f.seek(start)
-                remaining = length
-                chunk = 64 * 1024
-                try:
-                    while remaining > 0:
-                        buf = f.read(min(chunk, remaining))
-                        if not buf:
-                            break
-                        self.wfile.write(buf)
-                        remaining -= len(buf)
-                except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
-                    pass
+            send_video_range(self, path)
 
         def _resolve_texts(self, basename: str, proj_out: Path | None = None) -> Path | None:
-            if not _is_safe_basename(basename):
-                return None
-            base = proj_out or output_dir
-            for d in _find_texts_dirs(base):
-                p = d / basename
-                if p.is_file():
-                    return p
-            return None
+            return resolve_texts(basename, proj_out, output_dir)
 
         def _resolve_in(self, subdir: str, basename: str, proj_out: Path | None = None) -> Path | None:
-            if not _is_safe_basename(basename):
-                return None
-            if subdir == "texts":
-                return self._resolve_texts(basename, proj_out)
-            base = proj_out or output_dir
-            d = base / subdir
-            if not d.is_dir():
-                return None
-            p = d / basename
-            return p if p.is_file() else None
+            return resolve_in(subdir, basename, proj_out, output_dir)
 
         # ---- HTTP method dispatchers ----
 
@@ -511,50 +322,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
     Handler.input_dir = input_dir
     Handler.output_dir = output_dir
     Handler.config_path = config_path
+    Handler._config_cache = ConfigCache(config_path)
     return Handler
-
-
-def _resolve_last_project_config(config: AppConfig, config_path: Path | None) -> AppConfig:
-    """If registry has a last_project, attempt to load its config instead of default.
-
-    Supports both legacy (string name) and new (dict with name+input_dir) formats.
-    """
-    if not config_path:
-        return config
-    reg_file = config_path.parent / "projects.json"
-    if not reg_file.is_file():
-        return config
-    try:
-        reg = json.loads(reg_file.read_text(encoding="utf-8"))
-        last_project = reg.get("last_project")
-        if not last_project:
-            return config
-
-        # New format: dict with input_dir — resolve directly
-        if isinstance(last_project, dict):
-            input_dir_raw = last_project.get("input_dir")
-            if input_dir_raw:
-                p = Path(input_dir_raw)
-                if p.is_dir():
-                    cfg = load_config(config_path, project_dir=p)
-                    return cfg
-
-        # Legacy format: string name — match by project.json name
-        last_name = last_project.get("name") if isinstance(last_project, dict) else last_project
-        if not last_name:
-            return config
-        for p_str in reg.get("projects", []):
-            p = Path(p_str)
-            proj_file = p / "project.json"
-            if not proj_file.is_file():
-                continue
-            data = json.loads(proj_file.read_text(encoding="utf-8"))
-            if data.get("name") == last_name:
-                cfg = load_config(config_path, project_dir=p)
-                return cfg
-        return config
-    except Exception:
-        return config
 
 
 def run(
@@ -565,13 +334,20 @@ def run(
     open_browser: bool = True,
 ) -> int:
     # Try loading last used project config
-    active_config = _resolve_last_project_config(config, config_path)
+    active_config = resolve_last_project_config(config, config_path)
     handler = make_handler(active_config, config_path)
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
     print(f"  UI started: {url}")
     print(f"  Project directory: {active_config.paths.input_dir}")
     print(f"  Output directory: {active_config.paths.output_dir}")
+    token = _get_ui_token()
+    if _is_lan_mode(host):
+        if not token:
+            print("  ⚠  WARNING: LAN mode without UI_TOKEN — all endpoints are unprotected!")
+            print("  ⚠  Set UI_TOKEN env var for token-based auth")
+        else:
+            print("  🔑  Token auth active (UI_TOKEN)")
     print("  Ctrl+C to exit")
     if open_browser:
         threading.Timer(0.5, lambda: _open_browser(url)).start()
