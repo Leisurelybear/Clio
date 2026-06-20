@@ -120,6 +120,25 @@ class TestGetModel:
             assert result is not None
 
     @patch("vlog_tool.transcribe.WhisperModel")
+    def test_cuda_fallback_on_unexpected_exception(self, mock_whisper_cls):
+        """CUDA 下 unexpected 异常（如 cuBLAS dll 缺失）也回退到 CPU"""
+        mock_whisper_cls.side_effect = [
+            TypeError("Library cublas64_12.dll is not found or cannot be loaded"),
+            MagicMock(),
+        ]
+        cfg = MagicMock(whisper=WhisperConfig(model_size="small", cache_dir="/cache"))
+        with (
+            patch("vlog_tool.transcribe._whisper_model", None),
+            patch("vlog_tool.transcribe._whisper_cache_key", None),
+            patch("vlog_tool.transcribe._resolve_device", return_value="cuda"),
+        ):
+            result = _get_model(cfg)
+            assert mock_whisper_cls.call_count == 2
+            _, last_kwargs = mock_whisper_cls.call_args
+            assert last_kwargs["device"] == "cpu"
+            assert result is not None
+
+    @patch("vlog_tool.transcribe.WhisperModel")
     def test_cuda_fallback_re_raises_on_non_cuda(self, mock_whisper_cls):
         """非 CUDA 设备抛异常时不回退"""
         mock_whisper_cls.side_effect = ValueError("model error")

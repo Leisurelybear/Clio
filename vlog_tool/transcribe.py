@@ -102,6 +102,12 @@ def _get_model(config: AppConfig):
                             raise
                         print(f"  [警告] {device} {ct} 加载失败 ({e})，尝试下一个 compute type")
                         continue
+                    except Exception as e:
+                        if device == "cuda":
+                            print(f"  [警告] CUDA 加载异常 ({e})，回退到 CPU")
+                            device = "cpu"
+                            break
+                        raise
             return _whisper_model
         finally:
             for k, v in saved.items():
