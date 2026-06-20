@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from pathlib import Path
 
@@ -16,7 +17,10 @@ from vlog_tool.utils import write_json_atomic, write_text_atomic
 
 
 def run_generate_scripts(
-    config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None
+    config: AppConfig,
+    tracker: ProgressTracker | None = None,
+    single_file: Path | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> None:
     config.scripts_dir.mkdir(parents=True, exist_ok=True)
     state = ProcessingState(config.paths.output_dir)
@@ -32,6 +36,9 @@ def run_generate_scripts(
         completed = 0
         elapsed_total = 0.0
         for i, json_file in enumerate(files, start=1):
+            if cancel_event and cancel_event.is_set():
+                print("[取消] voiceover 步骤被用户终止")
+                break
             data = json.loads(json_file.read_text(encoding="utf-8"))
             data["index"] = data.get("index", json_file.stem[:3])
             orig_stem = Path(data.get("source_file") or json_file.stem).stem

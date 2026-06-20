@@ -105,7 +105,7 @@ def run_pipeline_steps(
             with timed(f"=== {label} ==="):
                 fn = _STEP_FUNCS[step]
                 kwargs: dict = {}
-                if cancel_event and step in ("compress", "transcribe", "cut"):
+                if cancel_event:
                     kwargs["cancel_event"] = cancel_event
                 if step in _STEP_DAY_ARG:
                     fn(config, day_label, tracker, **kwargs)

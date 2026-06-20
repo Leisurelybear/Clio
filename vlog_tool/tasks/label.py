@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 
 from vlog_tool.config import AppConfig
@@ -12,7 +13,11 @@ from vlog_tool.tasks._helpers import _eta_line
 from vlog_tool.utils import format_index, resolve_binary, run_ffmpeg
 
 
-def run_label_videos(config: AppConfig, tracker: ProgressTracker | None = None) -> None:
+def run_label_videos(
+    config: AppConfig,
+    tracker: ProgressTracker | None = None,
+    cancel_event: threading.Event | None = None,
+) -> None:
     """用 ffmpeg 在压缩视频上烧录序号（便于剪映对照）。"""
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
     labeled_dir = config.paths.output_dir / "labeled"
@@ -25,6 +30,9 @@ def run_label_videos(config: AppConfig, tracker: ProgressTracker | None = None) 
         completed = 0
         elapsed_total = 0.0
         for i, json_file in enumerate(files, start=1):
+            if cancel_event and cancel_event.is_set():
+                print("[取消] label 步骤被用户终止")
+                break
             data = json.loads(json_file.read_text(encoding="utf-8"))
             raw_idx = data.get("index")
             try:

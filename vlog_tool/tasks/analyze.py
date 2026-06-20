@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -74,7 +75,10 @@ def _resolve_original(input_dir: Path, compressed_stem: str, stem_cache: dict[st
 
 
 def run_analyze_all(
-    config: AppConfig, tracker: ProgressTracker | None = None, single_file: Path | None = None
+    config: AppConfig,
+    tracker: ProgressTracker | None = None,
+    single_file: Path | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> list[ClipRecord]:
     """Analyze already-compressed videos using AI (compress step must precede this).
 
@@ -125,6 +129,9 @@ def run_analyze_all(
         failed = 0
         elapsed_total = 0.0
         for i, (compressed, original, idx_str) in enumerate(items, start=1):
+            if cancel_event and cancel_event.is_set():
+                print("[取消] analyze 步骤被用户终止")
+                break
             idx_val = int(idx_str)
 
             existing = sorted(config.texts_dir.glob(f"{idx_str}_*.json"))

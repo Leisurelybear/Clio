@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 
 from vlog_tool.analyze import plan_daily_vlog
@@ -13,7 +14,12 @@ from vlog_tool.progress import ProgressTracker
 from vlog_tool.utils import format_index, write_json_atomic, write_text_atomic
 
 
-def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressTracker | None = None) -> None:
+def run_plan_vlog(
+    config: AppConfig,
+    day_label: str = "day1",
+    tracker: ProgressTracker | None = None,
+    cancel_event: threading.Event | None = None,
+) -> None:
     config.plans_dir.mkdir(parents=True, exist_ok=True)
 
     out_json = config.plans_dir / f"{day_label}_plan.json"
@@ -29,6 +35,9 @@ def run_plan_vlog(config: AppConfig, day_label: str = "day1", tracker: ProgressT
 
     clips = []
     for json_file in sorted(config.texts_dir.glob("*.json")):
+        if cancel_event and cancel_event.is_set():
+            print("[取消] plan 步骤被用户终止")
+            return
         data = json.loads(json_file.read_text(encoding="utf-8"))
         raw_idx = data.get("index")
         if raw_idx is None:

@@ -108,17 +108,20 @@ class TestRunPipelineStepsCancel:
             f"Expected cancel_event to be passed, got kwargs: {transcribe_kwargs}"
         )
 
-    def test_cancel_event_not_passed_to_analyze(self):
-        """cancel_event 不应传递给 analyze（不支持 cancel 的 step）"""
+    def test_cancel_event_passed_to_all_steps(self):
+        """cancel_event 应传递给所有 step（U-005 统一后）"""
         config = _mock_config(Path(""))
         cancel_event = Event()
-        analyze_kwargs: dict = {}
+        all_kwargs: dict[str, dict] = {}
 
-        def _analyze_mock(*a, **kw):
-            analyze_kwargs.update(kw)
-            return None
+        def _make_mock(name):
+            def _mock(*a, **kw):
+                all_kwargs[name] = kw
+                return None
 
-        fake_funcs = {"analyze": _analyze_mock}
+            return _mock
+
+        fake_funcs = {s: _make_mock(s) for s in ("analyze", "voiceover", "plan", "label")}
         with (
             patch("vlog_tool.pipeline._STEP_FUNCS", fake_funcs),
             patch("builtins.print"),
@@ -126,8 +129,9 @@ class TestRunPipelineStepsCancel:
                 "vlog_tool.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)
             ),
         ):
-            run_pipeline_steps(config, steps=["analyze"], cancel_event=cancel_event)
+            run_pipeline_steps(config, steps=list(fake_funcs), cancel_event=cancel_event)
 
-        assert "cancel_event" not in analyze_kwargs, (
-            f"cancel_event should NOT be passed to analyze, got kwargs: {analyze_kwargs}"
-        )
+        for step in ("analyze", "voiceover", "plan", "label"):
+            assert all_kwargs[step].get("cancel_event") is cancel_event, (
+                f"{step} should receive cancel_event, got: {all_kwargs[step]}"
+            )
