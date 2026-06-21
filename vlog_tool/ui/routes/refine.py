@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from vlog_tool.analyze import refine_script, refine_text
 from vlog_tool.tasks.refine import _load_analysis_for_script
-from vlog_tool.ui.services.file_service import _is_safe_basename, _save_atomic
+from vlog_tool.ui.services.file_service import _save_atomic
 
 if TYPE_CHECKING:
     from http.server import BaseHTTPRequestHandler
@@ -26,10 +25,9 @@ def handle_post_refine(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> 
 
     if not fname or ftype not in ("texts", "scripts"):
         return handler._send_json({"ok": False, "error": "missing or invalid file/type"}, 400)
-    if not _is_safe_basename(Path(fname).stem):
-        return handler._send_json({"ok": False, "error": "forbidden"}, 403)
 
-    proj_out = handler._get_project_output(qs)
+    proj_input = handler._resolve_project_input(qs)
+    proj_out = handler._get_project_output(proj_input)
     if ftype == "texts":
         p = handler._resolve_texts(fname, proj_out)
     else:
@@ -43,7 +41,7 @@ def handle_post_refine(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> 
     except (json.JSONDecodeError, OSError) as e:
         return handler._send_json({"ok": False, "error": f"failed to read file: {e}"}, 500)
 
-    config = handler._get_config(proj_out)
+    config = handler._get_config(proj_input)
 
     try:
         if ftype == "texts":

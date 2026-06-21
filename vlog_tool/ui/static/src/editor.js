@@ -112,7 +112,7 @@ async function refineCurrentFile(type) {
   btn.textContent = 'AI 审阅中...';
   status.textContent = '';
   try {
-    const r = await api('POST', `/api/refine?file=${encodeURIComponent(v[fileField])}`, { file: v[fileField], type, context: ctx || undefined });
+    const r = await api('POST', '/api/refine', { file: v[fileField], type, context: ctx || undefined });
     if (r.error) throw new Error(r.error);
     if (type === 'texts') state.texts = r.data;
     else state.voiceover = r.data;

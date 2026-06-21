@@ -59,8 +59,7 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
             ok = False
 
     print("环境检查:")
-    parent_name = Path(sys.executable).parent.name.lower()
-    venv_ok = parent_name in ("scripts", "bin") or ".venv" in sys.executable
+    venv_ok = sys.prefix != sys.base_prefix or ".venv" in sys.executable
     status(
         "虚拟环境",
         venv_ok,
