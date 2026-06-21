@@ -88,6 +88,7 @@ function renderTexts() {
     ol.appendChild(li);
   }
   pane.insertAdjacentHTML('beforeend', renderRefineUI('texts'));
+  pane.querySelector(`#btn-refine-texts`).onclick = () => refineCurrentFile('texts');
 }
 
 function renderRefineUI(type) {
@@ -95,7 +96,7 @@ function renderRefineUI(type) {
     <hr>
     <h3>AI 审阅修正</h3>
     <label>临时上下文（可选，如更正建议）<textarea id="refine-context-${type}" rows="2" placeholder="例如：地名写错了，请修正为正确的拼音"></textarea></label>
-    <button id="btn-refine-${type}" class="btn btn-secondary" onclick="refineCurrentFile('${type}')">AI 审阅修正</button>
+    <button id="btn-refine-${type}" class="btn btn-secondary">AI 审阅修正</button>
     <p id="refine-status-${type}" class="status"></p>
   `;
 }
@@ -110,9 +111,11 @@ async function refineCurrentFile(type) {
   const btn = $(`btn-refine-${type}`);
   const status = $(`refine-status-${type}`);
   const ctx = $(`refine-context-${type}`).value.trim();
+  if (btn.disabled) return;
   btn.disabled = true;
-  btn.textContent = 'AI 审阅中...';
-  status.textContent = '';
+  btn.textContent = '⏳ AI 审阅中...';
+  status.className = 'status';
+  status.innerHTML = '<span class="loading">正在请求 AI，请稍候...</span>';
   try {
     const r = await api('POST', '/api/refine', { file: v[fileField], type, context: ctx || undefined });
     if (r.error) throw new Error(r.error);
@@ -120,9 +123,14 @@ async function refineCurrentFile(type) {
     else state.voiceover = r.data;
     if (type === 'texts') renderTexts();
     else renderVoiceover();
+    status.innerHTML = `<span class="ok">AI 审阅完成</span>`;
     setStatus(`${label}已 AI 审阅修正`, 'ok');
   } catch (e) {
-    status.innerHTML = `<span class="err">修正失败: ${escapeHtml(e.message)}</span>`;
+    if (e.message.includes('正在 AI 审阅')) {
+      status.innerHTML = `<span class="warn">该文件正在 AI 审阅中（其他页面已触发），请等待完成</span>`;
+    } else {
+      status.innerHTML = `<span class="err">修正失败: ${escapeHtml(e.message)}</span>`;
+    }
   } finally {
     btn.disabled = false;
     btn.textContent = 'AI 审阅修正';
@@ -153,6 +161,7 @@ function renderVoiceover() {
   dEl.value = v.duration_hint_sec ?? '';
   dEl.oninput = () => { v.duration_hint_sec = parseFloat(dEl.value) || 0; markDirty(); };
   pane.insertAdjacentHTML('beforeend', renderRefineUI('scripts'));
+  pane.querySelector(`#btn-refine-scripts`).onclick = () => refineCurrentFile('scripts');
 }
 
 function renderTranscript() {

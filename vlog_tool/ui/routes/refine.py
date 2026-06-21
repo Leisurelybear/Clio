@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import threading
 from typing import TYPE_CHECKING
 
 from vlog_tool.analyze import refine_script, refine_text
@@ -11,6 +12,22 @@ from vlog_tool.ui.services.file_service import _save_atomic
 
 if TYPE_CHECKING:
     from http.server import BaseHTTPRequestHandler
+
+_refining: set[str] = set()
+_refining_lock = threading.Lock()
+
+
+def _is_file_busy(path: str) -> bool:
+    with _refining_lock:
+        return path in _refining
+
+
+def _mark_busy(path: str, busy: bool) -> None:
+    with _refining_lock:
+        if busy:
+            _refining.add(path)
+        else:
+            _refining.discard(path)
 
 
 def handle_post_refine(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
@@ -36,6 +53,10 @@ def handle_post_refine(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> 
     if p is None:
         return handler._send_json({"ok": False, "error": "forbidden or not found"}, 404)
 
+    abs_path = str(p.resolve())
+    if _is_file_busy(abs_path):
+        return handler._send_json({"ok": False, "error": "该文件正在 AI 审阅中，请等待完成"}, 409)
+
     try:
         data = json.loads(p.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError) as e:
@@ -43,6 +64,7 @@ def handle_post_refine(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> 
 
     config = handler._get_config(proj_input)
 
+    _mark_busy(abs_path, True)
     try:
         if ftype == "texts":
             refined = refine_text(data, config, context_override=context_override)
@@ -51,6 +73,8 @@ def handle_post_refine(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> 
             refined = refine_script(data, analysis, config, context_override=context_override)
     except Exception as e:
         return handler._send_json({"ok": False, "error": f"refine failed: {e}"}, 500)
+    finally:
+        _mark_busy(abs_path, False)
 
     raw = json.dumps(refined, ensure_ascii=False, indent=2).encode("utf-8")
     _save_atomic(p, raw)
