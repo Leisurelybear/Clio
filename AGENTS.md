@@ -319,6 +319,7 @@ Recent commit history:
 177. `94f4501` `fix(tasks): move elapsed_total to finally block for accurate ETA (B-004)`  ← ETA fix
 178. `d799f21` `fix(config): restore missing analyze: header in config.example.yaml`  ← YAML structure fix
 179. `91f1da4` `docs(config): add reencode_split example to config.example.yaml`  ← Config doc
+180. `b4bd05b` `feat(config): auto-inject missing dataclass field defaults into config YAML`  ← Auto-upgrade
 
 2026-06-18 Review fixes (based on `docs/analysis/2026-06-18-vlog-editing-helper-review.md`, see `docs/analysis/2026-06-18-review-fix-result.md`):
 - **P0-1** `cut.py`: switched to `write_json_atomic` / `write_text_atomic` (missed atomic writes)
@@ -570,6 +571,17 @@ See `vlog_tool/compress.py:24`.
 - Filenames like `001_巴黎铁塔_part1.json` itself has no `_segNN` marker, making it impossible to distinguish which segment it belongs to from the filename alone
 - Fix requires either: (a) embedding `_segNN` into sidecar filenames, or (b) matching by compressed file stem rather than index prefix
 - Tracked as B-097
+
+### 9.21 Config Auto-Upgrade: Dataclass Defaults Injection
+
+- `_upgrade_config_file()` in `loader.py` runs at the start of every `load_config()` call
+- For each YAML section (`paths`, `proxy`, `ai`, `compress`, `analyze`, `naming`, `script`, `plan`, `whisper`), it checks the corresponding dataclass for fields not present in the YAML and injects their Python `field(default=...)` values
+- Also covers `ai.providers.*` (per `ProviderConfig`) and `ai.tasks.*` (per `TaskConfig`)
+- Handles both `config.yaml` and `project.yaml` independently
+- `Path`-typed defaults are converted to strings via `str()` before YAML serialization to avoid unsafe `!!python/object` tags
+- Writes back via `yaml.dump()` only when something changed; prints a summary to stdout
+- **Trade-off**: PyYAML does not preserve comments — a one-time loss when new fields are injected
+- Only the user's local config files are touched; `config.example.yaml` is never modified
 
 ## 10. Verification Flow
 
