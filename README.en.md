@@ -2,7 +2,7 @@
 
 > 🧠 **Raw footage → Compress → AI understands → Voiceover scripts → Edit plan → CapCut final cut**
 >
-> A CLI + Web UI tool designed for solo travel vloggers. Feed your GoPro/phone 4K footage to AI, get summaries, timelines, voiceover scripts, and edit plans — then put the final touches (effects, lip-sync) in **CapCut (JianYing)**.
+> Feed your GoPro/phone 4K footage to AI, get summaries, timelines, voiceover scripts, and edit plans — then finish with effects and lip-sync in **CapCut (JianYing)**.
 
 [![CI](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml/badge.svg)](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/Leisurelybear/vlog-editing-helper/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/Leisurelybear/vlog-editing-helper)
@@ -18,53 +18,45 @@
 
 | | Feature | AI | Description |
 |---|---------|----|-------------|
-| 🗜️ | **Smart Compression** | | 4K → 640p · strip audio · auto-split (15min) · ~5MB per clip |
-| 🤖 | **AI Video Understanding** | ✅ Gemini | Watches footage → title / location / mood / summary / timeline |
-| ✍️ | **AI Voiceover** | ✅ DeepSeek | Writes narration from template + AI analysis |
-| 📋 | **AI Edit Planning** | ✅ DeepSeek | AI arranges segment order, target duration, theme |
-| 🧠 | **AI ASR Transcription** | ✅ Whisper | faster-whisper offline ASR with CUDA |
-| 🔧 | **AI Refine** | ✅ DeepSeek | Review + fix output with trip context, `--fix` support |
-| 🏷️ | **Label Burn-in** | | Burn index watermark onto compressed video |
-| ✂️ | **Precision Cutting** | | Plan-based cutting, fast or re-encode |
-| 🌐 | **Web UI Editor** | | Zero deps, browser-based editing & pipeline |
-| 🚀 | **One-shot Pipeline** | ✅ | `run --day day1` does it all, skips existing |
+| 🗜️ | **Smart Compression** | | 4K→640p·strip audio·auto-split·~5MB |
+| 🤖 | **AI Video Understanding** | ✅ Gemini | Watches footage→title/location/timeline |
+| ✍️ | **AI Voiceover** | ✅ DeepSeek | Writes narration from template |
+| 📋 | **AI Edit Planning** | ✅ DeepSeek | Arranges segment order/duration |
+| 🧠 | **AI ASR Transcription** | ✅ Whisper | faster-whisper offline + CUDA |
+| 🔧 | **AI Refine** | ✅ DeepSeek | Trip context review·`--fix` targeted fix |
+| 🏷️ | **Label Burn-in** | | Index watermark for CapCut reference |
+| ✂️ | **Precision Cutting** | | Plan-based cutting·fast/re-encode |
+| 🌐 | **Web UI Editor** | | Zero deps·browser editing+pipeline |
+| 🚀 | **One-shot Pipeline** | ✅ | `run --day day1` skips existing |
 
 ---
 
-## 🖥️ Web UI Editor
+## 🖥️ Screenshots
 
-**Pure Python stdlib** (`http.server`). No Node.js, no npm, no build step.
+**Pure Python stdlib** (`http.server`). No Node.js / npm / build step.
 
-```
-┌────────────────────────────────────────────┐
-│ Project: 📁 Paris2025  [Compressed|Original] │
-├──────────┬──────────────────┬──────────────┤
-│ 📋 Plan  │   ▶ Player       │ 📝 Analysis  │
-│ ⚙ Config │   ⏪ ⏸ ⏩        │  Title/Summ. │
-│ ▶ Run    │  0:00 / 0:42     │  Timeline    │
-│ ────────  │                  ├──────────────┤
-│ 🎬 Videos │   🔇 Speed 1x   │ 🎤 Voiceover │
-│ [001]xxx  │                  │  Script Edit │
-│ [002]yyy  │                  │  [Save]      │
-└──────────┴──────────────────┴──────────────┘
-```
-
-| Pipeline runner view | Vlog plan editor view |
-|:---:|:---:|
-| ![pipeline](docs/screenshots/pipeline.png) | ![plan](docs/screenshots/plan.png) |
-
-- 🎥 **HTML5 Player** — seek / jump / speed (0.5x–2x) / Range requests
-- 📂 **Source Toggle** — switch between compressed / original view
-- 📝 **Three Editing Tabs** — Analysis / Voiceover / Plan, Ctrl+S to save
-- ⚙ **Visual Config Editor** — Full YAML form, global & per-project modes
-- ▶ **Pipeline Runner** — Step-by-step or full run, live progress + ETA
-- 🔄 **Whisper Model Download** — One-click in UI, auto-rerun transcription
+<div align="center">
+  <img src="docs/screenshots/pipeline.png" alt="Pipeline runner" width="80%">
+  <br><sub>🏃 Pipeline runner — step-by-step or full run·live progress·ETA</sub>
+  <br><br>
+  <img src="docs/screenshots/analysis.png" alt="AI analysis editor" width="80%">
+  <br><sub>🤖 AI analysis editor — summary·timeline·manual tweaks</sub>
+  <br><br>
+  <img src="docs/screenshots/voiceover.png" alt="Voiceover editor" width="80%">
+  <br><sub>✍️ Voiceover script editor — AI-generated·edit·save</sub>
+  <br><br>
+  <img src="docs/screenshots/plan.png" alt="Edit plan editor" width="80%">
+  <br><sub>📋 Edit plan — theme·segment order·preview playback</sub>
+  <br><br>
+  <img src="docs/screenshots/new_project.png" alt="Project management" width="80%">
+  <br><sub>📁 Project management — create/switch/delete·visual config</sub>
+</div>
 
 Launch: `python main.py serve` → open `http://127.0.0.1:8765`
 
 ---
 
-## 🧩 Pipeline Steps
+## 🧩 Pipeline
 
 ```mermaid
 graph LR
@@ -84,209 +76,41 @@ graph LR
     style F fill:#e8f5e9,stroke:#1b5e20
 ```
 
-| Step | AI Engine | Command | Input → Output |
-|------|-----------|---------|---------------|
-| 1️⃣ Compress | | `compress` | 4K raw → 640p / ~5MB / no audio / auto-split |
-| 2️⃣ 🤖 **AI Analysis** | **Gemini** 2.5 Flash | `analyze` | Video → AI summary + timeline JSON |
-| 3️⃣ ✍️ **AI Voiceover** | **DeepSeek** / OpenAI | `scripts` | Analysis → AI-generated narration |
-| 4️⃣ 🧠 **AI Transcription** | **Whisper** ASR | `transcribe` | Video → Offline speech-to-text |
-| 5️⃣ 🤖 **AI Planning** | **DeepSeek** / OpenAI | `plan --day day1` | Analysis + transcripts → AI edit plan |
-| 6️⃣ 🔧 **AI Refine** | **DeepSeek** / Gemini | `refine` | Output + trip context → AI fix |
-| 7️⃣ Cut | | `cut --day day1` | Plan → Timestamp clip extraction |
-| 8️⃣ Label | | `label` | Video → Burn index watermark |
-| 🚀 Full Pipeline | All AI | `run --day day1` | Executes all steps sequentially |
-
-> 💡 Supports **single-file** processing: `python main.py analyze -i "output/compressed/001_GL010685.mp4"`
-> 💡 Each step independently skips existing output; add `--force` to regenerate
+> 💡 Each step runs independently (`analyze`/`scripts`/`plan`/`transcribe`/`refine`/`cut`/`label`),
+> supports single-file processing, `--force` to regenerate, auto-skips existing.
 
 ---
 
 ## 🚀 Quick Start
 
-### 📦 One-line Setup
-
 ```bash
-# Windows 🪟
-.\setup.ps1
+# 1️⃣ One-click setup (venv + ffmpeg + deps)
+.\setup.ps1                    # Windows
+./setup.sh                     # Linux / macOS
 
-# Linux / macOS 🐧
-./setup.sh
-```
-
-Auto-creates venv → installs deps → installs ffmpeg → creates `.env`.
-
-### 🔑 Configure API Keys
-
-```bash
-# Edit .env with your keys
+# 2️⃣ Edit .env with your API keys
 GEMINI_API_KEY=your_Gemini_API_Key
 DEEPSEEK_API_KEY=your_DeepSeek_API_Key
+
+# 3️⃣ Run it
+python main.py run -i "E:/Videos/🇫🇷ParisTrip" --day day1   # Full pipeline
+python main.py serve                                         # Web UI
+python main.py check                                         # Environment check
 ```
 
-### ⚙️ Edit Config
-
-```bash
-cp config.example.yaml config.yaml
-# Edit paths.input_dir, proxy.url, etc.
-```
-
-### ▶️ Run It
-
-```bash
-# 🏃 Full pipeline
-python main.py run -i "E:/Videos/🇫🇷ParisTrip" --day day1
-
-# 🔍 Environment check
-python main.py check
-
-# 🌐 Launch UI
-python main.py serve
-```
+Each AI task can use a different provider/model (`config.yaml` → `ai.tasks`): Gemini / DeepSeek / OpenAI / Tongyi Qianwen / Kimi. Trip context auto-injected from `templates/trip_context.md`.
 
 ---
 
-## 🧠 Multi-Provider AI
-
-| Task | Recommended | Type | Description |
-|------|-------------|------|-------------|
-| 🎬 Video Analysis | **Gemini** 2.5 Flash | Multimodal | Watches video, outputs title/location/timeline |
-| ✍️ Voiceover | **DeepSeek** / OpenAI | Text | Generates narration from template |
-| 📋 Edit Plan | **DeepSeek** / OpenAI | Text | Arranges segment sequence |
-| 🔧 Refine | Same (configurable) | Text | Fixes output with trip context |
-
-Each task can use a different provider/model via `config.yaml` → `ai.tasks`. Supports **OpenAI-compatible APIs** (Tongyi Qianwen, Kimi, etc.).
-
-📌 **Automatic trip context injection**: write your trip background and known pitfalls once in `templates/trip_context.md`, injected into every AI call.
-
----
-
-## 🎯 Typical Workflow
-
-```
-📹 Home from a shoot, plug in GoPro SD card
-
-> python main.py run -i "E:/2025-10 Paris" --day day1
->   ⚙️ Split 3 clips (34min total)
->   ⚙️ Compressed (avg 4.8MB each)
-> ── 🤖 AI takes over ──────────────────
->   ✅ Gemini analyzed all footage → titles / timelines
->   ✅ DeepSeek wrote voiceover scripts → templated style
->   ✅ Whisper ASR done → medium model, offline
->   ✅ DeepSeek planned edit order → 11 segs / ~3min
-> ── 🔧 Non-AI steps ──────────────────
->   ✅ Clips cut by plan
->   ✅ Index labels burned
-
-> python main.py serve
-  → Browser: review AI output, tweak scripts, reorder, preview
-
-📱 Open CapCut, import output/cuts/day1/, drag, add effects, done!
-```
-
----
-
-## 📁 Project Structure
-
-```
-vlog-video-analysis/
-├── main.py                    # 🎯 CLI entry
-├── config.example.yaml        # 📋 Config template
-├── setup.ps1 / setup.sh       # 🚀 One-click installer
-├── serve.ps1 / serve.sh       # 🌐 One-click UI launcher
-├── templates/
-│   ├── trip_context.md        # 🗺️ Trip background (auto-injected)
-│   └── vlog_template.md       # 📝 Voiceover template (customizable)
-├── vlog_tool/
-│   ├── compress.py            # 🗜️ ffmpeg wrapper
-│   ├── analyze.py             # 🤖 AI analysis logic
-│   ├── transcribe.py          # 🎙️ Whisper ASR
-│   ├── prompts.py             # 💬 All prompt templates
-│   ├── pipeline.py            # 🔄 Pipeline orchestration
-│   ├── config/                # ⚙️ Config parsing / validation
-│   ├── ai/                    # 🧠 AI adapters (Gemini / OpenAI compat)
-│   ├── tasks/                 # 📂 Step implementations
-│   ├── ui/                    # 🌐 Web UI (stdlib only, zero deps)
-│   └── tests/                 # 🧪 600+ unit tests
-└── output/
-    ├── compressed/            # 🗜️ Compressed videos
-    ├── texts/                 # 📝 AI analysis JSON
-    ├── transcripts/           # 🎙️ ASR transcripts JSON
-    ├── scripts/               # ✍️ Voiceover scripts
-    ├── plans/                 # 📋 Edit plans
-    ├── cuts/                  # ✂️ Cut segments
-    └── labeled/               # 🏷️ Label-burned videos
-```
-
----
-
-## 🧪 Testing & Quality
-
-```bash
-python -m pytest vlog_tool/tests/ -v
-
-# 600+ tests · GitHub Actions CI (Ubuntu + Windows · 3.11 / 3.12)
-# Code style: ruff (format + lint)
-```
-
-| Module | Tests | Coverage |
-|--------|-------|----------|
-| 🧩 config | 34 | Loading / merging / validation |
-| 🛠️ utils | 54 | extract_json / ffmpeg discovery / atomic IO |
-| 🎬 cut | 25 | Time parsing / filename gen |
-| 📊 progress | 14 | Progress / ETA |
-| 🤖 ai series | 53 | Gemini / OpenAI / retry / cache |
-| 🧠 analyze | 19 | File matching / context injection |
-| 🌐 routes | 48 | Video / config / plan / transcript APIs |
-| 🔄 tasks | 50+ | Step orchestration / cancel |
-| 🎙️ transcribe | 19 | Toggle / device / model / CUDA |
-| Others | ~200 | Pipeline / plan / processing_state / log |
-
----
-
-## 📚 Documentation
+## 📚 Docs
 
 | Doc | Description |
 |-----|-------------|
-| [AGENTS.md](AGENTS.md) | 🧑‍💻 AI maintenance manual (structure / conventions / gotchas) |
-| [ROADMAP.md](ROADMAP.md) | 🗺️ Feature tracking & roadmap |
 | [docs/cli-reference.md](docs/cli-reference.md) | 📖 Full CLI reference |
-| [vlog_tool/ui/README.md](vlog_tool/ui/README.md) | 🖥️ Web UI detailed guide |
-
----
-
----
-
-## ❓ FAQ
-
-### ffmpeg not found
-
-Run `.\setup.ps1` (Windows) or `./setup.sh` (Linux/Mac) to auto-install, or set paths manually in `config.yaml`.
-
-### socksio package not installed
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-### File is not in an ACTIVE state
-
-The tool polls automatically for Google's video processing; if it fails, retry later.
-
-### ConnectTimeout / network errors
-
-Check your proxy settings in `config.yaml`.
-
-### pip install fails
-
-Make sure you're using the project virtual environment (Windows: `.venv\Scripts\activate`, Linux/Mac: `source .venv/bin/activate`):
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-### Re-analyze a single video
-
-Delete the corresponding `.json`/`.txt` from `output/texts/`, or set `analyze.skip_existing: false`.
+| [vlog_tool/ui/README.md](vlog_tool/ui/README.md) | 🖥️ Web UI guide |
+| [AGENTS.md](AGENTS.md) | 🧑‍💻 Project structure / conventions / gotchas |
+| [ROADMAP.md](ROADMAP.md) | 🗺️ Feature tracking & roadmap |
+| [FAQ →](https://github.com/Leisurelybear/vlog-editing-helper/issues) | ❓ ffmpeg / network / re-analyze etc. |
 
 ---
 
@@ -297,28 +121,16 @@ Personal vlogger tool — [Issues](https://github.com/Leisurelybear/vlog-editing
 ```bash
 .venv\Scripts\activate         # Windows
 source .venv/bin/activate      # Linux/Mac
-ruff format .                  # Format
-ruff check .                   # Lint
-python -m pytest -v            # Test
+ruff format . && ruff check . && python -m pytest -v
 ```
 
 ---
 
 ## 🚀 Future Vision
 
-> This is just the beginning. Here's what we're exploring:
+🧠 Local AI inference · 🖼️ AI thumbnails · 🌍 Multi-language voiceover · 🎵 AI music · 🤝 Collaboration · 📊 Edit scoring · 🏪 Plugins
 
-| Vision | Description |
-|--------|-------------|
-| 🧠 **Local AI Inference** | Integrate llama.cpp / ollama for fully offline, zero-cost, privacy-first inference |
-| 🖼️ **AI Thumbnail Generation** | Auto-select frames + overlay titles for YouTube / Bilibili covers |
-| 🌍 **Multi-language Voiceover** | AI translates Chinese voiceover to EN / JP / FR etc. |
-| 🎵 **AI Music Recommendation** | Analyze video mood → suggest matching BGM with auto beat sync |
-| 🤝 **Collaborative Editing** | Project sharing, cloud sync for team vlog production |
-| 📊 **AI Edit Scoring** | Auto-evaluate pacing, shot diversity, give improvement suggestions |
-| 🏪 **Plugin Marketplace** | Third-party plugin system: custom AI steps, export templates, effects |
-
-**Got ideas? → [Open an Issue](https://github.com/Leisurelybear/vlog-editing-helper/issues) ✨**
+[→ Share your ideas](https://github.com/Leisurelybear/vlog-editing-helper/issues)
 
 ---
 
