@@ -49,6 +49,25 @@ class TestExtractJson:
         text = '{"key": "value with { inside"}'
         assert extract_json(text) == {"key": "value with { inside"}
 
+    def test_trailing_comma_in_object(self):
+        assert extract_json('{"a": 1,}') == {"a": 1}
+
+    def test_trailing_comma_in_nested(self):
+        text = '{"a": {"b": [1, 2,],},}'
+        assert extract_json(text) == {"a": {"b": [1, 2]}}
+
+    def test_trailing_comma_with_surrounding_text(self):
+        text = '一些文字\n```\n{"a": 1,}\n```\n结尾'
+        assert extract_json(text) == {"a": 1}
+
+    def test_no_valid_json_after_comma_fix_raises(self):
+        with pytest.raises(ValueError):
+            extract_json("{invalid,}")
+
+    def test_raises_on_broken_json_that_even_comma_fix_cant_save(self):
+        with pytest.raises(ValueError):
+            extract_json("{a: 1}")
+
 
 # ── mask_if_looks_like_key ──────────────────────────────────────────
 

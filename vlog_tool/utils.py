@@ -84,19 +84,38 @@ def with_retry(
     raise last_exc
 
 
+def _fix_trailing_commas(text: str) -> str:
+    """移除 JSON 中数组/对象末尾多余的逗号，使 json.loads 能解析。"""
+    return re.sub(r",\s*([}\]])", r"\1", text)
+
+
 def extract_json(text: str) -> dict:
     """从 AI 返回的文本中容错提取 JSON 对象。
 
     先尝试整体解析（多数情况）；失败时用正则抓第一个 {...} 块。
+    仍失败时尝试清理尾部逗号后重试。
     都失败时抛出 ValueError，含原文前 500 字方便排查。
     """
     text = text.strip()
     try:
         return json.loads(text)
     except json.JSONDecodeError:
-        match = re.search(r"\{[\s\S]*\}", text)
-        if match:
-            return json.loads(match.group())
+        pass
+
+    match = re.search(r"\{[\s\S]*\}", text)
+    if not match:
+        raise ValueError(f"AI 返回内容无法解析为 JSON:\n{text[:500]}")
+
+    candidate = match.group()
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        pass
+
+    fixed = _fix_trailing_commas(candidate)
+    try:
+        return json.loads(fixed)
+    except json.JSONDecodeError:
         raise ValueError(f"AI 返回内容无法解析为 JSON:\n{text[:500]}")
 
 
