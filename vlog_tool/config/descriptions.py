@@ -37,6 +37,7 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     "compress.remove_audio": "是否移除音频（压缩后仅保留画面，可减小体积）",
     "compress.split_max_min": "超过此分钟数的视频，压缩前先自动分段。0 关闭分段",
     "compress.splits_subdir": "分段视频存放的子目录名",
+    "compress.reencode_split": "分段时重新编码（精确到帧，避免段首黑屏但较慢）",
     # analyze
     "analyze.compressed_subdir": "压缩视频存放的子目录名",
     "analyze.texts_subdir": "AI 分析结果（文案）存放的子目录名",

@@ -76,3 +76,17 @@ class TestSplitVideo:
         # All segments are equal length since the code divides evenly
         last_dur = ffmpeg_calls[-1][ffmpeg_calls[-1].index("-t") + 1]
         assert float(last_dur) == pytest.approx(450.0, rel=0.01)
+
+    def test_reencode_uses_video_codec(self, monkeypatch, tmp_path: Path):
+        """When reencode=True, uses libx264 instead of -c copy."""
+        monkeypatch.setattr("vlog_tool.split.get_duration_sec", lambda *a, **kw: 1200.0)
+        ffmpeg_calls = []
+        monkeypatch.setattr("vlog_tool.split.run_ffmpeg", lambda args, ff: ffmpeg_calls.append(args))
+
+        split_video(tmp_path / "video.mp4", tmp_path / "splits", 10, "ffmpeg", "ffprobe", reencode=True)
+        assert len(ffmpeg_calls) == 2
+        assert "-c:v" in ffmpeg_calls[0]
+        assert "libx264" in ffmpeg_calls[0]
+        assert "-c:a" in ffmpeg_calls[0]
+        assert "aac" in ffmpeg_calls[0]
+        assert "-c" not in ffmpeg_calls[0] or ffmpeg_calls[0].index("-c") != ffmpeg_calls[0].index("-c:v")  # no bare -c

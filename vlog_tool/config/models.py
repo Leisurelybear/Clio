@@ -59,6 +59,7 @@ class CompressConfig:
     remove_audio: bool = True
     split_max_min: int = 15
     splits_subdir: str = "splits"
+    reencode_split: bool = False
 
 
 @dataclass

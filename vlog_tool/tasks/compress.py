@@ -38,7 +38,7 @@ def run_compress_all(
         max_min = config.compress.split_max_min
         if max_min > 0:
             splits_dir = config.paths.output_dir / config.compress.splits_subdir
-            segments = split_video(video, splits_dir, max_min, ffmpeg, ffprobe)
+            segments = split_video(video, splits_dir, max_min, ffmpeg, ffprobe, reencode=config.compress.reencode_split)
             for seg in segments:
                 items.append((video, seg))
         else:
