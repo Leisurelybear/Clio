@@ -14,7 +14,7 @@ from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.split import split_video
 from vlog_tool.tasks._helpers import ClipRecord, _eta_line, _next_index
-from vlog_tool.utils import find_videos, format_index, resolve_binary
+from vlog_tool.utils import find_videos, format_index, get_duration_sec, resolve_binary
 
 
 def run_compress_all(
@@ -53,6 +53,14 @@ def run_compress_all(
             if not f.is_file() or f.suffix.lower() not in VIDEO_EXTS:
                 continue
             if f.stat().st_size < MIN_VALID_SIZE:
+                continue
+            try:
+                dur = get_duration_sec(f, ffprobe)
+                if dur <= 0:
+                    raise ValueError("zero duration")
+            except Exception:
+                print(f"[清理] {f.name} 已损坏（ffprobe 无法读取），重新压缩")
+                f.unlink(missing_ok=True)
                 continue
             if "_" in f.stem:
                 prefix, stem_part = f.stem.split("_", 1)

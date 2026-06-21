@@ -87,6 +87,7 @@ class TestRunCompressAll:
         # Second call — should skip since output exists
         cfg.analyze.skip_existing = True
         monkeypatch.setattr("vlog_tool.tasks.compress._next_index", lambda *a: 1)
+        monkeypatch.setattr("vlog_tool.tasks.compress.get_duration_sec", lambda *a, **kw: 10.0)
         records2 = run_compress_all(cfg)
         assert len(records2) == 1
         assert call_count == 1  # still 1 — no new compress calls
@@ -116,6 +117,7 @@ class TestRunCompressAll:
         monkeypatch.setattr("vlog_tool.tasks.compress.compress_video", _mock_compress)
 
         cfg.analyze.skip_existing = True
+        monkeypatch.setattr("vlog_tool.tasks.compress.get_duration_sec", lambda *a, **kw: 10.0)
         records = run_compress_all(cfg)
         assert call_count == 0  # should NOT re-compress
         # Expect 1 skipped record (original file skipped via fallback)
