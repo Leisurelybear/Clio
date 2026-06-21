@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -56,6 +57,7 @@ def _read_trip_context(project_dir: str) -> str:
 
 def _validate_analysis(data: dict, source: str) -> dict:
     """校验 AI 分析结果，缺失字段补默认值并告警。"""
+    data = copy.deepcopy(data)
     required = {"title", "summary", "timeline"}
     missing = required - data.keys()
     if missing:
@@ -72,6 +74,7 @@ def _validate_analysis(data: dict, source: str) -> dict:
 
 def _validate_voiceover(data: dict, source: str) -> dict:
     """校验 AI 口播文案结果。"""
+    data = copy.deepcopy(data)
     required = {"voiceover", "title"}
     missing = required - data.keys()
     if missing:
@@ -85,6 +88,7 @@ def _validate_voiceover(data: dict, source: str) -> dict:
 
 def _validate_plan(data: dict, source: str) -> dict:
     """校验 AI vlog 规划结果。"""
+    data = copy.deepcopy(data)
     required = {"day_title", "sequence"}
     missing = required - data.keys()
     if missing:
