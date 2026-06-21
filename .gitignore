@@ -28,8 +28,9 @@ node_modules/
 # Test mock artifacts
 MagicMock/
 
-# Temp files
+# Temp files (including atomic-write .tmp.XXXXXXXX)
 *.tmp
+*.tmp.*
 *.swp
 *.swo
 *~
