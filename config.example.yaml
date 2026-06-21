@@ -82,6 +82,8 @@ compress:
   # reencode_split: true  # 分段时重新编码（-c:v libx264）以精确到帧，
                             # 避免段首黑屏。默认 false 使用 -c copy（快速但
                             # 切分边界在关键帧，段首可能有多余画面或黑帧）。
+
+analyze:
   compressed_subdir: compressed
   texts_subdir: texts
   skip_existing: true

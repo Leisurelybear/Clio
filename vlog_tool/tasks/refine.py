@@ -61,8 +61,8 @@ def run_refine_texts(
         for i, json_file in enumerate(files, start=1):
             print(_eta_line("refine", i, len(files), json_file.name, completed, elapsed_total))
             t0 = time.monotonic()
-            analysis = json.loads(json_file.read_text(encoding="utf-8"))
             try:
+                analysis = json.loads(json_file.read_text(encoding="utf-8"))
                 refined = refine_text(analysis, config, fix=fix, context_override=context_override)
             except Exception as e:
                 print(f"  失败: {e}")
@@ -104,9 +104,9 @@ def run_refine_scripts(
         for i, json_file in enumerate(files, start=1):
             print(_eta_line("refine", i, len(files), json_file.name, completed, elapsed_total))
             t0 = time.monotonic()
-            script = json.loads(json_file.read_text(encoding="utf-8"))
-            analysis = _load_analysis_for_script(json_file, config.texts_dir)
             try:
+                script = json.loads(json_file.read_text(encoding="utf-8"))
+                analysis = _load_analysis_for_script(json_file, config.texts_dir)
                 refined = refine_script(script, analysis, config, fix=fix, context_override=context_override)
             except Exception as e:
                 print(f"  失败: {e}")
