@@ -67,7 +67,8 @@ def run_refine_texts(
             except Exception as e:
                 print(f"  失败: {e}")
                 continue
-            elapsed_total += time.monotonic() - t0
+            finally:
+                elapsed_total += time.monotonic() - t0
             completed += 1
             write_json_atomic(json_file, refined)
             txt_path = json_file.with_suffix(".txt")
@@ -110,7 +111,8 @@ def run_refine_scripts(
             except Exception as e:
                 print(f"  失败: {e}")
                 continue
-            elapsed_total += time.monotonic() - t0
+            finally:
+                elapsed_total += time.monotonic() - t0
             completed += 1
             write_json_atomic(json_file, refined)
             md_path = json_file.with_name(json_file.stem + ".md")

@@ -205,7 +205,8 @@ def run_analyze_all(
                     tracker.update(phase="analyze", current=i, total=total, message=f"失败 {compressed.name}")
                     tracker.log(f"分析 {compressed.name} 失败: {e}")
                 continue
-            elapsed_total += time.monotonic() - t0
+            finally:
+                elapsed_total += time.monotonic() - t0
             completed += 1
             analysis["index"] = idx_val
             analysis["source_file"] = original.name
