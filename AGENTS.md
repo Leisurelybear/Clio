@@ -16,7 +16,7 @@ The end user is a solo vlogger: first compress and feed to AI, then add effects/
 - **google-genai** (Gemini 2.5 Flash's video File API)
 - **httpx** (DeepSeek / OpenAI compatible calls)
 - **PyYAML** (config parsing)
-- **pytest** (unit tests, auto-run in CI; currently **587 test cases**)
+- **pytest** (unit tests, auto-run in CI; currently **612 test cases**)
 
 Dependencies in `requirements.txt`; `setup.ps1` (Windows) / `setup.sh` (Linux/macOS) creates venv + installs ffmpeg + copies `.env` in one click.
 
@@ -228,7 +228,7 @@ more reliable than letting AI freely review:
 
 ## 7. Project Current Status
 
-Last updated: 2026-06-21 (B-007~B-009/B-011 fixes + R-003e/R-015c + full code review). Live:
+Last updated: 2026-06-22 (R-018/B-072/B-068/B-004 + code review fixes). Live:
 - GitHub Actions CI (Ubuntu, Windows, Python 3.11/3.12)
 - **611 pytest cases** (coverage table below)
 - Dependency version locked in `requirements-locked.txt`
@@ -313,6 +313,12 @@ Recent commit history:
 171. `cae3c9a` `feat(ui): differentiate project vs global config save message (R-015c)`  ← Config UX
 172. `089dc6a` `feat(ui): add refine panel with context textarea and AI trigger button (R-003e)`  ← New route + UI
 173. `f24bdf3` `fixup: address review findings - venv detection with sys.prefix, refine route security/proj_input/post-body cleanup`  ← Review fixes
+174. `92a6d9e` `feat(config): add ai.debug_print_prompt for prompt debugging (R-018)`  ← Debug print
+175. `6c3c231` `fix(compress): add ffprobe integrity check for skip_existing (B-072)`  ← Corrupt retry
+176. `cd1da63` `feat(split): add reencode_split option for frame-accurate cuts (B-068)`  ← Keyframe fix
+177. `94f4501` `fix(tasks): move elapsed_total to finally block for accurate ETA (B-004)`  ← ETA fix
+178. `d799f21` `fix(config): restore missing analyze: header in config.example.yaml`  ← YAML structure fix
+179. `91f1da4` `docs(config): add reencode_split example to config.example.yaml`  ← Config doc
 
 2026-06-18 Review fixes (based on `docs/analysis/2026-06-18-vlog-editing-helper-review.md`, see `docs/analysis/2026-06-18-review-fix-result.md`):
 - **P0-1** `cut.py`: switched to `write_json_atomic` / `write_text_atomic` (missed atomic writes)

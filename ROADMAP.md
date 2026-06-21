@@ -101,9 +101,9 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Does not print API keys or other secrets (keys are already masked by `mask_if_looks_like_key`)
 
 **Sub-tasks**:
-- [ ] R-018a: Add `debug_print_prompt` field to AI config
-- [ ] R-018b: Inject print logic in `_call_ai()` or provider `generate_text()` — log prompt before API call
-- [ ] R-018c: Ensure secrets are masked in debug output
+- [x] R-018a: Add `debug_print_prompt` field to AI config
+- [x] R-018b: Inject print logic in `_call_ai()` or provider `generate_text()` — log prompt before API call
+- [x] R-018c: Ensure secrets are masked in debug output
 
 ## Feature R-004: UI Config Read and Edit
 
@@ -504,7 +504,7 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 | ID | Issue | Fix Approach | Status |
 | --- | --- | --- | --- |
-| B-004 | ETA estimate too low (successful items include failed items' time) | Move timing to `finally` block, only count successes | |
+| B-004 | ETA estimate too low (successful items include failed items' time) | Move timing to `finally` block, only count successes | ✅ `d799f21` |
 | B-007 | Cross-platform venv detection only recognizes Windows `Scripts/`, Linux uses `bin/` | Support both `bin/` and `Scripts/` | ✅ `bdcc678` + `f24bdf3` |
 | B-015 | `project.yaml` write only validates YAML format, no `_validate_config` | Run full merge validation before `do_PUT /api/config/raw?project=X` | ✅ `9c73903` |
 | B-016 | `deepseek-v4-flash` in `config.yaml` may be an invalid model name (AGENTS §8.4) | Confirm actual usable model name, update config or add note | 🆕 |
@@ -545,7 +545,7 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | B-041 | `file_service.py:46` `_save_atomic` uses fixed `.tmp` filename, two concurrent requests writing same file overwrite each other | Add `os.urandom(4).hex()` random suffix | ✅ |
 | B-058 | `file_service.py:_save_atomic` skips existing `.bak` without overwriting, old `.bak` doesn't match latest content, after multiple saves `.bak` reflects earliest version | Overwrite `.bak` on every save | ✅ `7868a95` |
 | B-067 | `tasks/analyze.py:43` lazy `import re` in hot path | Move to top of file | ✅ `51f50d7` |
-| B-068 | `split.py` `-c copy` cuts by time, non-keyframe segment start has black frames, AI may misjudge | Document this; or provide `--reencode-split` option | 🆕 |
+| B-068 | `split.py` `-c copy` cuts by time, non-keyframe segment start has black frames, AI may misjudge | Add `reencode_split` option for frame-accurate cuts | ✅ `cd1da63` |
 | B-069 | `progress.py` tmp filename fixed, may conflict across processes | Use `os.urandom(4).hex()` random suffix | ✅ `ea2e79c` |
 | B-070 | `pipeline.py` unknown step name causes `NoneType` crash | Validate step names before loop and `raise ValueError` early | ✅ `34846df` |
 | B-071 | `server.py` Range request `length=0` (when `start=size-1`) unprotected | Add `length <= 0` boundary check | ✅ `e21373e` |
@@ -560,14 +560,14 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | B-045 | `sidebar.js:177` video list rendering piles up `{ once: true }` click listeners on `document`, close dropdown logic fails | Use event delegation + persistent handler, or `removeEventListener` before rendering | ✅ `a276225` |
 | B-059 | `_parse_providers` doesn't read `requests_per_minute` and `retry_attempts` from YAML | `cfg.get("requests_per_minute", 0)` + `retry_attempts` default unified to 2 | ✅ `a276225` |
 | B-060 | Original video view split segment index lost — each original file only uses `comp[0]`, plan referencing `002`/`003` returns 404 | Iterate all matches in `comp`, create independent video entries for each split segment | ✅ `c59880d` |
-| B-072 | `tasks/compress.py` corrupted `.mp4` permanently skipped by `skip_existing` without retry | Add file integrity check or fallback retry | 🆕 |
+| B-072 | `tasks/compress.py` corrupted `.mp4` permanently skipped by `skip_existing` without retry | Add ffprobe integrity check before skip | ✅ `6c3c231` |
 | B-073 | `routes/videos.py` `_parse_segment_info` only recognizes `001_GL010683_seg01` format | Relax naming convention assumptions, support custom naming | 🆕 |
 | B-086 | `server.py:524` hardcodes `config_path.parent / "projects.json"` instead of calling `_registry_path()` | Use `_registry_path(config_path)` for consistency | 🆕 |
 | B-087 | `serve.ps1`/`serve.sh` hardcodes project directory paths | Remove hardcoded paths, make distributable | 🆕 |
 | B-088 | `ROADMAP.md` 656 lines — completed features not archived | Archive completed `[x]` sections to separate file | 🆕 |
 | B-089 | `AGENTS.md` §7 commit history 100+ entries too long | Trim to ~30 most recent, archive rest | 🆕 |
 | B-090 | `pipeline.py` cancel_event not propagated to analyze/scripts/plan/label | Add `cancel_event` param + loop check to all 4 functions (see U-005) | 🆕 |
-| B-091 | `RateLimiter.__enter__` holds lock during `time.sleep()`, blocks parallel AI calls | Split acquire() from sleep (see U-006) | 🆕 |
+| B-091 | `RateLimiter.__enter__` holds lock during `time.sleep()`, blocks parallel AI calls | Split acquire() from sleep (see U-006) | ✅ `already in U-006` |
 | B-092 | `whisper_routes.py` ctypes thread kill unsafe (C ext blocks injection, resource leak) | Replace with chunked download (see U-007) | 🆕 |
 | B-093 | `transcribe.py` low-confidence segments silently dropped, no record kept | Mark with `low_confidence` flag instead of discard (see U-009) | 🆕 |
 | B-094 | `/api/fs/dirs` no path restriction, exposes full filesystem in LAN mode | Add root restriction + token auth (see U-008) | 🆕 |
@@ -618,6 +618,14 @@ All B-046~B-052 covered by 163 new tests:
 
 | Commit | Description |
 | --- | --- |
+| `d799f21` | fix(config): restore missing analyze: header in config.example.yaml (codereview); fix(refine): move json.loads into try block |
+| `91f1da4` | docs(config): add reencode_split example to config.example.yaml |
+| `94f4501` | fix(tasks): move elapsed_total to finally block for accurate ETA (B-004) |
+| `cd1da63` | feat(split): add reencode_split option for frame-accurate cuts (B-068) |
+| `6c3c231` | fix(compress): add ffprobe integrity check for skip_existing (B-072) |
+| `92a6d9e` | feat(config): add ai.debug_print_prompt for prompt debugging (R-018) |
+| `a10efb1` | docs: remove ASCII UI art, add new screenshots |
+| `a5dd5b0` | docs(readme): replace small image table with full-width screenshot gallery |
 | `f24bdf3` | fixup: address review findings - venv detection with sys.prefix, refine route security/proj_input/post-body cleanup |
 | `089dc6a` | feat(ui): add refine panel with context textarea and AI trigger button (R-003e) |
 | `cae3c9a` | feat(ui): differentiate project vs global config save message (R-015c) |
