@@ -259,7 +259,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-003c: `refine --context "..."` parameter: temporarily appended to prompt, placed after `ai.context`
 - [x] R-003d: UI: each video list item has dropdown "Rerun texts / voiceover / all"
 - [x] R-003f: Backend `POST /api/rerun` accepts `{video, task, source}`
-- [ ] R-003e: UI refine tab adds temporary context textarea (deferred to separate task)
+- [x] R-003e: UI refine tab adds temporary context textarea (deferred to separate task)
 - [ ] R-003g: Pipeline `run_rerun_single` (single-file support already exists, no separate function needed)
 
 ## ✅ Feature R-011: Plan Panel Preview Playback
@@ -465,7 +465,7 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | ID | Issue | Fix Approach | Status |
 | --- | --- | --- | --- |
 | B-004 | ETA estimate too low (successful items include failed items' time) | Move timing to `finally` block, only count successes | |
-| B-007 | Cross-platform venv detection only recognizes Windows `Scripts/`, Linux uses `bin/` | Support both `bin/` and `Scripts/` | |
+| B-007 | Cross-platform venv detection only recognizes Windows `Scripts/`, Linux uses `bin/` | Support both `bin/` and `Scripts/` | ✅ `bdcc678` + `f24bdf3` |
 | B-015 | `project.yaml` write only validates YAML format, no `_validate_config` | Run full merge validation before `do_PUT /api/config/raw?project=X` | ✅ `9c73903` |
 | B-016 | `deepseek-v4-flash` in `config.yaml` may be an invalid model name (AGENTS §8.4) | Confirm actual usable model name, update config or add note | 🆕 |
 | B-024 | `cut.py:9` `parse_time_range` doesn't validate end > start, AI-generated reverse intervals silently produce bad files with ffmpeg | Add `if end <= start: raise ValueError(...)` after parsing | ✅ `fix/B-024-parse-time-range-validate` |
@@ -491,7 +491,7 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | ID | Issue | Fix Approach | Status |
 | --- | --- | --- | --- |
 | B-005 | Linux `sorted(Path.iterdir())` order not guaranteed (glob also not ordered) | Explicit `sorted()` before matching | ✅ `a276225` |
-| B-008 | Functions silently modify input parameters (e.g., `analyze_video` modifies passed dict fields) | `deepcopy()` input params to avoid side effects | |
+| B-008 | Functions silently modify input parameters (e.g., `analyze_video` modifies passed dict fields) | `deepcopy()` input params to avoid side effects | ✅ `7017ff6` |
 | B-017 | `_find_texts_dirs` matches `texts*` too broadly — `texts_backup` also matches | Use more precise glob or add exclusion rule | ✅ `a276225` |
 | B-018 | `_config_cache` only grows (only pops on PUT config) | Clean stale cache on project list refresh | ✅ `a276225` |
 | B-032 | `tasks/label.py:29-31` glob idx may be integer 1 instead of `"001"`, causing file match failure and skipped processing | `format_index(int(idx), config.naming.index_width)` consistent formatting before glob | ✅ |
@@ -533,6 +533,7 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | B-094 | `/api/fs/dirs` no path restriction, exposes full filesystem in LAN mode | Add root restriction + token auth (see U-008) | 🆕 |
 | B-095 | `server.py` only 6% test coverage, no integration tests for dispatch/error paths | Add HTTP-level tests (see U-010) | 🆕 |
 | B-096 | `whisper_routes.py` 48% coverage — new feature, test lagging behind | Add tests for install/cancel/model management flows | 🆕 |
+| B-097 | `videos.py:101` `text_sidecars.get(idx)[0]` always picks first text file for all split segments, each segment should map to its own text/script sidecar | Match by segment-specific filename pattern instead of `[0]` | 📝 new |
 | B-074 | `analyze.py:_wrap_with_context` reads `trip_context.md` from disk on every AI call | Module-level `_trip_context_cache` | ✅ `fe57a7f` |
 | B-075 | `ui/server.py` Range request doesn't support suffix `bytes=-N` | Empty start + non-empty end → suffix calculation | ✅ `d2591a9` |
 | B-076 | `utils/discover_ffmpeg_bin` hardcoded `G:/ffmpeg` | Remove, use `FFMPEG_HOME` env var instead | ✅ `74c34f5` |
@@ -559,8 +560,8 @@ All B-046~B-052 covered by 163 new tests:
 | B-050 | Medium | `resolve_binary` no tests | `test_utils.py::TestResolveBinary` (3 tests) |
 | B-051 | Medium | ETA tests depend on sleep | Changed to use `mock.patch("time.monotonic")` to inject time |
 | B-052 | Medium | ETA assertion doesn't verify None | Changed to `assert data.get("eta_sec") is None` |
-| B-009 | AI occasionally outputs non-pure JSON, `extract_json` parsing fails | More precise extraction of valid JSON (recursive markdown stripping) | |
-| B-011 | New users `python main.py check` false failure (unfriendly messages) | Optimize check step messages | |
+| B-009 | AI occasionally outputs non-pure JSON, `extract_json` parsing fails | Trailing comma repair via regex fallback + 6 new tests | ✅ `badb621` |
+| B-011 | New users `python main.py check` false failure (unfriendly messages) | Optimize check step messages, platform-agnostic setup script hint | ✅ `bdcc678` |
 | B-010 | (Pending further confirmation) | — | |
 | B-019 | `VIDEO_EXTS` duplicate definition (utils.py includes .avi/.mkv, server.py does not) | Move to `vlog_tool/_constants.py` for unified reference | ✅ `4ac5785` |
 | B-020 | `_write_csv` `format_index(rec.index, 3)` hardcoded `3` instead of using config | Use `config.naming.index_width` instead | ✅ `4ac5785` |
@@ -577,6 +578,12 @@ All B-046~B-052 covered by 163 new tests:
 
 | Commit | Description |
 | --- | --- |
+| `f24bdf3` | fixup: address review findings - venv detection with sys.prefix, refine route security/proj_input/post-body cleanup |
+| `089dc6a` | feat(ui): add refine panel with context textarea and AI trigger button (R-003e) |
+| `cae3c9a` | feat(ui): differentiate project vs global config save message (R-015c) |
+| `7017ff6` | fix(analyze): deepcopy input in _validate_* to prevent side effects (B-008) |
+| `bdcc678` | fix(main): cross-platform venv detection and platform-agnostic check messages (B-007/B-011) |
+| `badb621` | fix(utils): handle trailing commas in extract_json with fallback repair (B-009) |
 | `fe45f53` | fix: lint F541 f-string and UT assertion after empty-state changes |
 | `c1584df` | fix(ui): move all event handlers before try block so they work in empty state |
 | `aa720d8` | fix(ui): move modal event binding before init early return; remove duplicate code |

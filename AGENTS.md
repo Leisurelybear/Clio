@@ -43,6 +43,7 @@ vlog-video-analysis/
 │   │   ├── server.py            #   UIHandler (BaseHTTPRequestHandler) + make_handler + run
 │   │   ├── README.md            #   UI usage documentation
 │   │   ├── routes/              #   Route handlers
+│   │   │   ├── refine.py           #   POST /api/refine (AI refine trigger)
 │   │   │   ├── transcripts.py   #   Transcript GET/PUT API
 │   │   │   └── whisper_routes.py#   Whisper check API
 │   │   └── static/              #   Frontend, no build step, ES modules
@@ -225,9 +226,9 @@ more reliable than letting AI freely review:
 
 ## 7. Project Current Status
 
-Last updated: 2026-06-20 (code review fixes + R-016 Whisper model UI download completed). Live:
+Last updated: 2026-06-21 (B-007~B-009/B-011 fixes + R-003e/R-015c + full code review). Live:
 - GitHub Actions CI (Ubuntu, Windows, Python 3.11/3.12)
-- **587 pytest cases** (coverage table below)
+- **611 pytest cases** (coverage table below)
 - Dependency version locked in `requirements-locked.txt`
 - Whisper ASR separate `requirements-whisper.txt` (faster-whisper, does not pollute main deps)
 Recent commit history:
@@ -304,6 +305,12 @@ Recent commit history:
 165. `9ef45e2` `fix(transcribe): thread-safe os.environ with save/restore pattern`  ← C1
 166. `326fe46` `feat(whisper): add POST /api/whisper/install with progress for UI model download`  ← R-016a
 167. `e361f7d` `feat(ui): add whisper model download button + progress in transcript tab`  ← R-016b/c
+168. `badb621` `fix(utils): handle trailing commas in extract_json with fallback repair (B-009)`  ← 6 new tests
+169. `bdcc678` `fix(main): cross-platform venv detection and platform-agnostic check messages (B-007/B-011)`  ← sys.base_prefix
+170. `7017ff6` `fix(analyze): deepcopy input in _validate_* to prevent side effects (B-008)`  ← Defensive copy
+171. `cae3c9a` `feat(ui): differentiate project vs global config save message (R-015c)`  ← Config UX
+172. `089dc6a` `feat(ui): add refine panel with context textarea and AI trigger button (R-003e)`  ← New route + UI
+173. `f24bdf3` `fixup: address review findings - venv detection with sys.prefix, refine route security/proj_input/post-body cleanup`  ← Review fixes
 
 2026-06-18 Review fixes (based on `docs/analysis/2026-06-18-vlog-editing-helper-review.md`, see `docs/analysis/2026-06-18-review-fix-result.md`):
 - **P0-1** `cut.py`: switched to `write_json_atomic` / `write_text_atomic` (missed atomic writes)
@@ -340,7 +347,7 @@ Known AI misidentification pitfall: mistaking Charles de Gaulle airport RER for 
 Project documentation status:
 - 2026-06-16 comprehensive code review (5 parallel subagents): found **6 Critical + 12 Important + 36 Minor**, fixed 6+12+5, 31 Minor remaining
 - 2026-06-16 second review (item-by-item): 5 S0 + 5 S1 + 1 S2 all fixed
-- `ROADMAP.md` current tracking: R-001（✓）/ R-002（✓）/ R-003/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012（✓）/ R-013（✓）/ R-014/ R-015（a[✓] d[✓]）/ R-016（a[✓] b[✓] c[✓]）+ Bug tracking（B-001~B-085）+ Performance optimization（P-001~P-003）+ Documentation upkeep（D-001~D-004）+ Architecture improvements（A-001~A-006）+ Code review P0~P3（14 items, 12 fixed）
+- `ROADMAP.md` current tracking: R-001（✓）/ R-002（✓）/ R-003（a[✓] b[✓] c[✓] d[✓] e[✓] f[✓]）/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012（✓）/ R-013（✓）/ R-014/ R-015（a[✓] c[✓] d[✓]）/ R-016（a[✓] b[✓] c[✓]）+ Bug tracking（B-001~B-097）+ Performance optimization（P-001~P-003）+ Documentation upkeep（D-001~D-004）+ Architecture improvements（A-001~A-006）+ Code review P0~P3（14 items, 12 fixed）
 - Whisper ASR fully integrated: standalone CLI (transcribe / whisper install / whisper check) + pipeline step + UI transcript tab + delete/edit/seek + 10% progress + CUDA fallback CPU + per-video rerun + full UT coverage (18 tests)
 - CI compatibility fixes: ctranslate2 mock module, config_path parameter passing, Linux case sensitivity, F821 lint
 - New ProcessingState UT (8 tests covering mark/reset_step/persistence/corruption recovery)
@@ -537,6 +544,16 @@ See `vlog_tool/compress.py:24`.
 - Fix: restrict to user home directory by default, add `UI_TOKEN` env var for LAN mode
 - The file has only 12% test coverage — a security-sensitive untested surface
 
+### 9.19 Split Segment Sidecar Mapping (`videos.py:101`)
+
+- `videos.py:101` `(text_sidecars.get(idx) or [None])[0]` always maps **all** split segments of the same video to the **first** text/script sidecar file
+- Example: `001_GL010683_seg01.mp4`, `_seg02.mp4`, `_seg03.mp4` all get `text_json` pointing to `001_巴黎铁塔_part1.json`
+- Affected features: texts tab display, voiceover tab display, save, refine — all read from `v.text_json` / `v.script_json`
+- Root cause: sidecars are keyed by index prefix (e.g. `001`), but segments are not differentiated by their `_segNN` suffix
+- Filenames like `001_巴黎铁塔_part1.json` itself has no `_segNN` marker, making it impossible to distinguish which segment it belongs to from the filename alone
+- Fix requires either: (a) embedding `_segNN` into sidecar filenames, or (b) matching by compressed file stem rather than index prefix
+- Tracked as B-097
+
 ## 10. Verification Flow
 
 Minimal verification:
@@ -556,16 +573,16 @@ Run through a media directory:
 
 Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cross-referenced against actual project state.
 
-### What both reviews got right (still actionable)
+### What both reviews got right (still actionable / already addressed)
 
-| Finding | Action | Phase |
-|---------|--------|-------|
-| `make_handler` closure too large (432 lines) | Extract business logic to services | **U-001** |
-| config.py 406 lines, 14 dataclasses | Split into `config/` package | **U-003** |
-| File system as database | Repository layer (long-term) | Phase 3 |
-| Config cache not true LRU | Fix in U-001a | **U-001** |
-| No domain models | `@dataclass VideoAnalysis/Segment/VoiceoverScript` | Phase 3 |
-| No token cost tracking | `ai/cost_tracker.py` | Phase 3 |
+| Finding | Action | Phase | Status |
+|---------|--------|-------|--------|
+| `make_handler` closure too large (432 lines) | Extract business logic to services | **U-001** | ✅ mostly done (routes/ + services/) |
+| config.py 406 lines, 14 dataclasses | Split into `config/` package | **U-003** | ✅ done |
+| File system as database | Repository layer (long-term) | Phase 3 | — |
+| Config cache not true LRU | Fix in U-001a | **U-001** | ✅ done (`config_cache.py`) |
+| No domain models | `@dataclass VideoAnalysis/Segment/VoiceoverScript` | Phase 3 | — |
+| No token cost tracking | `ai/cost_tracker.py` | Phase 3 | — |
 | Pipeline cancel not covering analyze/scripts/plan/label | Add cancel_event to all loop steps | **U-005** |
 | `RateLimiter` lock blocks parallel AI calls | Split acquire from sleep | **U-006** |
 | Whisper download ctypes thread kill unsafe | Replace with chunked download | **U-007** |
@@ -592,10 +609,11 @@ Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cros
 | AGENTS.md §7 commit history overly long (100+ entries) | Should trim to ~30 | Periodic cleanup |
 | `transcribe.py` low-confidence segs silently dropped | Information loss for downstream | **U-009** |
 | `server.py` 6% coverage + `fs.py` 12% coverage | Security-sensitive untested surface | **U-010** |
+| `videos.py:101` `(text_sidecars.get(idx) or [None])[0]` maps all split segments to first sidecar | All split segments share same text/script in UI | **B-097** |
 
 ### Tracking
 
-See `ROADMAP.md` section "In Progress" — entries **U-001** through **U-010**.
+See `ROADMAP.md` section "In Progress" — entries **U-002**, **U-007**, **U-008**, **U-010**.
 
 ---
 
@@ -609,5 +627,5 @@ If an AI assistant takes over, upon seeing `AGENTS.md` it should:
 4. Read `templates/trip_context.md` to understand the current trip background
 5. Ask the user what they specifically want to do, don't assume
 
-For new features: **discuss plan first → user confirms → implement → one commit → push**.
-**Do not** auto-commit / push (unless the user explicitly says "help me commit").
+For new features: **discuss plan first → user confirms → implement → one commit → confirm with user before push**.
+**Push only after user explicitly approves.**
