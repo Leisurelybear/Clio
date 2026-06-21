@@ -49,9 +49,22 @@
 └──────────┴──────────────────┴──────────────┘
 ```
 
-| Pipeline runner view | Vlog plan editor view |
-|:---:|:---:|
-| ![pipeline](docs/screenshots/pipeline.png) | ![plan](docs/screenshots/plan.png) |
+<div align="center">
+  <img src="docs/screenshots/pipeline.png" alt="Pipeline runner" width="85%">
+  <br><sub>🏃 Pipeline runner</sub>
+  <br><br>
+  <img src="docs/screenshots/analysis.png" alt="AI analysis editor" width="85%">
+  <br><sub>🤖 AI analysis editor</sub>
+  <br><br>
+  <img src="docs/screenshots/voiceover.png" alt="Voiceover editor" width="85%">
+  <br><sub>✍️ Voiceover editor</sub>
+  <br><br>
+  <img src="docs/screenshots/plan.png" alt="Edit plan" width="85%">
+  <br><sub>📋 Edit plan</sub>
+  <br><br>
+  <img src="docs/screenshots/new_project.png" alt="Project management" width="85%">
+  <br><sub>📁 Project management</sub>
+</div>
 
 - 🎥 **HTML5 Player** — seek / jump / speed (0.5x–2x) / Range requests
 - 📂 **Source Toggle** — switch between compressed / original view

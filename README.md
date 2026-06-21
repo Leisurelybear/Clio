@@ -49,9 +49,22 @@
 └──────────┴──────────────────┴──────────────┘
 ```
 
-| 流水线执行界面 | vlog 剪辑规划界面 |
-|:---:|:---:|
-| ![pipeline](docs/screenshots/pipeline.png) | ![plan](docs/screenshots/plan.png) |
+<div align="center">
+  <img src="docs/screenshots/pipeline.png" alt="流水线执行界面" width="85%">
+  <br><sub>🏃 流水线执行</sub>
+  <br><br>
+  <img src="docs/screenshots/analysis.png" alt="AI 分析界面" width="85%">
+  <br><sub>🤖 AI 分析编辑</sub>
+  <br><br>
+  <img src="docs/screenshots/voiceover.png" alt="口播文案界面" width="85%">
+  <br><sub>✍️ 口播文案编辑</sub>
+  <br><br>
+  <img src="docs/screenshots/plan.png" alt="剪辑规划界面" width="85%">
+  <br><sub>📋 剪辑规划</sub>
+  <br><br>
+  <img src="docs/screenshots/new_project.png" alt="项目管理界面" width="85%">
+  <br><sub>📁 项目管理</sub>
+</div>
 
 - 🎥 **HTML5 播放器** — 拖动 / 跳转 / 倍速（0.5x~2x）/ Range 请求
 - 📂 **源切换** — 一键切换「压缩版」/「原视频」视图
