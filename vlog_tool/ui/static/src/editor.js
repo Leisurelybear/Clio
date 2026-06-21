@@ -105,6 +105,8 @@ async function refineCurrentFile(type) {
   if (!v) return;
   const fileField = type === 'texts' ? 'text_json' : 'script_json';
   if (!v[fileField]) { setStatus(`当前视频没有 ${type} JSON`, 'err'); return; }
+  const label = type === 'texts' ? '素材分析' : '口播文案';
+  if (!confirm(`确定要提交 AI 审阅修正「${label}」吗？当前未保存的修改将丢失。`)) return;
   const btn = $(`btn-refine-${type}`);
   const status = $(`refine-status-${type}`);
   const ctx = $(`refine-context-${type}`).value.trim();
@@ -118,7 +120,7 @@ async function refineCurrentFile(type) {
     else state.voiceover = r.data;
     if (type === 'texts') renderTexts();
     else renderVoiceover();
-    setStatus(`${type === 'texts' ? '素材分析' : '口播文案'}已 AI 审阅修正`, 'ok');
+    setStatus(`${label}已 AI 审阅修正`, 'ok');
   } catch (e) {
     status.innerHTML = `<span class="err">修正失败: ${escapeHtml(e.message)}</span>`;
   } finally {
