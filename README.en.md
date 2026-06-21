@@ -35,20 +35,6 @@
 
 **Pure Python stdlib** (`http.server`). No Node.js, no npm, no build step.
 
-```
-┌────────────────────────────────────────────┐
-│ Project: 📁 Paris2025  [Compressed|Original] │
-├──────────┬──────────────────┬──────────────┤
-│ 📋 Plan  │   ▶ Player       │ 📝 Analysis  │
-│ ⚙ Config │   ⏪ ⏸ ⏩        │  Title/Summ. │
-│ ▶ Run    │  0:00 / 0:42     │  Timeline    │
-│ ────────  │                  ├──────────────┤
-│ 🎬 Videos │   🔇 Speed 1x   │ 🎤 Voiceover │
-│ [001]xxx  │                  │  Script Edit │
-│ [002]yyy  │                  │  [Save]      │
-└──────────┴──────────────────┴──────────────┘
-```
-
 <div align="center">
   <img src="docs/screenshots/pipeline.png" alt="Pipeline runner" width="85%">
   <br><sub>🏃 Pipeline runner</sub>
