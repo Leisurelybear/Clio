@@ -89,6 +89,22 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [ ] R-017e: UI task binding dropdowns with filtering
 - [ ] R-017f: Migration path for existing config.yaml providers
 
+### R-018: AI Prompt Debug Print
+
+**Background**: When AI returns unexpected results, users currently have no way to see what prompt was actually sent. Adding a config toggle to print the full prompt (after context injection, before API call) helps developers debug without modifying code.
+
+**Acceptance Criteria**:
+- Config option: `ai.debug_print_prompt: true` (default false)
+- When enabled, prints the final prompt (with trip context, user context_override, etc.) to stderr/log before calling the AI provider
+- Works for all AI call sites: analyze, voiceover, plan, refine, scripts
+- Clear delimiter markers in output so prompt boundaries are visible
+- Does not print API keys or other secrets (keys are already masked by `mask_if_looks_like_key`)
+
+**Sub-tasks**:
+- [ ] R-018a: Add `debug_print_prompt` field to AI config
+- [ ] R-018b: Inject print logic in `_call_ai()` or provider `generate_text()` — log prompt before API call
+- [ ] R-018c: Ensure secrets are masked in debug output
+
 ## Feature R-004: UI Config Read and Edit
 
 **Background**: Currently the UI only reads paths (output_dir / compressed_dir / texts_dirs / scripts_dir / plans_dir / input_dir) for file location. To change config, users must manually open `config.yaml`, edit, and restart the service. Switching AI provider / context / tasks from the UI saves a restart round-trip.
