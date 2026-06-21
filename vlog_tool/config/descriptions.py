@@ -27,6 +27,7 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     # ai.tasks.*
     "ai.tasks.{name}.provider": "此任务使用的 AI 厂商名称（在 providers 中定义）",
     "ai.tasks.{name}.model": "模型名称，如 gemini-2.5-flash、deepseek-chat",
+    "ai.debug_print_prompt": "调试用：设为 true 时在每次 AI 调用前打印完整 prompt 到控制台（含上下文注入）",
     # compress
     "compress.target_size_mb": "压缩后目标文件大小（MB）",
     "compress.max_width": "压缩后视频最大宽度（像素），高度按比例缩放",

@@ -46,6 +46,7 @@ class AIConfig:
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
     tasks: dict[str, TaskConfig] = field(default_factory=dict)
     context: str = ""
+    debug_print_prompt: bool = False
 
 
 @dataclass

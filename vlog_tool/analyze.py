@@ -126,8 +126,16 @@ def _wrap_with_context(prompt: str, config: AppConfig, context_override: str | N
     return f"## 背景与规范（请严格遵守）\n\n{chr(10).join(parts)}\n\n---\n\n{prompt}"
 
 
-def _call_ai(label: str, provider_id: str, model: str, prompt: str, fn) -> str:
-    """统一 AI 调用的日志壳：打印提示词大小、起止时间、响应大小。"""
+def _call_ai(label: str, provider_id: str, model: str, prompt: str, fn, *, debug_print: bool = False) -> str:
+    """统一 AI 调用的日志壳：打印提示词大小、起止时间、响应大小。
+    当 debug_print=True 时，还会将完整 prompt 输出到控制台。
+    """
+    if debug_print:
+        print("=" * 60)
+        print(f"[DEBUG PROMPT] {label} ({provider_id}/{model})")
+        print("-" * 60)
+        print(prompt)
+        print("=" * 60)
     prompt_bytes = len(prompt.encode("utf-8"))
     print(f"  AI: {provider_id}/{model}（prompt {format_size(prompt_bytes)}）")
     with timed(f"{label} {provider_id}/{model}"):
@@ -155,6 +163,7 @@ def analyze_video(video_path: str, config: AppConfig, progress_callback: Callabl
         model,
         prompt,
         lambda: provider.analyze_video(video_path, prompt, model, progress_callback=progress_callback),
+        debug_print=config.ai.debug_print_prompt,
     )
     return _validate_analysis(extract_json(text), video_path)
 
@@ -182,6 +191,7 @@ def generate_voiceover(clip_data: dict, template: str, config: AppConfig) -> dic
         model,
         prompt,
         lambda: provider.generate_text(prompt, model),
+        debug_print=config.ai.debug_print_prompt,
     )
     return _validate_voiceover(extract_json(text), clip_data.get("title", ""))
 
@@ -238,6 +248,7 @@ def plan_daily_vlog(
         model,
         prompt,
         lambda: provider.generate_text(prompt, model),
+        debug_print=config.ai.debug_print_prompt,
     )
     result = _validate_plan(extract_json(text), day_label)
 
@@ -294,6 +305,7 @@ def refine_text(analysis: dict, config: AppConfig, fix: str | None = None, conte
         model,
         prompt,
         lambda: provider.generate_text(prompt, model),
+        debug_print=config.ai.debug_print_prompt,
     )
     result = extract_json(text)
     if not isinstance(result, dict) or "index" not in result:
@@ -334,6 +346,7 @@ def refine_script(
         model,
         prompt,
         lambda: provider.generate_text(prompt, model),
+        debug_print=config.ai.debug_print_prompt,
     )
     result = extract_json(text)
     if not isinstance(result, dict) or "voiceover" not in result:

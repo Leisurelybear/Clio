@@ -21,6 +21,7 @@ ai:
   # context: "所有素材均拍摄于 2024 年 7 月法国巴黎，不要误判为其他城市。"
   # context_file: ./templates/trip_context.md
 
+  # debug_print_prompt: true  # 调试用：在每次 AI 调用前打印完整 prompt（含上下文注入）到控制台
   providers:
     gemini:
       type: gemini

@@ -11,7 +11,7 @@ from vlog_tool.analyze import _wrap_with_context, plan_daily_vlog
 
 def _fake_config(context: str = "", context_override: str | None = None) -> SimpleNamespace:
     return SimpleNamespace(
-        ai=SimpleNamespace(context=context),
+        ai=SimpleNamespace(context=context, debug_print_prompt=False),
         plan=SimpleNamespace(max_clips_per_day=10, target_duration_sec=300),
         script=SimpleNamespace(target_words=150),
         paths=SimpleNamespace(input_dir=Path("/tmp")),

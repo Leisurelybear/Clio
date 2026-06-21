@@ -26,6 +26,7 @@ def test_plan_prompt_includes_transcripts():
         "GL010683": {"segments": [{"start": 0.0, "end": 2.5, "text": "今天天气真好", "avg_logprob": -0.1}]}
     }
     cfg = MagicMock(spec=AppConfig)
+    cfg.ai = MagicMock(debug_print_prompt=False)
     cfg.plan = MagicMock()
     cfg.plan.max_clips_per_day = 12
     cfg.plan.target_duration_sec = 180
@@ -60,6 +61,7 @@ def test_plan_no_transcript_fallback():
         }
     ]
     cfg = MagicMock(spec=AppConfig)
+    cfg.ai = MagicMock(debug_print_prompt=False)
     cfg.plan = MagicMock()
     cfg.plan.max_clips_per_day = 12
     cfg.plan.target_duration_sec = 180
