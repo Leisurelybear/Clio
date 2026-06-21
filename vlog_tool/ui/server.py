@@ -58,6 +58,7 @@ from vlog_tool.ui.routes.texts import (
 )
 from vlog_tool.ui.routes.transcripts import (
     handle_get_transcripts,
+    handle_post_transcripts,
     handle_put_transcripts,
 )
 from vlog_tool.ui.routes.videos import handle_get_video, handle_get_videos
@@ -304,6 +305,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_post_project_remove(self, obj)
             if path == "/api/rerun":
                 return handle_post_rerun(self, qs, obj)
+            if path == "/api/transcripts":
+                return handle_post_transcripts(self, qs, obj)
             if path == "/api/whisper/install":
                 return handle_post_whisper_install(self)
             if path == "/api/whisper/install/cancel":

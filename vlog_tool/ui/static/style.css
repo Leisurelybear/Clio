@@ -907,6 +907,7 @@ button .icon { width: 12px; height: 12px; }
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background var(--transition-fast);
+  position: relative;
 }
 .transcript-seg:hover {
   background: var(--bg-surface);
@@ -915,6 +916,9 @@ button .icon { width: 12px; height: 12px; }
   font-size: var(--text-sm);
   color: var(--text-secondary);
   margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 .transcript-seg .seg-text {
   font-size: var(--text-base);
@@ -934,6 +938,66 @@ button .icon { width: 12px; height: 12px; }
   padding: 4px 6px;
   resize: vertical;
   box-sizing: border-box;
+}
+
+.transcript-seg .seg-del {
+  all: unset;
+  margin-left: auto;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--text-muted);
+  opacity: 0.4;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  user-select: none;
+}
+.transcript-seg .seg-del:hover {
+  opacity: 1;
+  color: var(--red);
+  background: var(--red-bg);
+}
+.transcript-seg .seg-del:active {
+  background: var(--error-bg);
+  color: #ff6b6b;
+}
+
+/* ── Transcript add form ────────────────────────────────────── */
+#add-transcript-form input[type="text"] {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font: inherit;
+  font-size: var(--text-sm);
+}
+#add-transcript-form input[type="text"]:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+#add-transcript-form textarea {
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font: inherit;
+  font-size: var(--text-sm);
+  resize: vertical;
+  box-sizing: border-box;
+}
+#add-transcript-form textarea:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+/* ── Input with browse button ───────────────────────────────── */
+.low-conf-icon {
+  color: var(--warning);
+  cursor: help;
+  margin-right: 2px;
 }
 
 /* ── Input with browse button ───────────────────────────────── */
