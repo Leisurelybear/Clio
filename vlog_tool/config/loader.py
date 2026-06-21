@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import dataclasses
 import os
+import typing
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -19,6 +21,7 @@ from vlog_tool.config.models import (
     ProxyConfig,
     ScriptConfig,
     TaskConfig,
+    WhisperConfig,
 )
 from vlog_tool.config.parsers import (
     _parse_providers,
@@ -26,6 +29,20 @@ from vlog_tool.config.parsers import (
     _parse_whisper,
 )
 from vlog_tool.config.validators import _filter_dc, _validate_config
+
+_SECTION_DC_MAP: dict[str, type] = {
+    "paths": PathsConfig,
+    "proxy": ProxyConfig,
+    "ai": AIConfig,
+    "compress": CompressConfig,
+    "analyze": AnalyzeConfig,
+    "naming": NamingConfig,
+    "script": ScriptConfig,
+    "plan": PlanConfig,
+    "whisper": WhisperConfig,
+}
+
+_MISSING = object()
 
 
 def _path(value: str | None, base: Path | None = None) -> Path:
@@ -65,6 +82,85 @@ def deep_merge(base: dict, override: dict) -> dict:
         if key not in base:
             result[key] = override[key]
     return result
+
+
+def _resolve_field_default(fd: dataclasses.Field):
+    if fd.default is not dataclasses.MISSING:
+        return fd.default
+    if fd.default_factory is not dataclasses.MISSING:
+        return fd.default_factory()
+    return _MISSING
+
+
+def _upgrade_config_file(yaml_path: Path) -> None:
+    if not yaml_path.is_file():
+        return
+    try:
+        with yaml_path.open(encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+    except Exception:
+        return
+
+    if not isinstance(raw, dict):
+        return
+
+    added: list[str] = []
+    changed = False
+
+    for section_name, dc_type in _SECTION_DC_MAP.items():
+        section = raw.get(section_name)
+        if not isinstance(section, dict):
+            continue
+        for fd in dc_type.__dataclass_fields__.values():
+            if typing.get_origin(fd.type) is dict:
+                continue
+            if fd.name in section:
+                continue
+            val = _resolve_field_default(fd)
+            if val is _MISSING:
+                continue
+            if isinstance(val, Path):
+                val = str(val)
+            section[fd.name] = val
+            added.append(f"{section_name}.{fd.name}")
+            changed = True
+
+    providers = raw.get("ai", {}).get("providers", {})
+    if isinstance(providers, dict):
+        for pname, pcfg in providers.items():
+            if not isinstance(pcfg, dict):
+                continue
+            for fd in ProviderConfig.__dataclass_fields__.values():
+                if fd.name in pcfg:
+                    continue
+                val = _resolve_field_default(fd)
+                if val is _MISSING:
+                    continue
+                pcfg[fd.name] = val
+                added.append(f"ai.providers.{pname}.{fd.name}")
+                changed = True
+
+    tasks = raw.get("ai", {}).get("tasks", {})
+    if isinstance(tasks, dict):
+        for tname, tcfg in tasks.items():
+            if not isinstance(tcfg, dict):
+                continue
+            for fd in TaskConfig.__dataclass_fields__.values():
+                if fd.name in tcfg:
+                    continue
+                val = _resolve_field_default(fd)
+                if val is _MISSING:
+                    continue
+                tcfg[fd.name] = val
+                added.append(f"ai.tasks.{tname}.{fd.name}")
+                changed = True
+
+    if not changed:
+        return
+
+    text = yaml.dump(raw, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    yaml_path.write_text(text, encoding="utf-8")
+    print(f"[config] {yaml_path.name} auto-added {len(added)} new field(s): {', '.join(added)}")
 
 
 def _load_context(ai_raw: dict, base: Path, project_dir: Path | None = None) -> str:
@@ -114,11 +210,14 @@ def load_config(
     base = config_file.parent
     _load_dotenv(base)
 
+    _upgrade_config_file(config_file)
+
     with config_file.open(encoding="utf-8") as f:
         raw: dict[str, Any] = yaml.safe_load(f) or {}
 
     if project_dir is not None:
         project_yaml = Path(project_dir).resolve() / "project.yaml"
+        _upgrade_config_file(project_yaml)
         if project_yaml.is_file():
             with project_yaml.open(encoding="utf-8") as f:
                 project_raw: dict[str, Any] = yaml.safe_load(f) or {}
