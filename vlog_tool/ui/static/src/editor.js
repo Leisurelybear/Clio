@@ -888,7 +888,11 @@ async function save() {
       if (r.error) throw new Error(r.error);
       state.dirty = false;
       updateSaveBtn();
-      setStatus('配置已保存（需重启服务生效）', 'ok');
+      const isProject = r.path && r.path.endsWith('project.yaml');
+      setStatus(
+        isProject ? '项目配置已保存，立即生效' : '全局配置已保存（需重启服务生效）',
+        'ok'
+      );
       return;
     }
     if (entity === 'plan') {
