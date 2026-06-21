@@ -158,6 +158,7 @@ vlog-video-analysis/
 - **FFMPEG_HOME** environment variable replaces hardcoded paths; `discover_ffmpeg_bin` search chain: `shutil.which` → WinGet Packages (Windows only) → `FFMPEG_HOME`
 - **Provider cache**: `ai/factory.py` `_provider_cache` by name, `_provider_cache_lock` thread-safe, `_clear_provider_cache()` for test isolation
 - **Config unknown fields**: `_filter_dc()` filters unknown YAML fields before passing to dataclass constructors, silently ignores typos
+- **Model registry (R-017)**: future feature where users register models (provider+model+apikey+adapter_type) via UI, tag capabilities (video/text), and bind tasks to compatible models via dropdown selectors
 
 ## 5. Standard Practices for Adding New Features
 

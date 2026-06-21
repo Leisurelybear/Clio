@@ -63,7 +63,31 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ## Staging / WIP
 
-- (None)
+### R-017: Model Registry & Task Binding UI
+
+**Background**: Currently users must manually edit `config.yaml` to change models — typing provider names, model strings, and API keys by hand. This is error-prone and unfriendly. Goal: a visual model registry where users can:
+
+- See all available models in a dropdown per task (instead of typing `deepseek-chat`)
+- Each model tagged with compatible task types (e.g. Gemini/OpenAI = video + text, DeepSeek = text only)
+- Each task can independently pick any registered model
+- Register new models: name, API key, adapter type (OpenAI-compatible / Anthropic / Gemini), base URL, etc.
+- New registrations auto-populate the provider list in `config.yaml`
+
+**Acceptance Criteria**:
+- UI "Models" tab listing all registered models with adapter type + supported tasks
+- Task binding panel: each task (video_analyze, voiceover, refine_text, etc.) shows a dropdown of compatible models
+- "Add Model" form: name, api_key, base_url, adapter_type (openai / anthropic / gemini), optional tags
+- Auto-validate: video tasks filter out text-only models
+- Backend: CRUD API for models, stored in `ai.providers` section of config
+- Existing `config.yaml` providers migrate seamlessly
+
+**Sub-tasks**:
+- [ ] R-017a: Design model registry data model (adapter type, capability tags, credential storage)
+- [ ] R-017b: Backend CRUD API for provider registration
+- [ ] R-017c: Backend task-model binding with capability validation
+- [ ] R-017d: UI model list + add/edit/remove
+- [ ] R-017e: UI task binding dropdowns with filtering
+- [ ] R-017f: Migration path for existing config.yaml providers
 
 ## Feature R-004: UI Config Read and Edit
 
