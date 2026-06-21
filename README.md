@@ -49,6 +49,10 @@
 └──────────┴──────────────────┴──────────────┘
 ```
 
+| 流水线执行界面 | vlog 剪辑规划界面 |
+|:---:|:---:|
+| ![pipeline](docs/screenshots/pipeline.png) | ![plan](docs/screenshots/plan.png) |
+
 - 🎥 **HTML5 播放器** — 拖动 / 跳转 / 倍速（0.5x~2x）/ Range 请求
 - 📂 **源切换** — 一键切换「压缩版」/「原视频」视图
 - 📝 **三 Tab 编辑** — 分析 / 口播 / 规划，改完 Ctrl+S 保存
@@ -246,6 +250,43 @@ python -m pytest vlog_tool/tests/ -v
 | [ROADMAP.md](ROADMAP.md) | 🗺️ 需求追踪 & 路线图 |
 | [docs/cli-reference.md](docs/cli-reference.md) | 📖 完整 CLI 命令参考 |
 | [vlog_tool/ui/README.md](vlog_tool/ui/README.md) | 🖥️ Web UI 详细说明 |
+
+---
+
+---
+
+## ❓ 常见问题
+
+### 找不到 ffmpeg
+
+1. 运行 `setup.ps1`（Windows）或 `setup.sh`（Linux/Mac）自动安装
+2. 或手动安装后在 `config.yaml` 填写路径
+
+### socksio package is not installed
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### File is not in an ACTIVE state
+
+视频上传后需等待 Google 处理。工具已内置轮询；若仍失败，稍后重试。
+
+### ConnectTimeout / 网络错误
+
+确认代理可用，检查 `config.yaml` 中 `proxy.url`。
+
+### pip 安装失败
+
+务必使用项目虚拟环境（Windows: `.venv\Scripts\activate`，Linux/Mac: `source .venv/bin/activate`）：
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### 重新分析某个视频
+
+删除 `output/texts/` 中对应的 `.txt` 和 `.json`，或设置 `analyze.skip_existing: false`。
 
 ---
 

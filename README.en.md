@@ -49,6 +49,10 @@
 └──────────┴──────────────────┴──────────────┘
 ```
 
+| Pipeline runner view | Vlog plan editor view |
+|:---:|:---:|
+| ![pipeline](docs/screenshots/pipeline.png) | ![plan](docs/screenshots/plan.png) |
+
 - 🎥 **HTML5 Player** — seek / jump / speed (0.5x–2x) / Range requests
 - 📂 **Source Toggle** — switch between compressed / original view
 - 📝 **Three Editing Tabs** — Analysis / Voiceover / Plan, Ctrl+S to save
@@ -247,6 +251,42 @@ python -m pytest vlog_tool/tests/ -v
 | [ROADMAP.md](ROADMAP.md) | 🗺️ Feature tracking & roadmap |
 | [docs/cli-reference.md](docs/cli-reference.md) | 📖 Full CLI reference |
 | [vlog_tool/ui/README.md](vlog_tool/ui/README.md) | 🖥️ Web UI detailed guide |
+
+---
+
+---
+
+## ❓ FAQ
+
+### ffmpeg not found
+
+Run `.\setup.ps1` (Windows) or `./setup.sh` (Linux/Mac) to auto-install, or set paths manually in `config.yaml`.
+
+### socksio package not installed
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### File is not in an ACTIVE state
+
+The tool polls automatically for Google's video processing; if it fails, retry later.
+
+### ConnectTimeout / network errors
+
+Check your proxy settings in `config.yaml`.
+
+### pip install fails
+
+Make sure you're using the project virtual environment (Windows: `.venv\Scripts\activate`, Linux/Mac: `source .venv/bin/activate`):
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### Re-analyze a single video
+
+Delete the corresponding `.json`/`.txt` from `output/texts/`, or set `analyze.skip_existing: false`.
 
 ---
 
