@@ -17,6 +17,19 @@ opencode_session_import.json
 /models/
 
 .idea/
+.vscode/
 
 .progress.json
 node_modules/
+
+# Ruff cache
+.ruff_cache/
+
+# Test mock artifacts
+MagicMock/
+
+# Temp files
+*.tmp
+*.swp
+*.swo
+*~
