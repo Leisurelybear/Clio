@@ -87,6 +87,44 @@ function renderTexts() {
     };
     ol.appendChild(li);
   }
+  pane.insertAdjacentHTML('beforeend', renderRefineUI('texts'));
+}
+
+function renderRefineUI(type) {
+  return `
+    <hr>
+    <h3>AI 审阅修正</h3>
+    <label>临时上下文（可选，如更正建议）<textarea id="refine-context-${type}" rows="2" placeholder="例如：地名写错了，请修正为正确的拼音"></textarea></label>
+    <button id="btn-refine-${type}" class="btn btn-secondary" onclick="refineCurrentFile('${type}')">AI 审阅修正</button>
+    <p id="refine-status-${type}" class="status"></p>
+  `;
+}
+
+async function refineCurrentFile(type) {
+  const v = state.videos.find(x => x.file === state.currentVideo);
+  if (!v) return;
+  const fileField = type === 'texts' ? 'text_json' : 'script_json';
+  if (!v[fileField]) { setStatus(`当前视频没有 ${type} JSON`, 'err'); return; }
+  const btn = $(`btn-refine-${type}`);
+  const status = $(`refine-status-${type}`);
+  const ctx = $(`refine-context-${type}`).value.trim();
+  btn.disabled = true;
+  btn.textContent = 'AI 审阅中...';
+  status.textContent = '';
+  try {
+    const r = await api('POST', `/api/refine?file=${encodeURIComponent(v[fileField])}`, { file: v[fileField], type, context: ctx || undefined });
+    if (r.error) throw new Error(r.error);
+    if (type === 'texts') state.texts = r.data;
+    else state.voiceover = r.data;
+    if (type === 'texts') renderTexts();
+    else renderVoiceover();
+    setStatus(`${type === 'texts' ? '素材分析' : '口播文案'}已 AI 审阅修正`, 'ok');
+  } catch (e) {
+    status.innerHTML = `<span class="err">修正失败: ${escapeHtml(e.message)}</span>`;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'AI 审阅修正';
+  }
 }
 
 function renderVoiceover() {
@@ -112,6 +150,7 @@ function renderVoiceover() {
   const dEl = pane.querySelector('[data-field="duration_hint_sec"]');
   dEl.value = v.duration_hint_sec ?? '';
   dEl.oninput = () => { v.duration_hint_sec = parseFloat(dEl.value) || 0; markDirty(); };
+  pane.insertAdjacentHTML('beforeend', renderRefineUI('scripts'));
 }
 
 function renderTranscript() {
@@ -1191,6 +1230,7 @@ export {
   renderConfig,
   executeCut,
   save,
+  refineCurrentFile,
   initProjectConfig,
   _renderConfigForm,
   labelFromPath,

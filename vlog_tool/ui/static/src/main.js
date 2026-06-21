@@ -3,7 +3,7 @@ import { $, $$, escapeHtml, setStatus, updateSidebarDay } from './utils.js';
 import { api } from './api.js';
 import { initLayout } from './layout.js';
 import { setupPlayer } from './viewer.js';
-import { save, initProjectConfig, renderActiveTab } from './editor.js';
+import { save, initProjectConfig, renderActiveTab, refineCurrentFile } from './editor.js';
 import {
   loadProjects,
   loadConfig,
@@ -29,6 +29,7 @@ import {
 window.switchToOriginalThenCompress = switchToOriginalThenCompress;
 window.goToRunTab = goToRunTab;
 window.initProjectConfig = initProjectConfig;
+window.refineCurrentFile = refineCurrentFile;
 
 async function init() {
   initLayout();

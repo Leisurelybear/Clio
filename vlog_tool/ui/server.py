@@ -43,6 +43,7 @@ from vlog_tool.ui.routes.projects import (
     handle_post_project_remove,
     handle_put_project,
 )
+from vlog_tool.ui.routes.refine import handle_post_refine
 from vlog_tool.ui.routes.run import (
     handle_get_run_status,
     handle_post_rerun,
@@ -297,6 +298,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_post_config_init(self, qs, obj)
             if path == "/api/cut":
                 return handle_post_cut(self, qs, obj)
+            if path == "/api/refine":
+                return handle_post_refine(self, qs, obj)
             if path == "/api/project/create":
                 return handle_post_project_create(self, obj)
             if path == "/api/project/add":

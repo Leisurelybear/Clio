@@ -7,26 +7,6 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ## In Progress
 
-### U-001: Server Handler Extraction (Phase 1 — Immediate)
-
-**Source**: 2026-06-20 code review (`docs/analysis/2026-06-20-REVIEW-part1.md`)
-
-**Background**: 2026-06-20 code review identified `make_handler()` (432-line closure) still contains business logic that should be in services. Already partially addressed (A-001 split routes), but `_resolve_project_input`/`_get_config`/`_send_video_range` remain in Handler.
-
-**Acceptance Criteria**:
-- `_resolve_project_input` → `project_service.py`
-- `_get_config` (LRU cache + mtime) → new `config_cache.py` service
-- `_send_video_range` → `file_service.py` or new `video_service.py`
-- `_resolve_texts`/`_resolve_in` → `file_service.py`
-- `make_handler` reduced to ≤200 lines, route dispatch only
-- `_resolve_last_project_config` at module level also moved to `project_service.py`
-
-**Sub-tasks**:
-- [ ] U-001a: Extract `_get_config` with LRU cache + mtime to `config_cache.py`
-- [ ] U-001b: Extract `_resolve_project_input` + `_resolve_last_project_config` to `project_service.py`
-- [ ] U-001c: Extract `_send_video_range` + `_resolve_texts`/`_resolve_in` to `file_service.py`
-- [ ] U-001d: Verify UI still works (manual test + all pytest pass)
-
 ### U-002: ProviderManager (Phase 2 — Short-term)
 
 **Source**: 2026-06-20 code review (`docs/analysis/2026-06-20-REVIEW-part1.md`)
@@ -46,48 +26,6 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [ ] U-002c: Call `close_all` on `server.py` shutdown
 - [ ] U-002d: Update tests + verify CI
 
-### U-003: Config Module Split (Phase 2 — Short-term)
-
-**Source**: 2026-06-20 code review (`docs/analysis/2026-06-20-REVIEW-part1.md`)
-
-**Background**: `config.py` 406 lines with 14 dataclasses + validation + deep-merge + env resolution. Splitting improves testability and maintainability.
-
-**Acceptance Criteria**:
-- `config/schema.py`: All dataclass definitions
-- `config/loader.py`: `load_config` + `deep_merge` + `_parse_providers`/`_parse_tasks`
-- `config/validator.py`: `_validate_config`
-- `config/defaults.py`: Default values and constants
-- `config/__init__.py` re-exports all public API, zero import changes for callers
-
-**Sub-tasks**:
-- [ ] U-003a: Create `config/` package directory with `__init__.py`
-- [ ] U-003b: Extract schema, loader, validator, defaults
-- [ ] U-003c: Verify all imports still work + all tests pass
-
-### U-005: Pipeline Cancel Coverage for All Steps (Phase 1 — Immediate)
-
-**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
-
-**Background**: `pipeline.py:108` only passes `cancel_event` to `compress`, `transcribe`, `cut`. `analyze`/`scripts`/`plan`/`label` have no cancel support. Users pressing "Cancel" in UI while analyze is running will still burn API quota on remaining videos.
-
-**Sub-tasks**:
-- [ ] U-005a: Add `cancel_event` param to `run_analyze_all` + check at each video loop iteration
-- [ ] U-005b: Add `cancel_event` param to `run_generate_scripts` + check
-- [ ] U-005c: Add `cancel_event` param to `run_plan_vlog` + check
-- [ ] U-005d: Add `cancel_event` param to `run_label_videos` + check
-- [ ] U-005e: Remove step restriction in `pipeline.py:108` so all steps propagate `cancel_event`
-
-### U-006: RateLimiter Lock Refactoring (Phase 2 — Prerequisite for Parallelism)
-
-**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
-
-**Background**: `RateLimiter.__enter__` holds the lock during `time.sleep()`. When P-001 (parallel AI analysis) is implemented, N threads will queue on the same lock, defeating parallelism. Fix: split "compute wait" (locked) from "sleep + call" (unlocked).
-
-**Sub-tasks**:
-- [ ] U-006a: Refactor `RateLimiter` — `acquire()` method returns wait time, sleep outside lock
-- [ ] U-006b: Update `gemini.py` to use new `acquire()` pattern
-- [ ] U-006c: Verify tests + no behavior change in single-threaded mode
-
 ### U-007: Whisper Cancel Safety (Phase 2)
 
 **Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
@@ -99,18 +37,6 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [ ] U-007b: Per-chunk `_INSTALL_CANCEL.is_set()` check for clean interrupt
 - [ ] U-007c: Remove `ctypes` thread-kill code
 - [ ] U-007d: Update tests
-
-### U-009: Whisper Low-Confidence Segment Flag (Phase 2 — Data Quality)
-
-**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
-
-**Background**: `transcribe.py:144` silently drops segments with `avg_logprob < -0.8` or `no_speech_prob > 0.1`. This information loss is invisible to users — they can't tell if a gap is silence or filtered-out speech.
-
-**Sub-tasks**:
-- [ ] U-009a: Change `transcribe.py` to keep all segments, add `low_confidence: bool` flag instead of filtering
-- [ ] U-009b: Count and log dropped segments for diagnostics
-- [ ] U-009c: Update UI transcript display to visually mark low-confidence segments (gray/warning color)
-- [ ] U-009d: Update tests for new behavior
 
 ### U-010: Server + fs.py Test Coverage (Phase 3 — Testing)
 
@@ -134,15 +60,6 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [ ] U-008b: Add `UI_TOKEN` env var check — when `--host` is not localhost, require `?token=` on all sensitive endpoints
 - [ ] U-008c: Update README.md with explicit security warning for `--host 0.0.0.0`
 - [ ] U-008d: Add tests for `fs.py` (currently 12% coverage)
-
-### U-004: Resolve `projects.json` Path Inconsistency (Phase 1 — Immediate)
-
-**Source**: Found during 2026-06-20 code review cross-check (review missed this)
-
-**Background**: `server.py:524` uses `config_path.parent / "projects.json"`, but `project_service.py` uses `_registry_path(config_path)` which returns `config_path.parent / "projects.json"` — they happen to be the same value, but this is coincidental and fragile.
-
-**Sub-tasks**:
-- [ ] U-004a: Change `server.py` to call `_registry_path(config_path)` for consistency
 
 ## Staging / WIP
 
@@ -275,7 +192,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Sub-tasks**:
 - [x] R-009a: Pin dependency versions + migration guide
-- [ ] R-009b: Linux `setup.sh` (low priority, project primarily targets Windows)
+- [x] R-009b: Linux `setup.sh` (low priority, project primarily targets Windows)
 - [x] R-009c: Core pure functions + routes + orchestration unit tests (pytest, 381 cases, CI Linux + Windows dual platform)
 - [ ] R-009d: Cross-platform venv detection fix (B-007, affects Linux CI)
 
@@ -791,3 +708,22 @@ All B-046~B-052 covered by 163 new tests:
 | `d6d62ef` | feat(config): per-project configuration via project.yaml |
 | `a9996a9` | fix(ai): clean up Gemini File API uploads + retry (B-001, B-002) |
 | `25128d1` | feat(ai): retry transient API failures with exponential backoff |
+
+---
+
+## ✅ Recently Completed (Verified 2026-06-21 Code Review)
+
+Items found already implemented during code-audit of ROADMAP:
+
+| ID | Description | Key Evidence |
+|----|-------------|-------------|
+| **U-001a** | `config_cache.py` with LRU + mtime + thread-safe | `vlog_tool/ui/services/config_cache.py` (79 lines) |
+| **U-001b** | `_resolve_project_input` + `resolve_last_project_config` in `project_service.py` | `project_service.py:resolve_project_input, resolve_last_project_config` |
+| **U-001c** | `send_video_range` + `resolve_texts`/`resolve_in` in `file_service.py` | `file_service.py:send_video_range, resolve_texts, resolve_in` |
+| **U-001d** | `server.py` reduced to ~360 lines, route dispatch only | `server.py` (363 lines) |
+| **U-003** | Config module split: `config/` package with 7 modules | `config/__init__.py`, `loader.py`, `models.py`, `parsers.py`, `validators.py`, `enums.py`, `descriptions.py` |
+| **U-004** | `projects.json` path centralized via `_registry_path()` | `project_service.py:_registry_path` — all callers use it |
+| **U-005** | `cancel_event` in all pipeline steps + generic propagation | `tasks/{analyze,scripts,plan,label}.py` all have `cancel_event` param; `pipeline.py:108` generic kwargs |
+| **U-006** | `acquire()` method in RateLimiter; gemini + openai_compat use it | `ratelimit.py:acquire()` returns wait without lock-sleep; `gemini.py:117`, `openai_compat.py:41` call `acquire()` |
+| **U-009** | Low-confidence segments kept with `low_confidence` flag + UI ⚠ icon | `transcribe.py:150-158` always appends; `editor.js:277` renders ⚠; `style.css` warning-color styling |
+| **R-009b** | `setup.sh` exists at repo root | `setup.sh` (180 lines, Linux/macOS equivalent of setup.ps1) |
