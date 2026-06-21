@@ -17,6 +17,9 @@ from vlog_tool.progress import ProgressTracker
 from vlog_tool.transcribe import check_whisper, transcribe_audio
 from vlog_tool.utils import find_videos, popen_subprocess, resolve_binary, write_json_atomic
 
+# isort: split
+from vlog_tool.shutdown import register_process, unregister_process
+
 
 def _get_video_duration(video_path: Path, ffprobe: str) -> float:
     """Use ffprobe to get video duration in seconds."""
@@ -58,6 +61,7 @@ def _extract_audio(
         str(tmp_path),
     ]
     proc = popen_subprocess(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
+    register_process(proc)
     time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
     last_log_pct = -1
     try:
@@ -95,6 +99,8 @@ def _extract_audio(
                 proc.wait()
         tmp_path.unlink(missing_ok=True)
         raise
+    finally:
+        unregister_process(proc)
 
 
 def run_transcribe_all(

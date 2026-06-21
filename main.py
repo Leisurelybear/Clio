@@ -10,6 +10,7 @@ from pathlib import Path
 
 from vlog_tool.config import apply_run_paths, load_config
 from vlog_tool.log import setup_logging
+from vlog_tool.shutdown import before_stop, install_hooks
 from vlog_tool.ui import run as run_ui
 from vlog_tool.ui.services.file_service import _migrate_project_configs
 from vlog_tool.utils import discover_ffmpeg_bin, find_videos
@@ -223,6 +224,7 @@ def main(argv: list[str] | None = None) -> int:
 
     base_config = load_config(config_path)
     setup_logging(base_config.paths.logs_dir)
+    install_hooks()
 
     if args.command == "check":
         return run_check(config_path, getattr(args, "input", None))
@@ -346,6 +348,8 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as e:
         print(f"错误: {e}", file=sys.stderr)
         return 1
+    finally:
+        before_stop()
 
     return 0
 

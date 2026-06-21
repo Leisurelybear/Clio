@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import TypeVar
 
 from vlog_tool._constants import VIDEO_EXTENSIONS
+from vlog_tool.shutdown import register_process, unregister_process
 
 T = TypeVar("T")
 
@@ -249,6 +250,7 @@ def run_ffmpeg(
 ) -> None:
     cmd = [ffmpeg, *args]
     process = popen_subprocess(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True, bufsize=1)
+    register_process(process)
     stderr_lines: list[str] = []
     time_pat = re.compile(r"time=(\d+):(\d+):(\d+\.\d+)")
     try:
@@ -274,5 +276,7 @@ def run_ffmpeg(
             except subprocess.TimeoutExpired:
                 process.kill()
         raise
+    finally:
+        unregister_process(process)
     if process.returncode != 0:
         raise RuntimeError(f"ffmpeg 执行失败:\n{' '.join(cmd)}\n{''.join(stderr_lines)}")

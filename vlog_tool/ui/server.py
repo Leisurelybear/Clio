@@ -20,6 +20,7 @@ from urllib.parse import parse_qs, urlparse
 from vlog_tool.config import AppConfig
 from vlog_tool.session_log import clear as clear_session_log
 from vlog_tool.session_log import read as read_session_log
+from vlog_tool.shutdown import before_stop, install_hooks
 from vlog_tool.ui.routes.config_routes import (
     handle_get_config,
     handle_get_config_raw,
@@ -338,6 +339,7 @@ def run(
     port: int = 8765,
     open_browser: bool = True,
 ) -> int:
+    install_hooks()
     # Try loading last used project config
     active_config = resolve_last_project_config(config, config_path)
     handler = make_handler(active_config, config_path)
@@ -357,6 +359,7 @@ def run(
         print("\n  UI closed")
     finally:
         server.server_close()
+        before_stop()
     return 0
 
 

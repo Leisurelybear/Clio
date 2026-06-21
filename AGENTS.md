@@ -27,6 +27,7 @@ vlog-video-analysis/
 ├── main.py                    # CLI entry, all subcommands registered here
 ├── vlog_tool/
 │   ├── config.py              # AppConfig dataclass + load_config
+│   ├── shutdown.py            # beforeStop hook: atexit + SIGTERM → kill ffmpeg + close provider connections + flush IO
 │   ├── pipeline.py            # High-level pipeline functions (run_analyze_all, etc.)
 │   ├── analyze.py             # AI interaction (analyze_video, generate_voiceover, plan_daily_vlog, refine_*)
 │   ├── compress.py            # ffmpeg wrapper
@@ -545,7 +546,16 @@ See `vlog_tool/compress.py:24`.
 - Fix: restrict to user home directory by default, add `UI_TOKEN` env var for LAN mode
 - The file has only 12% test coverage — a security-sensitive untested surface
 
-### 9.19 Split Segment Sidecar Mapping (`videos.py:101`)
+### 9.19 beforeStop Hook (`shutdown.py`)
+
+- `install_hooks()` registers `atexit` + `signal(SIGTERM)` (Unix) to call `before_stop()` on shutdown
+- `before_stop()` (idempotent): kills registered ffmpeg subprocesses → closes provider HTTP connections → flushes IO
+- `register_process(proc)` / `unregister_process(proc)`: every ffmpeg subprocess creation must wrap with these to avoid orphaned processes on SIGTERM
+- Currently integrated in: `run_ffmpeg()` (utils.py) and `_extract_audio()` (tasks/transcribe.py)
+- Both `main.py` and `server.py` call `install_hooks()` at startup and `before_stop()` in their `finally` blocks
+- Any new ffmpeg subprocess creation must follow the same register/unregister pattern
+
+### 9.20 Split Segment Sidecar Mapping (`videos.py:101`)
 
 - `videos.py:101` `(text_sidecars.get(idx) or [None])[0]` always maps **all** split segments of the same video to the **first** text/script sidecar file
 - Example: `001_GL010683_seg01.mp4`, `_seg02.mp4`, `_seg03.mp4` all get `text_json` pointing to `001_巴黎铁塔_part1.json`
