@@ -59,15 +59,18 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
             ok = False
 
     print("环境检查:")
+    parent_name = Path(sys.executable).parent.name.lower()
+    venv_ok = parent_name in ("scripts", "bin") or ".venv" in sys.executable
     status(
         "虚拟环境",
-        Path(sys.executable).parent.name.lower() == "scripts" or ".venv" in sys.executable,
-        sys.executable,
+        venv_ok,
+        sys.executable + (" (建议使用 .venv 虚拟环境)" if not venv_ok else ""),
     )
 
+    setup_script = "setup.ps1" if os.name == "nt" else "setup.sh"
     ffmpeg = config.paths.ffmpeg or discover_ffmpeg_bin("ffmpeg")
     ffprobe = config.paths.ffprobe or discover_ffmpeg_bin("ffprobe")
-    status("ffmpeg", bool(ffmpeg), ffmpeg or "未找到，运行 setup.ps1")
+    status("ffmpeg", bool(ffmpeg), ffmpeg or f"未找到，运行 {setup_script}")
     status("ffprobe", bool(ffprobe), ffprobe or "未找到")
 
     check_dir = input_dir or config.paths.input_dir
