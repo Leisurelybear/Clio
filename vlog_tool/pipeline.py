@@ -75,6 +75,8 @@ def run_pipeline_steps(
     steps: list[str] | None = None,
     tracker: ProgressTracker | None = None,
     cancel_event: threading.Event | None = None,
+    files: list[str] | None = None,
+    overwrite: bool = False,
 ) -> None:
     """运行指定步骤列表（可选的进度跟踪）。
 

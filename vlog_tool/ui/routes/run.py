@@ -44,12 +44,22 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
     cfg = handler._get_config(proj_input)
     if "use_transcripts" in obj:
         cfg.plan.use_transcripts = obj["use_transcripts"]
+    files_list = obj.get("files")
+    overwrite = obj.get("overwrite", False)
 
     def _run():
         handler.__class__._cancel_event.clear()
         tracker = ProgressTracker(cfg.paths.output_dir)
         try:
-            run_pipeline_steps(cfg, day_label, steps, tracker=tracker, cancel_event=handler.__class__._cancel_event)
+            run_pipeline_steps(
+                cfg,
+                day_label,
+                steps,
+                tracker=tracker,
+                cancel_event=handler.__class__._cancel_event,
+                files=files_list,
+                overwrite=overwrite,
+            )
         except Exception:
             tracker.error("pipeline failed")
             traceback.print_exc()
