@@ -68,12 +68,25 @@ git commit -m "feat(run): accept files filter + overwrite flag in API and pipeli
 
 ### Task 2: Add `files` filter to each pipeline task function
 
+**Pre-requisite:** This task also adds the kwargs propagation in `pipeline.py` (Task 1 accepted the params but didn't propagate them to avoid TypeError on step functions that don't yet accept files/overwrite).
+
 **Files:**
+- Modify: `vlog_tool/pipeline.py:109-115`
 - Modify: `vlog_tool/tasks/compress.py:20-32`
 - Modify: `vlog_tool/tasks/analyze.py:78-110`
 - Modify: `vlog_tool/tasks/transcribe.py` (find discovery point)
 - Modify: `vlog_tool/tasks/scripts.py:20-34`
 - Modify: `vlog_tool/tasks/refine.py` (find discovery point)
+
+- [ ] **Step 0: Add kwargs propagation back in pipeline.py**
+
+In `vlog_tool/pipeline.py`, after the `cancel_event` kwargs line, add back the files/overwrite propagation (this was deferred from Task 1):
+```python
+                if files is not None:
+                    kwargs["files"] = files
+                if overwrite:
+                    kwargs["overwrite"] = True
+```
 
 - [ ] **Step 1: Add filter to `run_compress_all`**
 

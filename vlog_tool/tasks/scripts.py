@@ -22,6 +22,8 @@ def run_generate_scripts(
     tracker: ProgressTracker | None = None,
     single_file: Path | None = None,
     cancel_event: threading.Event | None = None,
+    selected_files: list[str] | None = None,
+    overwrite: bool = False,
 ) -> None:
     config.scripts_dir.mkdir(parents=True, exist_ok=True)
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
@@ -32,6 +34,9 @@ def run_generate_scripts(
         files = [single_file]
     else:
         files = sorted(config.texts_dir.glob("*.json"))
+    if selected_files is not None:
+        allowed = {f.lower() for f in selected_files}
+        files = [f for f in files if f.stem.lower() in allowed]
     if tracker:
         tracker.update(phase="voiceover", total=len(files), message=f"生成口播文案（{len(files)} 条）...")
     with timed(f"run_generate_scripts（{len(files)} 个）"):
@@ -45,7 +50,7 @@ def run_generate_scripts(
             data["index"] = data.get("index", json_file.stem[:3])
             orig_stem = Path(data.get("source_file") or json_file.stem).stem
             out = config.scripts_dir / f"{json_file.stem}_voiceover.json"
-            if config.analyze.skip_existing and out.exists():
+            if not overwrite and config.analyze.skip_existing and out.exists():
                 print(f"[跳过] {out.name}")
                 state.mark(orig_stem, "voiceover", "skipped")
                 if tracker:

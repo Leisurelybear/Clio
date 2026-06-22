@@ -108,6 +108,8 @@ def run_transcribe_all(
     tracker: ProgressTracker | None = None,
     single_file: Path | None = None,
     cancel_event: threading.Event | None = None,
+    files: list[str] | None = None,
+    overwrite: bool = False,
 ) -> int:
     if not config.whisper.enabled:
         print("Whisper 转录未启用（whisper.enabled=false），跳过")
@@ -126,6 +128,9 @@ def run_transcribe_all(
     transcripts_dir.mkdir(parents=True, exist_ok=True)
 
     videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
+    if files is not None:
+        allowed = {f.lower() for f in files}
+        videos = [v for v in videos if v.stem.lower() in allowed]
     total = len(videos)
     if total == 0:
         print("没有找到需要转录的视频")
@@ -139,7 +144,7 @@ def run_transcribe_all(
     for i, orig_video in enumerate(videos):
         stem = orig_video.stem
         out_path = transcripts_dir / f"{stem}_transcript.json"
-        if config.analyze.skip_existing and out_path.exists():
+        if not overwrite and config.analyze.skip_existing and out_path.exists():
             try:
                 json.loads(out_path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):

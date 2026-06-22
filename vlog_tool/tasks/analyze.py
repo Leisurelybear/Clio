@@ -80,6 +80,8 @@ def run_analyze_all(
     tracker: ProgressTracker | None = None,
     single_file: Path | None = None,
     cancel_event: threading.Event | None = None,
+    files: list[str] | None = None,
+    overwrite: bool = False,
 ) -> list[ClipRecord]:
     """Analyze already-compressed videos using AI (compress step must precede this).
 
@@ -118,6 +120,10 @@ def run_analyze_all(
             idx_str = parts[0]
             items.append((p, orig_path, idx_str))
 
+    if files is not None:
+        allowed = {f.lower() for f in files}
+        items = [it for it in items if it[0].stem.lower() in allowed]
+
     if not items:
         print(f"[错误] 压缩目录为空或无法匹配: {config.compressed_dir}，请先运行压缩步骤")
         return []
@@ -139,7 +145,7 @@ def run_analyze_all(
             existing = sorted(config.texts_dir.glob(f"{idx_str}_*.json"))
             json_path = None
             analysis = None
-            if config.analyze.skip_existing and existing:
+            if not overwrite and config.analyze.skip_existing and existing:
                 candidate = existing[0]
                 try:
                     existing_data = json.loads(candidate.read_text(encoding="utf-8"))

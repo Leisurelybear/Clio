@@ -40,7 +40,12 @@ def _load_analysis_for_script(script_path: Path, texts_dir: Path) -> dict | None
 
 
 def run_refine_texts(
-    config: AppConfig, path: Path | None = None, fix: str | None = None, context_override: str | None = None
+    config: AppConfig,
+    path: Path | None = None,
+    fix: str | None = None,
+    context_override: str | None = None,
+    selected_files: list[str] | None = None,
+    overwrite: bool = False,
 ) -> int:
     """审阅并修正 texts/*.json；同步重写同名 .txt。返回处理条数。
 
@@ -49,6 +54,9 @@ def run_refine_texts(
     if fix and (path is None or path.is_dir()):
         raise ValueError("--fix 必须配合 -i 指定单个 json 文件，不能用于目录")
     files = _collect_target_files(path, config.texts_dir)
+    if selected_files is not None:
+        allowed = {f.lower() for f in selected_files}
+        files = [f for f in files if f.stem.lower() in allowed]
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
     if not files:
         print(f"未找到 json 文件: {path or config.texts_dir}")
@@ -86,7 +94,12 @@ def run_refine_texts(
 
 
 def run_refine_scripts(
-    config: AppConfig, path: Path | None = None, fix: str | None = None, context_override: str | None = None
+    config: AppConfig,
+    path: Path | None = None,
+    fix: str | None = None,
+    context_override: str | None = None,
+    selected_files: list[str] | None = None,
+    overwrite: bool = False,
 ) -> int:
     """审阅并修正 scripts/*_voiceover.json；同步重写同名 .md。
 
@@ -95,6 +108,9 @@ def run_refine_scripts(
     if fix and (path is None or path.is_dir()):
         raise ValueError("--fix 必须配合 -i 指定单个 json 文件，不能用于目录")
     files = _collect_target_files(path, config.scripts_dir, pattern="*_voiceover.json")
+    if selected_files is not None:
+        allowed = {f.lower() for f in selected_files}
+        files = [f for f in files if f.stem.lower() in allowed]
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
     if not files:
         print(f"未找到 voiceover json 文件: {path or config.scripts_dir}")

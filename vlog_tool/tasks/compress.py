@@ -22,6 +22,8 @@ def run_compress_all(
     tracker: ProgressTracker | None = None,
     single_file: Path | None = None,
     cancel_event: threading.Event | None = None,
+    files: list[str] | None = None,
+    overwrite: bool = False,
 ) -> list[ClipRecord]:
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
     ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
@@ -30,6 +32,9 @@ def run_compress_all(
         videos = [single_file]
     else:
         videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
+    if files is not None:
+        allowed = {f.lower() for f in files}
+        videos = [v for v in videos if v.stem.lower() in allowed]
     config.compressed_dir.mkdir(parents=True, exist_ok=True)
 
     # Phase 1: resolve items to compress — split long videos if needed
@@ -48,7 +53,7 @@ def run_compress_all(
     # Only include files >= 50KB to skip partially-written files from interrupted runs.
     MIN_VALID_SIZE = 50 * 1024
     existing_map: dict[str, tuple[int, Path]] = {}
-    if config.analyze.skip_existing and config.compressed_dir.is_dir():
+    if not overwrite and config.analyze.skip_existing and config.compressed_dir.is_dir():
         for f in config.compressed_dir.iterdir():
             if not f.is_file() or f.suffix.lower() not in VIDEO_EXTS:
                 continue
@@ -77,7 +82,7 @@ def run_compress_all(
         return m.group(1) if m else stem_part
 
     orig_to_compressed: dict[str, set[str]] = {}
-    if config.analyze.skip_existing:
+    if not overwrite and config.analyze.skip_existing:
         for stem_part in existing_map:
             orig_stem = _orig_stem_for(stem_part)
             orig_to_compressed.setdefault(orig_stem, set()).add(stem_part)

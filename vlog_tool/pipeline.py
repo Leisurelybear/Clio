@@ -109,6 +109,10 @@ def run_pipeline_steps(
                 kwargs: dict = {}
                 if cancel_event:
                     kwargs["cancel_event"] = cancel_event
+                if files is not None:
+                    kwargs["files"] = files
+                if overwrite:
+                    kwargs["overwrite"] = True
                 if step in _STEP_DAY_ARG:
                     fn(config, day_label, tracker, **kwargs)
                 else:
