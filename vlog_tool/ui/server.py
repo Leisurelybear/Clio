@@ -58,6 +58,7 @@ from vlog_tool.ui.routes.texts import (
     handle_put_texts,
     handle_put_voiceover,
 )
+from vlog_tool.ui.routes.token_routes import handle_get_token_usage
 from vlog_tool.ui.routes.transcripts import (
     handle_get_transcripts,
     handle_post_transcripts,
@@ -238,6 +239,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_get_whisper_install_status(self)
             if path == "/api/whisper/models":
                 return handle_get_whisper_models(self)
+            if path == "/api/token-usage":
+                return handle_get_token_usage(self, qs)
             if path == "/api/env":
                 return handle_get_env(self, qs)
             if path == "/api/logs":
