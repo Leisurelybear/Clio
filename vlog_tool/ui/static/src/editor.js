@@ -994,6 +994,17 @@ function labelFromPath(path) {
   return path ? path.split('.').pop() : 'config';
 }
 
+function _resolveDescPath(path, descriptions) {
+  if (!descriptions) return null;
+  if (descriptions[path]) return path;
+  const m = path.match(/^(ai\.(?:providers|tasks))\.([^.]+)\.(.+)$/);
+  if (m) {
+    const candidate = `${m[1]}.{name}.${m[3]}`;
+    if (descriptions[candidate]) return candidate;
+  }
+  return null;
+}
+
 function _renderTooltip(path, desc) {
   if (!desc) return '';
   return `<span class="config-desc-icon" data-desc-path="${path}" tabindex="0">
@@ -1006,7 +1017,8 @@ function _renderConfigForm(obj, path, descriptions = null) {
   if (obj === null || obj === undefined) {
     return `<span class="config-null">(空)</span>`;
   }
-  const tip = (descriptions && descriptions[path]) ? _renderTooltip(path, descriptions[path]) : '';
+  const descPath = _resolveDescPath(path, descriptions);
+  const tip = descPath ? _renderTooltip(path, descriptions[descPath]) : '';
   if (typeof obj === 'boolean') {
     return `<label class="config-field config-bool"><span class="config-key">${labelFromPath(path)}${tip}</span> <input type="checkbox" data-path="${path}" ${obj ? 'checked' : ''}></label>`;
   }
@@ -1024,7 +1036,15 @@ function _renderConfigForm(obj, path, descriptions = null) {
       return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}${tip}</span> <textarea data-path="${path}" rows="4">${escapeHtml(obj)}</textarea>${hint}</label>`;
     }
     const isPwd = path.endsWith('api_key');
-    return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}${tip}</span> <input type="${isPwd ? 'password' : 'text'}" data-path="${path}" value="${escapeHtml(obj)}"></label>`;
+    let hint = '';
+    if (path.endsWith('api_key_env')) {
+      hint = '<br><span class="hint">环境变量名称（如 <code>GEMINI_API_KEY</code>），实际密钥值写在项目根目录的 <code>.env</code> 文件中</span>';
+    } else if (path.endsWith('base_url')) {
+      hint = '<br><span class="hint">API 基础地址。Gemini 留空即可；OpenAI 兼容接口必填，如 <code>https://api.deepseek.com/v1</code></span>';
+    } else if (path.endsWith('api_key')) {
+      hint = '<br><span class="hint">API 密钥（直接填入）。<strong>不推荐</strong>，建议使用 <code>api_key_env</code> 配合 <code>.env</code> 文件更安全</span>';
+    }
+    return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}${tip}</span> <input type="${isPwd ? 'password' : 'text'}" data-path="${path}" value="${escapeHtml(obj)}"></label>${hint}`;
   }
   if (Array.isArray(obj)) {
     const allStr = obj.every(x => typeof x === 'string');
