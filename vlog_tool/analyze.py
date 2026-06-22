@@ -126,10 +126,17 @@ def _wrap_with_context(prompt: str, config: AppConfig, context_override: str | N
     return f"## 背景与规范（请严格遵守）\n\n{chr(10).join(parts)}\n\n---\n\n{prompt}"
 
 
-def _call_ai(label: str, provider_id: str, model: str, prompt: str, fn, *, debug_print: bool = False) -> str:
-    """统一 AI 调用的日志壳：打印提示词大小、起止时间、响应大小。
-    当 debug_print=True 时，还会将完整 prompt 输出到控制台。
-    """
+def _call_ai(
+    label: str,
+    provider_id: str,
+    model: str,
+    prompt: str,
+    fn,
+    *,
+    debug_print: bool = False,
+    token_store=None,
+    task_name: str = "",
+) -> str:
     if debug_print:
         print("=" * 60)
         print(f"[DEBUG PROMPT] {label} ({provider_id}/{model})")
@@ -139,9 +146,11 @@ def _call_ai(label: str, provider_id: str, model: str, prompt: str, fn, *, debug
     prompt_bytes = len(prompt.encode("utf-8"))
     print(f"  AI: {provider_id}/{model}（prompt {format_size(prompt_bytes)}）")
     with timed(f"{label} {provider_id}/{model}"):
-        text = fn()
-    print(f"  响应: {format_size(len(text.encode('utf-8')))}")
-    return text
+        resp = fn()
+    print(f"  响应: {format_size(len(resp.text.encode('utf-8')))}")
+    if token_store and resp.token_usage:
+        token_store.record(task_name or label, model, resp.token_usage)
+    return resp.text
 
 
 def _parse_timestamp_sec(ts: str) -> float:
@@ -154,7 +163,12 @@ def _parse_timestamp_sec(ts: str) -> float:
     return 0.0
 
 
-def analyze_video(video_path: str, config: AppConfig, progress_callback: Callable[[str], None] | None = None) -> dict:
+def analyze_video(
+    video_path: str,
+    config: AppConfig,
+    progress_callback: Callable[[str], None] | None = None,
+    token_store=None,
+) -> dict:
     provider, model = get_video_provider(config, TaskName.VIDEO_ANALYZE)
     prompt = _wrap_with_context(ANALYZE_PROMPT, config)
     text = _call_ai(
@@ -164,11 +178,13 @@ def analyze_video(video_path: str, config: AppConfig, progress_callback: Callabl
         prompt,
         lambda: provider.analyze_video(video_path, prompt, model, progress_callback=progress_callback),
         debug_print=config.ai.debug_print_prompt,
+        token_store=token_store,
+        task_name=TaskName.VIDEO_ANALYZE,
     )
     return _validate_analysis(extract_json(text), video_path)
 
 
-def generate_voiceover(clip_data: dict, template: str, config: AppConfig) -> dict:
+def generate_voiceover(clip_data: dict, template: str, config: AppConfig, token_store=None) -> dict:
     provider, model = get_task_provider(config, TaskName.VOICEOVER)
 
     timeline_text = "\n".join(
@@ -192,6 +208,8 @@ def generate_voiceover(clip_data: dict, template: str, config: AppConfig) -> dic
         prompt,
         lambda: provider.generate_text(prompt, model),
         debug_print=config.ai.debug_print_prompt,
+        token_store=token_store,
+        task_name=TaskName.VOICEOVER,
     )
     return _validate_voiceover(extract_json(text), clip_data.get("title", ""))
 
@@ -202,6 +220,7 @@ def plan_daily_vlog(
     day_label: str = "day1",
     transcripts_map: dict[str, dict] | None = None,
     use_transcripts: bool = True,
+    token_store=None,
 ) -> dict:
     provider, model = get_task_provider(config, TaskName.VLOG_PLAN)
 
@@ -249,6 +268,8 @@ def plan_daily_vlog(
         prompt,
         lambda: provider.generate_text(prompt, model),
         debug_print=config.ai.debug_print_prompt,
+        token_store=token_store,
+        task_name=TaskName.VLOG_PLAN,
     )
     result = _validate_plan(extract_json(text), day_label)
 
@@ -280,7 +301,9 @@ def plan_daily_vlog(
     return result
 
 
-def refine_text(analysis: dict, config: AppConfig, fix: str | None = None, context_override: str | None = None) -> dict:
+def refine_text(
+    analysis: dict, config: AppConfig, fix: str | None = None, context_override: str | None = None, token_store=None
+) -> dict:
     """审阅并修正现有的素材分析。
 
     fix 非空时切换为「按用户意见定向修正」模式（仅改用户提到的字段，
@@ -306,6 +329,8 @@ def refine_text(analysis: dict, config: AppConfig, fix: str | None = None, conte
         prompt,
         lambda: provider.generate_text(prompt, model),
         debug_print=config.ai.debug_print_prompt,
+        token_store=token_store,
+        task_name=TaskName.REFINE_TEXT,
     )
     result = extract_json(text)
     if not isinstance(result, dict) or "index" not in result:
@@ -315,7 +340,12 @@ def refine_text(analysis: dict, config: AppConfig, fix: str | None = None, conte
 
 
 def refine_script(
-    script: dict, analysis: dict | None, config: AppConfig, fix: str | None = None, context_override: str | None = None
+    script: dict,
+    analysis: dict | None,
+    config: AppConfig,
+    fix: str | None = None,
+    context_override: str | None = None,
+    token_store=None,
 ) -> dict:
     """审阅并修正现有的口播文案。
 
@@ -347,6 +377,8 @@ def refine_script(
         prompt,
         lambda: provider.generate_text(prompt, model),
         debug_print=config.ai.debug_print_prompt,
+        token_store=token_store,
+        task_name=TaskName.REFINE_TEXT,
     )
     result = extract_json(text)
     if not isinstance(result, dict) or "voiceover" not in result:
