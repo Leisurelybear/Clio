@@ -80,6 +80,7 @@ function updateEntityUI() {
     : state.currentEntity === 'run' ? 'entity-run'
     : state.currentEntity === 'config' ? 'entity-config'
     : state.currentEntity === 'logs' ? 'entity-logs'
+    : state.currentEntity === 'tokens' ? 'entity-tokens'
     : 'entity-video';
   $('editor').className = cls;
   $$('.project-item').forEach(p => p.classList.remove('active'));
@@ -94,6 +95,9 @@ function updateEntityUI() {
     $$('.video-item').forEach(v => v.classList.remove('active'));
   } else if (state.currentEntity === 'logs') {
     document.querySelector('.project-item[data-entity="logs"]').classList.add('active');
+    $$('.video-item').forEach(v => v.classList.remove('active'));
+  } else if (state.currentEntity === 'tokens') {
+    document.querySelector('.project-item[data-entity="tokens"]').classList.add('active');
     $$('.video-item').forEach(v => v.classList.remove('active'));
   }
 }

@@ -17,6 +17,7 @@ import {
   selectRun,
   selectConfig,
   selectLogs,
+  selectTokens,
   setSource,
   openBrowseDir,
   loadBrowseDir,
@@ -163,6 +164,7 @@ async function init() {
       else if (p.dataset.entity === 'run') selectRun();
       else if (p.dataset.entity === 'config') selectConfig();
       else if (p.dataset.entity === 'logs') selectLogs();
+      else if (p.dataset.entity === 'tokens') selectTokens();
     };
   });
   document.body.addEventListener('click', e => {

@@ -411,6 +411,13 @@ async function selectLogs() {
   import('./editor.js').then(mod => mod.renderActiveTab());
 }
 
+async function selectTokens() {
+  state.currentEntity = 'tokens';
+  markDirty(false);
+  const { renderActiveTab } = await import('./editor.js');
+  renderActiveTab();
+}
+
 async function setSource(source) {
   if (source === state.source) return;
   if (state.dirty) {
@@ -676,6 +683,7 @@ export {
   selectRun,
   selectConfig,
   selectLogs,
+  selectTokens,
   setSource,
   openBrowseDir,
   loadBrowseDir,

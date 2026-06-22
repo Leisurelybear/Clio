@@ -32,6 +32,10 @@ function renderActiveTab() {
     renderLogs();
     return;
   }
+  if (state.currentEntity === 'tokens') {
+    renderTokens();
+    return;
+  }
   $$('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === state.currentTab));
   $$('.tab-pane').forEach(p => p.classList.toggle('active', p.id === `tab-${state.currentTab}`));
   if (state.currentTab === 'texts') renderTexts();
@@ -1252,9 +1256,51 @@ function renderLogs() {
   })();
 }
 
+async function renderTokens() {
+  const pane = $('tab-tokens');
+  pane.innerHTML = '<p class="muted">加载中...</p>';
+  try {
+    const data = await api('GET', '/api/token-usage');
+    if (!data || !data.total) {
+      pane.innerHTML = '<p class="muted">暂无 token 使用数据。运行流水线后会自动记录。</p>';
+      return;
+    }
+    const t = data.total;
+    const totalHtml = `
+      <div style="display:flex;gap:var(--space-3);margin-bottom:var(--space-3);flex-wrap:wrap">
+        <div class="token-card"><div class="token-card-value">${t.total_tokens.toLocaleString()}</div><div class="token-card-label">总 Token</div></div>
+        <div class="token-card"><div class="token-card-value">${t.prompt_tokens.toLocaleString()}</div><div class="token-card-label">Prompt</div></div>
+        <div class="token-card"><div class="token-card-value">${t.completion_tokens.toLocaleString()}</div><div class="token-card-label">Completion</div></div>
+      </div>`;
+
+    let modelHtml = '<h4 style="margin:var(--space-2) 0">按模型</h4><table class="token-table"><tr><th>模型</th><th>调用次数</th><th>Prompt</th><th>Completion</th><th>总计</th></tr>';
+    for (const [model, m] of Object.entries(data.by_model || {})) {
+      modelHtml += `<tr><td>${escapeHtml(model)}</td><td>${m.calls}</td><td>${m.prompt_tokens.toLocaleString()}</td><td>${m.completion_tokens.toLocaleString()}</td><td>${m.total_tokens.toLocaleString()}</td></tr>`;
+    }
+    modelHtml += '</table>';
+
+    let taskHtml = '<h4 style="margin:var(--space-2) 0">按任务</h4><table class="token-table"><tr><th>任务</th><th>调用次数</th><th>Prompt</th><th>Completion</th><th>总计</th></tr>';
+    for (const [task, tk] of Object.entries(data.by_task || {})) {
+      taskHtml += `<tr><td>${escapeHtml(task)}</td><td>${tk.calls}</td><td>${tk.prompt_tokens.toLocaleString()}</td><td>${tk.completion_tokens.toLocaleString()}</td><td>${tk.total_tokens.toLocaleString()}</td></tr>`;
+    }
+    taskHtml += '</table>';
+
+    let historyHtml = '<h4 style="margin:var(--space-2) 0">历史记录</h4><table class="token-table"><tr><th>时间</th><th>任务</th><th>模型</th><th>Prompt</th><th>Completion</th><th>总计</th></tr>';
+    for (const h of (data.history || []).slice().reverse().slice(0, 100)) {
+      historyHtml += `<tr><td class="token-time">${escapeHtml(h.timestamp || '')}</td><td>${escapeHtml(h.task || '')}</td><td>${escapeHtml(h.model || '')}</td><td>${(h.prompt_tokens || 0).toLocaleString()}</td><td>${(h.completion_tokens || 0).toLocaleString()}</td><td>${(h.total_tokens || 0).toLocaleString()}</td></tr>`;
+    }
+    historyHtml += '</table>';
+
+    pane.innerHTML = `<div style="padding:var(--space-2)">${totalHtml}${modelHtml}${taskHtml}${historyHtml}</div>`;
+  } catch (e) {
+    pane.innerHTML = `<p class="muted">加载失败: ${escapeHtml(e.message || e)}</p>`;
+  }
+}
+
 export {
   renderActiveTab,
   renderLogs,
+  renderTokens,
   renderTexts,
   renderVoiceover,
   renderPlan,

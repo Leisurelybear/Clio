@@ -524,6 +524,52 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
 #editor.entity-video #tab-config { display: none; }
 #editor.entity-run .editor-actions,
 #editor.entity-logs .editor-actions { display: none; }
+#editor.entity-tokens .tabs { display: none; }
+#editor.entity-tokens .tab-pane:not(#tab-tokens) { display: none; }
+#editor.entity-tokens #tab-tokens { display: block; }
+#editor.entity-tokens .editor-actions { display: none; }
+
+.token-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  min-width: 140px;
+  text-align: center;
+}
+.token-card-value {
+  font-size: 1.6em;
+  font-weight: 700;
+  color: var(--accent);
+}
+.token-card-label {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+.token-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-3);
+}
+.token-table th, .token-table td {
+  padding: 4px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.token-table th {
+  color: var(--text-tertiary);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  background: var(--bg-base);
+}
+.token-time {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
 
 .tab-pane { display: none; padding: var(--space-3); flex: 1; overflow-y: auto; }
 .tab-pane.active { display: block; }
