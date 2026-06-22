@@ -4,6 +4,7 @@ import time
 
 import httpx
 
+from vlog_tool.ai.base import AIResponse, TokenUsage
 from vlog_tool.config import ProviderConfig, ProxyConfig
 from vlog_tool.ratelimit import make_rate_limiter
 from vlog_tool.utils import mask_if_looks_like_key, with_retry
@@ -42,8 +43,8 @@ class OpenAICompatProvider:
             if wait:
                 time.sleep(wait)
 
-    def generate_text(self, prompt: str, model: str) -> str:
-        def _do() -> str:
+    def generate_text(self, prompt: str, model: str) -> AIResponse:
+        def _do() -> AIResponse:
             self._maybe_wait()
             response = self._client.post(
                 f"{self._base_url}/chat/completions",
@@ -65,7 +66,18 @@ class OpenAICompatProvider:
                 body = response.text[:200]
                 raise ValueError(f"API {self._base_url} 返回 {sc}: {body}")
             data = response.json()
-            return data["choices"][0]["message"]["content"]
+            usage_raw = data.get("usage")
+            usage = None
+            if usage_raw:
+                usage = TokenUsage(
+                    prompt_tokens=usage_raw.get("prompt_tokens", 0),
+                    completion_tokens=usage_raw.get("completion_tokens", 0),
+                    total_tokens=usage_raw.get("total_tokens", 0),
+                )
+            return AIResponse(
+                text=data["choices"][0]["message"]["content"],
+                token_usage=usage,
+            )
 
         return with_retry(
             _do,
