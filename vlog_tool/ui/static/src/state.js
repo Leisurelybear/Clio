@@ -26,6 +26,13 @@ const state = {
   previewActive: false,
   previewIndex: -1,
   _previewEndTime: null,
+  selectionMode: false,
+  selectedFiles: [],
 };
 
-export { state };
+function clearSelection() {
+  state.selectionMode = false;
+  state.selectedFiles = [];
+}
+
+export { state, clearSelection };

@@ -427,6 +427,8 @@ async function setSource(source) {
   $('player-pane').classList.remove('plan-mode');
   state.source = source;
   state.currentVideo = null;
+  state.selectionMode = false;
+  state.selectedFiles = [];
   state.texts = null;
   state.voiceover = null;
   $$('.source-toggle button').forEach(b => b.classList.toggle('active', b.dataset.source === source));
