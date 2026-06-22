@@ -106,6 +106,17 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
     return 0 if ok else 1
 
 
+def cmd_tokens(args):
+    config = load_config(args.config)
+    import json
+
+    from vlog_tool.ai.token_usage import FileTokenUsageStore
+
+    store = FileTokenUsageStore(str(config.paths.output_dir))
+    stats = store.get_stats()
+    print(json.dumps(stats, indent=2, ensure_ascii=False))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Vlog 剪辑辅助工具：文件夹输入 → 压缩 → AI 分析 → 口播 → 规划",
@@ -206,6 +217,9 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--host", default="127.0.0.1", help="监听地址（默认 127.0.0.1，不暴露到局域网）")
     p_serve.add_argument("--port", type=int, default=8765, help="端口（默认 8765）")
     p_serve.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
+
+    p_tokens = sub.add_parser("tokens", help="查看 token 使用统计")
+    p_tokens.set_defaults(func=cmd_tokens)
 
     p_transcribe = sub.add_parser("transcribe", help="Whisper ASR 语音转录（需先安装 faster-whisper）")
     _add_io_args(p_transcribe)
@@ -342,6 +356,9 @@ def main(argv: list[str] | None = None) -> int:
                 port=args.port,
                 open_browser=not args.no_browser,
             )
+        elif args.command == "tokens":
+            cmd_tokens(args)
+            return 0
     except FileNotFoundError as e:
         print(f"错误: {e}", file=sys.stderr)
         return 1
