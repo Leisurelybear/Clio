@@ -581,6 +581,7 @@ See `vlog_tool/compress.py:24`.
 - `Path`-typed defaults are converted to strings via `str()` before YAML serialization to avoid unsafe `!!python/object` tags
 - Writes back via `yaml.dump()` only when something changed; prints a summary to stdout
 - **Trade-off**: PyYAML does not preserve comments — a one-time loss when new fields are injected
+- Uses atomic write (tmp + `os.replace`) to prevent partial writes on crash
 - Only the user's local config files are touched; `config.example.yaml` is never modified
 
 ## 10. Verification Flow

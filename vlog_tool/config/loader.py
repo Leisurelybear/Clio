@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import dataclasses
 import os
-import typing
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
@@ -112,12 +111,12 @@ def _upgrade_config_file(yaml_path: Path) -> None:
         if not isinstance(section, dict):
             continue
         for fd in dc_type.__dataclass_fields__.values():
-            if typing.get_origin(fd.type) is dict:
-                continue
             if fd.name in section:
                 continue
             val = _resolve_field_default(fd)
             if val is _MISSING:
+                continue
+            if isinstance(val, dict):
                 continue
             if isinstance(val, Path):
                 val = str(val)
@@ -159,7 +158,9 @@ def _upgrade_config_file(yaml_path: Path) -> None:
         return
 
     text = yaml.dump(raw, default_flow_style=False, allow_unicode=True, sort_keys=False)
-    yaml_path.write_text(text, encoding="utf-8")
+    tmp = yaml_path.with_suffix(".yaml.tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, yaml_path)
     print(f"[config] {yaml_path.name} auto-added {len(added)} new field(s): {', '.join(added)}")
 
 
