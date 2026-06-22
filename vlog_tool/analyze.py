@@ -5,7 +5,7 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
-from vlog_tool.ai.base import TaskName
+from vlog_tool.ai.base import AIResponse, TaskName
 from vlog_tool.ai.factory import get_task_provider, get_video_provider
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_size, timed
@@ -131,7 +131,7 @@ def _call_ai(
     provider_id: str,
     model: str,
     prompt: str,
-    fn,
+    fn: Callable[[], AIResponse],
     *,
     debug_print: bool = False,
     token_store=None,

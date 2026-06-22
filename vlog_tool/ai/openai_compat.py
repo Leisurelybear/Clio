@@ -87,7 +87,7 @@ class OpenAICompatProvider:
             what=f"OpenAI 兼容 {self._base_url}",
         )
 
-    def analyze_video(self, video_path: str, prompt: str, model: str) -> str:
+    def analyze_video(self, video_path: str, prompt: str, model: str) -> AIResponse:
         raise NotImplementedError(
             f"Provider '{self.provider_id}' 不支持视频分析，请将 ai.tasks.video_analyze 配置为 gemini 类型厂家"
         )
