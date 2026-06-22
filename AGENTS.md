@@ -228,11 +228,12 @@ more reliable than letting AI freely review:
 
 ## 7. Project Current Status
 
-Last updated: 2026-06-22 (R-018/B-072/B-068/B-004 + code review fixes). Live:
+Last updated: 2026-06-22 (R-014 token usage + code review fixes). Live:
 - GitHub Actions CI (Ubuntu, Windows, Python 3.11/3.12)
-- **611 pytest cases** (coverage table below)
+- **612 pytest cases** (coverage table below)
 - Dependency version locked in `requirements-locked.txt`
 - Whisper ASR separate `requirements-whisper.txt` (faster-whisper, does not pollute main deps)
+- R-014 token usage tracking fully integrated: `FileTokenUsageStore` with atomic writes, `AIResponse` return types on both providers, new UI sidebar entity "Tokens" with summary/task/model breakdown, CLI `tokens` subcommand
 Recent commit history:
 1. `chore: scaffold initial Vlog editing helper project`
 2. `fix(compress): escape comma in scale expression`  ← Windows ffmpeg filter comma escaping
@@ -320,6 +321,20 @@ Recent commit history:
 178. `d799f21` `fix(config): restore missing analyze: header in config.example.yaml`  ← YAML structure fix
 179. `91f1da4` `docs(config): add reencode_split example to config.example.yaml`  ← Config doc
 180. `b4bd05b` `feat(config): auto-inject missing dataclass field defaults into config YAML`  ← Auto-upgrade
+181. `aa9ddcf` `docs(spec): add R-014 token usage design doc`  ← Design doc
+182. `01317f0` `feat(ai): add TokenUsage, AIResponse types and FileTokenUsageStore`  ← Core types
+183. `e41c58f` `fix(ai): address code review - _merge_stats returns None, use _EMPTY_STATS constant, add lock to get_stats`  ← Code review fix
+184. `94769e6` `feat(ai): Gemini provider returns AIResponse with token_usage`  ← Gemini
+185. `ff5ac43` `refactor(ai): extract _extract_usage helper in Gemini provider`  ← Cleanup
+186. `4814bc8` `feat(ai): OpenAI compat provider returns AIResponse with token_usage`  ← OpenAI compat
+187. `3fb5e74` `fix(ai): guard against None content in openai_compat AIResponse`  ← Guard
+188. `05ce1b9` `feat(analyze): collect token usage from AIResponse in _call_ai`  ← Pipeline integration
+189. `8a1dfc8` `feat(tasks): inject FileTokenUsageStore into all AI pipeline steps`  ← Task injection
+190. `4057373` `feat(ui): add GET /api/token-usage backend route`  ← Backend route
+191. `b234a1b` `feat(cli): add tokens subcommand for token usage stats`  ← CLI
+192. `e875159` `feat(ui): add Tokens sidebar entity with usage statistics panel`  ← UI
+193. `27fb86a` `test: update provider tests for AIResponse return type`  <- Test update
+194. `6efbcc3` `fix(ai): fix return type annotation in OpenAICompatProvider and add type hint to _call_ai fn parameter`  <- Code review fix
 
 2026-06-18 Review fixes (based on `docs/analysis/2026-06-18-vlog-editing-helper-review.md`, see `docs/analysis/2026-06-18-review-fix-result.md`):
 - **P0-1** `cut.py`: switched to `write_json_atomic` / `write_text_atomic` (missed atomic writes)
@@ -356,7 +371,7 @@ Known AI misidentification pitfall: mistaking Charles de Gaulle airport RER for 
 Project documentation status:
 - 2026-06-16 comprehensive code review (5 parallel subagents): found **6 Critical + 12 Important + 36 Minor**, fixed 6+12+5, 31 Minor remaining
 - 2026-06-16 second review (item-by-item): 5 S0 + 5 S1 + 1 S2 all fixed
-- `ROADMAP.md` current tracking: R-001（✓）/ R-002（✓）/ R-003（a[✓] b[✓] c[✓] d[✓] e[✓] f[✓]）/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012（✓）/ R-013（✓）/ R-014/ R-015（a[✓] c[✓] d[✓]）/ R-016（a[✓] b[✓] c[✓]）+ Bug tracking（B-001~B-097）+ Performance optimization（P-001~P-003）+ Documentation upkeep（D-001~D-004）+ Architecture improvements（A-001~A-006）+ Code review P0~P3（14 items, 12 fixed）
+- `ROADMAP.md` current tracking: R-001（✓）/ R-002（✓）/ R-003（a[✓] b[✓] c[✓] d[✓] e[✓] f[✓]）/ R-004（✓）/ R-005（✓）/ R-006（✓）/ R-007（✓）/ R-008/ R-009/ R-010/ R-011（✓）/ R-012（✓）/ R-013（✓）/ R-014（✓）/ R-015（a[✓] c[✓] d[✓]）/ R-016（a[✓] b[✓] c[✓]）+ Bug tracking（B-001~B-097）+ Performance optimization（P-001~P-003）+ Documentation upkeep（D-001~D-004）+ Architecture improvements（A-001~A-006）+ Code review P0~P3（14 items, 12 fixed）
 - Whisper ASR fully integrated: standalone CLI (transcribe / whisper install / whisper check) + pipeline step + UI transcript tab + delete/edit/seek + 10% progress + CUDA fallback CPU + per-video rerun + full UT coverage (18 tests)
 - CI compatibility fixes: ctranslate2 mock module, config_path parameter passing, Linux case sensitivity, F821 lint
 - New ProcessingState UT (8 tests covering mark/reset_step/persistence/corruption recovery)
@@ -370,6 +385,16 @@ Project documentation status:
 - Config fixes: unknown YAML fields silently ignored, `project.yaml` works via CLI, `FFMPEG_HOME` environment variable support
 - 2026-06-17 comprehensive analysis report fixes: 10 commits covering usability (plan state/atomic writes/max_tokens/validation) through code quality (closure/transcript Chinese/prompts validation), see ROADMAP completed table
 - 2026-06-18 R-012 preview progress bar completed: two-row layout (control bar + progress bar), play/pause toggle (no longer stop+reset), segment blocks show index + hover tooltip with title/time window, click/drag to jump segments, plan segment click integrates with preview system
+
+2026-06-22 R-014 AI token usage statistics completed:
+- **TokenUsage + AIResponse**: frozen dataclass for token counts, `AIResponse` container replacing bare `str` return on both providers
+- **FileTokenUsageStore**: per-project token persistence with atomic writes + thread lock, `TokenUsageStore` ABC for future backends
+- **Provider changes**: both Gemini and OpenAI-compat return `AIResponse` with `token_usage` extracted from API response; `_extract_usage()` helper extracted
+- **Pipeline integration**: `_call_ai()` collects and records token usage; all 4 task modules inject `FileTokenUsageStore`
+- **UI**: sidebar "Tokens" entity with summary cards, model/task breakdown tables, history view (last 100 entries)
+- **CLI**: `main.py tokens` subcommand for terminal access
+- **Code review**: fixed `OpenAICompatProvider.analyze_video` return type annotation; added `Callable[[], AIResponse]` type hint to `_call_ai` fn parameter
+- All 612 tests passing
 
 2026-06-20 Code review fixes + R-016 Whisper model UI download:
 - **C3 fix**: `config.py:_parse_providers` was missing `max_tokens` propagation, user config was silently ignored and always 4096

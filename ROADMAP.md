@@ -360,22 +360,24 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-013i: CUDA fallback CPU + lazy import + no torch dependency (`1d1b46a`, `1c5d681`)
 - [x] R-013j: Comprehensive fixes: rerun 404, UI display/seek/delete, 10% progress, offset_sec conversion (`1b53499`)
 
-## Feature R-014: AI Model Token Usage Statistics (Project Level)
+## ✅ Feature R-014: AI Model Token Usage Statistics (Project Level)
 
 **Background**: Currently all AI calls only log prompt size and response size (bytes), with no per-token statistics. Users don't know how many tokens each project consumes, and cannot compare costs across models. Project-level token statistics help optimize model selection and cost control.
 
 **Acceptance Criteria**:
 - Record token usage after each AI call (prompt_tokens / completion_tokens / total_tokens), write to `output/.token_usage.json`
-- If the model API does not return token counts, use tiktoken for estimation
+- If the model API does not return token counts, use tiktoken for estimation (✅ Record API-returned token counts only; no tiktoken fallback — decision made at user request)
 - Aggregate by project: record cumulative token counts per model under each project
-- UI Settings tab or new tab shows token statistics (project overview / per-model breakdown / by time)
+- UI Settings tab or new tab shows token statistics (✅ New sidebar entity "Tokens" with summary cards, model/task breakdown, history view)
 - CLI supports `main.py tokens` to view statistics
 
 **Sub-tasks**:
-- [ ] R-014a: Backend AI calls unified token recording wrapper (returns token count regardless of provider)
-- [ ] R-014b: Write to `output/.token_usage.json`, aggregated by project/model/date
-- [ ] R-014c: UI displays token statistics panel
-- [ ] R-014d: CLI `tokens` subcommand
+- [x] R-014a: Add `TokenUsage` + `AIResponse` dataclasses; update `TextAIProvider`/`VideoAIProvider` return types; `FileTokenUsageStore` impl ← `01317f0`
+- [x] R-014b: Gemini + OpenAI providers return `AIResponse` with token_counts; `_call_ai()` collects via store ← `94769e6`~`3fb5e74`
+- [x] R-014c: All 5 AI functions + 4 pipeline tasks inject `FileTokenUsageStore` ← `05ce1b9`~`8a1dfc8`
+- [x] R-014d: Backend `GET /api/token-usage` route ← `4057373`
+- [x] R-014e: UI sidebar "Tokens" entity with summary cards + model/task breakdown + history ← `e875159`
+- [x] R-014f: CLI `tokens` subcommand ← `b234a1b`
 
 ## Feature R-015: Config Hot Reload
 
@@ -618,6 +620,20 @@ All B-046~B-052 covered by 163 new tests:
 
 | Commit | Description |
 | --- | --- |
+| `6efbcc3` | fix(ai): fix return type annotation in OpenAICompatProvider and add type hint to _call_ai fn parameter (code review fix) |
+| `27fb86a` | test: update provider tests for AIResponse return type |
+| `e875159` | feat(ui): add Tokens sidebar entity with usage statistics panel |
+| `b234a1b` | feat(cli): add tokens subcommand for token usage stats |
+| `4057373` | feat(ui): add GET /api/token-usage backend route |
+| `8a1dfc8` | feat(tasks): inject FileTokenUsageStore into all AI pipeline steps |
+| `05ce1b9` | feat(analyze): collect token usage from AIResponse in _call_ai |
+| `3fb5e74` | fix(ai): guard against None content in openai_compat AIResponse |
+| `4814bc8` | feat(ai): OpenAI compat provider returns AIResponse with token_usage |
+| `ff5ac43` | refactor(ai): extract _extract_usage helper in Gemini provider |
+| `94769e6` | feat(ai): Gemini provider returns AIResponse with token_usage |
+| `e41c58f` | fix(ai): address code review - _merge_stats returns None, use _EMPTY_STATS constant, add lock to get_stats |
+| `01317f0` | feat(ai): add TokenUsage, AIResponse types and FileTokenUsageStore |
+| `aa9ddcf` | docs(spec): add R-014 token usage design doc |
 | `d799f21` | fix(config): restore missing analyze: header in config.example.yaml (codereview); fix(refine): move json.loads into try block |
 | `91f1da4` | docs(config): add reencode_split example to config.example.yaml |
 | `94f4501` | fix(tasks): move elapsed_total to finally block for accurate ETA (B-004) |

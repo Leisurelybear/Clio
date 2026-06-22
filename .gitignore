@@ -22,6 +22,9 @@ opencode_session_import.json
 .progress.json
 node_modules/
 
+# Superpowers temp artifacts (brainstorm mockups, etc.)
+.superpowers/
+
 # Ruff cache
 .ruff_cache/
 
