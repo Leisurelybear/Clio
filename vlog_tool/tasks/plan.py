@@ -6,6 +6,7 @@ import json
 import threading
 from pathlib import Path
 
+from vlog_tool.ai.token_usage import FileTokenUsageStore
 from vlog_tool.analyze import plan_daily_vlog
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
@@ -21,6 +22,7 @@ def run_plan_vlog(
     cancel_event: threading.Event | None = None,
 ) -> None:
     config.plans_dir.mkdir(parents=True, exist_ok=True)
+    token_store = FileTokenUsageStore(str(config.paths.output_dir))
 
     out_json = config.plans_dir / f"{day_label}_plan.json"
     out_md = config.plans_dir / f"{day_label}_plan.md"
@@ -83,7 +85,12 @@ def run_plan_vlog(
     with timed(f"run_plan_vlog {day_label}（{len(clips)} 条）"):
         print(f"[规划] {day_label}，共 {len(clips)} 条素材")
         plan = plan_daily_vlog(
-            clips, config, day_label, transcripts_map=transcripts_map, use_transcripts=config.plan.use_transcripts
+            clips,
+            config,
+            day_label,
+            transcripts_map=transcripts_map,
+            use_transcripts=config.plan.use_transcripts,
+            token_store=token_store,
         )
     write_json_atomic(out_json, plan)
     if tracker:

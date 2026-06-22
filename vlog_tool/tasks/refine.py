@@ -6,6 +6,7 @@ import json
 import time
 from pathlib import Path
 
+from vlog_tool.ai.token_usage import FileTokenUsageStore
 from vlog_tool.analyze import refine_script, refine_text
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
@@ -48,6 +49,7 @@ def run_refine_texts(
     if fix and (path is None or path.is_dir()):
         raise ValueError("--fix 必须配合 -i 指定单个 json 文件，不能用于目录")
     files = _collect_target_files(path, config.texts_dir)
+    token_store = FileTokenUsageStore(str(config.paths.output_dir))
     if not files:
         print(f"未找到 json 文件: {path or config.texts_dir}")
         return 0
@@ -63,7 +65,9 @@ def run_refine_texts(
             t0 = time.monotonic()
             try:
                 analysis = json.loads(json_file.read_text(encoding="utf-8"))
-                refined = refine_text(analysis, config, fix=fix, context_override=context_override)
+                refined = refine_text(
+                    analysis, config, fix=fix, context_override=context_override, token_store=token_store
+                )
             except Exception as e:
                 print(f"  失败: {e}")
                 continue
@@ -91,6 +95,7 @@ def run_refine_scripts(
     if fix and (path is None or path.is_dir()):
         raise ValueError("--fix 必须配合 -i 指定单个 json 文件，不能用于目录")
     files = _collect_target_files(path, config.scripts_dir, pattern="*_voiceover.json")
+    token_store = FileTokenUsageStore(str(config.paths.output_dir))
     if not files:
         print(f"未找到 voiceover json 文件: {path or config.scripts_dir}")
         return 0
@@ -107,7 +112,9 @@ def run_refine_scripts(
             try:
                 script = json.loads(json_file.read_text(encoding="utf-8"))
                 analysis = _load_analysis_for_script(json_file, config.texts_dir)
-                refined = refine_script(script, analysis, config, fix=fix, context_override=context_override)
+                refined = refine_script(
+                    script, analysis, config, fix=fix, context_override=context_override, token_store=token_store
+                )
             except Exception as e:
                 print(f"  失败: {e}")
                 continue

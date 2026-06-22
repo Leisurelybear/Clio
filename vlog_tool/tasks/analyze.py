@@ -9,6 +9,7 @@ import time
 from pathlib import Path
 
 from vlog_tool._constants import VIDEO_EXTS
+from vlog_tool.ai.token_usage import FileTokenUsageStore
 from vlog_tool.analyze import analyze_video
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_duration, timed
@@ -86,6 +87,7 @@ def run_analyze_all(
     For single_file (an original video), finds the matching compressed file first.
     """
     config.texts_dir.mkdir(parents=True, exist_ok=True)
+    token_store = FileTokenUsageStore(str(config.paths.output_dir))
     records: list[ClipRecord] = []
 
     # Build one-time stem→path cache to avoid per-video rglob
@@ -196,7 +198,9 @@ def run_analyze_all(
             t0 = time.monotonic()
             try:
                 _on_progress("上传→AI分析...")
-                analysis = analyze_video(str(compressed), config, progress_callback=_on_progress)
+                analysis = analyze_video(
+                    str(compressed), config, progress_callback=_on_progress, token_store=token_store
+                )
             except Exception as e:
                 print(f"  [错误] 分析 {compressed.name} 失败: {e}")
                 failed += 1

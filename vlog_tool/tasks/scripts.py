@@ -7,6 +7,7 @@ import threading
 import time
 from pathlib import Path
 
+from vlog_tool.ai.token_usage import FileTokenUsageStore
 from vlog_tool.analyze import generate_voiceover
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
@@ -23,6 +24,7 @@ def run_generate_scripts(
     cancel_event: threading.Event | None = None,
 ) -> None:
     config.scripts_dir.mkdir(parents=True, exist_ok=True)
+    token_store = FileTokenUsageStore(str(config.paths.output_dir))
     state = ProcessingState(config.paths.output_dir)
     template = config.script.template_file.read_text(encoding="utf-8") if config.script.template_file.exists() else ""
 
@@ -55,7 +57,7 @@ def run_generate_scripts(
             if tracker:
                 tracker.next(message=f"生成口播 {json_file.stem}")
             t0 = time.monotonic()
-            script = generate_voiceover(data, template, config)
+            script = generate_voiceover(data, template, config, token_store=token_store)
             elapsed_total += time.monotonic() - t0
             completed += 1
             write_json_atomic(out, script)
