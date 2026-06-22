@@ -44,7 +44,7 @@ def run_refine_texts(
     path: Path | None = None,
     fix: str | None = None,
     context_override: str | None = None,
-    selected_files: list[str] | None = None,
+    files: list[str] | None = None,
     overwrite: bool = False,
 ) -> int:
     """审阅并修正 texts/*.json；同步重写同名 .txt。返回处理条数。
@@ -53,23 +53,23 @@ def run_refine_texts(
     """
     if fix and (path is None or path.is_dir()):
         raise ValueError("--fix 必须配合 -i 指定单个 json 文件，不能用于目录")
-    files = _collect_target_files(path, config.texts_dir)
-    if selected_files is not None:
-        allowed = {f.lower() for f in selected_files}
-        files = [f for f in files if f.stem.lower() in allowed]
+    target_files = _collect_target_files(path, config.texts_dir)
+    if files is not None:
+        allowed = {f.lower() for f in files}
+        target_files = [f for f in target_files if f.stem.lower() in allowed]
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
-    if not files:
+    if not target_files:
         print(f"未找到 json 文件: {path or config.texts_dir}")
         return 0
     label = "refine:fix:texts" if fix else "refine:texts"
-    print(f"[{label}] 目标 {len(files)} 个文件")
+    print(f"[{label}] 目标 {len(target_files)} 个文件")
     if fix:
         print(f"  修改意见: {fix}")
     completed = 0
     elapsed_total = 0.0
-    with timed(f"{label}（{len(files)} 个）"):
-        for i, json_file in enumerate(files, start=1):
-            print(_eta_line("refine", i, len(files), json_file.name, completed, elapsed_total))
+    with timed(f"{label}（{len(target_files)} 个）"):
+        for i, json_file in enumerate(target_files, start=1):
+            print(_eta_line("refine", i, len(target_files), json_file.name, completed, elapsed_total))
             t0 = time.monotonic()
             try:
                 analysis = json.loads(json_file.read_text(encoding="utf-8"))
@@ -90,7 +90,7 @@ def run_refine_texts(
                 print(f"  改动 ({len(changelog)}): {'; '.join(changelog)[:120]}")
             else:
                 print("  无改动")
-    return len(files)
+    return len(target_files)
 
 
 def run_refine_scripts(
@@ -98,7 +98,7 @@ def run_refine_scripts(
     path: Path | None = None,
     fix: str | None = None,
     context_override: str | None = None,
-    selected_files: list[str] | None = None,
+    files: list[str] | None = None,
     overwrite: bool = False,
 ) -> int:
     """审阅并修正 scripts/*_voiceover.json；同步重写同名 .md。
@@ -107,23 +107,23 @@ def run_refine_scripts(
     """
     if fix and (path is None or path.is_dir()):
         raise ValueError("--fix 必须配合 -i 指定单个 json 文件，不能用于目录")
-    files = _collect_target_files(path, config.scripts_dir, pattern="*_voiceover.json")
-    if selected_files is not None:
-        allowed = {f.lower() for f in selected_files}
-        files = [f for f in files if f.stem.lower() in allowed]
+    target_files = _collect_target_files(path, config.scripts_dir, pattern="*_voiceover.json")
+    if files is not None:
+        allowed = {f.lower() for f in files}
+        target_files = [f for f in target_files if f.stem.lower() in allowed]
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
-    if not files:
+    if not target_files:
         print(f"未找到 voiceover json 文件: {path or config.scripts_dir}")
         return 0
     label = "refine:fix:scripts" if fix else "refine:scripts"
-    print(f"[{label}] 目标 {len(files)} 个文件")
+    print(f"[{label}] 目标 {len(target_files)} 个文件")
     if fix:
         print(f"  修改意见: {fix}")
     completed = 0
     elapsed_total = 0.0
-    with timed(f"{label}（{len(files)} 个）"):
-        for i, json_file in enumerate(files, start=1):
-            print(_eta_line("refine", i, len(files), json_file.name, completed, elapsed_total))
+    with timed(f"{label}（{len(target_files)} 个）"):
+        for i, json_file in enumerate(target_files, start=1):
+            print(_eta_line("refine", i, len(target_files), json_file.name, completed, elapsed_total))
             t0 = time.monotonic()
             try:
                 script = json.loads(json_file.read_text(encoding="utf-8"))
@@ -145,4 +145,4 @@ def run_refine_scripts(
                 print(f"  改动 ({len(changelog)}): {'; '.join(changelog)[:120]}")
             else:
                 print("  无改动")
-    return len(files)
+    return len(target_files)

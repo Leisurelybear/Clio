@@ -17,6 +17,8 @@ def run_label_videos(
     config: AppConfig,
     tracker: ProgressTracker | None = None,
     cancel_event: threading.Event | None = None,
+    files: list[str] | None = None,
+    overwrite: bool = False,
 ) -> None:
     """用 ffmpeg 在压缩视频上烧录序号（便于剪映对照）。"""
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")

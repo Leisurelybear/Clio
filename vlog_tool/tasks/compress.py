@@ -113,7 +113,12 @@ def run_compress_all(
 
             # Fallback: source == original (no split) but compressed files with _segNN exist.
             # This happens when split_video failed/is inconsistent on re-run.
-            if config.analyze.skip_existing and source is original and original.stem in orig_to_compressed:
+            if (
+                not overwrite
+                and config.analyze.skip_existing
+                and source is original
+                and original.stem in orig_to_compressed
+            ):
                 seg_stems = orig_to_compressed[original.stem]
                 print(f"[跳过压缩] {label_name}: 已存在分割压缩片段 {', '.join(sorted(seg_stems))}")
                 if tracker:

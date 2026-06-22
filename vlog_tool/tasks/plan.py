@@ -20,6 +20,8 @@ def run_plan_vlog(
     day_label: str = "day1",
     tracker: ProgressTracker | None = None,
     cancel_event: threading.Event | None = None,
+    files: list[str] | None = None,
+    overwrite: bool = False,
 ) -> None:
     config.plans_dir.mkdir(parents=True, exist_ok=True)
     token_store = FileTokenUsageStore(str(config.paths.output_dir))

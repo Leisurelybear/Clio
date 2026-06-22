@@ -22,7 +22,7 @@ def run_generate_scripts(
     tracker: ProgressTracker | None = None,
     single_file: Path | None = None,
     cancel_event: threading.Event | None = None,
-    selected_files: list[str] | None = None,
+    files: list[str] | None = None,
     overwrite: bool = False,
 ) -> None:
     config.scripts_dir.mkdir(parents=True, exist_ok=True)
@@ -31,18 +31,18 @@ def run_generate_scripts(
     template = config.script.template_file.read_text(encoding="utf-8") if config.script.template_file.exists() else ""
 
     if single_file:
-        files = [single_file]
+        input_files = [single_file]
     else:
-        files = sorted(config.texts_dir.glob("*.json"))
-    if selected_files is not None:
-        allowed = {f.lower() for f in selected_files}
-        files = [f for f in files if f.stem.lower() in allowed]
+        input_files = sorted(config.texts_dir.glob("*.json"))
+    if files is not None:
+        allowed = {f.lower() for f in files}
+        input_files = [f for f in input_files if f.stem.lower() in allowed]
     if tracker:
-        tracker.update(phase="voiceover", total=len(files), message=f"生成口播文案（{len(files)} 条）...")
-    with timed(f"run_generate_scripts（{len(files)} 个）"):
+        tracker.update(phase="voiceover", total=len(input_files), message=f"生成口播文案（{len(input_files)} 条）...")
+    with timed(f"run_generate_scripts（{len(input_files)} 个）"):
         completed = 0
         elapsed_total = 0.0
-        for i, json_file in enumerate(files, start=1):
+        for i, json_file in enumerate(input_files, start=1):
             if cancel_event and cancel_event.is_set():
                 print("[取消] voiceover 步骤被用户终止")
                 break
@@ -58,7 +58,7 @@ def run_generate_scripts(
                     tracker.log(f"跳过 {json_file.stem}（已存在）")
                 continue
 
-            print(_eta_line("口播", i, len(files), json_file.stem, completed, elapsed_total))
+            print(_eta_line("口播", i, len(input_files), json_file.stem, completed, elapsed_total))
             if tracker:
                 tracker.next(message=f"生成口播 {json_file.stem}")
             t0 = time.monotonic()
