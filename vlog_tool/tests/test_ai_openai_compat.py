@@ -126,7 +126,7 @@ class TestGenerateText:
         self._mock_client.post.return_value = resp
 
         result = self._prov.generate_text("hello", "deepseek-chat")
-        assert result == "ok"
+        assert result.text == "ok"
         self._mock_client.post.assert_called_once()
 
     def test_sends_correct_payload(self):
