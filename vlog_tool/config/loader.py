@@ -232,6 +232,7 @@ def load_config(
             providers=_parse_providers(ai_raw.get("providers")),
             tasks=_parse_tasks(ai_raw.get("tasks")),
             context=_load_context(ai_raw, base, project_dir=project_dir),
+            debug_print_prompt=ai_raw.get("debug_print_prompt", False),
         )
     else:
         ai = _legacy_ai_config(raw)
