@@ -75,7 +75,7 @@ class OpenAICompatProvider:
                     total_tokens=usage_raw.get("total_tokens", 0),
                 )
             return AIResponse(
-                text=data["choices"][0]["message"]["content"],
+                text=data["choices"][0]["message"]["content"] or "",
                 token_usage=usage,
             )
 
