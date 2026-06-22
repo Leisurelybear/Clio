@@ -9,6 +9,7 @@ import httpx
 from google import genai
 from google.genai import types
 
+from vlog_tool.ai.base import AIResponse, TokenUsage
 from vlog_tool.config import ProviderConfig, ProxyConfig
 from vlog_tool.ratelimit import make_rate_limiter
 from vlog_tool.utils import mask_if_looks_like_key, with_retry
@@ -118,17 +119,25 @@ class GeminiProvider:
             if wait:
                 time.sleep(wait)
 
-    def generate_text(self, prompt: str, model: str) -> str:
-        def _do() -> str:
+    def generate_text(self, prompt: str, model: str) -> AIResponse:
+        def _do() -> AIResponse:
             self._maybe_wait()
             response = self._client.models.generate_content(model=model, contents=prompt)
-            return response.text or ""
+            usage = None
+            if response.usage_metadata:
+                meta = response.usage_metadata
+                usage = TokenUsage(
+                    prompt_tokens=meta.prompt_token_count or 0,
+                    completion_tokens=meta.candidates_token_count or 0,
+                    total_tokens=meta.total_token_count or 0,
+                )
+            return AIResponse(text=response.text or "", token_usage=usage)
 
         return self._call_with_retry(_do, model, model)
 
     def analyze_video(
         self, video_path: str, prompt: str, model: str, progress_callback: Callable[[str], None] | None = None
-    ) -> str:
+    ) -> AIResponse:
         uploaded = None
         try:
             if progress_callback:
@@ -153,13 +162,21 @@ class GeminiProvider:
             if progress_callback:
                 progress_callback("AI 分析中...")
 
-            def _do() -> str:
+            def _do() -> AIResponse:
                 self._maybe_wait()
                 response = self._client.models.generate_content(
                     model=model,
                     contents=[uploaded, prompt],
                 )
-                return response.text or ""
+                usage = None
+                if response.usage_metadata:
+                    meta = response.usage_metadata
+                    usage = TokenUsage(
+                        prompt_tokens=meta.prompt_token_count or 0,
+                        completion_tokens=meta.candidates_token_count or 0,
+                        total_tokens=meta.total_token_count or 0,
+                    )
+                return AIResponse(text=response.text or "", token_usage=usage)
 
             return self._call_with_retry(_do, f"视频 {model}", model)
         finally:
