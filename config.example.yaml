@@ -14,6 +14,20 @@ proxy:
   url: "socks5://127.0.0.1:1080"
 
 # AI 厂家与任务配置（每个步骤可独立指定厂家和模型）
+#
+# API 密钥管理：
+#   - 密钥放在项目根目录的 .env 文件中（参考 .env.example），不要写在 config.yaml 里
+#   - 每个 provider 的 api_key_env 告诉程序去读取哪个环境变量名
+#   - 启动时 .env 会自动加载到环境变量中，密钥只在内存中，不会写回日志
+#   - 例如：api_key_env: GEMINI_API_KEY → 读取 .env 里的 GEMINI_API_KEY=xxx
+#
+# 各厂商 base_url：
+#   - Gemini（type: gemini）：不需要写 base_url，SDK 自动使用 Google 官方端
+#   - OpenAI 兼容的（type: openai）：必须填 base_url，例如：
+#     - OpenAI 官方：https://api.openai.com/v1
+#     - DeepSeek：https://api.deepseek.com/v1
+#     - 通义千问：https://dashscope.aliyuncs.com/compatible-mode/v1
+#     - Kimi：https://api.moonshot.cn/v1
 ai:
   # 可选：trip 背景 + 规范说明。每次 AI 调用前会自动注入到提示词前面。
   # 用 inline 短文本（context）或者一个文件（context_file）都行，二选一。
@@ -26,6 +40,7 @@ ai:
     gemini:
       type: gemini
       api_key_env: GEMINI_API_KEY
+      # base_url: 留空即可，SDK 自动使用 Google 官方 API 地址（https://generativelanguage.googleapis.com）
       poll_interval_sec: 5
       # 免费额度下建议 5-8，付费可降到 3（重试间隔 ~2s 指数退避）
       retry_attempts: 5
@@ -42,6 +57,10 @@ ai:
       api_key_env: DEEPSEEK_API_KEY
       base_url: https://api.deepseek.com/v1
       # max_tokens: 4096  # 可选：AI 输出最大 token 数（默认 4096，覆盖大部分输出）
+  # 
+  # ⚠️ 注意：不要在 config.yaml 里写 api_key 字段，密钥请放在 .env 文件中
+  #    例如 .env 内容：GEMINI_API_KEY=AIza...  /  DEEPSEEK_API_KEY=sk-...
+  #    api_key 字段仅作为 .env 未设置时的后备方案（不推荐）
 
   # 注意：model 请填写厂商实际支持的模型名。
   # DeepSeek 官网可用：deepseek-chat（V3）、deepseek-reasoner（R1）。
