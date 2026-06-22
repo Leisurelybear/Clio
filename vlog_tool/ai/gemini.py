@@ -119,19 +119,21 @@ class GeminiProvider:
             if wait:
                 time.sleep(wait)
 
+    def _extract_usage(self, response) -> TokenUsage | None:
+        if not response.usage_metadata:
+            return None
+        meta = response.usage_metadata
+        return TokenUsage(
+            prompt_tokens=meta.prompt_token_count or 0,
+            completion_tokens=meta.candidates_token_count or 0,
+            total_tokens=meta.total_token_count or 0,
+        )
+
     def generate_text(self, prompt: str, model: str) -> AIResponse:
         def _do() -> AIResponse:
             self._maybe_wait()
             response = self._client.models.generate_content(model=model, contents=prompt)
-            usage = None
-            if response.usage_metadata:
-                meta = response.usage_metadata
-                usage = TokenUsage(
-                    prompt_tokens=meta.prompt_token_count or 0,
-                    completion_tokens=meta.candidates_token_count or 0,
-                    total_tokens=meta.total_token_count or 0,
-                )
-            return AIResponse(text=response.text or "", token_usage=usage)
+            return AIResponse(text=response.text or "", token_usage=self._extract_usage(response))
 
         return self._call_with_retry(_do, model, model)
 
@@ -168,15 +170,7 @@ class GeminiProvider:
                     model=model,
                     contents=[uploaded, prompt],
                 )
-                usage = None
-                if response.usage_metadata:
-                    meta = response.usage_metadata
-                    usage = TokenUsage(
-                        prompt_tokens=meta.prompt_token_count or 0,
-                        completion_tokens=meta.candidates_token_count or 0,
-                        total_tokens=meta.total_token_count or 0,
-                    )
-                return AIResponse(text=response.text or "", token_usage=usage)
+                return AIResponse(text=response.text or "", token_usage=self._extract_usage(response))
 
             return self._call_with_retry(_do, f"视频 {model}", model)
         finally:
