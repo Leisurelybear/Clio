@@ -139,3 +139,32 @@ class TestRunGenerateScripts:
 
         run_generate_scripts(cfg)
         mock_gen.assert_not_called()
+
+    @patch("vlog_tool.tasks.scripts.generate_voiceover")
+    def test_files_filter(self, mock_gen, cfg):
+        data = {"title": "t", "scenes": []}
+        for name in ("001_A.json", "002_B.json", "003_C.json"):
+            (cfg.texts_dir / name).write_text(json.dumps(data))
+        mock_gen.return_value = {"title": "t", "voiceover": "v", "edit_tip": ""}
+
+        from vlog_tool.tasks.scripts import run_generate_scripts
+
+        run_generate_scripts(cfg, files=["002_B"])
+        assert mock_gen.call_count == 1
+        out = cfg.scripts_dir / "002_B_voiceover.json"
+        assert out.exists()
+
+    @patch("vlog_tool.tasks.scripts.generate_voiceover")
+    def test_overwrite_flag(self, mock_gen, cfg):
+        data = {"title": "t"}
+        (cfg.texts_dir / "001.json").write_text(json.dumps(data))
+        out = cfg.scripts_dir / "001_voiceover.json"
+        out.write_text('{"voiceover": "existing"}')
+        mock_gen.return_value = {"title": "t", "voiceover": "new", "edit_tip": ""}
+
+        from vlog_tool.tasks.scripts import run_generate_scripts
+
+        run_generate_scripts(cfg, overwrite=True)
+        assert mock_gen.call_count == 1
+        result = json.loads(out.read_text(encoding="utf-8"))
+        assert result["voiceover"] == "new"

@@ -218,6 +218,36 @@ class TestRunTranscribeAll:
         result = run_transcribe_all(cfg, tracker)
         assert result == 0
 
+    def test_files_filter(self, cfg, tmp_path):
+        from vlog_tool.tasks.transcribe import run_transcribe_all
+
+        inp = tmp_path / "input"
+        inp.mkdir()
+        for name in ("GL010683.mp4", "GL010684.mp4"):
+            (inp / name).touch()
+        cfg.paths.input_dir = inp
+        cfg.paths.output_dir = tmp_path / "output"
+        cfg.paths.output_dir.mkdir()
+        cfg.analyze.skip_existing = False
+
+        fake_wav = tmp_path / "fake.wav"
+        fake_wav.touch()
+        call_count = 0
+
+        def _transcribe(*a, **kw):
+            nonlocal call_count
+            call_count += 1
+            return [{"start": 0.0, "end": 1.0, "text": "hi"}]
+
+        with (
+            patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffmpeg"),
+            patch("vlog_tool.tasks.transcribe._extract_audio", return_value=fake_wav),
+            patch("vlog_tool.tasks.transcribe.transcribe_audio", _transcribe),
+        ):
+            result = run_transcribe_all(cfg, files=["GL010683"])
+        assert result == 0
+        assert call_count == 1
+
 
 class TestRunTranscribeOne:
     @patch("vlog_tool.tasks.transcribe.resolve_binary", return_value="ffmpeg")

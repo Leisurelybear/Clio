@@ -135,3 +135,55 @@ class TestRunPipelineStepsCancel:
             assert all_kwargs[step].get("cancel_event") is cancel_event, (
                 f"{step} should receive cancel_event, got: {all_kwargs[step]}"
             )
+
+    def test_files_kwarg_propagation(self):
+        config = _mock_config(Path(""))
+        all_kwargs: dict[str, dict] = {}
+
+        def _make_mock(name):
+            def _mock(*a, **kw):
+                all_kwargs[name] = kw
+                return None
+
+            return _mock
+
+        fake_funcs = {s: _make_mock(s) for s in ("compress", "analyze", "voiceover", "transcribe", "plan", "label")}
+        with (
+            patch("vlog_tool.pipeline._STEP_FUNCS", fake_funcs),
+            patch("builtins.print"),
+            patch(
+                "vlog_tool.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)
+            ),
+        ):
+            run_pipeline_steps(config, steps=list(fake_funcs), files=["001_A", "002_B"])
+
+        for step in ("compress", "analyze", "voiceover", "transcribe", "plan", "label"):
+            assert all_kwargs[step].get("files") == ["001_A", "002_B"], (
+                f"{step} should receive files kwarg, got: {all_kwargs[step]}"
+            )
+
+    def test_overwrite_kwarg_propagation(self):
+        config = _mock_config(Path(""))
+        all_kwargs: dict[str, dict] = {}
+
+        def _make_mock(name):
+            def _mock(*a, **kw):
+                all_kwargs[name] = kw
+                return None
+
+            return _mock
+
+        fake_funcs = {s: _make_mock(s) for s in ("compress", "analyze", "voiceover", "transcribe", "plan", "label")}
+        with (
+            patch("vlog_tool.pipeline._STEP_FUNCS", fake_funcs),
+            patch("builtins.print"),
+            patch(
+                "vlog_tool.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)
+            ),
+        ):
+            run_pipeline_steps(config, steps=list(fake_funcs), overwrite=True)
+
+        for step in ("compress", "analyze", "voiceover", "transcribe", "plan", "label"):
+            assert all_kwargs[step].get("overwrite") is True, (
+                f"{step} should receive overwrite=True, got: {all_kwargs[step]}"
+            )

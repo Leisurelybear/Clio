@@ -172,6 +172,18 @@ class TestRunRefineTexts:
         content = txt.read_text(encoding="utf-8")
         assert "world" in content
 
+    @patch("vlog_tool.tasks.refine.refine_text")
+    def test_files_filter(self, mock_refine, cfg):
+        for name in ("001_A.json", "002_B.json", "003_C.json"):
+            (cfg.texts_dir / name).write_text('{"title": "t"}')
+        mock_refine.return_value = {"title": "fixed", "_changelog": []}
+
+        from vlog_tool.tasks.refine import run_refine_texts
+
+        result = run_refine_texts(cfg, files=["002_B"])
+        assert result == 1
+        mock_refine.assert_called_once()
+
 
 class TestRunRefineScripts:
     def test_fix_without_single_file_raises(self, cfg):
@@ -219,3 +231,15 @@ class TestRunRefineScripts:
         assert md.exists()
         content = md.read_text(encoding="utf-8")
         assert "fixed" in content
+
+    @patch("vlog_tool.tasks.refine.refine_script")
+    def test_files_filter(self, mock_refine, cfg):
+        for name in ("001_A_voiceover.json", "002_B_voiceover.json", "003_C_voiceover.json"):
+            (cfg.scripts_dir / name).write_text('{"voiceover": "s"}')
+        mock_refine.return_value = {"voiceover": "fixed", "_changelog": []}
+
+        from vlog_tool.tasks.refine import run_refine_scripts
+
+        result = run_refine_scripts(cfg, files=["002_B_voiceover"])
+        assert result == 1
+        mock_refine.assert_called_once()

@@ -164,3 +164,47 @@ class TestRunAnalyzeAll:
         _common_mocks(monkeypatch)
         records = run_analyze_all(cfg)
         assert len(records) == 0
+
+    def test_files_filter(self, monkeypatch, tmp_path: Path):
+        cfg = _cfg(tmp_path)
+        pairs = [("GL010683", "001_GL010683"), ("GL010684", "002_GL010684"), ("GL010685", "003_GL010685")]
+        for orig_stem, comp_stem in pairs:
+            (cfg.paths.input_dir / f"{orig_stem}.mp4").write_bytes(b"\x00" * 1000)
+            (cfg.compressed_dir / f"{comp_stem}.mp4").write_bytes(b"\x00" * 100)
+        _common_mocks(monkeypatch)
+        monkeypatch.setattr("vlog_tool.tasks.analyze.get_duration_sec", lambda *a: 60.0)
+        monkeypatch.setattr(
+            "vlog_tool.tasks.analyze.analyze_video",
+            lambda *a, **kw: {"title": "x", "summary": "x", "location": "x"},
+        )
+
+        records = run_analyze_all(cfg, files=["002_GL010684"])
+        assert len(records) == 1
+        assert records[0].compressed_path.name == "002_GL010684.mp4"
+
+    def test_overwrite_flag(self, monkeypatch, tmp_path: Path):
+        cfg = _cfg(tmp_path)
+        src = cfg.paths.input_dir / "GL010695.mp4"
+        src.write_bytes(b"\x00" * 1000)
+        comp = cfg.compressed_dir / "001_GL010695.mp4"
+        comp.write_bytes(b"\x00" * 100)
+        existing = cfg.texts_dir / "001_Test.json"
+        existing.write_text(
+            json.dumps({"title": "x", "summary": "x", "location": "x", "source_file": "GL010695.mp4"}),
+            encoding="utf-8",
+        )
+        _common_mocks(monkeypatch)
+        monkeypatch.setattr("vlog_tool.tasks.analyze.get_duration_sec", lambda *a: 60.0)
+        analyze_called = False
+
+        def _analyze(*a, **kw):
+            nonlocal analyze_called
+            analyze_called = True
+            return {"title": "overwritten"}
+
+        monkeypatch.setattr("vlog_tool.tasks.analyze.analyze_video", _analyze)
+
+        cfg.analyze.skip_existing = True
+        records = run_analyze_all(cfg, overwrite=True)
+        assert len(records) == 1
+        assert analyze_called is True
