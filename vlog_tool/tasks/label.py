@@ -25,13 +25,16 @@ def run_label_videos(
     labeled_dir = config.paths.output_dir / "labeled"
     labeled_dir.mkdir(parents=True, exist_ok=True)
 
-    files = sorted(config.texts_dir.glob("*.json"))
+    json_files = sorted(config.texts_dir.glob("*.json"))
+    if files is not None:
+        allowed = {f.lower() for f in files}
+        json_files = [f for f in json_files if f.stem.lower() in allowed]
     if tracker:
-        tracker.update(phase="label", total=len(files), message=f"烧录序号（{len(files)} 个）...")
-    with timed(f"run_label_videos（{len(files)} 个）"):
+        tracker.update(phase="label", total=len(json_files), message=f"烧录序号（{len(json_files)} 个）...")
+    with timed(f"run_label_videos（{len(json_files)} 个）"):
         completed = 0
         elapsed_total = 0.0
-        for i, json_file in enumerate(files, start=1):
+        for i, json_file in enumerate(json_files, start=1):
             if cancel_event and cancel_event.is_set():
                 print("[取消] label 步骤被用户终止")
                 break
@@ -54,13 +57,13 @@ def run_label_videos(
                 continue
 
             out = labeled_dir / f"{json_file.stem}_labeled.mp4"
-            if config.analyze.skip_existing and out.exists():
+            if not overwrite and config.analyze.skip_existing and out.exists():
                 print(f"[跳过标注] {out.name} (已存在)")
                 if tracker:
                     tracker.next(message=f"跳过 {out.name}")
                 continue
 
-            print(_eta_line("标注", i, len(files), json_file.stem, completed, elapsed_total))
+            print(_eta_line("标注", i, len(json_files), json_file.stem, completed, elapsed_total))
             if tracker:
                 tracker.next(message=f"标注 {json_file.stem}")
             t0 = time.monotonic()

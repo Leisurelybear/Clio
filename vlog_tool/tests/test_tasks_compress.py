@@ -141,3 +141,27 @@ class TestRunCompressAll:
         records = run_compress_all(cfg, single_file=src)
         assert len(records) == 1
         assert records[0].stem == "001_custom"
+
+    def test_files_filter(self, monkeypatch, tmp_path: Path):
+        cfg = _cfg(tmp_path)
+        for name in ("a.mp4", "b.mp4", "c.mp4"):
+            (cfg.paths.input_dir / name).write_bytes(b"\x00" * 1000)
+
+        monkeypatch.setattr("vlog_tool.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
+        monkeypatch.setattr(
+            "vlog_tool.tasks.compress.find_videos", lambda *a, **kw: list(cfg.paths.input_dir.iterdir())
+        )
+
+        compressed = []
+
+        def _mock_compress(inp, outp, c, **kw):
+            outp.write_bytes(b"\x00" * 300)
+            compressed.append(outp.name)
+            return outp
+
+        monkeypatch.setattr("vlog_tool.tasks.compress.compress_video", _mock_compress)
+        monkeypatch.setattr("vlog_tool.tasks.compress.split_video", lambda *a, **kw: [a[0]])
+
+        records = run_compress_all(cfg, files=["a"])
+        assert len(records) == 1
+        assert "a" in records[0].stem

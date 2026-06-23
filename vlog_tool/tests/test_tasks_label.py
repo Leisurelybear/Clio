@@ -124,3 +124,38 @@ class TestRunLabelVideos:
         tracker.update.assert_called_once()
         tracker.next.assert_called_once()
         tracker.log.assert_called_once()
+
+    @patch("vlog_tool.tasks.label.run_ffmpeg")
+    @patch("vlog_tool.tasks.label.resolve_binary")
+    def test_files_filter(self, mock_resolve, mock_ffmpeg, cfg):
+        (cfg.texts_dir / "001_A.json").write_text('{"index": 1}')
+        (cfg.texts_dir / "002_B.json").write_text('{"index": 2}')
+        (cfg.texts_dir / "003_C.json").write_text('{"index": 3}')
+        for idx in (1, 2, 3):
+            f = cfg.compressed_dir / f"00{idx}_src.mp4"
+            f.write_bytes(b"\x00")
+        mock_resolve.return_value = "ffmpeg"
+
+        from vlog_tool.tasks.label import run_label_videos
+
+        run_label_videos(cfg, files=["002_B"])
+        assert mock_ffmpeg.call_count == 1
+        args = mock_ffmpeg.call_args.args[0]
+        assert any("002_src.mp4" in str(a) for a in args)
+
+    @patch("vlog_tool.tasks.label.run_ffmpeg")
+    @patch("vlog_tool.tasks.label.resolve_binary")
+    def test_overwrite_flag(self, mock_resolve, mock_ffmpeg, cfg):
+        (cfg.texts_dir / "001.json").write_text('{"index": 1}')
+        compressed = cfg.compressed_dir / "001_src.mp4"
+        compressed.write_bytes(b"\x00")
+        labeled_dir = cfg.paths.output_dir / "labeled"
+        labeled_dir.mkdir()
+        out = labeled_dir / "001_labeled.mp4"
+        out.write_bytes(b"\x00")
+        mock_resolve.return_value = "ffmpeg"
+
+        from vlog_tool.tasks.label import run_label_videos
+
+        run_label_videos(cfg, overwrite=True)
+        mock_ffmpeg.assert_called_once()

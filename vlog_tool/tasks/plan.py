@@ -26,9 +26,12 @@ def run_plan_vlog(
     config.plans_dir.mkdir(parents=True, exist_ok=True)
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
 
+    if files is not None:
+        print("[规划] 使用所有素材生成全局规划（视频筛选仅影响前序步骤）")
+
     out_json = config.plans_dir / f"{day_label}_plan.json"
     out_md = config.plans_dir / f"{day_label}_plan.md"
-    if config.analyze.skip_existing and out_json.exists() and out_md.exists():
+    if not overwrite and config.analyze.skip_existing and out_json.exists() and out_md.exists():
         try:
             json.loads(out_json.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):

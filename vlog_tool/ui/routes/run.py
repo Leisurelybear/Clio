@@ -45,6 +45,8 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
     if "use_transcripts" in obj:
         cfg.plan.use_transcripts = obj["use_transcripts"]
     files_list = obj.get("files")
+    if files_list is not None and not isinstance(files_list, list):
+        return handler._send_json({"ok": False, "error": "files must be a list of video names"}, 400)
     overwrite = obj.get("overwrite", False)
 
     def _run():
