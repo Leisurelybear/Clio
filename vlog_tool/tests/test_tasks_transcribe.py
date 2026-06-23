@@ -94,18 +94,18 @@ class TestRunTranscribeAll:
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
-        inp = tmp_path / "input"
-        inp.mkdir()
-        (inp / "GL010683.mp4").touch()
         compressed = output / "compressed"
         compressed.mkdir(parents=True)
         (compressed / "001_GL010683.mp4").touch()
+        inp = tmp_path / "input"
+        inp.mkdir()
+        (inp / "GL010683.mp4").touch()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
 
         transcripts = output / "transcripts"
         transcripts.mkdir(parents=True)
-        (transcripts / "GL010683_transcript.json").write_text("{}")
+        (transcripts / "001_GL010683_transcript.json").write_text("{}")
 
         mock_extract.return_value = tmp_path / "fake.wav"
         (tmp_path / "fake.wav").touch()
@@ -122,12 +122,12 @@ class TestRunTranscribeAll:
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
-        inp = tmp_path / "input"
-        inp.mkdir()
-        (inp / "GL010683.mp4").touch()
         compressed = output / "compressed"
         compressed.mkdir(parents=True)
         (compressed / "001_GL010683.mp4").touch()
+        inp = tmp_path / "input"
+        inp.mkdir()
+        (inp / "GL010683.mp4").touch()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
 
@@ -144,18 +144,17 @@ class TestRunTranscribeAll:
     @patch("vlog_tool.tasks.transcribe._extract_audio")
     @patch("vlog_tool.tasks.transcribe.transcribe_audio")
     def test_original_not_found(self, mock_transcribe, mock_extract, cfg, tmp_path):
-        """压缩文件在 input_dir 中找不到原始视频时跳过"""
+        """压缩文件存在但找不到原始视频时跳过"""
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
         compressed = output / "compressed"
         compressed.mkdir(parents=True)
+        (compressed / "001_GL010683.mp4").touch()
         inp = tmp_path / "input"
         inp.mkdir()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
-
-        (compressed / "001_GL010683.mp4").touch()
 
         transcripts = output / "transcripts"
         transcripts.mkdir(parents=True)
@@ -172,12 +171,12 @@ class TestRunTranscribeAll:
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
-        inp = tmp_path / "input"
-        inp.mkdir()
-        (inp / "GL010683.mp4").touch()
         compressed = output / "compressed"
         compressed.mkdir(parents=True)
         (compressed / "001_GL010683.mp4").touch()
+        inp = tmp_path / "input"
+        inp.mkdir()
+        (inp / "GL010683.mp4").touch()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
 
@@ -198,12 +197,12 @@ class TestRunTranscribeAll:
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
-        inp = tmp_path / "input"
-        inp.mkdir()
-        (inp / "GL010683.mp4").touch()
         compressed = output / "compressed"
         compressed.mkdir(parents=True)
         (compressed / "001_GL010683.mp4").touch()
+        inp = tmp_path / "input"
+        inp.mkdir()
+        (inp / "GL010683.mp4").touch()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
 
@@ -221,13 +220,17 @@ class TestRunTranscribeAll:
     def test_files_filter(self, cfg, tmp_path):
         from vlog_tool.tasks.transcribe import run_transcribe_all
 
+        output = tmp_path / "output"
+        compressed = output / "compressed"
+        compressed.mkdir(parents=True)
+        for name in ("001_GL010683.mp4", "002_GL010684.mp4"):
+            (compressed / name).touch()
         inp = tmp_path / "input"
         inp.mkdir()
-        for name in ("GL010683.mp4", "GL010684.mp4"):
-            (inp / name).touch()
+        (inp / "GL010683.mp4").touch()
+        (inp / "GL010684.mp4").touch()
         cfg.paths.input_dir = inp
-        cfg.paths.output_dir = tmp_path / "output"
-        cfg.paths.output_dir.mkdir()
+        cfg.paths.output_dir = output
         cfg.analyze.skip_existing = False
 
         fake_wav = tmp_path / "fake.wav"
@@ -244,7 +247,7 @@ class TestRunTranscribeAll:
             patch("vlog_tool.tasks.transcribe._extract_audio", return_value=fake_wav),
             patch("vlog_tool.tasks.transcribe.transcribe_audio", _transcribe),
         ):
-            result = run_transcribe_all(cfg, files=["GL010683"])
+            result = run_transcribe_all(cfg, files=["001_GL010683"])
         assert result == 0
         assert call_count == 1
 

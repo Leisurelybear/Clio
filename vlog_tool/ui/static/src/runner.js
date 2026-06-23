@@ -82,9 +82,7 @@ function renderRun() {
         <span>覆盖现有输出</span>
       </label>
     </div>
-    <div id="run-progress" style="margin-top:12px">
-      <p class="muted">尚未运行</p>
-    </div>
+    <div id="run-progress" style="margin-top:12px"></div>
     <div id="run-state-container"></div>
   `;
 
@@ -272,6 +270,27 @@ async function pollRunStatus() {
       prog.innerHTML = `<p class="ok">✓ 流水线完成</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线完成', 'ok');
       renderProcessingState($('run-state-container'));
+      // 检查是否有转录失败（如缺少模型），弹出下载引导
+      (async () => {
+        try {
+          const ps = await api('GET', '/api/processing-state');
+          const hasTranscribeErr = Object.values(ps.files || {}).some(function(f) { return f.transcribe === 'error'; });
+          if (hasTranscribeErr) {
+            const warn = document.createElement('div');
+            warn.id = 'run-transcribe-warn';
+            warn.style.cssText = 'margin-top:12px;padding:12px;background:var(--warning-bg,#2a2520);border:1px solid var(--warning-border,#b8860b);border-radius:6px';
+            warn.innerHTML = `
+              <p style="margin:0 0 8px;font-weight:600">❗ 部分视频转录失败</p>
+              <p style="margin:0 0 8px;font-size:var(--text-sm);color:var(--text-secondary)">Whisper 模型未下载，请前往 <a href="#" id="link-go-settings" style="text-decoration:underline;color:var(--accent)">设置 → Whisper 模型管理</a> 手动下载模型（约 1-2 GB），再重跑「Whisper 转录」。</p>
+            `;
+            prog.appendChild(warn);
+            var settingsLink = $('link-go-settings');
+            if (settingsLink) {
+              settingsLink.onclick = function(e) { e.preventDefault(); import('./sidebar.js').then(function(s) { s.selectConfig(); }); };
+            }
+          }
+        } catch { /* 静默 */ }
+      })();
       state.currentDay = _lastRunDay;
       state.plan = null;
       await import('./sidebar.js').then(mod => mod.loadPlans());

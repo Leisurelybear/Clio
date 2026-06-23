@@ -33,7 +33,7 @@ def run_compress_all(
     else:
         videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
     if files is not None:
-        allowed = {f.lower() for f in files}
+        allowed = {Path(f).stem.lower() for f in files}
         videos = [v for v in videos if v.stem.lower() in allowed]
     config.compressed_dir.mkdir(parents=True, exist_ok=True)
 

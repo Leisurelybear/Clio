@@ -121,7 +121,7 @@ def run_analyze_all(
             items.append((p, orig_path, idx_str))
 
     if files is not None:
-        allowed = {f.lower() for f in files}
+        allowed = {Path(f).stem.lower() for f in files}
         items = [it for it in items if it[0].stem.lower() in allowed]
 
     if not items:

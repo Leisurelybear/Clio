@@ -50,13 +50,24 @@ async function loadPlans() {
   }
 }
 
+function updateSelectBtnVisibility() {
+  const btn = document.getElementById('btn-select-videos');
+  if (!btn) return;
+  const visible = state.videos.length > 0 && state.currentEntity === 'run';
+  btn.style.display = visible ? 'flex' : 'none';
+  if (!visible && state.selectionMode) {
+    state.selectionMode = false;
+    state.selectedFiles = [];
+    renderVideoList();
+  }
+}
+
 async function loadVideos() {
   const r = await api('GET', `/api/videos?source=${state.source}`);
   state.videos = r.videos;
   state.groups = r.groups || {};
   $('video-count').textContent = `(${state.videos.length})`;
-  const btn = document.getElementById('btn-select-videos');
-  if (btn) btn.style.display = state.videos.length > 0 ? 'flex' : 'none';
+  updateSelectBtnVisibility();
   renderVideoList();
 }
 
@@ -70,7 +81,7 @@ async function loadProject() {
     }
     state.steps = proj.steps || {};
     state.projectName = proj.name || '';
-    if (proj.lastEntity && ['video', 'plan', 'run', 'config', 'logs'].includes(proj.lastEntity)) {
+    if (proj.lastEntity && ['video', 'plan', 'run', 'config', 'logs', 'tokens'].includes(proj.lastEntity)) {
       state.lastEntity = proj.lastEntity;
     }
     if (proj.lastVideo) state.lastVideo = proj.lastVideo;
@@ -139,8 +150,8 @@ function renderVideoItem(v) {
   } else {
     matchBadge = `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
   }
-  li.innerHTML = `${checkboxHtml}
-    <div class="video-name">${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)}</div>
+  li.innerHTML = `<div class="video-name-row">${checkboxHtml}
+    <div class="video-name">${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)}</div></div>
     ${v.title ? `<div class="video-title">${escapeHtml(v.title)}</div>` : ''}
     <div class="video-match">${matchBadge}</div>
     <div class="video-meta">
@@ -170,6 +181,12 @@ function renderVideoItem(v) {
 
   li.onclick = (e) => {
     if (e.target.closest('.video-actions')) return;
+    if (state.selectionMode) {
+      if (e.target.closest('.video-checkbox')) return; // let native checkbox handle it
+      const cb = li.querySelector('.video-checkbox');
+      if (cb) { cb.checked = !cb.checked; cb.dispatchEvent(new Event('change', { bubbles: true })); }
+      return;
+    }
     selectVideo(v.file);
   };
 
@@ -403,6 +420,7 @@ async function selectPlan(dayOverride) {
   catch (e) { state.plan = null; }
   updateSidebarDay();
   updateEntityUI();
+  updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
 }
 
@@ -415,6 +433,7 @@ async function selectRun() {
   state.currentEntity = 'run';
   state.dirty = false;
   updateEntityUI();
+  updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
 }
 
@@ -441,6 +460,7 @@ async function selectConfig() {
     state._needsConfigInit = false;
   }
   updateEntityUI();
+  updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
 }
 
@@ -453,14 +473,21 @@ async function selectLogs() {
   state.currentEntity = 'logs';
   state.dirty = false;
   updateEntityUI();
+  updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
 }
 
 async function selectTokens() {
+  if (state.dirty) {
+    if (!confirm('当前 tab 有未保存的修改，确定切换到统计吗？')) return;
+  }
+  if (state.previewActive) stopPreview();
+  $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'tokens';
-  markDirty(false);
-  const { renderActiveTab } = await import('./editor.js');
-  renderActiveTab();
+  state.dirty = false;
+  updateEntityUI();
+  updateSelectBtnVisibility();
+  import('./editor.js').then(mod => mod.renderActiveTab());
 }
 
 function toggleSelection() {

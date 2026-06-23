@@ -174,21 +174,6 @@ function renderTranscript() {
   if (!t || !t.ok) {
     pane.innerHTML = '<p class="muted">当前视频没有转录数据。</p><p class="hint">请先运行流水线中的「转录」步骤，或在 CLI 执行 <code>python main.py transcribe</code>。</p>';
     renderWhisperInstallPrompt(pane);
-    // Check if install is already running — show progress immediately
-    (async () => {
-      try {
-        const s = await api('GET', '/api/whisper/install/status');
-        if (s.running && s.status === 'downloading') {
-          const prog = $('install-progress');
-          if (prog) prog.style.display = 'block';
-          const btn = $('btn-install-whisper');
-          if (btn) { btn.disabled = true; btn.textContent = '下载中...'; }
-          if (_installPollTimer) clearInterval(_installPollTimer);
-          _installPollTimer = setInterval(pollWhisperInstall, 1000);
-          pollWhisperInstall();
-        }
-      } catch { /* ignore */ }
-    })();
     return;
   }
   const segments = t.segments || [];
@@ -420,98 +405,20 @@ async function renderWhisperInstallPrompt(pane) {
   let check;
   try { check = await api('GET', '/api/whisper/check'); } catch { return; }
   if (!check) return;
+  if (check.model_cached) return;
   const installed = check.installed;
-  const cachePath = check.cache_path;
-  if (installed && cachePath) {
-    let hasCachedModel = false;
-    try {
-      const st = await api('GET', '/api/whisper/install/status');
-      if (st.status === 'done') { hasCachedModel = true; }
-    } catch { /* ignore */ }
-  }
   const div = document.createElement('div');
   div.id = 'whisper-install-prompt';
   div.style.cssText = 'margin-top:12px;padding:12px;background:var(--warning-bg,#2a2520);border:1px solid var(--warning-border,#b8860b);border-radius:6px';
   div.innerHTML = `
-    <p style="margin:0 0 8px;font-weight:600">${installed ? '⚠ Whisper 模型未缓存' : '⚠ 需要安装 Whisper'}</p>
-    <p style="margin:0 0 8px;font-size:var(--text-sm);color:var(--text-secondary)">${installed ? '模型文件尚未下载到本地缓存，需要下载约 1-2 GB。' : '语音转录依赖 faster-whisper，需要先安装依赖并下载模型。'}</p>
-    <button id="btn-install-whisper" class="btn-primary">${icon('download', 14)} 下载模型</button>
-    <div id="install-progress" style="display:none;margin-top:8px">
-      <div style="display:flex;justify-content:space-between;font-size:var(--text-xs);margin-bottom:4px">
-        <span id="install-msg">准备中...</span>
-        <span id="install-speed"></span>
-      </div>
-      <div style="background:#333;border-radius:3px;height:8px;overflow:hidden">
-        <div id="install-bar" style="background:#4a9eff;border-radius:3px;height:100%;width:0%"></div>
-      </div>
-      <p id="install-eta" class="muted" style="font-size:var(--text-xs);margin:4px 0 0"></p>
-    </div>
-    <div id="install-error" style="display:none;margin-top:8px;font-size:var(--text-sm);color:var(--err)"></div>
+    <p style="margin:0 0 8px;font-weight:600">⚠ Whisper 模型未下载</p>
+    <p style="margin:0 0 8px;font-size:var(--text-sm);color:var(--text-secondary)">需要下载 ${installed ? '模型文件（约 1-2 GB）' : 'faster-whisper 依赖及模型文件'}，请前往 <a href="#" id="whisper-go-settings" style="text-decoration:underline;color:var(--accent)">设置 → Whisper 模型管理</a> 手动下载。</p>
   `;
   pane.appendChild(div);
-
-  const btn = $('btn-install-whisper');
-  if (!btn) return;
-  btn.onclick = async () => {
-    btn.disabled = true;
-    btn.textContent = '正在启动下载...';
-    const prog = $('install-progress');
-    if (prog) prog.style.display = 'block';
-    try {
-      const r = await api('POST', '/api/whisper/install', {});
-      if (!r.ok) throw new Error(r.error || '启动失败');
-      btn.textContent = '下载中...';
-      if (_installPollTimer) clearInterval(_installPollTimer);
-      _installPollTimer = setInterval(pollWhisperInstall, 1000);
-      pollWhisperInstall();
-    } catch (e) {
-      btn.disabled = false;
-      btn.innerHTML = `${icon('download', 14)} 下载模型`;
-      const errEl = $('install-error');
-      if (errEl) { errEl.style.display = 'block'; errEl.textContent = '启动下载失败: ' + e.message; }
-    }
-  };
-}
-
-async function pollWhisperInstall() {
-  try {
-    const s = await api('GET', '/api/whisper/install/status');
-    const bar = $('install-bar');
-    const msg = $('install-msg');
-    const speed = $('install-speed');
-    const eta = $('install-eta');
-    const errEl = $('install-error');
-    if (!s.running && s.status === 'idle') {
-      if (_installPollTimer) { clearInterval(_installPollTimer); _installPollTimer = null; }
-      return;
-    }
-    if (s.status === 'downloading') {
-      if (bar) bar.style.width = (s.progress_pct || 0) + '%';
-      if (msg) msg.textContent = s.message || '下载中...';
-      if (speed && s.speed) speed.textContent = s.speed;
-      if (eta) {
-        if (s.eta_sec != null) {
-          const m = Math.floor(s.eta_sec / 60);
-          const sec = s.eta_sec % 60;
-          eta.textContent = `预计剩余 ${m} 分 ${sec} 秒`;
-        } else {
-          eta.textContent = '';
-        }
-      }
-    } else if (s.status === 'done') {
-      if (_installPollTimer) { clearInterval(_installPollTimer); _installPollTimer = null; }
-      if (bar) bar.style.width = '100%';
-      if (msg) msg.textContent = '✔ 模型下载完成';
-      if (eta) eta.textContent = '';
-      // R-016c: auto-retry transcribe after download
-      await retryTranscribe();
-    } else if (s.status === 'error') {
-      if (_installPollTimer) { clearInterval(_installPollTimer); _installPollTimer = null; }
-      const btn = $('btn-install-whisper');
-      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('download', 14)} 重试下载`; }
-      if (errEl) { errEl.style.display = 'block'; errEl.textContent = s.message || '下载失败'; }
-    }
-  } catch { /* ignore polling errors */ }
+  var settingsLink = $('whisper-go-settings');
+  if (settingsLink) {
+    settingsLink.onclick = function(e) { e.preventDefault(); import('./sidebar.js').then(function(s) { s.selectConfig(); }); };
+  }
 }
 
 function renderModelManagement() {
@@ -737,7 +644,6 @@ async function _pollModelDl() {
       if (eta) eta.textContent = '';
       if (dlBtn) { dlBtn.disabled = false; dlBtn.innerHTML = `${icon('download', 14)} 下载模型`; }
       _loadModelMgmt();
-      retryTranscribe();
     } else if (s.status === 'error') {
       if (_installPollTimer) { clearInterval(_installPollTimer); _installPollTimer = null; }
       if (cancelBtn) cancelBtn.style.display = 'none';
@@ -745,35 +651,6 @@ async function _pollModelDl() {
       if (msg) msg.textContent = s.message || '下载失败';
     }
   } catch { /* ignore */ }
-}
-
-async function retryTranscribe() {
-  const v = state.videos.find(x => x.file === state.currentVideo);
-  if (!v || !v.file) return;
-  try {
-    const r = await api('POST', '/api/rerun', {
-      video: v.file,
-      task: 'transcribe',
-      source: 'compressed',
-    });
-    if (r.ok) {
-      setStatus('模型下载完成，正在重新转录...', 'ok');
-      // Poll for transcription to complete, then refresh
-      let attempts = 0;
-      const poll = setInterval(async () => {
-        attempts++;
-        try {
-          state.transcript = await api('GET', `/api/transcripts?video=${encodeURIComponent(v.file)}`);
-        } catch { /* not ready yet */ }
-        if ((state.transcript && state.transcript.ok) || attempts > 30) {
-          clearInterval(poll);
-          renderTranscript();
-        }
-      }, 2000);
-    }
-  } catch (e) {
-    setStatus('自动转录失败: ' + e.message, 'err');
-  }
 }
 
 function renderPlan() {

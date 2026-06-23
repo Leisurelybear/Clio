@@ -21,6 +21,20 @@ from vlog_tool.utils import find_videos, popen_subprocess, resolve_binary, write
 from vlog_tool.shutdown import register_process, unregister_process
 
 
+def _resolve_original_video(compressed_stem: str, input_dir: Path, stem_cache: dict[str, Path]) -> Path | None:
+    """从压缩文件名 stem（如 001_GL010691 / 001_GL010691_seg01）解析出原始视频路径。"""
+    if "_" in compressed_stem:
+        _, orig_stem = compressed_stem.split("_", 1)
+    else:
+        orig_stem = compressed_stem
+    orig_stem = re.sub(r"_seg\d+$", "", orig_stem)
+    return stem_cache.get(orig_stem.lower())
+
+
+def _build_original_stem_map(input_dir: Path) -> dict[str, Path]:
+    return {p.stem.lower(): p for p in find_videos(input_dir, recursive=True)}
+
+
 def _get_video_duration(video_path: Path, ffprobe: str) -> float:
     """Use ffprobe to get video duration in seconds."""
     import subprocess as _subprocess
@@ -127,9 +141,16 @@ def run_transcribe_all(
     transcripts_dir = config.paths.output_dir / config.whisper.transcripts_subdir
     transcripts_dir.mkdir(parents=True, exist_ok=True)
 
-    videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
+    compressed_dir = config.paths.output_dir / config.analyze.compressed_subdir
+    if not compressed_dir.is_dir():
+        print(f"压缩目录不存在: {compressed_dir}，请先运行压缩步骤")
+        if tracker:
+            tracker.log(f"压缩目录不存在: {compressed_dir}")
+            tracker.update(phase="transcribe", current=0, total=0, message="压缩目录不存在，跳过")
+        return 0
+    videos = find_videos(compressed_dir)
     if files is not None:
-        allowed = {f.lower() for f in files}
+        allowed = {Path(f).stem.lower() for f in files}
         videos = [v for v in videos if v.stem.lower() in allowed]
     total = len(videos)
     if total == 0:
@@ -139,41 +160,58 @@ def run_transcribe_all(
     if tracker:
         tracker.update(phase="transcribe", total=total, current=0, message="Whisper 语音转录...")
     state = ProcessingState(config.paths.output_dir)
+    original_cache = _build_original_stem_map(config.paths.input_dir)
+    error_count = 0
 
     start_time = time.time()
-    for i, orig_video in enumerate(videos):
-        stem = orig_video.stem
-        out_path = transcripts_dir / f"{stem}_transcript.json"
+    for i, compressed_video in enumerate(videos):
+        compressed_stem = compressed_video.stem
+        out_path = transcripts_dir / f"{compressed_stem}_transcript.json"
+        original_video = _resolve_original_video(compressed_stem, config.paths.input_dir, original_cache)
+        if original_video is None:
+            print(f"  [跳过] {compressed_stem}: 未找到原始视频")
+            state.mark(compressed_stem, "transcribe", "skipped")
+            if tracker:
+                tracker.next(message=f"跳过 {compressed_stem}")
+                tracker.log(f"跳过 {compressed_stem}（无原始文件）")
+            continue
+
+        orig_stem = original_video.stem
+
         if not overwrite and config.analyze.skip_existing and out_path.exists():
             try:
                 json.loads(out_path.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
-                print(f"  [重新转录] {stem} (已有文件损坏)")
+                print(f"  [重新转录] {compressed_stem} (已有文件损坏)")
             else:
-                print(f"[跳过] {stem} (已有转录)")
-                state.mark(stem, "transcribe", "skipped")
+                print(f"[跳过] {compressed_stem} (已有转录)")
+                state.mark(orig_stem, "transcribe", "skipped")
                 if tracker:
-                    tracker.next(message=f"跳过 {stem}")
-                    tracker.log(f"跳过 {stem}（已转录）")
+                    tracker.next(message=f"跳过 {compressed_stem}")
+                    tracker.log(f"跳过 {compressed_stem}（已转录）")
                 continue
 
         if cancel_event and cancel_event.is_set():
             print("  [取消] 转录阶段被终止")
             break
         ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
-        ffprobe = resolve_binary(config.paths.ffmpeg, "ffprobe")
-        audio_dur = _get_video_duration(orig_video, ffprobe)
+        ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
+        audio_dur = _get_video_duration(original_video, ffprobe)
 
         def _on_extract_progress(pct: int) -> None:
             if tracker:
-                tracker.update(phase="transcribe", current=pct, total=100, message=f"{stem}: 提取音频 ({pct}%)")
+                tracker.update(
+                    phase="transcribe", current=pct, total=100, message=f"{compressed_stem}: 提取音频 ({pct}%)"
+                )
 
         def _on_transcribe_progress(pct: int) -> None:
             if tracker:
-                tracker.update(phase="transcribe", current=pct, total=100, message=f"{stem}: Whisper 转录 ({pct}%)")
+                tracker.update(
+                    phase="transcribe", current=pct, total=100, message=f"{compressed_stem}: Whisper 转录 ({pct}%)"
+                )
 
         wav_path = _extract_audio(
-            orig_video,
+            original_video,
             ffmpeg,
             progress_callback=_on_extract_progress,
             cancel_event=cancel_event,
@@ -181,57 +219,68 @@ def run_transcribe_all(
         )
         if wav_path is None:
             if cancel_event and cancel_event.is_set():
-                print(f"  [取消] {stem}: 音频提取被用户中断")
-                state.mark(stem, "transcribe", "cancelled")
+                print(f"  [取消] {compressed_stem}: 音频提取被用户中断")
+                state.mark(orig_stem, "transcribe", "cancelled")
                 if tracker:
-                    tracker.next(message=f"取消 {stem}")
-                    tracker.log(f"取消 {stem}")
+                    tracker.next(message=f"取消 {compressed_stem}")
+                    tracker.log(f"取消 {compressed_stem}")
                 break
-            print(f"  [跳过] {stem}: 音频提取失败（可能无音轨）")
-            state.mark(stem, "transcribe", "skipped")
+            print(f"  [跳过] {compressed_stem}: 音频提取失败（可能无音轨）")
+            state.mark(orig_stem, "transcribe", "skipped")
             if tracker:
-                tracker.next(message=f"跳过 {stem} (no audio)")
-                tracker.log(f"跳过 {stem}（无音轨）")
+                tracker.next(message=f"跳过 {compressed_stem} (no audio)")
+                tracker.log(f"跳过 {compressed_stem}（无音轨）")
             continue
 
         try:
             segments = transcribe_audio(wav_path, config, progress_callback=_on_transcribe_progress)
             transcript = {
-                "source_video": orig_video.name,
-                "source_stem": stem,
+                "source_video": original_video.name,
+                "source_stem": compressed_stem,
                 "language": config.whisper.language,
                 "model_size": config.whisper.model_size,
                 "segments": segments,
                 "generated_at": datetime.now().isoformat(),
             }
             write_json_atomic(out_path, transcript)
-            state.mark(stem, "transcribe", "done")
+            state.mark(orig_stem, "transcribe", "done")
             seg_info = f"{len(segments)} 段" if segments else "无有效内容"
             elapsed = time.time() - start_time
             pace = elapsed / (i + 1)
             eta = pace * (total - i - 1)
             eta_str = format_duration(eta)
-            print(f"  [转录 {i + 1}/{total}] {stem}（{seg_info}，平均 {format_duration(pace)}，剩余 ~{eta_str}）")
+            pace_str = format_duration(pace)
+            line = f"  [转录 {i + 1}/{total}] {compressed_stem}（{seg_info}，平均 {pace_str}，剩余 ~{eta_str}）"
+            print(line)
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            print(f"  [错误] {stem}: {e}")
-            state.mark(stem, "transcribe", "error")
+            print(f"  [错误] {compressed_stem}: {e}")
+            state.mark(orig_stem, "transcribe", "error")
             if tracker:
-                tracker.next(message=f"失败 {stem}")
-                tracker.log(f"转录 {stem} 失败")
+                tracker.next(message=f"失败 {compressed_stem}")
+                tracker.log(f"转录 {compressed_stem} 失败")
+                error_count += 1
             continue
         finally:
             wav_path.unlink(missing_ok=True)
 
         if tracker:
-            tracker.next(message=f"完成 {stem}")
-            tracker.log(f"转录 {stem} ✓")
+            tracker.next(message=f"完成 {compressed_stem}")
+            tracker.log(f"转录 {compressed_stem} ✓")
 
+    if error_count > 0 and tracker:
+        tracker.log(f"转录完成（{error_count} 个文件失败）")
+        tracker.update(message=f"转录完成（{error_count} 个文件失败）")
     return 0
 
 
-def run_transcribe_one(config: AppConfig, video_path: Path, cancel_event: threading.Event | None = None) -> dict:
+def run_transcribe_one(
+    config: AppConfig,
+    video_path: Path,
+    cancel_event: threading.Event | None = None,
+    progress_callback: Callable[[int], None] | None = None,
+) -> dict:
     """单文件转录（供 UI rerun 使用）。"""
     import time
 
@@ -242,6 +291,8 @@ def run_transcribe_one(config: AppConfig, video_path: Path, cancel_event: thread
     if cancel_event and cancel_event.is_set():
         return {"error": "转录被用户取消"}
     print("  [transcribe_one] 提取音频...")
+    if progress_callback:
+        progress_callback(0)
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
     wav_path = _extract_audio(video_path, ffmpeg, cancel_event=cancel_event)
     if wav_path is None:
@@ -249,11 +300,14 @@ def run_transcribe_one(config: AppConfig, video_path: Path, cancel_event: thread
     wav_size = wav_path.stat().st_size
     print(f"  [transcribe_one] WAV 提取完成: {wav_path.name} ({wav_size / 1024:.0f} KB)，耗时 {time.time() - t0:.1f}s")
     try:
-        dev = config.whisper.device
         model = config.whisper.model_size
-        print(f"  [transcribe_one] 开始 Whisper 转录 (device={dev}, model={model})...")
+        print(f"  [transcribe_one] 开始加载模型 ({model})...")
+        if progress_callback:
+            progress_callback(10)
         t1 = time.time()
-        segments = transcribe_audio(wav_path, config)
+        segments = transcribe_audio(
+            wav_path, config, progress_callback=lambda pct: progress_callback(10 + int(pct * 0.8))
+        )
         t2 = time.time()
         print(f"  [transcribe_one] Whisper 完成: {len(segments)} 段, 耗时 {t2 - t1:.1f}s")
         transcript = {

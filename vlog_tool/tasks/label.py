@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import threading
 import time
+from pathlib import Path
 
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
@@ -27,7 +28,7 @@ def run_label_videos(
 
     json_files = sorted(config.texts_dir.glob("*.json"))
     if files is not None:
-        allowed = {f.lower() for f in files}
+        allowed = {Path(f).stem.lower() for f in files}
         json_files = [f for f in json_files if f.stem.lower() in allowed]
     if tracker:
         tracker.update(phase="label", total=len(json_files), message=f"烧录序号（{len(json_files)} 个）...")

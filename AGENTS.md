@@ -88,7 +88,7 @@ vlog-video-analysis/
 │   ├── test_helpers.py        #   20 tests - _next_index / _write_csv / _rewrite_text_file
 │   ├── test_log.py            #   13 tests - TeeWriter / format_size / format_duration
 │   ├── test_main.py           #    7 tests - CLI subcommand dispatch
-│   ├── test_pipeline.py       #    4 tests - cancel_event propagation
+│   ├── test_pipeline.py       #    6 tests - cancel_event + files/overwrite propagation
 │   ├── test_plan.py           #    2 tests - plan prompt transcript injection
 │   ├── test_processing_state.py#   8 tests - mark / reset / persistence / corruption recovery
 │   ├── test_progress.py       #   14 tests - ProgressTracker read/write/ETA/atomic write
@@ -102,13 +102,13 @@ vlog-video-analysis/
 │   ├── test_routes_transcripts.py# 18 tests - transcript/whisper API routes
 │   ├── test_routes_videos.py  #    8 tests - videos GET routes
 │   ├── test_split.py          #    7 tests - split_video segment calculation
-│   ├── test_tasks_analyze.py  #    6 tests - run_analyze_all orchestration/duration gate
-│   ├── test_tasks_compress.py #    4 tests - run_compress_all orchestration
-│   ├── test_tasks_cut.py      #   11 tests - run_cut_all / offset calculation / cancel
-│   ├── test_tasks_label.py    #    6 tests - run_label_videos orchestration
-│   ├── test_tasks_refine.py   #   11 tests - run_refine_texts / scripts / fix mode
-│   ├── test_tasks_scripts.py  #    8 tests - run_generate_scripts orchestration
-│   ├── test_tasks_transcribe.py#  11 tests - run_transcribe_all / one orchestration
+│   ├── test_tasks_analyze.py  #    8 tests - run_analyze_all + files/overwrite
+│   ├── test_tasks_compress.py #    5 tests - run_compress_all + files_filter
+│   ├── test_tasks_cut.py      #   11 tests - run_cut_all / offset / cancel
+│   ├── test_tasks_label.py    #    8 tests - run_label_videos + files/overwrite
+│   ├── test_tasks_refine.py   #   21 tests - run_refine_texts/scripts/fix_mode + files_filter
+│   ├── test_tasks_scripts.py  #   10 tests - run_generate_scripts + files/overwrite
+│   ├── test_tasks_transcribe.py#  12 tests - run_transcribe_all + files_filter
 │   ├── test_transcribe.py     #   19 tests - transcribe toggle / device / model / CUDA fallback
 │   ├── test_utils.py          #   34 tests - extract_json / mask_key / sanitize / find_videos / with_retry
 │   ├── test_utils_expanded.py #   20 tests - run_subprocess / discover_ffmpeg / atomic_io / run_ffmpeg
@@ -230,10 +230,11 @@ more reliable than letting AI freely review:
 
 Last updated: 2026-06-22 (R-014 token usage + code review fixes). Live:
 - GitHub Actions CI (Ubuntu, Windows, Python 3.11/3.12)
-- **612 pytest cases** (coverage table below)
+- **624 pytest cases** (coverage table below)
 - Dependency version locked in `requirements-locked.txt`
 - Whisper ASR separate `requirements-whisper.txt` (faster-whisper, does not pollute main deps)
 - R-014 token usage tracking fully integrated: `FileTokenUsageStore` with atomic writes, `AIResponse` return types on both providers, new UI sidebar entity "Tokens" with summary/task/model breakdown, CLI `tokens` subcommand
+- R-018 multi-video selection + step execution: sidebar checkbox multi-select, backend `files`/`overwrite` params through pipeline, selection mode badge, run button disabled when empty
 Recent commit history:
 1. `chore: scaffold initial Vlog editing helper project`
 2. `fix(compress): escape comma in scale expression`  ← Windows ffmpeg filter comma escaping
@@ -335,6 +336,14 @@ Recent commit history:
 192. `e875159` `feat(ui): add Tokens sidebar entity with usage statistics panel`  ← UI
 193. `27fb86a` `test: update provider tests for AIResponse return type`  <- Test update
 194. `6efbcc3` `fix(ai): fix return type annotation in OpenAICompatProvider and add type hint to _call_ai fn parameter`  <- Code review fix
+195. `3ace4f4` `docs: add R-018 multi-video selection design doc + .superpowers to gitignore`  <- Design doc
+196. `f9828b8` `feat(run): accept files filter + overwrite flag in API and pipeline`  <- R-018b
+197. `58003f8` `feat(tasks): add files filter and overwrite param to all pipeline steps`  <- R-018b
+198. `54dc63e` `feat(ui): add selectionMode + selectedFiles to state, clear on source switch`  <- R-018 state
+199. `983f526` `feat(ui): add selection mode with checkboxes and select all/cancel in sidebar`  <- R-018a
+200. `5b0a9c0` `feat(ui): wire selection mode to runner - send files/overwrite params, show badge`  <- R-018d/e
+201. `95b539f` `fix(review): address code review - fix label.py shadow, plan.py overwrite gate, add type validation and tests`  <- Review fix
+202. `fa5fee1` `test: add unit tests for files/overwrite params across all pipeline steps`  <- 12 new tests
 
 2026-06-18 Review fixes (based on `docs/analysis/2026-06-18-vlog-editing-helper-review.md`, see `docs/analysis/2026-06-18-review-fix-result.md`):
 - **P0-1** `cut.py`: switched to `write_json_atomic` / `write_text_atomic` (missed atomic writes)

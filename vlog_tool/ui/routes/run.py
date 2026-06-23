@@ -33,6 +33,13 @@ def handle_get_run_status(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     with handler.__class__._run_lock:
         running = handler._run_thread is not None and handler._run_thread.is_alive()
     data["running"] = running
+    if data.get("status") == "running" and not running:
+        data["status"] = "idle"
+        data["message"] = ""
+        try:
+            progress_file.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass
     handler._send_json(data)
 
 
@@ -48,6 +55,12 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
     if files_list is not None and not isinstance(files_list, list):
         return handler._send_json({"ok": False, "error": "files must be a list of video names"}, 400)
     overwrite = obj.get("overwrite", False)
+
+    # Write initial progress BEFORE starting the thread so the first poll
+    # sees "running" immediately, preventing the race where the frontend
+    # re-enables the button before the thread writes to .progress.json.
+    pre_tracker = ProgressTracker(cfg.paths.output_dir)
+    pre_tracker.update(phase="启动", current=0, total=0, message="流水线启动中...")
 
     def _run():
         handler.__class__._cancel_event.clear()
@@ -188,7 +201,14 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
                 if not check_whisper():
                     raise RuntimeError("faster-whisper 未安装。执行: python main.py whisper install")
                 _log(f"original_video={original_video}, exists={original_video.is_file()}")
-                result = run_transcribe_one(cfg, original_video, cancel_event=cancel_event)
+                result = run_transcribe_one(
+                    cfg,
+                    original_video,
+                    cancel_event=cancel_event,
+                    progress_callback=lambda pct: tracker.update(
+                        phase="transcribe", current=pct, total=100, message=f"{video_basename}: 转录 ({pct}%)"
+                    ),
+                )
                 if "error" in result:
                     _log(f"✗ transcription failed: {result['error']}")
                     raise RuntimeError(result["error"])

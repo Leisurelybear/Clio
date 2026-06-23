@@ -35,7 +35,7 @@ def run_generate_scripts(
     else:
         input_files = sorted(config.texts_dir.glob("*.json"))
     if files is not None:
-        allowed = {f.lower() for f in files}
+        allowed = {Path(f).stem.lower() for f in files}
         input_files = [f for f in input_files if f.stem.lower() in allowed]
     if tracker:
         tracker.update(phase="voiceover", total=len(input_files), message=f"生成口播文案（{len(input_files)} 条）...")

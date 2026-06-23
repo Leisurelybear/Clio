@@ -431,11 +431,11 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Selected videos are highlighted in the list
 
 **Sub-tasks**:
-- [ ] R-018a: Sidebar video list add checkbox + select all/deselect all
-- [ ] R-018b: Backend `/api/run/start` supports `files: string[]` filter parameter
-- [ ] R-018c: Run panel adjusts progress display based on selected videos (total count / ETA / message)
-- [ ] R-018d: Selected video highlight style + count display
-- [ ] R-018e: Disable run button + hint text when nothing selected
+- [x] R-018a: Sidebar video list add checkbox + select all/deselect all
+- [x] R-018b: Backend `/api/run/start` supports `files: string[]` filter + `overwrite` parameter
+- [x] R-018c: Run panel adjusts progress display based on selected videos (total count / ETA / message)
+- [x] R-018d: Selected video highlight style + count display + selection mode badge
+- [x] R-018e: Disable run button + hint text when nothing selected
 
 ## Documentation Maintenance (from 2026-06-10 Full Review)
 
@@ -620,6 +620,14 @@ All B-046~B-052 covered by 163 new tests:
 
 | Commit | Description |
 | --- | --- |
+| `fa5fee1` | test: add unit tests for files/overwrite params across all pipeline steps (R-018) |
+| `95b539f` | fix(review): address code review - fix label.py shadow, plan.py overwrite gate, add type validation and tests (R-018) |
+| `5b0a9c0` | feat(ui): wire selection mode to runner - send files/overwrite params, show badge (R-018d/e) |
+| `983f526` | feat(ui): add selection mode with checkboxes and select all/cancel in sidebar (R-018a) |
+| `54dc63e` | feat(ui): add selectionMode + selectedFiles to state, clear on source switch (R-018) |
+| `58003f8` | feat(tasks): add files filter and overwrite param to all pipeline steps (R-018b) |
+| `f9828b8` | feat(run): accept files filter + overwrite flag in API and pipeline (R-018b) |
+| `3ace4f4` | docs: add R-018 multi-video selection design doc + .superpowers to gitignore |
 | `6efbcc3` | fix(ai): fix return type annotation in OpenAICompatProvider and add type hint to _call_ai fn parameter (code review fix) |
 | `27fb86a` | test: update provider tests for AIResponse return type |
 | `e875159` | feat(ui): add Tokens sidebar entity with usage statistics panel |

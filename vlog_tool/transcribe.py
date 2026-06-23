@@ -29,6 +29,12 @@ _whisper_cache_key: str | None = None
 _env_lock = threading.Lock()
 
 
+def _clear_model_cache() -> None:
+    global _whisper_model, _whisper_cache_key
+    _whisper_model = None
+    _whisper_cache_key = None
+
+
 def _resolve_cache_dir(config: AppConfig) -> Path:
     if config.whisper.cache_dir:
         return Path(config.whisper.cache_dir).resolve()
@@ -41,7 +47,7 @@ def _resolve_device(config: AppConfig) -> str:
             from ctranslate2 import get_cuda_device_count
 
             return "cuda" if get_cuda_device_count() > 0 else "cpu"
-        except (ImportError, OSError):
+        except (ImportError, OSError, RuntimeError):
             return "cpu"
     return config.whisper.device
 
@@ -65,9 +71,10 @@ def _get_model(config: AppConfig):
             os.environ.setdefault("MKL_NUM_THREADS", "4")
             if config.whisper.hf_endpoint:
                 os.environ["HF_ENDPOINT"] = config.whisper.hf_endpoint
-            if config.proxy.enabled and isinstance(config.proxy.url, str) and config.proxy.url.strip():
-                os.environ["HTTP_PROXY"] = config.proxy.url
-                os.environ["HTTPS_PROXY"] = config.proxy.url
+            else:
+                if config.proxy.enabled and isinstance(config.proxy.url, str) and config.proxy.url.strip():
+                    os.environ["HTTP_PROXY"] = config.proxy.url
+                    os.environ["HTTPS_PROXY"] = config.proxy.url
 
             cache_dir = _resolve_cache_dir(config)
             device = _resolve_device(config)
@@ -127,16 +134,41 @@ def transcribe_audio(
     if progress_callback:
         progress_callback(0)
 
-    segments_iter, info = model.transcribe(
-        str(audio_path),
-        language=None if lang == "auto" else lang,
-        word_timestamps=False,
-        vad_filter=True,
-        vad_parameters=dict(min_silence_duration_ms=300),
-        beam_size=5,
-        best_of=5,
-        temperature=0.0,
-    )
+    try:
+        segments_iter, info = model.transcribe(
+            str(audio_path),
+            language=None if lang == "auto" else lang,
+            word_timestamps=False,
+            vad_filter=True,
+            vad_parameters=dict(min_silence_duration_ms=300),
+            beam_size=5,
+            best_of=5,
+            temperature=0.0,
+        )
+    except (RuntimeError, OSError) as e:
+        err = str(e)
+        if "cublas" in err.lower() or "cuda" in err.lower() or "library" in err.lower():
+            print(f"  [警告] CUDA 推理失败 ({e})，回退到 CPU 重试")
+            _clear_model_cache()
+            _orig_device = config.whisper.device
+            config.whisper.device = "cpu"
+            try:
+                model = _get_model(config)
+                segments_iter, info = model.transcribe(
+                    str(audio_path),
+                    language=None if lang == "auto" else lang,
+                    word_timestamps=False,
+                    vad_filter=True,
+                    vad_parameters=dict(min_silence_duration_ms=300),
+                    beam_size=5,
+                    best_of=5,
+                    temperature=0.0,
+                )
+            finally:
+                config.whisper.device = _orig_device
+        else:
+            raise
+
     total_duration = info.duration
     last_pct = 0
     result = []
