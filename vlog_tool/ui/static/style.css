@@ -938,6 +938,15 @@ button .icon { width: 12px; height: 12px; }
 }
 .rerun-close-btn:hover { background: var(--bg-hover); color: var(--text-primary); }
 
+/* ── Run Files Badge ─────────────────────────────────────── */
+.run-files-badge {
+  font-size: var(--text-sm);
+  color: var(--accent);
+  padding: 4px 8px;
+  background: rgba(79,195,247,0.08);
+  border-radius: var(--radius-sm);
+}
+
 /* ── Browse Modal ──────────────────────────────────────────── */
 .modal-dialog-wide { min-width: 480px; max-width: 70vw; }
 

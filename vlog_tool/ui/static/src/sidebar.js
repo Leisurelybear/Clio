@@ -10,6 +10,7 @@ import {
 } from './utils.js';
 import { api, icon } from './api.js';
 import { stopPreview } from './viewer.js';
+import { updateRunFilesBadge } from './runner.js';
 
 // ── Data loading ───────────────────────────────────────────────
 
@@ -326,6 +327,8 @@ function renderVideoList() {
   for (const v of ungrouped) {
     ul.appendChild(renderVideoItem(v));
   }
+
+  updateRunFilesBadge();
 }
 
 function _resetDropdownPosition(dropdown) {

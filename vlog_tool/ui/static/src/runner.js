@@ -74,8 +74,13 @@ function renderRun() {
     <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
     <div class="run-step-list">${stepChecks}</div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
-      <button id="btn-run-start" class="btn-primary">${icon('play', 16)} 运行选中步骤</button>
+      <button id="btn-run-start" class="btn-primary">${getRunButtonText()}</button>
+      <span id="run-files-badge" class="run-files-badge" style="display:none"></span>
       <button id="btn-run-cancel" class="btn-secondary" style="display:none">取消</button>
+      <label class="run-option-check" id="option-overwrite-wrap" style="display:none">
+        <input type="checkbox" id="run-overwrite">
+        <span>覆盖现有输出</span>
+      </label>
     </div>
     <div id="run-progress" style="margin-top:12px">
       <p class="muted">尚未运行</p>
@@ -107,6 +112,7 @@ function renderRun() {
   }
 
   togglePlanSubOptions();
+  updateRunFilesBadge();
 
   const runBtn = $('btn-run-start');
   runBtn.onclick = startRun;
@@ -127,6 +133,28 @@ function togglePlanSubOptions() {
   sub.querySelectorAll('input, button').forEach(el => el.disabled = !enabled);
 }
 
+function getRunButtonText() {
+  if (state.selectionMode && state.selectedFiles.length > 0) {
+    return `${icon('play', 16)} 运行选中步骤 (${state.selectedFiles.length})`;
+  }
+  return `${icon('play', 16)} 运行选中步骤`;
+}
+
+function updateRunFilesBadge() {
+  const badge = $('run-files-badge');
+  const overwrap = $('option-overwrite-wrap');
+  if (!badge || !overwrap) return;
+  if (state.selectionMode && state.selectedFiles.length > 0) {
+    const numFiles = state.selectedFiles.length;
+    badge.textContent = `(${numFiles} 个视频)`;
+    badge.style.display = 'inline';
+    overwrap.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+    overwrap.style.display = 'none';
+  }
+}
+
 async function startRun() {
   const btn = $('btn-run-start');
   if (btn.disabled) return;
@@ -142,11 +170,19 @@ async function startRun() {
   _lastRunDay = ($('run-day')?.value.trim() || state.currentDay);
   if (_runPollTimer) clearInterval(_runPollTimer);
   try {
-    const r = await api('POST', '/api/run/start', {
+    const body = {
       day_label: _lastRunDay,
       steps: checked,
       use_transcripts: $('run-use-transcripts').checked,
-    });
+    };
+    if (state.selectionMode && state.selectedFiles.length > 0) {
+      body.files = state.selectedFiles;
+    }
+    const overwriteCb = $('run-overwrite');
+    if (overwriteCb && overwriteCb.checked) {
+      body.overwrite = true;
+    }
+    const r = await api('POST', '/api/run/start', body);
     if (r.ok) {
       _runActive = true;
       setStatus(r.message || '流水线已启动', 'ok');
@@ -317,4 +353,5 @@ export {
   startRun,
   pollRunStatus,
   _stopRunPoll,
+  updateRunFilesBadge,
 };
