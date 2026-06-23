@@ -23,6 +23,7 @@ import {
   loadBrowseDir,
   switchToOriginalThenCompress,
   goToRunTab,
+  toggleSelection,
   hideRerunProgress,
 } from './sidebar.js';
 
@@ -203,6 +204,7 @@ async function init() {
     } catch (e) { setStatus('重载失败: ' + e.message, 'err'); }
   };
   $('btn-save').onclick = save;
+  document.getElementById('btn-select-videos').addEventListener('click', toggleSelection);
   $$('.tab').forEach(t => t.onclick = () => { state.currentTab = t.dataset.tab; renderActiveTab(); });
   setupPlayer();
   document.addEventListener('keydown', (e) => {

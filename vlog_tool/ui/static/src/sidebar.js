@@ -54,6 +54,8 @@ async function loadVideos() {
   state.videos = r.videos;
   state.groups = r.groups || {};
   $('video-count').textContent = `(${state.videos.length})`;
+  const btn = document.getElementById('btn-select-videos');
+  if (btn) btn.style.display = state.videos.length > 0 ? 'flex' : 'none';
   renderVideoList();
 }
 
@@ -102,7 +104,14 @@ function renderSteps() {
 
 function renderVideoItem(v) {
   const li = document.createElement('li');
-  li.className = 'video-item';
+  let checkboxHtml = '';
+  let selectedClass = '';
+  if (state.selectionMode) {
+    const isSelected = state.selectedFiles.includes(v.file);
+    selectedClass = isSelected ? ' selected' : '';
+    checkboxHtml = `<input type="checkbox" class="video-checkbox" data-file="${v.file}" ${isSelected ? 'checked' : ''}>`;
+  }
+  li.className = 'video-item' + selectedClass;
   if (state.currentVideo === v.file) li.classList.add('active');
   if (!v.match) li.classList.add('no-match');
 
@@ -129,7 +138,7 @@ function renderVideoItem(v) {
   } else {
     matchBadge = `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
   }
-  li.innerHTML = `
+  li.innerHTML = `${checkboxHtml}
     <div class="video-name">${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)}</div>
     ${v.title ? `<div class="video-title">${escapeHtml(v.title)}</div>` : ''}
     <div class="video-match">${matchBadge}</div>
@@ -205,12 +214,45 @@ function renderVideoItem(v) {
     }
   };
 
+  if (state.selectionMode) {
+    const cb = li.querySelector('.video-checkbox');
+    if (cb) {
+      cb.addEventListener('change', (e) => {
+        e.stopPropagation();
+        if (cb.checked) {
+          if (!state.selectedFiles.includes(v.file)) state.selectedFiles.push(v.file);
+        } else {
+          state.selectedFiles = state.selectedFiles.filter(f => f !== v.file);
+        }
+        renderVideoList();
+      });
+    }
+  }
+
   return li;
 }
 
 function renderVideoList() {
   const ul = $('video-list');
   ul.innerHTML = '';
+  if (state.selectionMode) {
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'selection-header';
+    const allSelected = state.videos.length > 0 && state.selectedFiles.length === state.videos.length;
+    headerDiv.innerHTML = `
+      <span class="selection-count">已选: ${state.selectedFiles.length}/${state.videos.length}</span>
+      <span class="selection-action" data-action="all">${allSelected ? '取消全选' : '全选'}</span>
+    `;
+    headerDiv.querySelector('[data-action="all"]').onclick = () => {
+      if (allSelected) {
+        state.selectedFiles = [];
+      } else {
+        state.selectedFiles = state.videos.map(v => v.file);
+      }
+      renderVideoList();
+    };
+    ul.appendChild(headerDiv);
+  }
   if (!state.videos.length) {
     const isCompressedEmpty = state.source === 'compressed';
     if (isCompressedEmpty) {
@@ -416,6 +458,24 @@ async function selectTokens() {
   markDirty(false);
   const { renderActiveTab } = await import('./editor.js');
   renderActiveTab();
+}
+
+function toggleSelection() {
+  state.selectionMode = !state.selectionMode;
+  if (!state.selectionMode) {
+    state.selectedFiles = [];
+  }
+  renderVideoList();
+  const btn = document.getElementById('btn-select-videos');
+  if (btn) {
+    if (state.selectionMode) {
+      btn.innerHTML = '<span class="icon">✕</span> 取消选择';
+      btn.style.border = '1px solid var(--warn)';
+    } else {
+      btn.innerHTML = '<span class="icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span> 选择视频';
+      btn.style.border = '';
+    }
+  }
 }
 
 async function setSource(source) {
@@ -691,6 +751,7 @@ export {
   loadBrowseDir,
   switchToOriginalThenCompress,
   goToRunTab,
+  toggleSelection,
   showRerunProgress,
   hideRerunProgress,
   pollRerunStatus,
