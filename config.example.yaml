@@ -35,6 +35,11 @@ ai:
   # context: "所有素材均拍摄于 2024 年 7 月法国巴黎，不要误判为其他城市。"
   # context_file: ./templates/trip_context.md
 
+  # 已缓存的 AI 提供商过期间隔（分钟），超时后自动关闭重建。
+  # 长时间运行的 UI 服务建议设 60-120，避免旧 HTTP session 泄漏。
+  # 设为 0 表示永不过期。
+  # provider_ttl_min: 60
+
   # debug_print_prompt: true  # 调试用：在每次 AI 调用前打印完整 prompt（含上下文注入）到控制台
   providers:
     gemini:

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import threading
+import time
+from dataclasses import dataclass
 
 from vlog_tool.ai.base import TaskName, TextAIProvider, VideoAIProvider
 from vlog_tool.ai.gemini import GeminiProvider
@@ -13,7 +15,14 @@ _PROVIDER_TYPES = {
     "openai_compat": OpenAICompatProvider,
 }
 
-_provider_cache: dict[tuple, TextAIProvider] = {}
+
+@dataclass
+class _CachedEntry:
+    provider: TextAIProvider
+    created_at: float
+
+
+_provider_cache: dict[tuple, _CachedEntry] = {}
 _provider_cache_lock = threading.Lock()
 
 
@@ -30,10 +39,17 @@ def _build_provider(config: AppConfig, provider_name: str):
         config.proxy.url,
         config.proxy.enabled,
     )
+
+    ttl_sec = float("inf") if config.ai.provider_ttl_min <= 0 else config.ai.provider_ttl_min * 60
+
     with _provider_cache_lock:
         cached = _provider_cache.get(cache_key)
+        if cached is not None and time.monotonic() - cached.created_at < ttl_sec:
+            return cached.provider
         if cached is not None:
-            return cached
+            cached.provider.close()
+            del _provider_cache[cache_key]
+
     cls = _PROVIDER_TYPES.get(provider_cfg.type)
     if not cls:
         raise ValueError(f"不支持的厂家类型 '{provider_cfg.type}'，可选: {', '.join(_PROVIDER_TYPES)}")
@@ -42,15 +58,15 @@ def _build_provider(config: AppConfig, provider_name: str):
         existing = _provider_cache.get(cache_key)
         if existing is not None:
             provider.close()
-            return existing
-        _provider_cache[cache_key] = provider
+            return existing.provider
+        _provider_cache[cache_key] = _CachedEntry(provider=provider, created_at=time.monotonic())
     return provider
 
 
 def _clear_provider_cache() -> None:
     """Close all cached providers and clear the cache (for testing / config reload)."""
     with _provider_cache_lock:
-        providers = list(_provider_cache.values())
+        providers = [e.provider for e in _provider_cache.values()]
         _provider_cache.clear()
     for p in providers:
         try:

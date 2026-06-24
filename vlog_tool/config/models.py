@@ -47,6 +47,7 @@ class AIConfig:
     tasks: dict[str, TaskConfig] = field(default_factory=dict)
     context: str = ""
     debug_print_prompt: bool = False
+    provider_ttl_min: int = 60
 
 
 @dataclass
