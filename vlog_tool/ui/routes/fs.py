@@ -12,6 +12,21 @@ if TYPE_CHECKING:
 
 from vlog_tool.ui.services.file_service import _list_drives
 
+# ── security: restrict file-system browsing to known-safe roots ──
+
+
+def _is_allowed_path(resolved: Path) -> bool:
+    try:
+        if resolved.is_relative_to(Path.home()):
+            return True
+    except ValueError:
+        pass
+    if sys.platform == "win32":
+        drive = resolved.drive
+        if drive and str(resolved) == drive + "\\":
+            return True
+    return False
+
 
 def handle_get_fs_dirs(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     """Handle GET /api/fs/dirs."""
@@ -23,6 +38,8 @@ def handle_get_fs_dirs(handler: BaseHTTPRequestHandler, qs: dict) -> None:
         return handler._send_json({"path": "/", "dirs": ["/"], "parent": None, "is_drive_list": True})
     try:
         resolved = Path(dir_path).resolve()
+        if not _is_allowed_path(resolved):
+            return handler._send_json({"error": "access denied"}, 403)
         if not resolved.is_dir():
             return handler._send_json({"error": "not a directory"}, 400)
         dirs: list[str] = []
