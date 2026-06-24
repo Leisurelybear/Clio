@@ -22,6 +22,8 @@ if TYPE_CHECKING:
 
 def handle_get_run_status(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     """Handle GET /api/run/status."""
+    proj_input = handler._resolve_project_input(qs)
+    state = handler._get_state(str(proj_input.resolve()))
     progress_file = handler._get_project_output(qs) / ".progress.json"
     if progress_file.is_file():
         try:
@@ -30,8 +32,8 @@ def handle_get_run_status(handler: BaseHTTPRequestHandler, qs: dict) -> None:
             data = {"status": "unknown"}
     else:
         data = {"status": "idle"}
-    with handler.__class__._run_lock:
-        running = handler._run_thread is not None and handler._run_thread.is_alive()
+    with state.run_lock:
+        running = state.run_thread is not None and state.run_thread.is_alive()
     data["running"] = running
     if data.get("status") == "running" and not running:
         data["status"] = "idle"
@@ -49,6 +51,7 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
     steps = obj.get("steps")
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
+    state = handler._get_state(str(proj_input.resolve()))
     if "use_transcripts" in obj:
         cfg.plan.use_transcripts = obj["use_transcripts"]
     files_list = obj.get("files")
@@ -63,7 +66,7 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
     pre_tracker.update(phase="启动", current=0, total=0, message="流水线启动中...")
 
     def _run():
-        handler.__class__._cancel_event.clear()
+        state.cancel_event.clear()
         tracker = ProgressTracker(cfg.paths.output_dir)
         try:
             run_pipeline_steps(
@@ -71,7 +74,7 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
                 day_label,
                 steps,
                 tracker=tracker,
-                cancel_event=handler.__class__._cancel_event,
+                cancel_event=state.cancel_event,
                 files=files_list,
                 overwrite=overwrite,
             )
@@ -79,18 +82,20 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
             tracker.error("pipeline failed")
             traceback.print_exc()
 
-    with handler.__class__._run_lock:
-        if handler._run_thread is not None and handler._run_thread.is_alive():
+    with state.run_lock:
+        if state.run_thread is not None and state.run_thread.is_alive():
             return handler._send_json({"ok": False, "error": "pipeline is already running"}, 409)
-        handler._run_thread = threading.Thread(target=_run, daemon=True)
-        handler._run_thread.start()
+        state.run_thread = threading.Thread(target=_run, daemon=True)
+        state.run_thread.start()
     label = "+".join(steps) if steps else "all"
     handler._send_json({"ok": True, "message": f"pipeline started ({label})"})
 
 
 def handle_post_run_cancel(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
     """Handle POST /api/run/cancel."""
-    handler.__class__._cancel_event.set()
+    proj_input = handler._resolve_project_input(qs)
+    state = handler._get_state(str(proj_input.resolve()))
+    state.cancel_event.set()
     handler._send_json({"ok": True, "message": "取消请求已发送"})
 
 
@@ -98,6 +103,7 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
     """Handle POST /api/rerun."""
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
+    state = handler._get_state(str(proj_input.resolve()))
     proj_out = _project_output_dir(proj_input)
 
     video_basename = (obj.get("video") or "").strip()
@@ -158,7 +164,7 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
         original_video=original_video,
         texts_json=texts_json,
         proj_out=proj_out,
-        cancel_event=handler.__class__._cancel_event,
+        cancel_event=state.cancel_event,
     ):
         cancel_event.clear()
         # Deep-copy config, force redo (user clicked rerun => regenerate everything)
@@ -227,9 +233,9 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
             tracker.error(f"rerun failed: {e}")
             traceback.print_exc()
 
-    with handler.__class__._run_lock:
-        if handler._run_thread is not None and handler._run_thread.is_alive():
+    with state.run_lock:
+        if state.run_thread is not None and state.run_thread.is_alive():
             return handler._send_json({"ok": False, "error": "a task is already running"}, 409)
-        handler._run_thread = threading.Thread(target=_rerun_worker, daemon=True)
-        handler._run_thread.start()
+        state.run_thread = threading.Thread(target=_rerun_worker, daemon=True)
+        state.run_thread.start()
     handler._send_json({"ok": True, "message": f"started rerun {task} ({video_basename})"})

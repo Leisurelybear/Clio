@@ -12,6 +12,7 @@ import json
 import mimetypes
 import shutil
 import threading
+from dataclasses import dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -90,6 +91,13 @@ from vlog_tool.utils import write_json_atomic
 STATIC_DIR = Path(__file__).parent / "static"
 
 
+@dataclass
+class _ServerState:
+    run_lock: threading.Lock = field(default_factory=threading.Lock)
+    run_thread: threading.Thread | None = None
+    cancel_event: threading.Event = field(default_factory=threading.Event)
+
+
 def make_handler(config: AppConfig, config_path: Path | None = None) -> type[BaseHTTPRequestHandler]:
     output_dir = config.paths.output_dir
     input_dir = config.paths.input_dir
@@ -123,13 +131,16 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
     }
 
     class Handler(BaseHTTPRequestHandler):
-        # Shared state (class-level, across instances)
-        _run_lock = threading.Lock()
-        _run_thread: threading.Thread | None = None
-        _cancel_event = threading.Event()
+        _project_states: dict[str, _ServerState] = {}
         _config_cache: ConfigCache | None = None
         DEFAULT_PROJECT: dict = {}
-        server: BaseHTTPRequestHandler  # set by HTTPServer
+        server: BaseHTTPRequestHandler
+
+        def _get_state(self, project_key: str) -> _ServerState:
+            states = self.__class__._project_states
+            if project_key not in states:
+                states[project_key] = _ServerState()
+            return states[project_key]  # set by HTTPServer
 
         def log_message(self, fmt, *args):
             print(f"  [serve] {self.address_string()} - {fmt % args}")

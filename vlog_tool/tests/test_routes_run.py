@@ -18,13 +18,18 @@ from vlog_tool.ui.routes.run import (
 
 @pytest.fixture
 def _handler():
-    """Create a mock handler with _run_lock, _run_thread, and _cancel_event."""
+    """Create a mock handler with _get_state returning a per-project ServerState-like object."""
     from threading import Event, Lock
 
+    class _FakeState:
+        def __init__(self):
+            self.run_lock = Lock()
+            self.run_thread = None
+            self.cancel_event = Event()
+
     handler = MagicMock()
-    handler.__class__._run_lock = Lock()
-    handler.__class__._run_thread = None
-    handler.__class__._cancel_event = Event()
+    handler._get_state = lambda key: handler.__class__._fake_state
+    handler.__class__._fake_state = _FakeState()
     return handler
 
 
@@ -40,6 +45,7 @@ def _no_thread(monkeypatch):
 class TestHandleGetRunStatus:
     def test_idle_when_no_progress_file(self, _handler):
         handler = _handler
+        handler._resolve_project_input.return_value = Path("/nonexistent")
         handler._get_project_output.return_value = Path("/nonexistent")
 
         handle_get_run_status(handler, {})
@@ -48,13 +54,15 @@ class TestHandleGetRunStatus:
 
     def test_reads_progress_file(self, tmp_path: Path, _handler):
         handler = _handler
+        proj_input = tmp_path / "input"
         proj_out = tmp_path / "output"
         proj_out.mkdir(parents=True)
         progress = proj_out / ".progress.json"
         progress.write_text(json.dumps({"status": "running", "phase": "compress"}), encoding="utf-8")
+        handler._resolve_project_input.return_value = proj_input
         handler._get_project_output.return_value = proj_out
-        handler._run_thread = MagicMock()
-        handler._run_thread.is_alive.return_value = True
+        handler.__class__._fake_state.run_thread = MagicMock()
+        handler.__class__._fake_state.run_thread.is_alive.return_value = True
 
         handle_get_run_status(handler, {})
 
@@ -68,8 +76,9 @@ class TestHandleGetRunStatus:
 class TestHandlePostRunStart:
     def test_already_running(self, _handler):
         handler = _handler
-        handler._run_thread = MagicMock()
-        handler._run_thread.is_alive.return_value = True
+        handler._resolve_project_input.return_value = Path("/input")
+        handler.__class__._fake_state.run_thread = MagicMock()
+        handler.__class__._fake_state.run_thread.is_alive.return_value = True
 
         handle_post_run_start(handler, {}, {})
 
@@ -134,9 +143,10 @@ class TestHandlePostRerun:
 class TestHandlePostRunCancel:
     def test_cancel_sets_event(self, _handler):
         handler = _handler
-        assert not handler.__class__._cancel_event.is_set()
+        handler._resolve_project_input.return_value = Path("/input")
+        assert not handler.__class__._fake_state.cancel_event.is_set()
 
         handle_post_run_cancel(handler, {}, {})
 
-        assert handler.__class__._cancel_event.is_set()
+        assert handler.__class__._fake_state.cancel_event.is_set()
         handler._send_json.assert_called_once_with({"ok": True, "message": "取消请求已发送"})
