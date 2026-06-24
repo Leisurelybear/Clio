@@ -16,6 +16,7 @@ class RateLimiter:
         self._logged = False
 
     def __enter__(self) -> None:
+        wait = 0.0
         with self._lock:
             now = time.monotonic()
             if now < self._next_at:
@@ -23,9 +24,10 @@ class RateLimiter:
                 if not self._logged:
                     print(f"  [限流] 等待 {wait:.1f}s（每 {self._interval:.1f}s 一次）")
                     self._logged = True
-                time.sleep(wait)
             self._next_at = time.monotonic() + self._interval
             self._logged = False
+        if wait > 0:
+            time.sleep(wait)
 
     def acquire(self) -> float:
         """非阻塞获取限流许可。
