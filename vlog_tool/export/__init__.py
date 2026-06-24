@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from vlog_tool.export.jianying import export_plan_to_jianying
+
 FORMAT_REGISTRY: dict[str, type] = {}
+FORMAT_REGISTRY["jianying"] = export_plan_to_jianying
 
 
 def export_plan(
