@@ -754,6 +754,32 @@ function renderPlan() {
     <div id="cut-result" style="margin-top:12px"></div>
   `;
   pane.appendChild(cutSection);
+  // ── 导出区块 ────────────────────────────────────────────────
+  const exportSection = document.createElement('div');
+  exportSection.className = 'cut-section';
+  exportSection.style.marginTop = '16px';
+  exportSection.innerHTML = `
+    <h3>导出到剪映</h3>
+    <p class="hint">生成剪映专业版可直接打开的草稿文件</p>
+    <button id="btn-jianying-export" class="btn-primary">${icon('export', 16)} 导出到剪映</button>
+    <div id="export-result" style="margin-top:8px;font-size:var(--text-sm)"></div>
+  `;
+  pane.appendChild(exportSection);
+
+  $('btn-jianying-export')?.addEventListener('click', async () => {
+    const resultDiv = $('export-result');
+    resultDiv.innerHTML = '<span class="muted">导出中…</span>';
+    try {
+      const r = await api('POST', '/api/export', { day: state.currentDay || 'day1', format: 'jianying' });
+      if (r.ok) {
+        resultDiv.innerHTML = `<span style="color:var(--ok,#484)">✓ 已导出到 ${escapeHtml(r.path)}</span>`;
+      } else {
+        resultDiv.innerHTML = `<span style="color:var(--err,#c44)">✗ ${escapeHtml(r.error || '导出失败')}</span>`;
+      }
+    } catch (e) {
+      resultDiv.innerHTML = `<span style="color:var(--err,#c44)">✗ 导出失败: ${escapeHtml(e.message || e)}</span>`;
+    }
+  });
   $('btn-cut-exec').onclick = executeCut;
 }
 
