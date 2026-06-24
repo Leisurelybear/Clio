@@ -21,14 +21,12 @@ from vlog_tool.utils import find_videos, popen_subprocess, resolve_binary, write
 from vlog_tool.shutdown import register_process, unregister_process
 
 
-def _resolve_original_video(compressed_stem: str, input_dir: Path, stem_cache: dict[str, Path]) -> Path | None:
-    """从压缩文件名 stem（如 001_GL010691 / 001_GL010691_seg01）解析出原始视频路径。"""
+def _extract_orig_stem(compressed_stem: str) -> str:
     if "_" in compressed_stem:
         _, orig_stem = compressed_stem.split("_", 1)
     else:
         orig_stem = compressed_stem
-    orig_stem = re.sub(r"_seg\d+$", "", orig_stem)
-    return stem_cache.get(orig_stem.lower())
+    return re.sub(r"_seg\d+$", "", orig_stem)
 
 
 def _build_original_stem_map(input_dir: Path) -> dict[str, Path]:
@@ -167,10 +165,11 @@ def run_transcribe_all(
     for i, compressed_video in enumerate(videos):
         compressed_stem = compressed_video.stem
         out_path = transcripts_dir / f"{compressed_stem}_transcript.json"
-        original_video = _resolve_original_video(compressed_stem, config.paths.input_dir, original_cache)
+        orig_stem = _extract_orig_stem(compressed_stem)
+        original_video = original_cache.get(orig_stem.lower())
         if original_video is None:
             print(f"  [跳过] {compressed_stem}: 未找到原始视频")
-            state.mark(compressed_stem, "transcribe", "skipped")
+            state.mark(orig_stem, "transcribe", "skipped")
             if tracker:
                 tracker.next(message=f"跳过 {compressed_stem}")
                 tracker.log(f"跳过 {compressed_stem}（无原始文件）")
@@ -297,7 +296,16 @@ def run_transcribe_one(
     if progress_callback:
         progress_callback(0)
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
-    wav_path = _extract_audio(video_path, ffmpeg, cancel_event=cancel_event)
+    ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
+    audio_dur = _get_video_duration(video_path, ffprobe)
+
+    def _on_extract(pct: int) -> None:
+        if progress_callback:
+            progress_callback(int(pct * 0.1))
+
+    wav_path = _extract_audio(
+        video_path, ffmpeg, progress_callback=_on_extract, cancel_event=cancel_event, total_duration=audio_dur
+    )
     if wav_path is None:
         return {"error": "音频提取失败"}
     wav_size = wav_path.stat().st_size
