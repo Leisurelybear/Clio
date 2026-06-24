@@ -29,6 +29,7 @@ from vlog_tool.ui.routes.config_routes import (
     handle_put_config_raw,
 )
 from vlog_tool.ui.routes.env_routes import handle_get_env, handle_put_env
+from vlog_tool.ui.routes.export import handle_post_export
 from vlog_tool.ui.routes.fs import handle_get_fs_dirs
 from vlog_tool.ui.routes.plan import (
     handle_get_plan,
@@ -315,6 +316,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_post_cut(self, qs, obj)
             if path == "/api/refine":
                 return handle_post_refine(self, qs, obj)
+            if path == "/api/export":
+                return handle_post_export(self, qs, obj)
             if path == "/api/project/create":
                 return handle_post_project_create(self, obj)
             if path == "/api/project/add":
