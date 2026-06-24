@@ -260,7 +260,7 @@ def run_transcribe_all(
             if tracker:
                 tracker.next(message=f"失败 {compressed_stem}")
                 tracker.log(f"转录 {compressed_stem} 失败")
-                error_count += 1
+            error_count += 1
             continue
         finally:
             wav_path.unlink(missing_ok=True)
@@ -269,9 +269,12 @@ def run_transcribe_all(
             tracker.next(message=f"完成 {compressed_stem}")
             tracker.log(f"转录 {compressed_stem} ✓")
 
-    if error_count > 0 and tracker:
-        tracker.log(f"转录完成（{error_count} 个文件失败）")
-        tracker.update(message=f"转录完成（{error_count} 个文件失败）")
+    if error_count > 0:
+        msg = f"转录完成（{error_count} 个文件失败）"
+        print(msg)
+        if tracker:
+            tracker.log(msg)
+            tracker.update(message=msg)
     return 0
 
 
