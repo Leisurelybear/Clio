@@ -12,6 +12,7 @@ from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.config import AppConfig
 from vlog_tool.cut import cut_one, parse_time_range
 from vlog_tool.log import format_duration, timed
+from vlog_tool.processing_state import ProcessingState
 from vlog_tool.tasks._helpers import _eta_line
 from vlog_tool.utils import get_duration_sec, resolve_binary, sanitize_name, write_json_atomic, write_text_atomic
 
@@ -79,6 +80,15 @@ def run_cut_all(
     print(f"[cut] 输出: {out_root}")
     print(f"[cut] 视频来源: {source} ({comp_dir if source == 'compressed' else input_dir})")
 
+    state = ProcessingState(config.paths.output_dir)
+
+    def _orig_stem_from_path(video_path: Path) -> str:
+        stem = video_path.stem
+        if "_" in stem:
+            stem = stem.split("_", 1)[1]
+        m = _SEG_RE.match(stem)
+        return m.group(1) if m else stem
+
     def _resolve_video_path(idx: str) -> Path | None:
         if source == "compressed":
             candidates = sorted(comp_dir.glob(f"{idx}_*"))
@@ -122,6 +132,9 @@ def run_cut_all(
                 start, end = parse_time_range(timeline)
             except ValueError as e:
                 print(f"  [跳过] 时间格式错误 '{timeline}': {e}")
+                orig_stem = _orig_stem_from_path(video_path) if video_path else ""
+                if orig_stem:
+                    state.mark(orig_stem, "cut", "skipped")
                 continue
 
             # Apply segment offset for original source with split videos
@@ -140,7 +153,12 @@ def run_cut_all(
 
             print(_eta_line("裁剪", i, len(seq), clip_stem, completed, elapsed_total))
             t0 = time.monotonic()
-            cut_one(video_path, clip_path, start, end, ffmpeg, reencode=reencode, cancel_event=cancel_event)
+            try:
+                cut_one(video_path, clip_path, start, end, ffmpeg, reencode=reencode, cancel_event=cancel_event)
+                state.mark(_orig_stem_from_path(video_path), "cut", "done")
+            except Exception:
+                state.mark(_orig_stem_from_path(video_path), "cut", "error")
+                raise
             elapsed_total += time.monotonic() - t0
             completed += 1
 

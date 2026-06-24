@@ -9,6 +9,7 @@ from pathlib import Path
 
 from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
+from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
 from vlog_tool.tasks._helpers import _eta_line
 from vlog_tool.utils import format_index, resolve_binary, run_ffmpeg
@@ -25,6 +26,7 @@ def run_label_videos(
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
     labeled_dir = config.paths.output_dir / "labeled"
     labeled_dir.mkdir(parents=True, exist_ok=True)
+    state = ProcessingState(config.paths.output_dir)
 
     json_files = sorted(config.texts_dir.glob("*.json"))
     if files is not None:
@@ -51,8 +53,10 @@ def run_label_videos(
             for f in config.compressed_dir.glob(f"{idx}_*"):
                 compressed = f
                 break
+            orig_stem = json_file.stem.split("_", 1)[-1]
             if not compressed or not compressed.exists():
                 print(f"[跳过] 找不到压缩文件: {idx}")
+                state.mark(orig_stem, "label", "skipped")
                 if tracker:
                     tracker.next(message=f"跳过 {idx}（无压缩文件）")
                 continue
@@ -60,6 +64,7 @@ def run_label_videos(
             out = labeled_dir / f"{json_file.stem}_labeled.mp4"
             if not overwrite and config.analyze.skip_existing and out.exists():
                 print(f"[跳过标注] {out.name} (已存在)")
+                state.mark(orig_stem, "label", "skipped")
                 if tracker:
                     tracker.next(message=f"跳过 {out.name}")
                 continue
@@ -70,7 +75,12 @@ def run_label_videos(
             t0 = time.monotonic()
             label = idx.replace("'", "")
             vf = f"drawtext=text='{label}':fontsize=36:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=8:x=20:y=20"
-            run_ffmpeg(["-i", str(compressed), "-vf", vf, "-an", "-y", str(out)], ffmpeg)
+            try:
+                run_ffmpeg(["-i", str(compressed), "-vf", vf, "-an", "-y", str(out)], ffmpeg)
+                state.mark(orig_stem, "label", "done")
+            except Exception:
+                state.mark(orig_stem, "label", "error")
+                raise
             elapsed_total += time.monotonic() - t0
             completed += 1
             if tracker:
