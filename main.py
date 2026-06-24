@@ -221,6 +221,11 @@ def main(argv: list[str] | None = None) -> int:
     p_tokens = sub.add_parser("tokens", help="查看 token 使用统计")
     p_tokens.set_defaults(func=cmd_tokens)
 
+    p_export = sub.add_parser("export", help="导出 plan 到剪辑软件草稿")
+    p_export.add_argument("--format", default="jianying", choices=["jianying"], help="导出格式")
+    p_export.add_argument("--day", default="day1", help="日 vlog 标签（默认 day1）")
+    p_export.add_argument("--output", type=Path, default=None, help="输出目录（默认 output/export/<day>_<format>/）")
+
     p_transcribe = sub.add_parser("transcribe", help="Whisper ASR 语音转录（需先安装 faster-whisper）")
     _add_io_args(p_transcribe)
     p_transcribe.add_argument("--force", action="store_true", help="忽略已有转录，重新生成")
@@ -358,6 +363,14 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "tokens":
             cmd_tokens(args)
+            return 0
+        elif args.command == "export":
+            from vlog_tool.export import export_plan
+
+            plan_path = config.plans_dir / f"{args.day}_plan.json"
+            out_dir = args.output or config.paths.output_dir / "export" / f"{args.day}_{args.format}"
+            ffprobe = config.paths.ffprobe
+            export_plan(args.format, plan_path, out_dir, config.paths.input_dir, args.day, ffprobe=ffprobe)
             return 0
     except FileNotFoundError as e:
         print(f"错误: {e}", file=sys.stderr)
