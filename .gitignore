@@ -9,7 +9,9 @@ __pycache__/
 *.bak
 projects.json
 projects.json.bak
-.opencode/
+.opencode/*
+!.opencode/skills/
+!.opencode/skills/**
 opencode_session_import.json
 .claude/
 
