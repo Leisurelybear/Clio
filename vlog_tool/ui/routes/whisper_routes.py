@@ -282,110 +282,81 @@ def _run_install(handler, progress_path: Path) -> None:
             },
         )
 
-        from huggingface_hub import hf_hub_download  # noqa
+        import requests as _req
+        from huggingface_hub import hf_hub_url
 
-        # hf_hub_download returns the path to the downloaded file.
-        # Run in a thread so we can poll file size for progress.
-        result: list[Path | None] = [None]
-        exc_info: list[BaseException | None] = [None]
+        url = hf_hub_url(repo_id, filename="model.bin")
+        proxy_url = cfg.proxy.url if (cfg.proxy.enabled and cfg.proxy.url) else None
+        proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
 
-        def _dl_thread() -> None:
-            try:
-                p = hf_hub_download(
-                    repo_id=repo_id,
-                    filename="model.bin",
-                    cache_dir=str(cache_dir),
-                    resume_download=True,
-                    local_dir_use_symlinks=False,
-                )
-                result[0] = Path(p)
-            except BaseException as e:
-                exc_info[0] = e
-
-        import threading as _threading
+        model_cache_dir = cache_dir / f"models--Systran--faster-whisper-{model_name}"
+        snapshots = model_cache_dir / "snapshots" / "downloaded"
+        snapshots.mkdir(parents=True, exist_ok=True)
+        model_path = snapshots / "model.bin"
+        tmp_path = model_path.with_name(model_path.name + ".tmp")
 
         _INSTALL_CANCEL.clear()
-        t = _threading.Thread(target=_dl_thread, daemon=True)
-        t.start()
+        response = _req.get(url, stream=True, proxies=proxies, timeout=30, allow_redirects=True)
+        response.raise_for_status()
 
+        total_size = int(response.headers.get("Content-Length", 0)) or total_size
+
+        downloaded = 0
         start = time.monotonic()
+        last_report_time = 0.0
         last_pct = 0
-        while t.is_alive():
-            if _INSTALL_CANCEL.is_set():
-                # Forcibly stop the download thread
-                try:
-                    import ctypes as _ctypes
 
-                    tid = t.ident
-                    if tid:
-                        _ctypes.pythonapi.PyThreadState_SetAsyncExc(_ctypes.c_long(tid), _ctypes.py_object(SystemExit))
-                except Exception:
-                    pass
-                # Give it a moment to exit
-                t.join(timeout=3)
-                # Clean up partial files
-                partial = _find_model_file(cache_dir, model_name)
-                if partial:
-                    try:
-                        partial.unlink(missing_ok=True)
-                    except OSError:
-                        pass
-                _write_install_progress(
-                    progress_path,
-                    {"status": "idle", "progress_pct": 0, "message": "下载已取消"},
+        with open(tmp_path, "wb") as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                if _INSTALL_CANCEL.is_set():
+                    tmp_path.unlink(missing_ok=True)
+                    _write_install_progress(
+                        progress_path,
+                        {"status": "idle", "progress_pct": 0, "message": "下载已取消"},
+                    )
+                    return
+                if chunk:
+                    f.write(chunk)
+                    downloaded += len(chunk)
+
+                now = time.monotonic()
+                if now - last_report_time < 1.0:
+                    continue
+                last_report_time = now
+                pct = int(downloaded / total_size * 100) if total_size else 0
+                speed_bps = downloaded / max(now - start, 1.0)
+                speed_str = (
+                    f"{speed_bps / 1024 / 1024:.1f} MB/s"
+                    if speed_bps > 1024 * 1024
+                    else f"{speed_bps / 1024:.0f} KB/s"
+                    if speed_bps
+                    else ""
                 )
-                return
-            t.join(timeout=1.0)
-            elapsed = time.monotonic() - start
-            candidate = _find_model_file(cache_dir, model_name) if cache_dir.is_dir() else None
-            current = candidate.stat().st_size if candidate and candidate.is_file() else 0
-            pct = int(current / total_size * 100) if total_size else 0
-            speed_bps = current / max(elapsed, 1.0)
-            speed_str = (
-                f"{speed_bps / 1024 / 1024:.1f} MB/s"
-                if speed_bps > 1024 * 1024
-                else f"{speed_bps / 1024:.0f} KB/s"
-                if speed_bps
-                else ""
-            )
-            eta_sec = int((total_size - current) / max(speed_bps, 1)) if total_size and speed_bps else None
-            if total_size and pct >= last_pct + 2:
-                _write_install_progress(
-                    progress_path,
-                    {
-                        "status": "downloading",
-                        "progress_pct": pct,
-                        "message": f"下载模型 {model_name} ({pct}%)",
-                        "speed": speed_str,
-                        "eta_sec": eta_sec,
-                    },
-                )
-                last_pct = pct
-            elif not total_size:
-                _write_install_progress(
-                    progress_path,
-                    {
-                        "status": "downloading",
-                        "progress_pct": 0,
-                        "message": f"下载模型 {model_name} ({int(elapsed)}s, {_format_bytes(current)} 已下载)",
-                    },
-                )
+                eta_sec = int((total_size - downloaded) / max(speed_bps, 1)) if total_size and speed_bps else None
+                if total_size and pct >= last_pct + 2:
+                    _write_install_progress(
+                        progress_path,
+                        {
+                            "status": "downloading",
+                            "progress_pct": pct,
+                            "message": f"下载模型 {model_name} ({pct}%)",
+                            "speed": speed_str,
+                            "eta_sec": eta_sec,
+                        },
+                    )
+                    last_pct = pct
+                elif not total_size:
+                    _write_install_progress(
+                        progress_path,
+                        {
+                            "status": "downloading",
+                            "progress_pct": 0,
+                            "message": f"下载模型 {model_name} ({int(now - start)}s, "
+                            f"{_format_bytes(downloaded)} 已下载)",
+                        },
+                    )
 
-        if _INSTALL_CANCEL.is_set():
-            # Race: thread exited from SystemExit between loop iterations
-            _write_install_progress(
-                progress_path,
-                {"status": "idle", "progress_pct": 0, "message": "下载已取消"},
-            )
-            return
-
-        if exc_info[0]:
-            raise RuntimeError(_download_error_detail(exc_info[0], cfg)) from exc_info[0]
-        model_path = result[0]
-
-        if not model_path or not model_path.is_file():
-            raise RuntimeError("模型下载后文件未找到")
-
+        tmp_path.replace(model_path)
         _write_install_progress(
             progress_path,
             {
