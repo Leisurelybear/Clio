@@ -107,7 +107,7 @@ def _process_video_item(
     if json_path:
         text_path = json_path.with_suffix(".txt")
         if tracker:
-            tracker.update(message=f"跳过 {compressed.name}...")
+            tracker.next(message=f"跳过 {compressed.name}...")
             tracker.log(f"跳过 {compressed.name}（已分析）")
         state.mark(original.stem, "analyze", "skipped")
         print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
@@ -128,7 +128,7 @@ def _process_video_item(
             if dur_sec > max_min * 60:
                 print(f"  [跳过] {compressed.name} 时长 {format_duration(dur_sec)} 超过限制 {max_min} 分钟")
                 if tracker:
-                    tracker.update(message=f"跳过 {compressed.name}（超长）")
+                    tracker.next(message=f"跳过 {compressed.name}（超长）")
                     tracker.log(f"跳过 {compressed.name}（超长 {format_duration(dur_sec)}）")
                 state.mark(original.stem, "analyze", "skipped")
                 return None
@@ -145,7 +145,7 @@ def _process_video_item(
         state.mark(original.stem, "analyze", "error")
         error_count[0] += 1
         if tracker:
-            tracker.update(message=f"失败 {compressed.name}")
+            tracker.next(message=f"失败 {compressed.name}")
             tracker.log(f"分析 {compressed.name} 失败: {e}")
         return None
 
@@ -160,6 +160,7 @@ def _process_video_item(
 
     state.mark(original.stem, "analyze", "done")
     if tracker:
+        tracker.next(message=f"完成 {compressed.name}")
         tracker.log(f"分析 {original.stem} ✓")
     print(f"  -> {final_text.name}")
     return ClipRecord(
@@ -232,6 +233,9 @@ def run_analyze_all(
     with timed(f"run_analyze_all（{total} 个）"):
         error_count: list[int] = [0]
         max_workers = config.analyze.max_workers
+
+        if tracker:
+            tracker.update(phase="analyze", total=total, current=0)
 
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
             futures = []

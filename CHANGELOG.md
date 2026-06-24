@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-25
+
+### Added
+- F-02 concurrent AI analysis: `ThreadPoolExecutor(max_workers)` for analyze step, per-video progress via `tracker.next()` (34dd5b5)
+- U-002 provider cache TTL: `ai.provider_ttl_min` (default 60), expired providers auto-close on access (538064b)
+
+### Fixed
+- B-02 plan state.mark key: fallback `source_stem` to JSON filename when `source_file` field is empty (bb86872)
+- B-05 Whisper download: replace unsafe `PyThreadState_SetAsyncExc` with safe `requests.get(stream=True)` + chunked cancel check (6d452e6)
+- B-05: restore detailed error messages via `_download_error_detail()` for HTTP/download failures
+- F-02: restore `tracker.update(phase="analyze")` and per-video `tracker.next()` calls lost during refactoring
+
+### Refactored
+- A-01 server.py: move `_project_states={}` and `_config_cache=None` from class body to closure assignment (69c3321)
+
 ## 2026-06-24
 
 ### Fixed

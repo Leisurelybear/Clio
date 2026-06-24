@@ -13,18 +13,14 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Background**: Current `_provider_cache` in `factory.py` already has composite key + thread safety (C2/C4 fixed), but no TTL/expiration/hot-reload. Long-running server accumulates HTTP sessions.
 
-**Acceptance Criteria**:
-- `ai/manager.py`: `ProviderManager` class replaces module-level `_provider_cache`
-- TTL-based expiration (default 30min no-access → auto close)
-- `close_all()` for server shutdown cleanup
-- `hot_reload()` for config hot-reload (close old, create new)
-- Maintain existing thread-safety + composite key + test isolation
+**Status**: ✅ **Done** (simple TTL added to `_build_provider`, no separate class — `538064b`)
 
-**Sub-tasks**:
-- [ ] U-002a: Implement `ProviderManager` class with TTL + `close_all` + `hot_reload`
-- [ ] U-002b: Integrate into `factory.py` (backward-compatible)
-- [ ] U-002c: Call `close_all` on `server.py` shutdown
-- [ ] U-002d: Update tests + verify CI
+**Acceptance Criteria**:
+- ~`ai/manager.py`: `ProviderManager` class replaces module-level `_provider_cache`~ _inline in factory.py_
+- ✅ TTL-based expiration (default 60min, `ai.provider_ttl_min`)
+- ✅ `close_all()` via existing `_clear_provider_cache()` (called from `shutdown.py`)
+- ❌ `hot_reload()` — not implemented (future work if needed)
+- ✅ Maintain existing thread-safety + composite key + test isolation
 
 ### U-007: Whisper Cancel Safety (Phase 2)
 
@@ -32,11 +28,13 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Background**: `whisper_routes.py` uses `ctypes.pythonapi.PyThreadState_SetAsyncExc` to kill download thread — unsafe (C extensions block injection, resource leaks). Replace with chunked download that checks cancel flag per-chunk.
 
+**Status**: ✅ **Done** (`6d452e6`)
+
 **Sub-tasks**:
-- [ ] U-007a: Replace `hf_hub_download` with chunked `requests.get(stream=True)` + `iter_content`
-- [ ] U-007b: Per-chunk `_INSTALL_CANCEL.is_set()` check for clean interrupt
-- [ ] U-007c: Remove `ctypes` thread-kill code
-- [ ] U-007d: Update tests
+- [x] U-007a: Replace `hf_hub_download` with chunked `requests.get(stream=True)` + `iter_content`
+- [x] U-007b: Per-chunk `_INSTALL_CANCEL.is_set()` check for clean interrupt
+- [x] U-007c: Remove `ctypes` thread-kill code
+- [ ] U-007d: Update tests _(no existing tests for this code path — new tests deferred)_
 
 ### U-010: Server + fs.py Test Coverage (Phase 3 — Testing)
 

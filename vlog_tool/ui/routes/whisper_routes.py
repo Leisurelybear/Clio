@@ -296,8 +296,11 @@ def _run_install(handler, progress_path: Path) -> None:
         tmp_path = model_path.with_name(model_path.name + ".tmp")
 
         _INSTALL_CANCEL.clear()
-        response = _req.get(url, stream=True, proxies=proxies, timeout=30, allow_redirects=True)
-        response.raise_for_status()
+        try:
+            response = _req.get(url, stream=True, proxies=proxies, timeout=30, allow_redirects=True)
+            response.raise_for_status()
+        except _req.exceptions.RequestException as e:
+            raise RuntimeError(_download_error_detail(e, cfg)) from e
 
         total_size = int(response.headers.get("Content-Length", 0)) or total_size
 
@@ -356,7 +359,10 @@ def _run_install(handler, progress_path: Path) -> None:
                         },
                     )
 
-        tmp_path.replace(model_path)
+        try:
+            tmp_path.replace(model_path)
+        except OSError as e:
+            raise RuntimeError(_download_error_detail(e, cfg)) from e
         _write_install_progress(
             progress_path,
             {
