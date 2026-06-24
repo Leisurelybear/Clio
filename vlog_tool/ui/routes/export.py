@@ -3,12 +3,8 @@
 from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler
-from typing import TYPE_CHECKING
 
 from vlog_tool.export import export_plan
-
-if TYPE_CHECKING:
-    pass
 
 
 def handle_post_export(
