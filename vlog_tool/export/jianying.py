@@ -27,12 +27,13 @@ def _resolve_video(
 
     Returns (absolute_path, duration_us) or None if not found.
     """
+    if ffprobe is None:
+        print("  [跳过] ffprobe 未配置，无法读取视频时长")
+        return None
     videos = find_videos(input_dir, recursive=True)
     pattern = f"{index}_"
     for v in videos:
         if v.stem.startswith(pattern):
-            if ffprobe is None:
-                return None
             try:
                 duration = get_duration_sec(v, ffprobe)
             except Exception:
@@ -45,17 +46,18 @@ def _build_materials(
     plan_data: dict,
     input_dir: Path,
     ffprobe: str | None = None,
-) -> tuple[dict, dict[str, str]]:
+) -> tuple[dict, dict[str, str], dict[int, str]]:
     """Build materials.videos and materials.texts.
 
-    Returns (materials_dict, index_to_material_id).
+    Returns (materials_dict, index_to_material_id, seq_text_ids).
     """
     videos: list[dict] = []
     texts: list[dict] = []
     index_to_material_id: dict[str, str] = {}
     seen_indices: set[str] = set()
+    seq_text_ids: dict[int, str] = {}
 
-    for seg in plan_data.get("sequence", []):
+    for i, seg in enumerate(plan_data.get("sequence", [])):
         idx = seg.get("index", "")
         if not idx:
             continue
@@ -95,29 +97,34 @@ def _build_materials(
                     "content": json.dumps(content, ensure_ascii=False),
                 }
             )
-            seg["_text_material_id"] = text_id
+            seq_text_ids[i] = text_id
 
-    return {
-        "videos": videos,
-        "texts": texts,
-        "audios": [],
-        "stickers": [],
-        "video_effects": [],
-        "material_animations": [],
-        "transitions": [],
-        "masks": [],
-        "common_masks": [],
-        "canvases": [],
-        "speeds": [],
-        "audio_fades": [],
-        "placeholder_infos": [],
-        "vocal_separations": [],
-    }, index_to_material_id
+    return (
+        {
+            "videos": videos,
+            "texts": texts,
+            "audios": [],
+            "stickers": [],
+            "video_effects": [],
+            "material_animations": [],
+            "transitions": [],
+            "masks": [],
+            "common_masks": [],
+            "canvases": [],
+            "speeds": [],
+            "audio_fades": [],
+            "placeholder_infos": [],
+            "vocal_separations": [],
+        },
+        index_to_material_id,
+        seq_text_ids,
+    )
 
 
 def _build_tracks(
     plan_data: dict,
     index_to_material_id: dict[str, str],
+    seq_text_ids: dict[int, str] | None = None,
 ) -> list[dict]:
     """Build video and text tracks from plan sequence."""
     video_segments: list[dict] = []
@@ -125,7 +132,7 @@ def _build_tracks(
     accumulated_us = 0
     skipped_count = 0
 
-    for seg in plan_data.get("sequence", []):
+    for i, seg in enumerate(plan_data.get("sequence", [])):
         idx = seg.get("index", "")
         if idx not in index_to_material_id:
             skipped_count += 1
@@ -164,7 +171,7 @@ def _build_tracks(
         )
 
         # Text segment for voiceover
-        text_mat_id = seg.get("_text_material_id")
+        text_mat_id = (seq_text_ids or {}).get(i)
         if text_mat_id:
             text_segments.append(
                 {
@@ -222,8 +229,8 @@ def export_plan_to_jianying(
     if not sequence:
         print(f"  [警告] plan 文件为空序列: {plan_path}")
 
-    materials, index_to_material_id = _build_materials(plan_data, input_dir, ffprobe)
-    tracks = _build_tracks(plan_data, index_to_material_id)
+    materials, index_to_material_id, seq_text_ids = _build_materials(plan_data, input_dir, ffprobe)
+    tracks = _build_tracks(plan_data, index_to_material_id, seq_text_ids)
 
     total_duration_us = 0
     for track in tracks:
