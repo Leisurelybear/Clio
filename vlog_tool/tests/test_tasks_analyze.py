@@ -24,6 +24,7 @@ def _cfg(tmp_path: Path) -> SimpleNamespace:
         analyze=SimpleNamespace(
             skip_existing=False,
             max_analyze_duration_min=30,
+            max_workers=1,
         ),
         ai=SimpleNamespace(context=""),
         compress=SimpleNamespace(split_max_min=0, splits_subdir="splits"),

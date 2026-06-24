@@ -109,6 +109,9 @@ analyze:
   # 压缩视频超过此时长（分钟）则跳过分析，避免浪费 Gemini 配额
   # 设为 0 表示不限制；免费额度建议 30-45，付费可按需调整
   max_analyze_duration_min: 45
+  # AI 分析并发数（ThreadPoolExecutor）。1=串行（默认），>1 并发分析多个视频
+  # 注意：并发需要 Gemini 账号有足够的配额（requests_per_minute 也要相应调整）
+  max_workers: 1
 
 naming:
   index_width: 3

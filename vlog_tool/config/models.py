@@ -68,6 +68,7 @@ class AnalyzeConfig:
     texts_subdir: str = "texts"
     skip_existing: bool = True
     max_analyze_duration_min: int = 30
+    max_workers: int = 1
 
 
 @dataclass

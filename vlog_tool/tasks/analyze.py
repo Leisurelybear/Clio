@@ -6,6 +6,7 @@ import json
 import re
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from vlog_tool._constants import VIDEO_EXTS
@@ -18,7 +19,6 @@ from vlog_tool.progress import ProgressTracker
 from vlog_tool.tasks._helpers import (
     ClipRecord,
     _build_stem,
-    _eta_line,
     _write_csv,
     _write_text_file,
 )
@@ -73,6 +73,103 @@ def _resolve_original(input_dir: Path, compressed_stem: str, stem_cache: dict[st
     if m:
         return _try_find(m.group(1))
     return None
+
+
+def _process_video_item(
+    compressed: Path,
+    original: Path,
+    idx_str: str,
+    config: AppConfig,
+    token_store: FileTokenUsageStore,
+    overwrite: bool,
+    tracker: ProgressTracker | None,
+    state: ProcessingState,
+    error_count: list[int],
+) -> ClipRecord | None:
+    idx_val = int(idx_str)
+
+    existing = sorted(config.texts_dir.glob(f"{idx_str}_*.json"))
+    json_path = None
+    analysis = None
+    if not overwrite and config.analyze.skip_existing and existing:
+        candidate = existing[0]
+        try:
+            existing_data = json.loads(candidate.read_text(encoding="utf-8"))
+            if existing_data.get("source_file", "") == original.name:
+                json_path = candidate
+                analysis = existing_data
+            else:
+                print(f"  [覆盖] {candidate.name} 的 source_file 不匹配，将重新分析")
+                candidate.unlink()
+                candidate.with_suffix(".txt").unlink(missing_ok=True)
+        except (json.JSONDecodeError, OSError):
+            pass
+    if json_path:
+        text_path = json_path.with_suffix(".txt")
+        if tracker:
+            tracker.update(message=f"跳过 {compressed.name}...")
+            tracker.log(f"跳过 {compressed.name}（已分析）")
+        state.mark(original.stem, "analyze", "skipped")
+        print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
+        return ClipRecord(
+            index=idx_val,
+            stem=json_path.stem,
+            source_path=original,
+            compressed_path=compressed,
+            text_path=text_path,
+            analysis=analysis,
+        )
+
+    max_min = config.analyze.max_analyze_duration_min
+    if max_min > 0:
+        try:
+            ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
+            dur_sec = get_duration_sec(compressed, ffprobe)
+            if dur_sec > max_min * 60:
+                print(f"  [跳过] {compressed.name} 时长 {format_duration(dur_sec)} 超过限制 {max_min} 分钟")
+                if tracker:
+                    tracker.update(message=f"跳过 {compressed.name}（超长）")
+                    tracker.log(f"跳过 {compressed.name}（超长 {format_duration(dur_sec)}）")
+                state.mark(original.stem, "analyze", "skipped")
+                return None
+        except Exception as e:
+            print(f"  [警告] 无法检查 {compressed.name} 时长: {e}")
+
+    print(f"  [{compressed.name}] 分析中...")
+    t0 = time.monotonic()
+    try:
+        analysis = analyze_video(str(compressed), config, progress_callback=lambda msg: None, token_store=token_store)
+    except Exception as e:
+        elapsed_total = time.monotonic() - t0
+        print(f"  [错误] 分析 {compressed.name} 失败: {e}（耗时 {format_duration(elapsed_total)}）")
+        state.mark(original.stem, "analyze", "error")
+        error_count[0] += 1
+        if tracker:
+            tracker.update(message=f"失败 {compressed.name}")
+            tracker.log(f"分析 {compressed.name} 失败: {e}")
+        return None
+
+    analysis["index"] = idx_val
+    analysis["source_file"] = original.name
+
+    stem = _build_stem(idx_val, analysis.get("title", original.stem), config)
+    final_text = config.texts_dir / f"{stem}.txt"
+    json_path = config.texts_dir / f"{stem}.json"
+    _write_text_file(final_text, analysis, original, compressed)
+    write_json_atomic(json_path, analysis)
+
+    state.mark(original.stem, "analyze", "done")
+    if tracker:
+        tracker.log(f"分析 {original.stem} ✓")
+    print(f"  -> {final_text.name}")
+    return ClipRecord(
+        index=idx_val,
+        stem=stem,
+        source_path=original,
+        compressed_path=compressed,
+        text_path=final_text,
+        analysis=analysis,
+    )
 
 
 def run_analyze_all(
@@ -133,120 +230,40 @@ def run_analyze_all(
     state = ProcessingState(config.paths.output_dir)
 
     with timed(f"run_analyze_all（{total} 个）"):
-        completed = 0
-        failed = 0
-        elapsed_total = 0.0
-        for i, (compressed, original, idx_str) in enumerate(items, start=1):
-            if cancel_event and cancel_event.is_set():
-                print("[取消] analyze 步骤被用户终止")
-                break
-            idx_val = int(idx_str)
+        error_count: list[int] = [0]
+        max_workers = config.analyze.max_workers
 
-            existing = sorted(config.texts_dir.glob(f"{idx_str}_*.json"))
-            json_path = None
-            analysis = None
-            if not overwrite and config.analyze.skip_existing and existing:
-                candidate = existing[0]
-                try:
-                    existing_data = json.loads(candidate.read_text(encoding="utf-8"))
-                    if existing_data.get("source_file", "") == original.name:
-                        json_path = candidate
-                        analysis = existing_data
-                    else:
-                        print(f"  [覆盖] {candidate.name} 的 source_file 不匹配，将重新分析")
-                        candidate.unlink()
-                        candidate.with_suffix(".txt").unlink(missing_ok=True)
-                except (json.JSONDecodeError, OSError):
-                    pass
-            if json_path:
-                text_path = json_path.with_suffix(".txt")
-                if tracker:
-                    tracker.update(phase="analyze", current=i, total=total, message=f"跳过 {compressed.name}...")
-                    tracker.log(f"跳过 {compressed.name}（已分析）")
-                state.mark(original.stem, "analyze", "skipped")
-                print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
-                records.append(
-                    ClipRecord(
-                        index=idx_val,
-                        stem=json_path.stem,
-                        source_path=original,
-                        compressed_path=compressed,
-                        text_path=text_path,
-                        analysis=analysis,
-                    )
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = []
+            for compressed, original, idx_str in items:
+                if cancel_event and cancel_event.is_set():
+                    print("[取消] analyze 步骤被用户终止")
+                    break
+                f = pool.submit(
+                    _process_video_item,
+                    compressed,
+                    original,
+                    idx_str,
+                    config,
+                    token_store,
+                    overwrite,
+                    tracker,
+                    state,
+                    error_count,
                 )
-                continue
+                futures.append(f)
+            for future in as_completed(futures):
+                result = future.result()
+                if result is not None:
+                    records.append(result)
 
-            print(_eta_line("分析", i, total, compressed.name, completed, elapsed_total))
-
-            # Duration gate: skip if compressed video is too long for Gemini
-            max_min = config.analyze.max_analyze_duration_min
-            if max_min > 0:
-                try:
-                    ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
-                    dur_sec = get_duration_sec(compressed, ffprobe)
-                    if dur_sec > max_min * 60:
-                        print(f"  [跳过] {compressed.name} 时长 {format_duration(dur_sec)} 超过限制 {max_min} 分钟")
-                        if tracker:
-                            tracker.update(
-                                phase="analyze", current=i, total=total, message=f"跳过 {compressed.name}（超长）"
-                            )
-                            tracker.log(f"跳过 {compressed.name}（超长 {format_duration(dur_sec)}）")
-                        state.mark(original.stem, "analyze", "skipped")
-                        continue
-                except Exception as e:
-                    print(f"  [警告] 无法检查 {compressed.name} 时长: {e}")
-
-            def _on_progress(msg: str) -> None:
-                if tracker:
-                    tracker.update(phase="analyze", current=i, total=total, message=f"{compressed.name}: {msg}")
-
-            t0 = time.monotonic()
-            try:
-                _on_progress("上传→AI分析...")
-                analysis = analyze_video(
-                    str(compressed), config, progress_callback=_on_progress, token_store=token_store
-                )
-            except Exception as e:
-                print(f"  [错误] 分析 {compressed.name} 失败: {e}")
-                failed += 1
-                state.mark(original.stem, "analyze", "error")
-                if tracker:
-                    tracker.update(phase="analyze", current=i, total=total, message=f"失败 {compressed.name}")
-                    tracker.log(f"分析 {compressed.name} 失败: {e}")
-                continue
-            finally:
-                elapsed_total += time.monotonic() - t0
-            completed += 1
-            analysis["index"] = idx_val
-            analysis["source_file"] = original.name
-
-            stem = _build_stem(idx_val, analysis.get("title", original.stem), config)
-            final_text = config.texts_dir / f"{stem}.txt"
-            json_path = config.texts_dir / f"{stem}.json"
-
-            _on_progress("写入磁盘...")
-            _write_text_file(final_text, analysis, original, compressed)
-            write_json_atomic(json_path, analysis)
-
-            records.append(
-                ClipRecord(
-                    index=idx_val,
-                    stem=stem,
-                    source_path=original,
-                    compressed_path=compressed,
-                    text_path=final_text,
-                    analysis=analysis,
-                )
-            )
-            state.mark(original.stem, "analyze", "done")
-            if tracker:
-                tracker.log(f"分析 {original.stem} ✓")
-            print(f"  -> {final_text.name}")
+    records.sort(key=lambda r: r.index)
 
     _write_csv(config.summary_csv, records, config)
     print(f"\nCSV 已保存: {config.summary_csv}")
 
+    completed = len(records)
+    failed = error_count[0]
     if completed == 0 and failed > 0:
         raise RuntimeError(f"AI 分析全部失败（{failed} 个失败），请检查 API Key 和网络连接")
     return records
