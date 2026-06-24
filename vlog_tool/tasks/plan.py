@@ -54,7 +54,7 @@ def run_plan_vlog(
         except (ValueError, TypeError):
             print(f"  [跳过] 无效 index '{raw_idx}' 在 {json_file.name}")
             continue
-        source_stem = Path(data.get("source_file", "")).stem
+        source_stem = Path(data.get("source_file", "")).stem or json_file.stem
         clips.append(
             {
                 "index": format_index(idx, config.naming.index_width),
