@@ -131,8 +131,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
     }
 
     class Handler(BaseHTTPRequestHandler):
-        _project_states: dict[str, _ServerState] = {}
-        _config_cache: ConfigCache | None = None
+        _project_states: dict[str, _ServerState]
+        _config_cache: ConfigCache
         DEFAULT_PROJECT: dict = {}
         server: BaseHTTPRequestHandler
 
@@ -337,12 +337,13 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
-    # Expose closure variables as class attrs so route modules can access them
+    # Per-project state dict and config cache (set from closure, not class default)
+    Handler._project_states = {}
+    Handler._config_cache = ConfigCache(config_path)
     Handler.DEFAULT_PROJECT = DEFAULT_PROJECT
     Handler.input_dir = input_dir
     Handler.output_dir = output_dir
     Handler.config_path = config_path
-    Handler._config_cache = ConfigCache(config_path)
     return Handler
 
 
