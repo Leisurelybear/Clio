@@ -514,6 +514,9 @@ async function setSource(source) {
     if (!confirm('当前 tab 有未保存的修改，确定切换源吗？')) return;
   }
   if (state.previewActive) stopPreview();
+  // Save current video for source-switch follow
+  const oldVideo = state.videos.find(x => x.file === state.currentVideo);
+  const oldMatchFile = oldVideo?.match?.file;
   $('player-pane').classList.remove('plan-mode');
   state.source = source;
   state.currentVideo = null;
@@ -525,16 +528,23 @@ async function setSource(source) {
   saveProject();  // 持久化 source 选择
   try {
     await loadVideos();
+    const target = oldVideo ? state.videos.find(v => v.file === oldMatchFile || v.match?.file === oldVideo.file) : null;
     if (state.videos.length) {
       if (state.currentEntity === 'plan') {
-        // stay in plan: don't auto-select a video, just clear the player
-        $('player').removeAttribute('src');
-        $('player-name').textContent = '请选择左侧视频或规划节点';
-        // re-render plan so segment click handlers use the new source's v.file
         import('./editor.js').then(mod => mod.renderActiveTab());
-        setStatus(`已切到 ${source} 视图（仍停留在规划）`, 'ok');
+        if (target) {
+          state.currentVideo = target.file;
+          const projParam = state.currentProjectName ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
+          $('player').src = `/api/video?file=${encodeURIComponent(target.file)}&source=${source}${projParam}`;
+          $('player-name').textContent = target.file;
+          setStatus(`已切到 ${source} 视图`, 'ok');
+        } else {
+          $('player').removeAttribute('src');
+          $('player-name').textContent = '请选择左侧视频或规划节点';
+          setStatus(`已切到 ${source} 视图（仍停留在规划）`, 'ok');
+        }
       } else {
-        await selectVideo(state.videos[0].file);
+        await selectVideo(target ? target.file : state.videos[0].file);
       }
     } else {
       $('player').removeAttribute('src');
