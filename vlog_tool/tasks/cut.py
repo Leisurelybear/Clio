@@ -14,7 +14,14 @@ from vlog_tool.cut import cut_one, parse_time_range
 from vlog_tool.log import format_duration, timed
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.tasks._helpers import _eta_line
-from vlog_tool.utils import get_duration_sec, resolve_binary, sanitize_name, write_json_atomic, write_text_atomic
+from vlog_tool.utils import (
+    find_videos,
+    get_duration_sec,
+    resolve_binary,
+    sanitize_name,
+    write_json_atomic,
+    write_text_atomic,
+)
 
 _SEG_RE = re.compile(r"^(.+)_seg(\d+)$")
 
@@ -101,8 +108,8 @@ def run_cut_all(
             # If the compressed file has _segNN, strip it to find the original
             m = _SEG_RE.match(suffix)
             orig_stem = m.group(1) if m else suffix
-            for p in sorted(input_dir.iterdir()):
-                if p.is_file() and p.suffix.lower() in VIDEO_EXTS and p.stem.lower() == orig_stem:
+            for p in find_videos(input_dir, recursive=True):
+                if p.stem.lower() == orig_stem:
                     return p
             return None
 
