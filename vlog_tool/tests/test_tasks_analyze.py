@@ -183,6 +183,50 @@ class TestRunAnalyzeAll:
         assert len(records) == 1
         assert records[0].compressed_path.name == "002_GL010684.mp4"
 
+    def test_single_file_with_vindex_includes_all_segments(self, monkeypatch, tmp_path: Path):
+        cfg = _cfg(tmp_path)
+        src = cfg.paths.input_dir / "GL010695.mp4"
+        src.write_bytes(b"\x00" * 1000)
+        comp1 = cfg.compressed_dir / "001_GL010695_seg01.mp4"
+        comp1.write_bytes(b"\x00" * 100)
+        comp2 = cfg.compressed_dir / "002_GL010695_seg02.mp4"
+        comp2.write_bytes(b"\x00" * 100)
+
+        from vlog_tool.vmeta import SegmentEntry, VideoIndex
+
+        segs = [
+            SegmentEntry(
+                index="001",
+                filename="001_GL010695_seg01.mp4",
+                offset_sec=0.0,
+                duration_sec=30.0,
+                segment_number=1,
+                total_segments=2,
+            ),
+            SegmentEntry(
+                index="002",
+                filename="002_GL010695_seg02.mp4",
+                offset_sec=30.0,
+                duration_sec=30.0,
+                segment_number=2,
+                total_segments=2,
+            ),
+        ]
+        vindex = VideoIndex.build(source=src, source_duration=60.0, segments=segs)
+        vindex.write(cfg.compressed_dir)
+
+        _common_mocks(monkeypatch)
+        monkeypatch.setattr("vlog_tool.tasks.analyze.get_duration_sec", lambda *a: 30.0)
+        monkeypatch.setattr(
+            "vlog_tool.tasks.analyze.analyze_video",
+            lambda *a, **kw: {"title": "Seg", "summary": "x", "location": "x", "source_file": "GL010695.mp4"},
+        )
+
+        records = run_analyze_all(cfg, single_file=src)
+        assert len(records) == 2
+        assert records[0].compressed_path.name == "001_GL010695_seg01.mp4"
+        assert records[1].compressed_path.name == "002_GL010695_seg02.mp4"
+
     def test_overwrite_flag(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
         src = cfg.paths.input_dir / "GL010695.mp4"
