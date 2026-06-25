@@ -19,6 +19,7 @@ class ClipRecord:
     compressed_path: Path | None = None
     text_path: Path | None = None
     analysis: dict | None = None
+    duration_sec: float = 0.0
 
 
 def _build_stem(index: int, title: str, config: AppConfig) -> str:
@@ -140,7 +141,13 @@ def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None
         writer.writeheader()
         for rec in records:
             a = rec.analysis or {}
-            info = probe_video_info(rec.source_path, ffprobe) if rec.source_path.exists() else {}
+            if not rec.duration_sec and rec.source_path.exists():
+                info = probe_video_info(rec.source_path, ffprobe)
+                duration_sec = info.get("duration_sec", "")
+                source_size_mb = info.get("size_mb", "")
+            else:
+                duration_sec = rec.duration_sec
+                source_size_mb = ""
             writer.writerow(
                 {
                     "index": format_index(rec.index, config.naming.index_width),
@@ -153,7 +160,7 @@ def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None
                     "source_file": str(rec.source_path),
                     "compressed_file": str(rec.compressed_path) if rec.compressed_path else "",
                     "text_file": str(rec.text_path) if rec.text_path else "",
-                    "duration_sec": info.get("duration_sec", ""),
-                    "source_size_mb": info.get("size_mb", ""),
+                    "duration_sec": duration_sec,
+                    "source_size_mb": source_size_mb,
                 }
             )
