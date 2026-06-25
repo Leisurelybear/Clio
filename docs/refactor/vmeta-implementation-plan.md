@@ -15,7 +15,7 @@
 
 **降级原则**：所有读取处均保留原有逻辑作为 fallback，存量项目无需任何迁移操作。
 
-## 实施结果：7 个 Commit
+## 实施结果：8 个 Commit
 
 ```
 cd795df feat(vmeta): add .vmeta/.vindex sidecar module with 13 tests
@@ -25,6 +25,7 @@ cd795df feat(vmeta): add .vmeta/.vindex sidecar module with 13 tests
 373a611 fix(cut): read .vmeta in _resolve_video_path and _compute_segment_offset
 79384d5 feat(reindex): add reindex command + UI /api/vmeta endpoint
 b4fd911  fix(cut,vmeta): use glob instead of hardcoded .mp4 extension
+73f8132 refactor(compress): put split temp files in compressed_dir
 ```
 
 ## 与规划的关键差异
@@ -55,6 +56,12 @@ b4fd911  fix(cut,vmeta): use glob instead of hardcoded .mp4 extension
 
 - `_compute_segment_offset(cut.py)`：使用 `comp_dir.glob(f"{compressed_stem}.*")` 代替 `comp_dir / f"{compressed_stem}.mp4"`
 - `handle_get_vmeta(videos.py)`：使用 `comp_dir.glob(f"{stem}.*")` + `VIDEO_EXTS` 过滤代替 `f"{stem}.mp4"`
+
+### 6. 合并 split 临时文件到 compressed_dir（Commit 8）
+
+规划中 split 临时文件写入 `splits_subdir`，但所有消费者都已按数字前缀过滤（`prefix.isdigit()`），因此 split 临时文件（无数字前缀，如 `GL010684_seg01.mp4`）可以安全地与压缩文件共存于 `compressed_dir`。
+
+改动：`compress.py` 将 `split_video` 的输出目录从 `output_dir/splits` 改为 `config.compressed_dir`。
 
 ### 5. `_write_vindex` 不处理 skip_existing 分支
 

@@ -27,12 +27,14 @@ from vlog_tool.tasks.cut import run_cut_all  # noqa: F401
 from vlog_tool.tasks.label import run_label_videos  # noqa: F401
 from vlog_tool.tasks.plan import run_plan_vlog  # noqa: F401
 from vlog_tool.tasks.refine import run_refine_scripts, run_refine_texts  # noqa: F401
+from vlog_tool.tasks.reindex import auto_reindex_if_needed  # noqa: F401
 from vlog_tool.tasks.scripts import run_generate_scripts  # noqa: F401
 from vlog_tool.tasks.transcribe import run_transcribe_all  # noqa: F401
 
 
 def run_full_pipeline(config: AppConfig, day_label: str = "day1") -> None:
     config.paths.output_dir.mkdir(parents=True, exist_ok=True)
+    auto_reindex_if_needed(config)
     with timed("=== 1/7 压缩原视频 ==="):
         run_compress_all(config)
     with timed("=== 2/7 AI 分析素材 ==="):
@@ -83,6 +85,7 @@ def run_pipeline_steps(
     steps 取值: analyze, voiceover, plan, label（默认全部）。
     """
     config.paths.output_dir.mkdir(parents=True, exist_ok=True)
+    auto_reindex_if_needed(config)
     if not steps:
         steps = list(_STEP_FUNCS.keys())
 

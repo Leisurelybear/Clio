@@ -297,11 +297,15 @@ def main(argv: list[str] | None = None) -> int:
             return run_reindex(config)
         elif args.command == "compress":
             from vlog_tool.pipeline import run_compress_all
+            from vlog_tool.tasks.reindex import auto_reindex_if_needed
 
+            auto_reindex_if_needed(config)
             run_compress_all(config, single_file=single_file)
         elif args.command == "analyze":
             from vlog_tool.pipeline import run_analyze_all
+            from vlog_tool.tasks.reindex import auto_reindex_if_needed
 
+            auto_reindex_if_needed(config)
             run_analyze_all(config, single_file=single_file)
         elif args.command == "scripts":
             from vlog_tool.pipeline import run_generate_scripts
@@ -309,11 +313,15 @@ def main(argv: list[str] | None = None) -> int:
             run_generate_scripts(config, single_file=single_file)
         elif args.command == "label":
             from vlog_tool.pipeline import run_label_videos
+            from vlog_tool.tasks.reindex import auto_reindex_if_needed
 
+            auto_reindex_if_needed(config)
             run_label_videos(config)
         elif args.command == "plan":
             from vlog_tool.pipeline import run_plan_vlog
+            from vlog_tool.tasks.reindex import auto_reindex_if_needed
 
+            auto_reindex_if_needed(config)
             config.plan.use_transcripts = not getattr(args, "no_transcripts", False)
             run_plan_vlog(config, args.day)
         elif args.command == "run":
@@ -348,7 +356,9 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
         elif args.command == "cut":
             from vlog_tool.pipeline import run_cut_all
+            from vlog_tool.tasks.reindex import auto_reindex_if_needed
 
+            auto_reindex_if_needed(config)
             run_cut_all(
                 config,
                 day_label=args.day,

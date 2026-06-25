@@ -22,9 +22,10 @@ class ConfigCache:
     - Returns deep copies to prevent caller mutation.
     """
 
-    def __init__(self, config_path: Path | None, maxsize: int = 20) -> None:
+    def __init__(self, config_path: Path | None, maxsize: int = 20, on_load: callable | None = None) -> None:
         self._config_path = config_path
         self._maxsize = maxsize
+        self._on_load = on_load
         self._cache: dict[str, AppConfig] = {}
         self._meta: dict[str, tuple[float | None, float | None]] = {}
         self._lock = threading.Lock()
@@ -53,6 +54,8 @@ class ConfigCache:
 
             self._cache[key] = new_config
             self._meta[key] = (cfg_mtime, proj_mtime)
+            if self._on_load:
+                self._on_load(new_config)
             return copy.deepcopy(new_config)
 
     def invalidate_all(self) -> None:

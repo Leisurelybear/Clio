@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time as _time
 from collections import defaultdict
 from pathlib import Path
 
@@ -21,6 +22,61 @@ def _find_original_for_stem(stem: str, input_dir: Path) -> Path | None:
         if p.is_file() and p.suffix.lower() in VIDEO_EXTS and p.stem.lower() == stem.lower():
             return p
     return None
+
+
+def auto_reindex_if_needed(config: AppConfig, ffprobe: str | None = None) -> bool:
+    """检测 compressed_dir 是否有压缩视频缺少 .vindex，自动补全。
+
+    返回 True 表示执行了 reindex，False 表示不需要或无法补全。
+    """
+    compressed_dir = config.compressed_dir
+    if not compressed_dir.is_dir():
+        return False
+
+    import os
+    import re as _re
+
+    # 找所有带数字前缀的压缩视频
+    groups: dict[str, list[Path]] = {}
+    for p in sorted(compressed_dir.iterdir()):
+        if not p.is_file() or p.suffix.lower() not in VIDEO_EXTS:
+            continue
+        if "_" not in p.stem:
+            continue
+        prefix, stem_part = p.stem.split("_", 1)
+        if not prefix.isdigit():
+            continue
+        m = _re.match(r"^(.+)_seg\d+$", stem_part)
+        orig_stem = m.group(1) if m else stem_part
+        groups.setdefault(orig_stem, []).append(p)
+
+    # 检查哪些没有 .vindex
+    missing = [s for s in groups if not VideoIndex.read(s, compressed_dir)]
+    if not missing:
+        return False
+
+    # 全屏阻截：清屏 → 显示重建提示 → 完成后恢复
+    os.system("cls" if os.name == "nt" else "clear")
+    _W = 60
+    print("!" * _W)
+    print("!!" + " " * (_W - 4) + "!!")
+    print("!!  视频索引重建中...".ljust(_W - 1) + "!!")
+    print(f"!!  检测到 {len(missing)}/{len(groups)} 个原视频缺少索引文件".ljust(_W - 1) + "!!")
+    print("!!" + " " * (_W - 4) + "!!")
+    print("!!  请勿中断操作".ljust(_W - 1) + "!!")
+    print("!!" + " " * (_W - 4) + "!!")
+    print("!" * _W)
+    print()
+    run_reindex(config, ffprobe)
+    print()
+    print("!" * _W)
+    print("!!" + " " * (_W - 4) + "!!")
+    print("!!  ✅ 索引重建完成，继续执行...".ljust(_W - 1) + "!!")
+    print("!!" + " " * (_W - 4) + "!!")
+    print("!" * _W)
+    _time.sleep(1.5)
+    os.system("cls" if os.name == "nt" else "clear")
+    return True
 
 
 def run_reindex(config: AppConfig, ffprobe: str | None = None) -> int:
