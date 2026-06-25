@@ -369,8 +369,15 @@ def main(argv: list[str] | None = None) -> int:
 
             plan_path = config.plans_dir / f"{args.day}_plan.json"
             out_dir = args.output or config.paths.output_dir / "export" / f"{args.day}_{args.format}"
-            ffprobe = config.paths.ffprobe
-            export_plan(args.format, plan_path, out_dir, config.paths.input_dir, args.day, ffprobe=ffprobe)
+            export_plan(
+                args.format,
+                plan_path,
+                out_dir,
+                config.paths.input_dir,
+                args.day,
+                ffprobe=config.paths.ffprobe,
+                texts_dir=config.texts_dir,
+            )
             return 0
     except FileNotFoundError as e:
         print(f"错误: {e}", file=sys.stderr)

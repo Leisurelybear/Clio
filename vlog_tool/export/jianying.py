@@ -18,17 +18,16 @@ def _to_microseconds(seconds: float) -> int:
     return int(seconds * 1_000_000)
 
 
-def _resolve_video(
+def _resolve_video_by_prefix(
     index: str,
     input_dir: Path,
     ffprobe: str | None = None,
 ) -> tuple[Path, int] | None:
-    """Find original video by index (e.g. '001' → '001_GL010683.mp4').
+    """Fallback: find video by {index}_ prefix (e.g. '001' → '001_GL010683.mp4').
 
-    Returns (absolute_path, duration_us) or None if not found.
+    Works for compressed files but not originals.
     """
     if ffprobe is None:
-        print("  [跳过] ffprobe 未配置，无法读取视频时长")
         return None
     videos = find_videos(input_dir, recursive=True)
     pattern = f"{index}_"
@@ -42,12 +41,67 @@ def _resolve_video(
     return None
 
 
+def _build_index_to_source(texts_dir: Path) -> dict[str, str]:
+    """Read text JSONs to build {index_str: source_stem} mapping.
+
+    Text JSON contains 'index' (int or str) and 'source_file' (e.g. 'GL010695.mp4').
+    Returns mapping like {'001': 'GL010695', '1': 'GL010695', ...}.
+    """
+    mapping: dict[str, str] = {}
+    if not texts_dir.is_dir():
+        return mapping
+    for p in sorted(texts_dir.glob("*.json")):
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        raw_idx = data.get("index")
+        source = data.get("source_file", "")
+        if raw_idx is None or not source:
+            continue
+        stem = Path(source).stem
+        idx_str = str(raw_idx)
+        mapping[idx_str] = stem
+        # Also map zero-padded version (text stores 1, plan uses "001")
+        mapping[idx_str.zfill(3)] = stem
+    return mapping
+
+
+def _resolve_video(
+    source_stem: str,
+    input_dir: Path,
+    ffprobe: str | None = None,
+) -> tuple[Path, int] | None:
+    """Find original video by source_stem (e.g. 'GL010695').
+
+    Returns (absolute_path, duration_us) or None if not found.
+    """
+    if ffprobe is None:
+        print("  [跳过] ffprobe 未配置，无法读取视频时长")
+        return None
+    videos = find_videos(input_dir, recursive=True)
+    # Case-insensitive stem match
+    target_lower = source_stem.lower()
+    for v in videos:
+        if v.stem.lower() == target_lower:
+            try:
+                duration = get_duration_sec(v, ffprobe)
+            except Exception:
+                return None
+            return v.resolve(), _to_microseconds(duration)
+    return None
+
+
 def _build_materials(
     plan_data: dict,
     input_dir: Path,
     ffprobe: str | None = None,
+    index_to_source: dict[str, str] | None = None,
 ) -> tuple[dict, dict[str, str], dict[int, str]]:
     """Build materials.videos and materials.texts.
+
+    index_to_source maps plan index to source_stem (from texts/*.json source_file).
+    Falls back to {index}_ prefix matching if mapping unavailable.
 
     Returns (materials_dict, index_to_material_id, seq_text_ids).
     """
@@ -57,6 +111,8 @@ def _build_materials(
     seen_indices: set[str] = set()
     seq_text_ids: dict[int, str] = {}
 
+    index_to_source = index_to_source or {}
+
     for i, seg in enumerate(plan_data.get("sequence", [])):
         idx = seg.get("index", "")
         if not idx:
@@ -65,7 +121,12 @@ def _build_materials(
         # Video material (one per unique index)
         if idx not in seen_indices:
             seen_indices.add(idx)
-            resolved = _resolve_video(idx, input_dir, ffprobe)
+            source_stem = index_to_source.get(idx)
+            if source_stem:
+                resolved = _resolve_video(source_stem, input_dir, ffprobe)
+            else:
+                # Fallback: try matching by {index}_ prefix (works for compressed files)
+                resolved = _resolve_video_by_prefix(idx, input_dir, ffprobe)
             if resolved is None:
                 print(f"  [跳过] 视频素材 [{idx}] 未找到，跳过相关片段")
                 continue
@@ -216,8 +277,12 @@ def export_plan_to_jianying(
     input_dir: Path,
     day_label: str = "day1",
     ffprobe: str | None = None,
+    texts_dir: Path | None = None,
 ) -> Path:
     """Generate JianYing draft from plan JSON.
+
+    texts_dir is used to resolve plan index → source_file → original video.
+    Falls back to {index}_ prefix matching if not provided.
 
     Returns path to the output draft directory.
     """
@@ -229,7 +294,8 @@ def export_plan_to_jianying(
     if not sequence:
         print(f"  [警告] plan 文件为空序列: {plan_path}")
 
-    materials, index_to_material_id, seq_text_ids = _build_materials(plan_data, input_dir, ffprobe)
+    index_to_source = _build_index_to_source(texts_dir) if texts_dir else {}
+    materials, index_to_material_id, seq_text_ids = _build_materials(plan_data, input_dir, ffprobe, index_to_source)
     tracks = _build_tracks(plan_data, index_to_material_id, seq_text_ids)
 
     total_duration_us = 0

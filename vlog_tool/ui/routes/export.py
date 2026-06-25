@@ -26,7 +26,9 @@ def handle_post_export(
 
     out_dir = cfg.paths.output_dir / "export" / f"{day}_{fmt}"
     try:
-        result_path = export_plan(fmt, plan_path, out_dir, cfg.paths.input_dir, day, ffprobe=cfg.paths.ffprobe)
+        result_path = export_plan(
+            fmt, plan_path, out_dir, cfg.paths.input_dir, day, ffprobe=cfg.paths.ffprobe, texts_dir=cfg.texts_dir
+        )
     except (FileNotFoundError, ValueError) as e:
         handler._send_json({"ok": False, "error": str(e)}, 400)
         return
