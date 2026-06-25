@@ -16,6 +16,7 @@ from vlog_tool.ui.services.file_service import (
     _is_safe_basename,
 )
 from vlog_tool.utils import get_duration_sec, resolve_binary
+from vlog_tool.vmeta import VideoMeta
 
 if TYPE_CHECKING:
     from http.server import BaseHTTPRequestHandler
@@ -216,3 +217,18 @@ def handle_get_video(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     if not vp.is_file() or vp.suffix.lower() not in VIDEO_EXTS:
         return handler.send_error(HTTPStatus.NOT_FOUND)
     handler._send_video_range(vp)
+
+
+def handle_get_vmeta(handler: BaseHTTPRequestHandler, stem: str) -> None:
+    """Handle GET /api/vmeta/{stem} → .vmeta JSON content."""
+    if not stem:
+        return handler._send_json({"ok": False, "error": "missing stem"}, 400)
+    proj_input = handler._resolve_project_input({})
+    proj_out = handler._get_project_output(proj_input)
+    compressed_path = proj_out / "compressed" / f"{stem}.mp4"
+    meta = VideoMeta.read(compressed_path)
+    if meta is None:
+        return handler._send_json({"ok": False, "error": "not found"}, 404)
+    from vlog_tool.vmeta import _meta_to_dict
+
+    handler._send_json(_meta_to_dict(meta))

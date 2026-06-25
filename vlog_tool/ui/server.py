@@ -66,7 +66,7 @@ from vlog_tool.ui.routes.transcripts import (
     handle_post_transcripts,
     handle_put_transcripts,
 )
-from vlog_tool.ui.routes.videos import handle_get_video, handle_get_videos
+from vlog_tool.ui.routes.videos import handle_get_video, handle_get_videos, handle_get_vmeta
 from vlog_tool.ui.routes.whisper_routes import (
     handle_get_whisper_check,
     handle_get_whisper_install_status,
@@ -229,6 +229,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_get_videos(self, qs)
             if path == "/api/video":
                 return handle_get_video(self, qs)
+            if path.startswith("/api/vmeta/"):
+                stem = path[len("/api/vmeta/") :]
+                return handle_get_vmeta(self, stem)
             if path == "/api/texts":
                 return handle_get_texts(self, qs)
             if path == "/api/voiceover":
