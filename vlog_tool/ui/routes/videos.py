@@ -91,7 +91,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                     continue
                 stem = p.stem
                 idx = stem.split("_", 1)[0] if "_" in stem else ""
-                orig = _find_original_for_compressed(stem, proj_input)
+                orig = _find_original_for_compressed(stem, proj_input, comp_dir)
                 orig_stem = Path(orig).stem if orig else None
                 group_key, seg_num = _parse_segment_info(stem)
                 v: dict[str, Any] = {
@@ -124,9 +124,19 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                     "indices": [m[0] for m in members],
                     "total": total,
                 }
-                # compute segment offset from original video duration
+                # compute segment offset from .vmeta first, then fallback to estimation
                 offsets: dict[str, float] = {}
-                if total > 1 and _ffprobe:
+                for member_idx, seg_num in members:
+                    for v in videos:
+                        if v["index"] == member_idx:
+                            comp_file = comp_dir / v["file"]
+                            meta = VideoMeta.read(comp_file)
+                            if meta and meta.split_info:
+                                offsets[member_idx] = meta.split_info.offset_sec
+                            break
+                # legacy estimation for files without .vmeta
+                missing = [m for m in members if m[0] not in offsets]
+                if missing and total > 1 and _ffprobe:
                     orig: Path | None = None
                     for ext in VIDEO_EXTS:
                         candidate = proj_input / f"{gk}{ext}"
@@ -137,7 +147,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                         try:
                             dur = get_duration_sec(orig, _ffprobe)
                             seg_dur = dur / total
-                            for i, (member_idx, _) in enumerate(members):
+                            for i, (member_idx, _) in enumerate(missing):
                                 offsets[member_idx] = round(i * seg_dur, 1)
                         except Exception:
                             pass
