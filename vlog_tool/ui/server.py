@@ -22,6 +22,7 @@ from vlog_tool.config import AppConfig
 from vlog_tool.session_log import clear as clear_session_log
 from vlog_tool.session_log import read as read_session_log
 from vlog_tool.shutdown import before_stop, install_hooks
+from vlog_tool.tasks.reindex import auto_reindex_if_needed
 from vlog_tool.ui.routes.config_routes import (
     handle_get_config,
     handle_get_config_raw,
@@ -66,7 +67,7 @@ from vlog_tool.ui.routes.transcripts import (
     handle_post_transcripts,
     handle_put_transcripts,
 )
-from vlog_tool.ui.routes.videos import handle_get_video, handle_get_videos
+from vlog_tool.ui.routes.videos import handle_get_video, handle_get_videos, handle_get_vmeta
 from vlog_tool.ui.routes.whisper_routes import (
     handle_get_whisper_check,
     handle_get_whisper_install_status,
@@ -229,6 +230,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_get_videos(self, qs)
             if path == "/api/video":
                 return handle_get_video(self, qs)
+            if path.startswith("/api/vmeta/"):
+                stem = path[len("/api/vmeta/") :]
+                return handle_get_vmeta(self, stem)
             if path == "/api/texts":
                 return handle_get_texts(self, qs)
             if path == "/api/voiceover":
@@ -342,7 +346,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
     # Per-project state dict and config cache (set from closure, not class default)
     Handler._project_states = {}
-    Handler._config_cache = ConfigCache(config_path)
+    Handler._config_cache = ConfigCache(config_path, on_load=auto_reindex_if_needed)
     Handler.DEFAULT_PROJECT = DEFAULT_PROJECT
     Handler.input_dir = input_dir
     Handler.output_dir = output_dir
@@ -360,6 +364,7 @@ def run(
     install_hooks()
     # Try loading last used project config
     active_config = resolve_last_project_config(config, config_path)
+    auto_reindex_if_needed(active_config)
     handler = make_handler(active_config, config_path)
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"

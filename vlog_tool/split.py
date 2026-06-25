@@ -12,6 +12,7 @@ def split_video(
     ffmpeg: str,
     ffprobe: str,
     reencode: bool = False,
+    manifest_dir: Path | None = None,
 ) -> list[Path]:
     """Split a video into equal-length segments if it exceeds max_duration_min.
 
@@ -97,7 +98,8 @@ def split_video(
                 }
             )
 
-        manifest_path = output_dir / f"{video_path.stem}_split_manifest.json"
+        manifest_target = manifest_dir or output_dir
+        manifest_path = manifest_target / f"{video_path.stem}_split_manifest.json"
         write_json_atomic(manifest_path, manifest)
     except BaseException:
         for f in segments:

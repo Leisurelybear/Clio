@@ -15,6 +15,79 @@ from vlog_tool.progress import ProgressTracker
 from vlog_tool.split import split_video
 from vlog_tool.tasks._helpers import ClipRecord, _eta_line, _next_index
 from vlog_tool.utils import find_videos, format_index, get_duration_sec, resolve_binary
+from vlog_tool.vmeta import SegmentEntry, SplitInfo, VideoIndex, VideoMeta
+
+
+def _build_split_info(source: Path, original: Path, config: AppConfig) -> SplitInfo | None:
+    """从 split_manifest.json 读取本分段的 offset_sec 和段号信息。"""
+    if source is original:
+        return None
+    manifest_path = config.compressed_dir / f"{original.stem}_split_manifest.json"
+    if not manifest_path.is_file():
+        return None
+    try:
+        import json
+
+        entries = json.loads(manifest_path.read_text(encoding="utf-8"))
+        total = len(entries)
+        for e in entries:
+            if e.get("filename") == source.name or Path(e.get("filename", "")).stem == source.stem:
+                return SplitInfo(
+                    original_stem=original.stem,
+                    segment_index=e["segment_index"],
+                    total_segments=total,
+                    offset_sec=e["offset_sec"],
+                    segment_duration_sec=e["actual_duration_sec"],
+                )
+    except Exception:
+        pass
+    return None
+
+
+def _safe_duration(path: Path, ffprobe: str) -> float:
+    try:
+        return get_duration_sec(path, ffprobe)
+    except Exception:
+        return 0.0
+
+
+def _write_vindex(records: list[ClipRecord], config: AppConfig, ffprobe: str) -> None:
+    from collections import defaultdict
+
+    compressed_dir = config.compressed_dir
+    groups: dict[Path, list[ClipRecord]] = defaultdict(list)
+    for rec in records:
+        if rec.compressed_path is not None:
+            groups[rec.source_path].append(rec)
+
+    for original, recs in groups.items():
+        seg_entries: list[SegmentEntry] = []
+        source_dur = 0.0
+        for rec in recs:
+            if rec.meta is None or rec.compressed_path is None:
+                continue
+            source_dur = rec.meta.source_duration_sec
+            si = rec.meta.split_info
+            seg_entries.append(
+                SegmentEntry(
+                    index=format_index(rec.index, config.naming.index_width),
+                    filename=rec.compressed_path.name,
+                    offset_sec=si.offset_sec if si else 0.0,
+                    duration_sec=rec.meta.target_duration_sec,
+                    segment_number=si.segment_index if si else 1,
+                    total_segments=si.total_segments if si else 1,
+                )
+            )
+
+        if not seg_entries:
+            continue
+
+        vindex = VideoIndex.build(
+            source=original,
+            source_duration=source_dur,
+            segments=sorted(seg_entries, key=lambda s: s.segment_number),
+        )
+        vindex.write(compressed_dir)
 
 
 def run_compress_all(
@@ -42,8 +115,15 @@ def run_compress_all(
     for video in videos:
         max_min = config.compress.split_max_min
         if max_min > 0:
-            splits_dir = config.paths.output_dir / config.compress.splits_subdir
-            segments = split_video(video, splits_dir, max_min, ffmpeg, ffprobe, reencode=config.compress.reencode_split)
+            segments = split_video(
+                video,
+                config.compressed_dir,
+                max_min,
+                ffmpeg,
+                ffprobe,
+                reencode=config.compress.reencode_split,
+                manifest_dir=config.compressed_dir,
+            )
             for seg in segments:
                 items.append((video, seg))
         else:
@@ -146,5 +226,35 @@ def run_compress_all(
             state.mark(original.stem, "compress", "done")
             elapsed_total += time.monotonic() - t0
             completed += 1
-            records.append(ClipRecord(index=use_idx, stem=use_out.stem, source_path=original, compressed_path=use_out))
+
+            # 写 .vmeta
+            split_info = _build_split_info(source, original, config)
+            src_dur = _safe_duration(original, ffprobe)
+            tgt_dur = _safe_duration(use_out, ffprobe)
+            meta = VideoMeta.build(
+                source=original,
+                target=use_out,
+                source_duration=src_dur,
+                target_duration=tgt_dur,
+                compress_settings={
+                    "max_width": config.compress.max_width,
+                    "fps": config.compress.fps,
+                    "target_size_mb": config.compress.target_size_mb,
+                },
+                split_info=split_info,
+            )
+            meta.write(use_out)
+
+            records.append(
+                ClipRecord(
+                    index=use_idx,
+                    stem=use_out.stem,
+                    source_path=original,
+                    compressed_path=use_out,
+                    meta=meta,
+                )
+            )
+
+    # 写 .vindex（每个原始文件一个，汇总所有分段）
+    _write_vindex(records, config, ffprobe)
     return records

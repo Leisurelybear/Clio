@@ -24,6 +24,7 @@ from typing import Any
 import yaml
 
 from vlog_tool._constants import VIDEO_EXTS
+from vlog_tool.vmeta import VideoIndex, VideoMeta
 
 
 def _is_safe_basename(name: str) -> bool:
@@ -151,12 +152,20 @@ def _list_drives() -> list[str]:
         return [f"{d}:\\" for d in string.ascii_uppercase if Path(f"{d}:\\").is_dir()]
 
 
-def _find_original_for_compressed(stem: str, input_dir: Path) -> str | None:
-    """For a compressed stem like '001_GL010695', find the matching original basename
-    in input_dir. Match is case-insensitive on the GoPro-style suffix (everything
-    after the first '_'). Falls back to stripping '_segNN' suffix for split videos.
-    Returns the original filename or None if not found.
+def _find_original_for_compressed(stem: str, input_dir: Path, comp_dir: Path | None = None) -> str | None:
+    """For a compressed stem like '001_GL010695', find the matching original basename.
+    Prefers .vmeta for O(1) lookup; falls back to stem matching for legacy projects.
     """
+    # Try .vmeta first (O(1), supports any directory layout)
+    if comp_dir is not None:
+        for p in comp_dir.glob(f"{stem}.*"):
+            if p.suffix.lower() not in VIDEO_EXTS:
+                continue
+            meta = VideoMeta.read(p)
+            if meta is not None:
+                return Path(meta.source_path).name
+
+    # Legacy fallback: stem matching
     if "_" not in stem or not input_dir.is_dir():
         return None
     suffix = stem.split("_", 1)[1].lower()
@@ -174,11 +183,24 @@ def _find_original_for_compressed(stem: str, input_dir: Path) -> str | None:
 
 def _find_compressed_for_original(stem: str, comp_dir: Path) -> list[tuple[str, str]] | None:
     """For an original stem like 'GL010695', find matching compressed file(s) and
-    their indices. Returns a sorted list of (compressed_basename, index) tuples,
+    their indices. Prefers .vindex for O(1) lookup; falls back to directory scan
+    for legacy projects.
+    Returns a sorted list of (compressed_basename, index) tuples,
     or None if not found. For split videos, returns all segments sorted by index.
     """
     if not comp_dir.is_dir():
         return None
+
+    # Try .vindex first (O(1))
+    vindex = VideoIndex.read(stem, comp_dir)
+    if vindex is not None:
+        paths = vindex.compressed_paths(comp_dir)
+        if paths:
+            matches = [(p.name, s.index) for p, s in zip(paths, vindex.segments)]
+            matches.sort(key=lambda m: m[1])
+            return matches
+
+    # Legacy fallback: directory scan
     needle = stem.lower()
     matches: list[tuple[str, str]] = []
     for p in sorted(comp_dir.iterdir()):

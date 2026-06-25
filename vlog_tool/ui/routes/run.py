@@ -132,12 +132,12 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
             # Maybe frontend sent a compressed filename with source:original
             # (e.g. from original view where v.file is actually compressed name).
             # Try resolving via _find_original_for_compressed as fallback.
-            original_name = _find_original_for_compressed(stem, proj_input)
+            original_name = _find_original_for_compressed(stem, proj_input, cfg.compressed_dir)
             if not original_name:
                 return handler._send_json({"ok": False, "error": f"original video not found: {video_basename}"}, 404)
             original_video = proj_input / original_name
     else:
-        original_name = _find_original_for_compressed(stem, proj_input)
+        original_name = _find_original_for_compressed(stem, proj_input, cfg.compressed_dir)
         if not original_name:
             return handler._send_json({"ok": False, "error": f"no matching original video for {stem}"}, 404)
         original_video = proj_input / original_name

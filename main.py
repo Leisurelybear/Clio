@@ -226,6 +226,14 @@ def main(argv: list[str] | None = None) -> int:
     p_export.add_argument("--day", default="day1", help="日 vlog 标签（默认 day1）")
     p_export.add_argument("--output", type=Path, default=None, help="输出目录（默认 output/export/<day>_<format>/）")
 
+    p_reindex = sub.add_parser("reindex", help="重建 .vmeta / .vindex sidecar 文件")
+    p_reindex.add_argument(
+        "--project",
+        type=str,
+        default="",
+        help="指定项目名（默认自动检测）",
+    )
+
     p_transcribe = sub.add_parser("transcribe", help="Whisper ASR 语音转录（需先安装 faster-whisper）")
     _add_io_args(p_transcribe)
     p_transcribe.add_argument("--force", action="store_true", help="忽略已有转录，重新生成")
@@ -283,13 +291,21 @@ def main(argv: list[str] | None = None) -> int:
     context_override = (getattr(args, "context", "") or "").strip() or None
 
     try:
-        if args.command == "compress":
-            from vlog_tool.pipeline import run_compress_all
+        if args.command == "reindex":
+            from vlog_tool.tasks.reindex import run_reindex
 
+            return run_reindex(config)
+        elif args.command == "compress":
+            from vlog_tool.pipeline import run_compress_all
+            from vlog_tool.tasks.reindex import auto_reindex_if_needed
+
+            auto_reindex_if_needed(config)
             run_compress_all(config, single_file=single_file)
         elif args.command == "analyze":
             from vlog_tool.pipeline import run_analyze_all
+            from vlog_tool.tasks.reindex import auto_reindex_if_needed
 
+            auto_reindex_if_needed(config)
             run_analyze_all(config, single_file=single_file)
         elif args.command == "scripts":
             from vlog_tool.pipeline import run_generate_scripts
@@ -297,11 +313,15 @@ def main(argv: list[str] | None = None) -> int:
             run_generate_scripts(config, single_file=single_file)
         elif args.command == "label":
             from vlog_tool.pipeline import run_label_videos
+            from vlog_tool.tasks.reindex import auto_reindex_if_needed
 
+            auto_reindex_if_needed(config)
             run_label_videos(config)
         elif args.command == "plan":
             from vlog_tool.pipeline import run_plan_vlog
+            from vlog_tool.tasks.reindex import auto_reindex_if_needed
 
+            auto_reindex_if_needed(config)
             config.plan.use_transcripts = not getattr(args, "no_transcripts", False)
             run_plan_vlog(config, args.day)
         elif args.command == "run":
@@ -336,7 +356,9 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
         elif args.command == "cut":
             from vlog_tool.pipeline import run_cut_all
+            from vlog_tool.tasks.reindex import auto_reindex_if_needed
 
+            auto_reindex_if_needed(config)
             run_cut_all(
                 config,
                 day_label=args.day,

@@ -22,6 +22,7 @@ from vlog_tool.utils import (
     write_json_atomic,
     write_text_atomic,
 )
+from vlog_tool.vmeta import VideoMeta
 
 _SEG_RE = re.compile(r"^(.+)_seg(\d+)$")
 
@@ -30,6 +31,13 @@ def _compute_segment_offset(compressed_stem: str, comp_dir: Path, original_path:
     """For a split segment, compute its start offset in the original video.
     Returns 0.0 if the file is not a segment or offset cannot be computed.
     """
+    for p in comp_dir.glob(f"{compressed_stem}.*"):
+        if p.suffix.lower() in VIDEO_EXTS:
+            meta = VideoMeta.read(p)
+            if meta and meta.split_info:
+                return meta.split_info.offset_sec
+
+    # 降级：原有估算逻辑
     m = _SEG_RE.match(compressed_stem.split("_", 1)[1] if "_" in compressed_stem else "")
     if not m:
         return 0.0
@@ -104,8 +112,17 @@ def run_cut_all(
             comp_candidates = sorted(comp_dir.glob(f"{idx}_*"))
             if not comp_candidates:
                 return None
-            suffix = comp_candidates[0].stem.split("_", 1)[1].lower()
-            # If the compressed file has _segNN, strip it to find the original
+            compressed = comp_candidates[0]
+
+            # 优先：读 .vmeta 直接拿原始路径（O(1)，支持任意目录层级）
+            meta = VideoMeta.read(compressed)
+            if meta is not None:
+                src = meta.source_path_obj()
+                if src.is_file():
+                    return src
+
+            # 降级：regex 反解 + rglob（修复 B-06）
+            suffix = compressed.stem.split("_", 1)[1].lower()
             m = _SEG_RE.match(suffix)
             orig_stem = m.group(1) if m else suffix
             for p in find_videos(input_dir, recursive=True):

@@ -8,6 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from vlog_tool.config import AppConfig
+from vlog_tool.vmeta import VideoMeta
 
 
 @pytest.fixture
@@ -68,6 +69,42 @@ class TestComputeSegmentOffset:
 
             result = _compute_segment_offset("001_src_seg2", cfg.compressed_dir, Path("/dummy.mp4"), "ffprobe")
             assert result == 60.0
+
+
+class TestResolveVideoPath:
+    def test_resolve_video_path_reads_vmeta(self, cfg):
+        """When .vmeta exists, _resolve_video_path returns the original path from vmeta."""
+        compressed = cfg.compressed_dir / "001_src.mp4"
+        compressed.write_bytes(b"\x00" * 100)
+        original = cfg.paths.input_dir / "src.mp4"
+        original.write_bytes(b"\x00" * 1000)
+        meta = VideoMeta.build(source=original, target=compressed, source_duration=10, target_duration=10)
+        meta.write(compressed)
+
+        # We need to test _resolve_video_path's "original" path logic.
+        # Create a wrapper that exposes _resolve_video_path with source="original".
+        from vlog_tool.tasks.cut import run_cut_all
+
+        seq = [{"index": "001", "title": "A", "use_timeline": "00:00-00:10"}]
+        _write_plan(cfg, seq=seq)
+        with patch("vlog_tool.tasks.cut.cut_one"), patch("vlog_tool.tasks.cut.resolve_binary", return_value="ffmpeg"):
+            result = run_cut_all(cfg, "day1", source="original")
+        assert len(result) == 1
+
+    def test_resolve_video_path_falls_back_to_rglob(self, cfg):
+        """Without .vmeta, _resolve_video_path falls back to rglob matching."""
+        compressed = cfg.compressed_dir / "001_src.mp4"
+        compressed.write_bytes(b"\x00" * 100)
+        original = cfg.paths.input_dir / "src.mp4"
+        original.write_bytes(b"\x00" * 1000)
+
+        seq = [{"index": "001", "title": "A", "use_timeline": "00:00-00:10"}]
+        _write_plan(cfg, seq=seq)
+        with patch("vlog_tool.tasks.cut.cut_one"), patch("vlog_tool.tasks.cut.resolve_binary", return_value="ffmpeg"):
+            from vlog_tool.tasks.cut import run_cut_all
+
+            result = run_cut_all(cfg, "day1", source="original")
+        assert len(result) == 1
 
 
 class TestRunCutAll:

@@ -23,6 +23,7 @@ from vlog_tool.tasks._helpers import (
     _write_text_file,
 )
 from vlog_tool.utils import get_duration_sec, resolve_binary, write_json_atomic
+from vlog_tool.vmeta import VideoIndex
 
 
 def _build_stem_to_path(input_dir: Path) -> dict[str, Path]:
@@ -202,13 +203,28 @@ def run_analyze_all(
 
     if single_file:
         items: list[tuple[Path, Path, str]] = []
-        candidates = [p for p in _list_compressed(config.compressed_dir) if single_file.stem.lower() in p.stem.lower()]
-        if not candidates:
-            print(f"[错误] 未找到 {single_file.name} 对应的压缩文件，请先运行压缩步骤")
-            return []
-        compressed = candidates[0]
-        idx_str = compressed.stem.split("_", 1)[0]
-        items.append((compressed, single_file, idx_str))
+
+        # 优先读 .vindex（O(1)，含所有分段）
+        vindex = VideoIndex.read(single_file.stem, config.compressed_dir)
+        if vindex is not None:
+            comp_paths = vindex.compressed_paths(config.compressed_dir)
+            if not comp_paths:
+                print(f"[错误] .vindex 存在但压缩文件缺失: {single_file.name}，请重新压缩")
+                return []
+            for comp in comp_paths:
+                idx_str = comp.stem.split("_", 1)[0]
+                items.append((comp, single_file, idx_str))
+        else:
+            # 降级：原有 stem 匹配，修复只取 candidates[0] 的 bug
+            candidates = [
+                p for p in _list_compressed(config.compressed_dir) if single_file.stem.lower() in p.stem.lower()
+            ]
+            if not candidates:
+                print(f"[错误] 未找到 {single_file.name} 对应的压缩文件，请先运行压缩步骤")
+                return []
+            for comp in candidates:
+                idx_str = comp.stem.split("_", 1)[0]
+                items.append((comp, single_file, idx_str))
     else:
         items = []
         for p in _list_compressed(config.compressed_dir):

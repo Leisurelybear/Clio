@@ -188,7 +188,7 @@ class TestListProjects:
         names = [p["name"] for p in projects]
         assert "Paris Trip" in names
 
-    def test_auto_discover_sibling(self, tmp_path: Path):
+    def test_does_not_auto_discover_sibling(self, tmp_path: Path):
         cfg = tmp_path / "config.yaml"
         cfg.write_bytes(b"")
         projects_root = tmp_path / "projects"
@@ -198,6 +198,10 @@ class TestListProjects:
         (tokyo / "project.json").write_text(json.dumps({"name": "Tokyo"}), encoding="utf-8")
         input_dir = projects_root / "current"
         input_dir.mkdir()
+        (input_dir / "project.json").write_text(json.dumps({"name": "Current"}), encoding="utf-8")
+        reg = tmp_path / "projects.json"
+        reg.write_text(json.dumps({"projects": [str(input_dir.resolve())]}), encoding="utf-8")
         projects = _list_projects(cfg, input_dir)
         names = [p["name"] for p in projects]
-        assert "Tokyo" in names
+        assert "Tokyo" not in names
+        assert "Current" in names

@@ -9,12 +9,14 @@ from vlog_tool.tasks._helpers import (
     ClipRecord,
     _build_stem,
     _eta_line,
+    _get_video_info,
     _next_index,
     _rewrite_script_md,
     _rewrite_text_file,
     _write_csv,
     _write_text_file,
 )
+from vlog_tool.vmeta import VideoMeta
 
 
 def _fake_config(index_width: int = 3) -> SimpleNamespace:
@@ -196,3 +198,37 @@ class TestWriteCsv:
         _write_csv(out, [], _fake_config())
         assert out.exists()
         assert out.read_text(encoding="utf-8-sig").strip() != ""
+
+
+class TestGetVideoInfo:
+    def test_uses_meta_when_available(self, tmp_path: Path):
+        src = tmp_path / "src.mp4"
+        src.write_bytes(b"\x00" * 2_000_000)
+        tgt = tmp_path / "001_src.mp4"
+        tgt.write_bytes(b"\x00" * 500)
+        meta = VideoMeta.build(source=src, target=tgt, source_duration=100.0, target_duration=99.0)
+        rec = ClipRecord(index=1, stem="001_src", source_path=src, compressed_path=tgt, meta=meta)
+        result = _get_video_info(rec, "ffprobe")
+        assert result["duration_sec"] == 100.0
+        assert result["size_mb"] > 1.0
+
+    def test_uses_disk_meta_when_record_has_no_meta(self, tmp_path: Path):
+        src = tmp_path / "src.mp4"
+        src.write_bytes(b"\x00" * 2_000_000)
+        tgt = tmp_path / "001_src.mp4"
+        tgt.write_bytes(b"\x00" * 500)
+        meta = VideoMeta.build(source=src, target=tgt, source_duration=100.0, target_duration=99.0)
+        meta.write(tgt)
+        rec = ClipRecord(index=1, stem="001_src", source_path=src, compressed_path=tgt)
+        result = _get_video_info(rec, "ffprobe")
+        assert result["duration_sec"] == 100.0
+
+    def test_falls_back_to_probe(self, tmp_path: Path, monkeypatch):
+        monkeypatch.setattr(
+            "vlog_tool.tasks._helpers.probe_video_info", lambda *a, **kw: {"duration_sec": 50.0, "size_mb": 10.0}
+        )
+        src = tmp_path / "src.mp4"
+        src.write_bytes(b"\x00" * 100)
+        rec = ClipRecord(index=1, stem="001_src", source_path=src)
+        result = _get_video_info(rec, "ffprobe")
+        assert result["duration_sec"] == 50.0

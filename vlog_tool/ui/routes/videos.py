@@ -16,6 +16,7 @@ from vlog_tool.ui.services.file_service import (
     _is_safe_basename,
 )
 from vlog_tool.utils import get_duration_sec, resolve_binary
+from vlog_tool.vmeta import VideoMeta
 
 if TYPE_CHECKING:
     from http.server import BaseHTTPRequestHandler
@@ -90,7 +91,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                     continue
                 stem = p.stem
                 idx = stem.split("_", 1)[0] if "_" in stem else ""
-                orig = _find_original_for_compressed(stem, proj_input)
+                orig = _find_original_for_compressed(stem, proj_input, comp_dir)
                 orig_stem = Path(orig).stem if orig else None
                 group_key, seg_num = _parse_segment_info(stem)
                 v: dict[str, Any] = {
@@ -123,9 +124,19 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                     "indices": [m[0] for m in members],
                     "total": total,
                 }
-                # compute segment offset from original video duration
+                # compute segment offset from .vmeta first, then fallback to estimation
                 offsets: dict[str, float] = {}
-                if total > 1 and _ffprobe:
+                for member_idx, seg_num in members:
+                    for v in videos:
+                        if v["index"] == member_idx:
+                            comp_file = comp_dir / v["file"]
+                            meta = VideoMeta.read(comp_file)
+                            if meta and meta.split_info:
+                                offsets[member_idx] = meta.split_info.offset_sec
+                            break
+                # legacy estimation for files without .vmeta
+                missing = [m for m in members if m[0] not in offsets]
+                if missing and total > 1 and _ffprobe:
                     orig: Path | None = None
                     for ext in VIDEO_EXTS:
                         candidate = proj_input / f"{gk}{ext}"
@@ -136,7 +147,7 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                         try:
                             dur = get_duration_sec(orig, _ffprobe)
                             seg_dur = dur / total
-                            for i, (member_idx, _) in enumerate(members):
+                            for i, (member_idx, _) in enumerate(missing):
                                 offsets[member_idx] = round(i * seg_dur, 1)
                         except Exception:
                             pass
@@ -216,3 +227,20 @@ def handle_get_video(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     if not vp.is_file() or vp.suffix.lower() not in VIDEO_EXTS:
         return handler.send_error(HTTPStatus.NOT_FOUND)
     handler._send_video_range(vp)
+
+
+def handle_get_vmeta(handler: BaseHTTPRequestHandler, stem: str) -> None:
+    """Handle GET /api/vmeta/{stem} → .vmeta JSON content."""
+    if not stem:
+        return handler._send_json({"ok": False, "error": "missing stem"}, 400)
+    proj_input = handler._resolve_project_input({})
+    proj_out = handler._get_project_output(proj_input)
+    comp_dir = proj_out / "compressed"
+    for p in comp_dir.glob(f"{stem}.*"):
+        if p.suffix.lower() in VIDEO_EXTS:
+            meta = VideoMeta.read(p)
+            if meta is not None:
+                from vlog_tool.vmeta import _meta_to_dict
+
+                return handler._send_json(_meta_to_dict(meta))
+    handler._send_json({"ok": False, "error": "not found"}, 404)

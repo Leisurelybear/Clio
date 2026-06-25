@@ -9,6 +9,7 @@ from pathlib import Path
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_duration
 from vlog_tool.utils import format_index, probe_video_info, resolve_binary, sanitize_name, write_text_atomic
+from vlog_tool.vmeta import VideoMeta
 
 
 @dataclass
@@ -20,6 +21,7 @@ class ClipRecord:
     text_path: Path | None = None
     analysis: dict | None = None
     duration_sec: float = 0.0
+    meta: VideoMeta | None = None
 
 
 def _build_stem(index: int, title: str, config: AppConfig) -> str:
@@ -119,6 +121,22 @@ def _rewrite_script_md(path: Path, script: dict) -> None:
     write_text_atomic(path, md)
 
 
+def _get_video_info(rec: ClipRecord, ffprobe: str) -> dict:
+    if rec.meta is not None:
+        return {
+            "duration_sec": rec.meta.source_duration_sec,
+            "size_mb": round(rec.meta.source_size / 1024 / 1024, 2),
+        }
+    if rec.compressed_path is not None:
+        m = VideoMeta.read(rec.compressed_path)
+        if m is not None:
+            return {
+                "duration_sec": m.source_duration_sec,
+                "size_mb": round(m.source_size / 1024 / 1024, 2),
+            }
+    return probe_video_info(rec.source_path, ffprobe) if rec.source_path.exists() else {}
+
+
 def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
@@ -141,8 +159,8 @@ def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None
         writer.writeheader()
         for rec in records:
             a = rec.analysis or {}
-            if not rec.duration_sec and rec.source_path.exists():
-                info = probe_video_info(rec.source_path, ffprobe)
+            if not rec.duration_sec:
+                info = _get_video_info(rec, ffprobe)
                 duration_sec = info.get("duration_sec", "")
                 source_size_mb = info.get("size_mb", "")
             else:
