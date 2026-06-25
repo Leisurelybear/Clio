@@ -84,6 +84,9 @@ def run_plan_vlog(
                     transcripts_map[stem] = data
             except (json.JSONDecodeError, KeyError):
                 continue
+    if config.plan.use_transcripts and not transcripts_map:
+        print("[警告] use_transcripts=true 但未找到任何 transcript 数据，规划将不使用语音信息")
+        print("       请先运行 transcript 步骤，或设置 use_transcripts: false 消除此警告")
 
     if tracker:
         tracker.update(phase="plan", total=1, current=0, message=f"生成 {day_label} 规划...")
@@ -97,6 +100,8 @@ def run_plan_vlog(
             use_transcripts=config.plan.use_transcripts,
             token_store=token_store,
         )
+        if config.plan.use_transcripts:
+            plan["_transcripts_missing"] = not transcripts_map
     write_json_atomic(out_json, plan)
     if tracker:
         tracker.log(f"规划 {day_label} ✓")

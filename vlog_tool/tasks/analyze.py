@@ -88,6 +88,14 @@ def _process_video_item(
 ) -> ClipRecord | None:
     idx_val = int(idx_str)
 
+    # Probe compressed file duration once (cheaper than probing original in _write_csv)
+    duration_sec = 0.0
+    try:
+        ffprobe_bin = resolve_binary(config.paths.ffprobe, "ffprobe")
+        duration_sec = get_duration_sec(compressed, ffprobe_bin)
+    except Exception:
+        pass
+
     existing = sorted(config.texts_dir.glob(f"{idx_str}_*.json"))
     json_path = None
     analysis = None
@@ -118,22 +126,17 @@ def _process_video_item(
             compressed_path=compressed,
             text_path=text_path,
             analysis=analysis,
+            duration_sec=duration_sec,
         )
 
     max_min = config.analyze.max_analyze_duration_min
-    if max_min > 0:
-        try:
-            ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
-            dur_sec = get_duration_sec(compressed, ffprobe)
-            if dur_sec > max_min * 60:
-                print(f"  [跳过] {compressed.name} 时长 {format_duration(dur_sec)} 超过限制 {max_min} 分钟")
-                if tracker:
-                    tracker.next(message=f"跳过 {compressed.name}（超长）")
-                    tracker.log(f"跳过 {compressed.name}（超长 {format_duration(dur_sec)}）")
-                state.mark(original.stem, "analyze", "skipped")
-                return None
-        except Exception as e:
-            print(f"  [警告] 无法检查 {compressed.name} 时长: {e}")
+    if max_min > 0 and duration_sec > max_min * 60:
+        print(f"  [跳过] {compressed.name} 时长 {format_duration(duration_sec)} 超过限制 {max_min} 分钟")
+        if tracker:
+            tracker.next(message=f"跳过 {compressed.name}（超长）")
+            tracker.log(f"跳过 {compressed.name}（超长 {format_duration(duration_sec)}）")
+        state.mark(original.stem, "analyze", "skipped")
+        return None
 
     print(f"  [{compressed.name}] 分析中...")
     t0 = time.monotonic()
@@ -170,6 +173,7 @@ def _process_video_item(
         compressed_path=compressed,
         text_path=final_text,
         analysis=analysis,
+        duration_sec=duration_sec,
     )
 
 
