@@ -196,45 +196,7 @@ def _list_projects(
             }
         )
 
-    # 2. Scan sibling directories of input_dir (auto-discovery)
-    projects_root = input_dir.parent
-    if projects_root.is_dir():
-        for p in sorted(projects_root.iterdir()):
-            if not p.is_dir():
-                continue
-            proj_file = p / "project.json"
-            try:
-                if not proj_file.is_file():
-                    continue
-            except (PermissionError, OSError):
-                continue
-            res = p.resolve()
-            if str(res) in seen_dirs:
-                continue
-            seen_dirs.add(str(res))
-            try:
-                data = json.loads(proj_file.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                data = {}
-            name = data.get("name") or p.name
-            proj_out = _project_output_dir(p)
-            projects.append(
-                {
-                    "name": name,
-                    "input_dir": str(p),
-                    "output_dir": str(proj_out),
-                    "currentDay": data.get("currentDay", "day1"),
-                    "source": data.get("source", "compressed"),
-                    "steps": _detect_steps(proj_out),
-                    "createdAt": data.get("createdAt"),
-                    "updatedAt": data.get("updatedAt"),
-                    "is_current": (
-                        name == current_project_name if current_project_name else p.resolve() == input_dir.resolve()
-                    ),
-                }
-            )
-
-    # 3. Include current input_dir fallback only when an explicit project was requested
+    # 2. Include current input_dir fallback only when an explicit project was requested
     if current_project_name:
         cur_resolved = str(input_dir.resolve())
         if cur_resolved not in seen_dirs:
