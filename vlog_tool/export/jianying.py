@@ -49,21 +49,25 @@ def _build_index_to_source(texts_dir: Path) -> dict[str, str]:
     """
     mapping: dict[str, str] = {}
     if not texts_dir.is_dir():
+        print(f"  [debug] texts_dir 不存在: {texts_dir}")
         return mapping
     for p in sorted(texts_dir.glob("*.json")):
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"  [debug] 读取失败 {p}: {e}")
             continue
         raw_idx = data.get("index")
         source = data.get("source_file", "")
+        print(f"  [debug] 文件={p.name}, index={raw_idx!r}, source_file={source!r}")
         if raw_idx is None or not source:
+            print("  [debug] 跳过: 缺少 index 或 source_file")
             continue
         stem = Path(source).stem
         idx_str = str(raw_idx)
         mapping[idx_str] = stem
-        # Also map zero-padded version (text stores 1, plan uses "001")
         mapping[idx_str.zfill(3)] = stem
+        print(f"  [debug] 映射: {idx_str} -> {stem}, {idx_str.zfill(3)} -> {stem}")
     return mapping
 
 
@@ -295,6 +299,9 @@ def export_plan_to_jianying(
         print(f"  [警告] plan 文件为空序列: {plan_path}")
 
     index_to_source = _build_index_to_source(texts_dir) if texts_dir else {}
+    print(f"  [debug] texts_dir={texts_dir}, index_to_source={index_to_source}")
+    if texts_dir:
+        print(f"  [debug] texts_dir exists={texts_dir.is_dir()}, files={list(texts_dir.glob('*.json'))}")
     materials, index_to_material_id, seq_text_ids = _build_materials(plan_data, input_dir, ffprobe, index_to_source)
     tracks = _build_tracks(plan_data, index_to_material_id, seq_text_ids)
 
