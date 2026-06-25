@@ -5,6 +5,9 @@
 ### Added
 - F-02 concurrent AI analysis: `ThreadPoolExecutor(max_workers)` for analyze step, per-video progress via `tracker.next()` (34dd5b5)
 - U-002 provider cache TTL: `ai.provider_ttl_min` (default 60), expired providers auto-close on access (538064b)
+- N-01 JianYing draft export: `vlog_tool/export/` package with FORMAT_REGISTRY dispatch, `draft_content.json` builder for JianYing 5.9 (f010db0, 559921c, 3349038)
+- CLI `export` subcommand: `main.py export --format jianying --day day1` (008da7b)
+- UI export button: "导出到剪映" in plan view, `POST /api/export` route (8e4be96, 3349038)
 
 ### Fixed
 - B-02 plan state.mark key: fallback `source_stem` to JSON filename when `source_file` field is empty (bb86872)

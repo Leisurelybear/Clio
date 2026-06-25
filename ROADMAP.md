@@ -395,6 +395,20 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ## Staging / WIP
 
+### N-01: JianYing Draft Export (剪映草稿导出)
+
+**Source**: 2026-06-24 code review (`docs/analysis/2026-06-24-claude_review.md`)
+
+**Background**: plan.json → draft_content.json → JianYing Pro directly importable draft. Core pipeline built but video resolution not working for original files (missing source_file to filepath mapping).
+
+**Sub-tasks**:
+- [x] N-01a: Design spec (`docs/superpowers/specs/2026-06-25-jianying-export-design.md`)
+- [x] N-01b: `vlog_tool/export/` package with FORMAT_REGISTRY
+- [x] N-01c: `export_plan_to_jianying()` core builder
+- [x] N-01d: CLI `export` subcommand
+- [x] N-01e: UI `POST /api/export` route + plan view button
+- [!] N-01f: Video resolution — `_resolve_video` needs to use source_file from texts/*.json (debugging, see 4c9f7db, 673619e)
+
 - (None)
 
 ## Feature R-016: Draggable UI Layout
