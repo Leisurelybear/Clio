@@ -31,11 +31,11 @@ def _compute_segment_offset(compressed_stem: str, comp_dir: Path, original_path:
     """For a split segment, compute its start offset in the original video.
     Returns 0.0 if the file is not a segment or offset cannot be computed.
     """
-    compressed = comp_dir / f"{compressed_stem}.mp4"
-    if compressed.is_file():
-        meta = VideoMeta.read(compressed)
-        if meta and meta.split_info:
-            return meta.split_info.offset_sec
+    for p in comp_dir.glob(f"{compressed_stem}.*"):
+        if p.suffix.lower() in VIDEO_EXTS:
+            meta = VideoMeta.read(p)
+            if meta and meta.split_info:
+                return meta.split_info.offset_sec
 
     # 降级：原有估算逻辑
     m = _SEG_RE.match(compressed_stem.split("_", 1)[1] if "_" in compressed_stem else "")

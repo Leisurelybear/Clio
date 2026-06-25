@@ -225,10 +225,12 @@ def handle_get_vmeta(handler: BaseHTTPRequestHandler, stem: str) -> None:
         return handler._send_json({"ok": False, "error": "missing stem"}, 400)
     proj_input = handler._resolve_project_input({})
     proj_out = handler._get_project_output(proj_input)
-    compressed_path = proj_out / "compressed" / f"{stem}.mp4"
-    meta = VideoMeta.read(compressed_path)
-    if meta is None:
-        return handler._send_json({"ok": False, "error": "not found"}, 404)
-    from vlog_tool.vmeta import _meta_to_dict
+    comp_dir = proj_out / "compressed"
+    for p in comp_dir.glob(f"{stem}.*"):
+        if p.suffix.lower() in VIDEO_EXTS:
+            meta = VideoMeta.read(p)
+            if meta is not None:
+                from vlog_tool.vmeta import _meta_to_dict
 
-    handler._send_json(_meta_to_dict(meta))
+                return handler._send_json(_meta_to_dict(meta))
+    handler._send_json({"ok": False, "error": "not found"}, 404)
