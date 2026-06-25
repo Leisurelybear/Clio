@@ -115,10 +115,9 @@ def run_compress_all(
     for video in videos:
         max_min = config.compress.split_max_min
         if max_min > 0:
-            splits_dir = config.paths.output_dir / config.compress.splits_subdir
             segments = split_video(
                 video,
-                splits_dir,
+                config.compressed_dir,
                 max_min,
                 ffmpeg,
                 ffprobe,
