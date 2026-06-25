@@ -195,7 +195,10 @@ def run_transcribe_all(
             break
         ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
         ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
-        audio_dur = _get_video_duration(original_video, ffprobe)
+        audio_source = (
+            compressed_video if compressed_video.is_file() and not config.compress.remove_audio else original_video
+        )
+        audio_dur = _get_video_duration(audio_source, ffprobe)
 
         def _on_extract_progress(pct: int) -> None:
             if tracker:
@@ -210,7 +213,7 @@ def run_transcribe_all(
                 )
 
         wav_path = _extract_audio(
-            original_video,
+            audio_source,
             ffmpeg,
             progress_callback=_on_extract_progress,
             cancel_event=cancel_event,
