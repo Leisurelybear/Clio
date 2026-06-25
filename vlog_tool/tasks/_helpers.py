@@ -9,6 +9,7 @@ from pathlib import Path
 from vlog_tool.config import AppConfig
 from vlog_tool.log import format_duration
 from vlog_tool.utils import format_index, probe_video_info, resolve_binary, sanitize_name, write_text_atomic
+from vlog_tool.vmeta import VideoMeta
 
 
 @dataclass
@@ -20,6 +21,7 @@ class ClipRecord:
     text_path: Path | None = None
     analysis: dict | None = None
     duration_sec: float = 0.0
+    meta: VideoMeta | None = None
 
 
 def _build_stem(index: int, title: str, config: AppConfig) -> str:
