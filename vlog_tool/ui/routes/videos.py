@@ -229,11 +229,11 @@ def handle_get_video(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     handler._send_video_range(vp)
 
 
-def handle_get_vmeta(handler: BaseHTTPRequestHandler, stem: str) -> None:
+def handle_get_vmeta(handler: BaseHTTPRequestHandler, qs: dict, stem: str) -> None:
     """Handle GET /api/vmeta/{stem} → .vmeta JSON content."""
     if not stem:
         return handler._send_json({"ok": False, "error": "missing stem"}, 400)
-    proj_input = handler._resolve_project_input({})
+    proj_input = handler._resolve_project_input(qs)
     proj_out = handler._get_project_output(proj_input)
     comp_dir = proj_out / "compressed"
     for p in comp_dir.glob(f"{stem}.*"):

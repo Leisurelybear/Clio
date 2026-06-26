@@ -15,7 +15,7 @@ from vlog_tool.transcribe import _resolve_cache_dir, check_whisper
 from vlog_tool.utils import run_subprocess
 
 
-def handle_get_whisper_check(handler) -> None:
+def handle_get_whisper_check(handler, qs: dict | None = None) -> None:
     installed = check_whisper()
     cuda = False
     if installed:
@@ -29,9 +29,8 @@ def handle_get_whisper_check(handler) -> None:
     cache_path = None
     model_cached = False
     try:
-        from vlog_tool.config import load_config
-
-        cfg = load_config()
+        proj_input = handler._resolve_project_input(qs or {})
+        cfg = handler._get_config(proj_input)
         cache_dir = _resolve_cache_dir(cfg)
         if cache_dir.is_dir():
             cache_path = str(cache_dir)
@@ -75,8 +74,8 @@ _INSTALL_THREAD: threading.Thread | None = None
 _INSTALL_CANCEL = threading.Event()
 
 
-def _install_progress_path(handler) -> Path:
-    proj_out = handler._get_project_output({})
+def _install_progress_path(handler, qs: dict | None = None) -> Path:
+    proj_out = handler._get_project_output(qs or {})
     return proj_out / ".whisper_install.json"
 
 
@@ -91,8 +90,8 @@ def _write_install_progress(path: Path, data: dict) -> None:
         tmp.unlink(missing_ok=True)
 
 
-def handle_get_whisper_install_status(handler) -> None:
-    path = _install_progress_path(handler)
+def handle_get_whisper_install_status(handler, qs: dict | None = None) -> None:
+    path = _install_progress_path(handler, qs)
     if path.is_file():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -109,18 +108,18 @@ def handle_get_whisper_install_status(handler) -> None:
     handler._send_json(data)
 
 
-def handle_post_whisper_install(handler) -> None:
+def handle_post_whisper_install(handler, qs: dict | None = None) -> None:
     global _INSTALL_THREAD
 
     with _INSTALL_LOCK:
         if _INSTALL_THREAD is not None and _INSTALL_THREAD.is_alive():
             handler._send_json({"ok": False, "error": "download is already running"}, 409)
             return
-        progress_path = _install_progress_path(handler)
+        progress_path = _install_progress_path(handler, qs)
 
         def _worker():
             try:
-                _run_install(handler, progress_path)
+                _run_install(handler, qs, progress_path)
             except Exception as e:
                 _write_install_progress(
                     progress_path,
@@ -137,12 +136,12 @@ def handle_post_whisper_install(handler) -> None:
     handler._send_json({"ok": True, "message": "whisper install started"})
 
 
-def handle_post_whisper_install_cancel(handler) -> None:
+def handle_post_whisper_install_cancel(handler, qs: dict | None = None) -> None:
     """POST /api/whisper/install/cancel — cancel ongoing download."""
     global _INSTALL_CANCEL
     _INSTALL_CANCEL.set()
     # Clean up partial progress state
-    path = _install_progress_path(handler)
+    path = _install_progress_path(handler, qs)
     if path.is_file():
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
@@ -229,8 +228,8 @@ def _find_model_file(cache_dir: Path, model_name: str) -> Path | None:
     return None
 
 
-def _run_install(handler, progress_path: Path) -> None:
-    proj_input = handler._resolve_project_input({})
+def _run_install(handler, qs: dict | None, progress_path: Path) -> None:
+    proj_input = handler._resolve_project_input(qs or {})
     cfg = handler._get_config(proj_input)
 
     # Step 1: ensure huggingface_hub is installed
@@ -383,8 +382,8 @@ def _run_install(handler, progress_path: Path) -> None:
 # ── Whisper model management ─────────────────────────────────────────────────
 
 
-def _get_cache_dir(handler) -> Path:
-    proj_input = handler._resolve_project_input({})
+def _get_cache_dir(handler, qs: dict | None = None) -> Path:
+    proj_input = handler._resolve_project_input(qs or {})
     cfg = handler._get_config(proj_input)
     return _resolve_cache_dir(cfg)
 
@@ -441,13 +440,13 @@ def _format_bytes(n: int) -> str:
     return f"{n / (1024 * 1024 * 1024):.2f} GB"
 
 
-def handle_get_whisper_models(handler) -> None:
+def handle_get_whisper_models(handler, qs: dict | None = None) -> None:
     """GET /api/whisper/models — list cached models and available model sizes."""
-    cache_dir = _get_cache_dir(handler)
+    cache_dir = _get_cache_dir(handler, qs)
     cached = _list_cached_models(cache_dir)
     available = list(WhisperModelSize)
     # Get current configured model
-    proj_input = handler._resolve_project_input({})
+    proj_input = handler._resolve_project_input(qs or {})
     cfg = handler._get_config(proj_input)
     current_model = cfg.whisper.model_size
     # Disk space info
@@ -512,21 +511,22 @@ def handle_put_whisper_model(handler, qs: dict, obj: dict) -> None:
         )
         return
     # Write to project.yaml or global config
-    proj_input = handler._resolve_project_input({})
+    proj_input = handler._resolve_project_input(qs)
     proj_yaml = proj_input / "project.yaml"
     import yaml
 
-    if proj_yaml.is_file():
-        with open(proj_yaml, encoding="utf-8") as f:
-            raw = yaml.safe_load(f) or {}
-        raw.setdefault("whisper", {})["model_size"] = model_name
-        suffix = os.urandom(4).hex()
-        tmp = proj_yaml.parent / f"{proj_yaml.name}.{suffix}.tmp"
-        try:
-            tmp.write_text(yaml.dump(raw, allow_unicode=True, default_flow_style=False), encoding="utf-8")
-            tmp.replace(proj_yaml)
-        except OSError:
-            tmp.unlink(missing_ok=True)
-            handler._send_json({"ok": False, "error": "写入配置文件失败"}, 500)
-            return
+    with open(proj_yaml, "a", encoding="utf-8") as f:
+        pass
+    with open(proj_yaml, encoding="utf-8") as f:
+        raw = yaml.safe_load(f) or {}
+    raw.setdefault("whisper", {})["model_size"] = model_name
+    suffix = os.urandom(4).hex()
+    tmp = proj_yaml.parent / f"{proj_yaml.name}.{suffix}.tmp"
+    try:
+        tmp.write_text(yaml.dump(raw, allow_unicode=True, default_flow_style=False), encoding="utf-8")
+        tmp.replace(proj_yaml)
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        handler._send_json({"ok": False, "error": "写入配置文件失败"}, 500)
+        return
     handler._send_json({"ok": True, "model_size": model_name})

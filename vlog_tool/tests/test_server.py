@@ -429,7 +429,7 @@ class TestDoGET:
     def test_api_vmeta(self, mock_fn, handler_cls):
         handler = _build_handler(handler_cls, path="/api/vmeta/001_test")
         handler.do_GET()
-        mock_fn.assert_called_once_with(handler, "001_test")
+        mock_fn.assert_called_once_with(handler, {}, "001_test")
 
     @patch("vlog_tool.ui.server.handle_get_texts")
     def test_api_texts(self, mock_fn, handler_cls):
@@ -483,19 +483,19 @@ class TestDoGET:
     def test_api_whisper_check(self, mock_fn, handler_cls):
         handler = _build_handler(handler_cls, path="/api/whisper/check")
         handler.do_GET()
-        mock_fn.assert_called_once_with(handler)
+        mock_fn.assert_called_once_with(handler, {})
 
     @patch("vlog_tool.ui.server.handle_get_whisper_install_status")
     def test_api_whisper_install_status(self, mock_fn, handler_cls):
         handler = _build_handler(handler_cls, path="/api/whisper/install/status")
         handler.do_GET()
-        mock_fn.assert_called_once_with(handler)
+        mock_fn.assert_called_once_with(handler, {})
 
     @patch("vlog_tool.ui.server.handle_get_whisper_models")
     def test_api_whisper_models(self, mock_fn, handler_cls):
         handler = _build_handler(handler_cls, path="/api/whisper/models")
         handler.do_GET()
-        mock_fn.assert_called_once_with(handler)
+        mock_fn.assert_called_once_with(handler, {})
 
     @patch("vlog_tool.ui.server.handle_get_token_usage")
     def test_api_token_usage(self, mock_fn, handler_cls):
@@ -709,13 +709,13 @@ class TestDoPOST:
     def test_post_whisper_install(self, mock_fn, handler_cls):
         handler = self._post_handler(handler_cls, {}, "/api/whisper/install")
         handler.do_POST()
-        mock_fn.assert_called_once_with(handler)
+        mock_fn.assert_called_once_with(handler, {})
 
     @patch("vlog_tool.ui.server.handle_post_whisper_install_cancel")
     def test_post_whisper_install_cancel(self, mock_fn, handler_cls):
         handler = self._post_handler(handler_cls, {}, "/api/whisper/install/cancel")
         handler.do_POST()
-        mock_fn.assert_called_once_with(handler)
+        mock_fn.assert_called_once_with(handler, {})
 
     @patch("vlog_tool.ui.server.handle_post_whisper_model_delete")
     def test_post_whisper_model_delete(self, mock_fn, handler_cls):

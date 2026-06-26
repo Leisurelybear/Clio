@@ -232,7 +232,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 return handle_get_video(self, qs)
             if path.startswith("/api/vmeta/"):
                 stem = path[len("/api/vmeta/") :]
-                return handle_get_vmeta(self, stem)
+                return handle_get_vmeta(self, qs, stem)
             if path == "/api/texts":
                 return handle_get_texts(self, qs)
             if path == "/api/voiceover":
@@ -250,11 +250,11 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             if path == "/api/transcripts":
                 return handle_get_transcripts(self, qs)
             if path == "/api/whisper/check":
-                return handle_get_whisper_check(self)
+                return handle_get_whisper_check(self, qs)
             if path == "/api/whisper/install/status":
-                return handle_get_whisper_install_status(self)
+                return handle_get_whisper_install_status(self, qs)
             if path == "/api/whisper/models":
-                return handle_get_whisper_models(self)
+                return handle_get_whisper_models(self, qs)
             if path == "/api/token-usage":
                 return handle_get_token_usage(self, qs)
             if path == "/api/env":
@@ -333,9 +333,9 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             if path == "/api/transcripts":
                 return handle_post_transcripts(self, qs, obj)
             if path == "/api/whisper/install":
-                return handle_post_whisper_install(self)
+                return handle_post_whisper_install(self, qs)
             if path == "/api/whisper/install/cancel":
-                return handle_post_whisper_install_cancel(self)
+                return handle_post_whisper_install_cancel(self, qs)
             if path == "/api/whisper/models/delete":
                 return handle_post_whisper_model_delete(self, qs, obj)
             if path == "/api/logs/clear":

@@ -112,7 +112,7 @@ class TestHandleGetWhisperCheck:
             patch("vlog_tool.ui.routes.whisper_routes.check_whisper", return_value=True),
             patch("ctranslate2.get_cuda_device_count", return_value=1),
         ):
-            handle_get_whisper_check(handler)
+            handle_get_whisper_check(handler, {})
             handler._send_json.assert_called_once()
             args = handler._send_json.call_args
             assert args[0][0]["installed"] is True
@@ -123,7 +123,7 @@ class TestHandleGetWhisperCheck:
         handler._send_json = MagicMock()
 
         with patch("vlog_tool.ui.routes.whisper_routes.check_whisper", return_value=False):
-            handle_get_whisper_check(handler)
+            handle_get_whisper_check(handler, {})
             args = handler._send_json.call_args
             assert args[0][0]["installed"] is False
 
@@ -187,7 +187,7 @@ class TestHandleGetWhisperInstallStatus:
         handler = MagicMock()
         handler._get_project_output.return_value = Path("/nonexistent")
         handler._send_json = MagicMock()
-        handle_get_whisper_install_status(handler)
+        handle_get_whisper_install_status(handler, {})
         args = handler._send_json.call_args
         assert args[0][0]["status"] == "idle"
 
@@ -200,7 +200,7 @@ class TestHandleGetWhisperInstallStatus:
         alive = MagicMock()
         alive.is_alive.return_value = True
         with patch("vlog_tool.ui.routes.whisper_routes._INSTALL_THREAD", alive):
-            handle_get_whisper_install_status(handler)
+            handle_get_whisper_install_status(handler, {})
         args = handler._send_json.call_args
         assert args[0][0]["progress_pct"] == 42
 
@@ -210,7 +210,7 @@ class TestHandleGetWhisperInstallStatus:
         handler = MagicMock()
         handler._get_project_output.return_value = tmp_path
         handler._send_json = MagicMock()
-        handle_get_whisper_install_status(handler)
+        handle_get_whisper_install_status(handler, {})
         args = handler._send_json.call_args
         assert args[0][0]["status"] == "idle"
         assert "中断" in args[0][0]["message"]
@@ -221,7 +221,7 @@ class TestHandleGetWhisperInstallStatus:
         handler = MagicMock()
         handler._get_project_output.return_value = tmp_path
         handler._send_json = MagicMock()
-        handle_get_whisper_install_status(handler)
+        handle_get_whisper_install_status(handler, {})
         args = handler._send_json.call_args
         assert args[0][0]["status"] == "done"
 
@@ -242,7 +242,7 @@ class TestHandlePostWhisperInstall:
         handler = self._make_handler(tmp_path)
         handler._send_json = MagicMock()
         with patch("vlog_tool.ui.routes.whisper_routes._INSTALL_THREAD", None):
-            handle_post_whisper_install(handler)
+            handle_post_whisper_install(handler, {})
         handler._send_json.assert_called_once_with({"ok": True, "message": "whisper install started"})
 
     def test_rejects_concurrent(self, tmp_path: Path):
@@ -254,7 +254,7 @@ class TestHandlePostWhisperInstall:
         dummy = threading.Thread(target=alive.wait)
         dummy.start()
         with patch("vlog_tool.ui.routes.whisper_routes._INSTALL_THREAD", dummy):
-            handle_post_whisper_install(handler)
+            handle_post_whisper_install(handler, {})
         alive.set()
         dummy.join()
         handler._send_json.assert_called_once()
