@@ -19,6 +19,7 @@ from vlog_tool.config.models import (
     ProviderConfig,
     ProxyConfig,
     ScriptConfig,
+    ServerConfig,
     TaskConfig,
     WhisperConfig,
 )
@@ -32,6 +33,7 @@ from vlog_tool.config.validators import _filter_dc, _validate_config
 _SECTION_DC_MAP: dict[str, type] = {
     "paths": PathsConfig,
     "proxy": ProxyConfig,
+    "server": ServerConfig,
     "ai": AIConfig,
     "compress": CompressConfig,
     "analyze": AnalyzeConfig,
@@ -248,6 +250,7 @@ def load_config(
             logs_dir=_path(paths_raw.get("logs_dir", "./logs"), base),
         ),
         proxy=ProxyConfig(**_filter_dc(raw.get("proxy", {}), ProxyConfig)),
+        server=ServerConfig(**_filter_dc(raw.get("server", {}), ServerConfig)),
         ai=ai,
         compress=CompressConfig(**_filter_dc(raw.get("compress", {}), CompressConfig)),
         analyze=AnalyzeConfig(**_filter_dc(raw.get("analyze", {}), AnalyzeConfig)),

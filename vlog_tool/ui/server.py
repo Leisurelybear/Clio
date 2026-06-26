@@ -100,7 +100,9 @@ class _ServerState:
     cancel_event: threading.Event = field(default_factory=threading.Event)
 
 
-def make_handler(config: AppConfig, config_path: Path | None = None) -> type[BaseHTTPRequestHandler]:
+def make_handler(
+    config: AppConfig, config_path: Path | None = None, api_token: str = ""
+) -> type[BaseHTTPRequestHandler]:
     output_dir = config.paths.output_dir
     input_dir = config.paths.input_dir
     static_dir = STATIC_DIR
@@ -146,6 +148,25 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
 
         def log_message(self, fmt, *args):
             print(f"  [serve] {self.address_string()} - {fmt % args}")
+
+        def _require_auth(self) -> bool:
+            """Check Authorization header or ?token= query param against configured token.
+
+            Returns True if authorized, sends 401 and returns False otherwise.
+            If token is empty string, auth is disabled.
+            """
+            token = self.__class__._api_token
+            if not token:
+                return True
+            auth = self.headers.get("Authorization", "")
+            if auth.startswith("Bearer ") and auth[7:] == token:
+                return True
+            url = urlparse(self.path)
+            qs = parse_qs(url.query)
+            if qs.get("token", [None])[0] == token:
+                return True
+            self._send_json({"error": "未授权访问，需要有效的 API Token"}, 401)
+            return False
 
         def _send_json(self, obj, status: int = 200) -> None:
             body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -218,6 +239,16 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
                 rel = path[len("/static/") :]
                 return handle_static(self, rel)
 
+            # Routes that require auth
+            _sensitive = {
+                "/api/env",
+                "/api/config/raw",
+                "/api/video",
+                "/api/fs/dirs",
+            }
+            if path in _sensitive and not self._require_auth():
+                return
+
             if path == "/api/config":
                 return handle_get_config(self, qs)
             if path == "/api/config/raw":
@@ -269,6 +300,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             url = urlparse(self.path)
             qs = parse_qs(url.query)
             path = url.path
+            if not self._require_auth():
+                return
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length) if length else b""
             try:
@@ -301,6 +334,8 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
             url = urlparse(self.path)
             qs = parse_qs(url.query)
             path = url.path
+            if not self._require_auth():
+                return
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length) if length else b""
             try:
@@ -347,6 +382,7 @@ def make_handler(config: AppConfig, config_path: Path | None = None) -> type[Bas
     # Per-project state dict and config cache (set from closure, not class default)
     Handler._project_states = {}
     Handler._config_cache = ConfigCache(config_path, on_load=auto_reindex_if_needed)
+    Handler._api_token = api_token
     Handler.DEFAULT_PROJECT = DEFAULT_PROJECT
     Handler.input_dir = input_dir
     Handler.output_dir = output_dir
@@ -360,19 +396,35 @@ def run(
     host: str = "127.0.0.1",
     port: int = 8765,
     open_browser: bool = True,
+    api_token: str | None = None,
 ) -> int:
     install_hooks()
+    import secrets
+
+    TOKEN = api_token
+    _is_local = host in ("127.0.0.1", "localhost", "")
+    if TOKEN is None:
+        if _is_local:
+            TOKEN = ""
+        else:
+            TOKEN = secrets.token_urlsafe(32)
+    if TOKEN:
+        print(f"  API Token: {TOKEN}")
+        print(f"  Token URL: http://{host}:{port}/?token={TOKEN}")
     # Try loading last used project config
     active_config = resolve_last_project_config(config, config_path)
     auto_reindex_if_needed(active_config)
-    handler = make_handler(active_config, config_path)
+    handler = make_handler(active_config, config_path, api_token=TOKEN)
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
     print(f"  UI started: {url}")
     print(f"  Project directory: {active_config.paths.input_dir}")
     print(f"  Output directory: {active_config.paths.output_dir}")
-    if host not in ("127.0.0.1", "localhost", ""):
-        print(f"  ⚠  Listening on {host} — exposed to LAN!")
+    if not _is_local:
+        if not TOKEN:
+            print(f"  ⚠  Listening on {host} — exposed to LAN without auth!")
+        else:
+            print(f"  ⚠  Listening on {host} — exposed to LAN (auth required)")
     print("  Ctrl+C to exit")
     if open_browser:
         threading.Timer(0.5, lambda: _open_browser(url)).start()

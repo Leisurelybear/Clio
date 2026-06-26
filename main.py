@@ -217,6 +217,7 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--host", default="127.0.0.1", help="监听地址（默认 127.0.0.1，不暴露到局域网）")
     p_serve.add_argument("--port", type=int, default=8765, help="端口（默认 8765）")
     p_serve.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
+    p_serve.add_argument("--token", type=str, default=None, help="API Token（留空则自动生成）")
 
     p_tokens = sub.add_parser("tokens", help="查看 token 使用统计")
     p_tokens.set_defaults(func=cmd_tokens)
@@ -382,6 +383,7 @@ def main(argv: list[str] | None = None) -> int:
                 host=args.host,
                 port=args.port,
                 open_browser=not args.no_browser,
+                api_token=args.token or config.server.api_token,
             )
         elif args.command == "tokens":
             cmd_tokens(args)

@@ -115,9 +115,15 @@ class WhisperConfig:
 
 
 @dataclass
+class ServerConfig:
+    api_token: str | None = None
+
+
+@dataclass
 class AppConfig:
     paths: PathsConfig
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
+    server: ServerConfig = field(default_factory=ServerConfig)
     ai: AIConfig = field(default_factory=AIConfig)
     compress: CompressConfig = field(default_factory=CompressConfig)
     analyze: AnalyzeConfig = field(default_factory=AnalyzeConfig)
