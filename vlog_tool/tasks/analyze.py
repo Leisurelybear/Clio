@@ -13,7 +13,7 @@ from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.ai.token_usage import FileTokenUsageStore
 from vlog_tool.analyze import analyze_video
 from vlog_tool.config import AppConfig
-from vlog_tool.identity import _identity_to_dict, resolve_identity
+from vlog_tool.identity import _identity_to_dict, load_identity, resolve_identity
 from vlog_tool.log import format_duration, timed
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
@@ -121,6 +121,7 @@ def _process_video_item(
             tracker.log(f"跳过 {compressed.name}（已分析）")
         state.mark(original.stem, "analyze", "skipped")
         print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
+        identity = load_identity(analysis) or resolve_identity(compressed, config.paths.input_dir, idx_str)
         return ClipRecord(
             index=idx_val,
             stem=json_path.stem,
@@ -129,6 +130,7 @@ def _process_video_item(
             text_path=text_path,
             analysis=analysis,
             duration_sec=duration_sec,
+            identity=identity,
         )
 
     max_min = config.analyze.max_analyze_duration_min
@@ -179,6 +181,7 @@ def _process_video_item(
         text_path=final_text,
         analysis=analysis,
         duration_sec=duration_sec,
+        identity=identity,
     )
 
 
