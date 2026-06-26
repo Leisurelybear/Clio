@@ -15,7 +15,7 @@
 
 **降级原则**：所有读取处均保留原有逻辑作为 fallback，存量项目无需任何迁移操作。
 
-## 实施结果：8 个 Commit
+## 实施结果：11 个 Commit
 
 ```
 cd795df feat(vmeta): add .vmeta/.vindex sidecar module with 13 tests
@@ -26,6 +26,9 @@ cd795df feat(vmeta): add .vmeta/.vindex sidecar module with 13 tests
 79384d5 feat(reindex): add reindex command + UI /api/vmeta endpoint
 b4fd911  fix(cut,vmeta): use glob instead of hardcoded .mp4 extension
 73f8132 refactor(compress): put split temp files in compressed_dir
+720e827 fix(ui): _find_original_for_compressed reads .vmeta first; _find_compressed_for_original reads .vindex first
+e879996 fix(routes): videos.py segment offset reads .vmeta.split_info.offset_sec; run.py passes comp_dir
+73bdb11 refactor(ui): remove Stage 2 sibling auto-discovery from _list_projects
 ```
 
 ## 与规划的关键差异
@@ -115,4 +118,4 @@ b4fd911  fix(cut,vmeta): use glob instead of hardcoded .mp4 extension
 
 ---
 
-*实施完成 · 2026-06-25 · 分支: feat/vmeta-sidecar*
+*实施完成 · 2026-06-26 · 分支: feat/vmeta-sidecar*

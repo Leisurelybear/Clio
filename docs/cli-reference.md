@@ -33,7 +33,7 @@ Compress videos in the media folder with ffmpeg to 640p / 5MB / audio-stripped m
 Does **not** invoke AI. Suitable for batch compressing first, then manual review later.
 
 Two phases:
-1. **Split (Phase 1)**: Long videos (default > 15 minutes) are first cut at keyframes into `_segNN` segments, stored in `splits/`
+1. **Split (Phase 1)**: Long videos (default > 15 minutes) are first cut at keyframes into `_segNN` segments
 2. **Compress (Phase 2)**: Each split segment (and short videos that don't need splitting) is compressed individually to `compressed/`
 
 ```bash
@@ -110,6 +110,19 @@ python main.py label
 ```
 
 Output to `output/<media folder name>/labeled/<index>_<title>_labeled.mp4`.
+
+---
+
+## `reindex` — Rebuild .vmeta / .vindex Sidecars
+
+Rebuild `.vmeta` (compressed→original mapping) and `.vindex` (original→compressed mapping) sidecar files from existing compressed videos. Useful after merging split temp files or when upgrading old projects.
+
+```bash
+python main.py reindex
+python main.py reindex -i "E:/Videos/Franch3"
+```
+
+The UI automatically reindexes when opening a project for the first time.
 
 ---
 
@@ -256,7 +269,6 @@ See `vlog_tool/ui/README.md` for details.
 ```
 output/
 ├── compressed/          # Compressed videos (for AI use, audio stripped)
-├── splits/              # Long video split segments (default splits videos > 15 min)
 ├── texts/
 │   ├── 001_丽江古城.txt    # Human-readable: summary + timeline
 │   └── 001_丽江古城.json   # Machine-readable, used by subsequent steps
@@ -279,7 +291,7 @@ output/
 ```
 Raw Footage (input_dir)
     │
-    ├── Long videos (>15min) → split ───► splits/_segNN segments
+    ├── Long videos (>15min) → split ───► _segNN segments (in compressed_dir)
     │
     ▼ compress
 640p Compressed Videos (compressed/)

@@ -16,9 +16,9 @@ Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cros
 | Config cache not true LRU | Fix in U-001a | **U-001** | ✅ done (`config_cache.py`) |
 | No domain models | `@dataclass VideoAnalysis/Segment/VoiceoverScript` | Phase 3 | — |
 | No token cost tracking | `ai/cost_tracker.py` | Phase 3 | — |
-| Pipeline cancel not covering analyze/scripts/plan/label | Add cancel_event to all loop steps | **U-005** |
-| `RateLimiter` lock blocks parallel AI calls | Split acquire from sleep | **U-006** |
-| Whisper download ctypes thread kill unsafe | Replace with chunked download | **U-007** |
+| Pipeline cancel not covering analyze/scripts/plan/label | Add cancel_event to all loop steps | **U-005** | ✅ done |
+| `RateLimiter` lock blocks parallel AI calls | Split acquire from sleep | **U-006** | ✅ done |
+| Whisper download ctypes thread kill unsafe | Replace with chunked download | **U-007** | ✅ done |
 | `/api/fs/dirs` no auth/restriction for LAN mode | Add root restriction + token | **U-008** |
 | Whisper low-confidence segments silently dropped | Mark `low_confidence` flag | **U-009** |
 

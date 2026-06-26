@@ -14,7 +14,7 @@ An **AI preprocessing pipeline**: raw travel vlog footage → ffmpeg compression
 - **google-genai** (Gemini 2.5 Flash video File API)
 - **httpx** (DeepSeek / OpenAI compatible calls)
 - **PyYAML** (config parsing)
-- **pytest** (unit tests, auto-run in CI; **624 test cases**)
+- **pytest** (unit tests, auto-run in CI; **643 test cases**)
 
 Dependencies in `requirements.txt`; `setup.ps1`/`setup.sh` creates venv + installs ffmpeg + copies `.env` in one click.
 
@@ -24,7 +24,7 @@ Dependencies in `requirements.txt`; `setup.ps1`/`setup.sh` creates venv + instal
 vlog-video-analysis/
 ├── main.py                    CLI entry
 ├── vlog_tool/
-│   ├── config.py              AppConfig + load_config
+│   ├── config/                AppConfig + load_config (config package)
 │   ├── shutdown.py            beforeStop hook
 │   ├── pipeline.py            High-level pipeline orchestration
 │   ├── analyze.py             AI interaction functions
@@ -34,6 +34,10 @@ vlog-video-analysis/
 │   ├── whisper_cli.py         Whisper CLI
 │   ├── utils.py               ffmpeg discovery, file IO, extract_json
 │   ├── log.py                 Logging (hourly rotating, TeeWriter)
+│   ├── cut.py                 Segment cutting (ffmpeg wrapper)
+│   ├── split.py               Long video splitter
+│   ├── vmeta.py               .vmeta/.vindex sidecar metadata
+│   ├── progress.py            Progress tracker (used by UI + CLI)
 │   ├── tasks/                 Pipeline steps (per-step modules)
 │   ├── ui/                    Web UI (stdlib http.server)
 │   │   ├── server.py          HTTP server
@@ -48,7 +52,7 @@ vlog-video-analysis/
 ├── config.example.yaml / .env.example
 ├── requirements.txt / requirements-locked.txt
 ├── .github/workflows/test.yml
-└── vlog_tool/tests/            pytest unit tests (624 cases)
+└── vlog_tool/tests/            pytest unit tests (643 cases)
 ```
 
 > See `docs/superpowers/agents/directory-tree.md` for full tree with file-level annotations and test coverage details.

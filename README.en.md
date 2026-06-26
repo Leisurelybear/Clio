@@ -7,7 +7,7 @@
 [![CI](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml/badge.svg)](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/Leisurelybear/vlog-editing-helper/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/Leisurelybear/vlog-editing-helper)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
-![tests](https://img.shields.io/badge/tests-600%2B-brightgreen)
+![tests](https://img.shields.io/badge/tests-640%2B-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **English** · [简体中文](README.md)
@@ -205,7 +205,7 @@ vlog-video-analysis/
 │   ├── ai/                    # 🧠 AI adapters (Gemini / OpenAI compat)
 │   ├── tasks/                 # 📂 Step implementations
 │   ├── ui/                    # 🌐 Web UI (stdlib only, zero deps)
-│   └── tests/                 # 🧪 600+ unit tests
+│   └── tests/                 # 🧪 640+ unit tests
 └── output/
     ├── compressed/            # 🗜️ Compressed videos
     ├── texts/                 # 📝 AI analysis JSON
@@ -223,22 +223,26 @@ vlog-video-analysis/
 ```bash
 python -m pytest vlog_tool/tests/ -v
 
-# 600+ tests · GitHub Actions CI (Ubuntu + Windows · 3.11 / 3.12)
+# 640+ tests · GitHub Actions CI (Ubuntu + Windows · 3.11 / 3.12)
 # Code style: ruff (format + lint)
 ```
 
 | Module | Tests | Coverage |
 |--------|-------|----------|
-| 🧩 config | 34 | Loading / merging / validation |
-| 🛠️ utils | 54 | extract_json / ffmpeg discovery / atomic IO |
-| 🎬 cut | 25 | Time parsing / filename gen |
-| 📊 progress | 14 | Progress / ETA |
-| 🤖 ai series | 53 | Gemini / OpenAI / retry / cache |
+| 🧩 config | 46 | Loading / merging / validation / descriptions |
+| 🛠️ utils | 74 | extract_json / ffmpeg discovery / atomic IO / subprocess |
+| 🎬 cut | 26 | Time parsing / filename gen / offset |
+| 📊 progress | 15 | Progress / ETA |
+| 🤖 ai series | 60 | Gemini / OpenAI / retry / cache |
 | 🧠 analyze | 19 | File matching / context injection |
-| 🌐 routes | 48 | Video / config / plan / transcript APIs |
-| 🔄 tasks | 50+ | Step orchestration / cancel |
-| 🎙️ transcribe | 19 | Toggle / device / model / CUDA |
-| Others | ~200 | Pipeline / plan / processing_state / log |
+| 🌐 routes | 103 | Video / config / plan / transcript / env APIs |
+| 🔄 tasks | 81 | Step orchestration / cancel / file filter |
+| 🎙️ transcribe | 20 | Toggle / device / model / CUDA |
+| 📦 file_service | 61 | Safe path / atomic save / segment match |
+| 📁 project | 22 | Output dir / registry / step detection |
+| 📊 processing_state | 8 | Mark / reset / persistence |
+| 🧪 vmeta | 13 | Sidecar meta / index / staleness |
+| Others | ~96 | Pipeline / plan / log / ratelimit / main entry etc. |
 
 ---
 

@@ -7,7 +7,7 @@
 [![CI](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml/badge.svg)](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/Leisurelybear/vlog-editing-helper/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/Leisurelybear/vlog-editing-helper)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
-![tests](https://img.shields.io/badge/tests-600%2B-brightgreen)
+![tests](https://img.shields.io/badge/tests-640%2B-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [English](README.en.md) · **简体中文**
@@ -203,7 +203,7 @@ vlog-video-analysis/
 │   ├── ai/                    # 🧠 AI 适配层（Gemini / OpenAI 兼容）
 │   ├── tasks/                 # 📂 各步骤具体实现
 │   ├── ui/                    # 🌐 Web UI（零依赖纯 stdlib）
-│   └── tests/                 # 🧪 600+ 单元测试
+│   └── tests/                 # 🧪 640+ 单元测试
 └── output/
     ├── compressed/            # 🗜️ 压缩后的视频
     ├── texts/                 # 📝 AI 分析结果 JSON
@@ -222,22 +222,26 @@ vlog-video-analysis/
 # 跑全部测试
 python -m pytest vlog_tool/tests/ -v
 
-# 600+ 用例 · GitHub Actions CI（Ubuntu + Windows · 3.11 / 3.12）
+# 640+ 用例 · GitHub Actions CI（Ubuntu + Windows · 3.11 / 3.12）
 # 代码风格: ruff (format + lint)
 ```
 
 | 模块 | 用例数 | 覆盖内容 |
 |------|-------|---------|
-| 🧩 config | 34 | 加载 / 合并 / 校验 |
-| 🛠️ utils | 54 | extract_json / ffmpeg 发现 / 原子 IO |
-| 🎬 cut | 25 | 时间解析 / 文件名生成 |
-| 📊 progress | 14 | 进度追踪 / ETA |
-| 🤖 ai 系列 | 53 | Gemini / OpenAI 兼容 / 重试 / 缓存 |
+| 🧩 config | 46 | 加载 / 合并 / 校验 / 描述 |
+| 🛠️ utils | 74 | extract_json / ffmpeg 发现 / 原子 IO / 子进程 |
+| 🎬 cut | 26 | 时间解析 / 文件名生成 / 偏移 |
+| 📊 progress | 15 | 进度追踪 / ETA |
+| 🤖 ai 系列 | 60 | Gemini / OpenAI 兼容 / 重试 / 缓存 |
 | 🧠 analyze | 19 | 文件匹配 / 上下文注入 / 验证 |
-| 🌐 routes | 48 | 视频 / 配置 / 规划 / 转录 API |
-| 🔄 tasks 系列 | 50+ | 各步骤编排 / 取消传播 |
-| 🎙️ transcribe | 19 | 转录开关 / 设备 / 模型 / CUDA |
-| 其他 | ~200 | pipeline / plan / processing_state / 日志等 |
+| 🌐 routes | 103 | 视频 / 配置 / 规划 / 转录 / 环境 API |
+| 🔄 tasks 系列 | 81 | 各步骤编排 / 取消传播 / 文件过滤 |
+| 🎙️ transcribe | 20 | 转录开关 / 设备 / 模型 / CUDA |
+| 📦 file_service | 61 | 安全路径 / 原子保存 / 段匹配 |
+| 📁 project | 22 | 目录 / 注册表 / 步骤检测 |
+| 📊 processing_state | 8 | 标记 / 重置 / 持久化 |
+| 🧪 vmeta | 13 | 侧边栏元数据 / 索引 / 过期检测 |
+| 其他 | ~96 | pipeline / plan / log / ratelimit / 主入口等 |
 
 ---
 
