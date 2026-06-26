@@ -11,6 +11,7 @@ import uuid
 from pathlib import Path
 
 from vlog_tool.cut import parse_time_range
+from vlog_tool.identity import load_identity
 from vlog_tool.utils import find_videos, get_duration_sec
 
 
@@ -46,6 +47,8 @@ def _build_index_to_source(texts_dir: Path) -> dict[str, str]:
 
     Text JSON contains 'index' (int or str) and 'source_file' (e.g. 'GL010695.mp4').
     Returns mapping like {'001': 'GL010695', '1': 'GL010695', ...}.
+
+    For v2 artifacts, prefers media_identity.original_stem over source_file.
     """
     mapping: dict[str, str] = {}
     if not texts_dir.is_dir():
@@ -58,17 +61,47 @@ def _build_index_to_source(texts_dir: Path) -> dict[str, str]:
             print(f"  [debug] 读取失败 {p}: {e}")
             continue
         raw_idx = data.get("index")
-        source = data.get("source_file", "")
-        print(f"  [debug] 文件={p.name}, index={raw_idx!r}, source_file={source!r}")
-        if raw_idx is None or not source:
-            print("  [debug] 跳过: 缺少 index 或 source_file")
+        if raw_idx is None:
+            print(f"  [debug] 跳过(无index): {p.name}")
             continue
-        stem = Path(source).stem
+
+        # Prefer media_identity.original_stem for v2, fall back to source_file for v1
+        identity = load_identity(data)
+        if identity is not None:
+            stem = identity.original_stem
+            print(f"  [debug] 文件={p.name}, index={raw_idx!r}, media_identity.original_stem={stem!r}")
+        else:
+            source = data.get("source_file", "")
+            print(f"  [debug] 文件={p.name}, index={raw_idx!r}, source_file={source!r}")
+            if not source:
+                print("  [debug] 跳过: 缺少 source_file 且无 media_identity")
+                continue
+            stem = Path(source).stem
+
         idx_str = str(raw_idx)
         mapping[idx_str] = stem
         mapping[idx_str.zfill(3)] = stem
         print(f"  [debug] 映射: {idx_str} -> {stem}, {idx_str.zfill(3)} -> {stem}")
     return mapping
+
+
+def _build_index_to_offset(texts_dir: Path) -> dict[str, float]:
+    """Read segment offsets from analysis JSON media_identity blocks.
+
+    Returns {index_str: offset_sec} for split clips, empty dict for non-split.
+    """
+    offsets: dict[str, float] = {}
+    if not texts_dir.is_dir():
+        return offsets
+    for p in sorted(texts_dir.glob("*.json")):
+        try:
+            data = json.loads(p.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        identity = load_identity(data)
+        if identity is not None and identity.segment_offset_sec:
+            offsets[identity.index] = identity.segment_offset_sec
+    return offsets
 
 
 def _resolve_video(
@@ -190,12 +223,14 @@ def _build_tracks(
     plan_data: dict,
     index_to_material_id: dict[str, str],
     seq_text_ids: dict[int, str] | None = None,
+    index_to_offset: dict[str, float] | None = None,
 ) -> list[dict]:
     """Build video and text tracks from plan sequence."""
     video_segments: list[dict] = []
     text_segments: list[dict] = []
     accumulated_us = 0
     skipped_count = 0
+    index_to_offset = index_to_offset or {}
 
     for i, seg in enumerate(plan_data.get("sequence", [])):
         idx = seg.get("index", "")
@@ -217,6 +252,7 @@ def _build_tracks(
             print(f"  [跳过] 片段 [{idx}] 时长为 0: {timeline_str}")
             continue
 
+        offset = index_to_offset.get(idx, 0.0)
         material_id = index_to_material_id[idx]
         seg_uuid = str(uuid.uuid4())
 
@@ -229,7 +265,7 @@ def _build_tracks(
                     "duration": duration_us,
                 },
                 "source_timerange": {
-                    "start": _to_microseconds(start_sec),
+                    "start": _to_microseconds(start_sec + offset),
                     "duration": duration_us,
                 },
             }
@@ -299,11 +335,12 @@ def export_plan_to_jianying(
         print(f"  [警告] plan 文件为空序列: {plan_path}")
 
     index_to_source = _build_index_to_source(texts_dir) if texts_dir else {}
+    index_to_offset = _build_index_to_offset(texts_dir) if texts_dir else {}
     print(f"  [debug] texts_dir={texts_dir}, index_to_source={index_to_source}")
     if texts_dir:
         print(f"  [debug] texts_dir exists={texts_dir.is_dir()}, files={list(texts_dir.glob('*.json'))}")
     materials, index_to_material_id, seq_text_ids = _build_materials(plan_data, input_dir, ffprobe, index_to_source)
-    tracks = _build_tracks(plan_data, index_to_material_id, seq_text_ids)
+    tracks = _build_tracks(plan_data, index_to_material_id, seq_text_ids, index_to_offset)
 
     total_duration_us = 0
     for track in tracks:
