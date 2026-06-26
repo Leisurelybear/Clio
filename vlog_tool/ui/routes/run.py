@@ -59,32 +59,32 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
         return handler._send_json({"ok": False, "error": "files must be a list of video names"}, 400)
     overwrite = obj.get("overwrite", False)
 
-    # Write initial progress BEFORE starting the thread so the first poll
-    # sees "running" immediately, preventing the race where the frontend
-    # re-enables the button before the thread writes to .progress.json.
-    pre_tracker = ProgressTracker(cfg.paths.output_dir)
-    pre_tracker.update(phase="启动", current=0, total=0, message="流水线启动中...")
-
-    def _run():
-        state.cancel_event.clear()
-        tracker = ProgressTracker(cfg.paths.output_dir)
-        try:
-            run_pipeline_steps(
-                cfg,
-                day_label,
-                steps,
-                tracker=tracker,
-                cancel_event=state.cancel_event,
-                files=files_list,
-                overwrite=overwrite,
-            )
-        except Exception:
-            tracker.error("pipeline failed")
-            traceback.print_exc()
-
     with state.run_lock:
         if state.run_thread is not None and state.run_thread.is_alive():
             return handler._send_json({"ok": False, "error": "pipeline is already running"}, 409)
+
+        # Write initial progress after confirming the run slot is reserved,
+        # so a duplicate request cannot clobber .progress.json before the 409.
+        pre_tracker = ProgressTracker(cfg.paths.output_dir)
+        pre_tracker.update(phase="启动", current=0, total=0, message="流水线启动中...")
+
+        def _run():
+            state.cancel_event.clear()
+            tracker = ProgressTracker(cfg.paths.output_dir)
+            try:
+                run_pipeline_steps(
+                    cfg,
+                    day_label,
+                    steps,
+                    tracker=tracker,
+                    cancel_event=state.cancel_event,
+                    files=files_list,
+                    overwrite=overwrite,
+                )
+            except Exception:
+                tracker.error("pipeline failed")
+                traceback.print_exc()
+
         state.run_thread = threading.Thread(target=_run, daemon=True)
         state.run_thread.start()
     label = "+".join(steps) if steps else "all"

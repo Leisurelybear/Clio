@@ -84,6 +84,17 @@ class TestHandlePostRunStart:
 
         handler._send_json.assert_called_once_with({"ok": False, "error": "pipeline is already running"}, 409)
 
+    def test_already_running_does_not_clobber_progress(self, tmp_path, _handler):
+        """Duplicate run request must NOT overwrite existing progress file."""
+        handler = _handler
+        handler._resolve_project_input.return_value = Path("/input")
+        handler.__class__._fake_state.run_thread = MagicMock()
+        handler.__class__._fake_state.run_thread.is_alive.return_value = True
+
+        handle_post_run_start(handler, {}, {})
+
+        handler._send_json.assert_called_once_with({"ok": False, "error": "pipeline is already running"}, 409)
+
     def test_starts_thread(self, tmp_path: Path, _no_thread, _handler):
         handler = _handler
         handler._resolve_project_input.return_value = tmp_path / "input"
