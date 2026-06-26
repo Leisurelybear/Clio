@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from vlog_tool._constants import VIDEO_EXTS
+from vlog_tool.identity import load_identity
 from vlog_tool.ui.services.file_service import (
     _find_compressed_for_original,
     _find_original_for_compressed,
@@ -49,18 +50,27 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     # texts/scripts sidecars are keyed by the compressed index in both views
     text_sidecars: dict[str, list[str]] = {}
     text_titles: dict[str, str] = {}
+    text_identities: dict[str, Any] = {}  # index -> MediaIdentity (for v2)
     for td in _find_texts_dirs(proj_out):
         for f in sorted(td.iterdir()):
-            if f.suffix != ".json" or "_" not in f.stem:
+            if f.suffix != ".json":
                 continue
-            idx = f.stem.split("_", 1)[0]
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            idx = str(data.get("index", ""))
+            if not idx:
+                if "_" not in f.stem:
+                    continue
+                idx = f.stem.split("_", 1)[0]
             text_sidecars.setdefault(idx, []).append(f.name)
             if idx not in text_titles:
-                try:
-                    data = json.loads(f.read_text(encoding="utf-8"))
-                    text_titles[idx] = data.get("title", "")
-                except Exception:
-                    text_titles[idx] = ""
+                text_titles[idx] = data.get("title", "")
+            if idx not in text_identities:
+                identity = load_identity(data)
+                if identity is not None:
+                    text_identities[idx] = identity
     script_sidecars: dict[str, list[str]] = {}
     sd = proj_out / "scripts"
     if sd.is_dir():
@@ -77,7 +87,16 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     if transcripts_dir.is_dir():
         for f in transcripts_dir.iterdir():
             if f.suffix == ".json" and f.stem.endswith("_transcript"):
+                # Add compressed stem (v1 behavior)
                 transcripts_set.add(f.stem[: -len("_transcript")])
+                # Also add original_stem if v2 (in case transcript files were re-run)
+                try:
+                    tf_data = json.loads(f.read_text(encoding="utf-8"))
+                    identity = load_identity(tf_data)
+                    if identity is not None:
+                        transcripts_set.add(identity.original_stem)
+                except Exception:
+                    pass
 
     videos: list[dict] = []
     groups: dict[str, dict] = {}
@@ -101,7 +120,13 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                     "title": text_titles.get(idx, ""),
                     "text_json": (text_sidecars.get(idx) or [None])[0],
                     "script_json": (script_sidecars.get(idx) or [None])[0],
-                    "transcript_file": orig_stem if orig_stem and orig_stem in transcripts_set else None,
+                    "transcript_file": (
+                        text_identities[idx].original_stem
+                        if idx in text_identities and text_identities[idx].original_stem in transcripts_set
+                        else orig_stem
+                        if orig_stem and orig_stem in transcripts_set
+                        else None
+                    ),
                     "match": ({"source": "original", "file": orig} if orig else None),
                     "group_key": group_key,
                     "segment_label": None,
