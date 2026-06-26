@@ -53,7 +53,7 @@ def _path(value: str | None, base: Path | None = None) -> Path:
     return path.resolve()
 
 
-def _load_dotenv(base: Path) -> None:
+def _load_dotenv(base: Path, override: bool = False) -> None:
     env_file = base / ".env"
     if not env_file.is_file():
         return
@@ -63,7 +63,7 @@ def _load_dotenv(base: Path) -> None:
             continue
         key, _, value = line.partition("=")
         key, value = key.strip(), value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
+        if key and (override or key not in os.environ):
             os.environ[key] = value
 
 

@@ -109,6 +109,21 @@ class TestHandlePutEnv:
         assert dotenv.read_text(encoding="utf-8") == ""
         handler._send_json.assert_called_once_with({"ok": True, "path": str(dotenv)})
 
+    def test_overrides_existing_env_var(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("key: val\n", encoding="utf-8")
+        handler.config_path = cfg
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+        dotenv = tmp_path / ".env"
+        dotenv.write_text("MY_KEY=new_value\n", encoding="utf-8")
+
+        with patch("vlog_tool.ui.routes.env_routes._load_dotenv") as mock_load:
+            handle_put_env(handler, {}, {"content": "MY_KEY=new_value\n"})
+
+        mock_load.assert_called_once_with(tmp_path, override=True)
+
     def test_new_file_created(self, tmp_path: Path):
         """New .env file is created when it doesn't exist."""
         handler = MagicMock()

@@ -39,7 +39,7 @@ def handle_put_env(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None
     env_path.parent.mkdir(parents=True, exist_ok=True)
     env_path.write_text(content, encoding="utf-8")
     # Reload env vars into os.environ so subsequent load_config picks them up
-    _load_dotenv(env_path.parent)
+    _load_dotenv(env_path.parent, override=True)
     # Clear config cache so next request rebuilds with the new API keys
     handler.__class__._config_cache.invalidate_all()
     handler._send_json({"ok": True, "path": str(env_path)})
