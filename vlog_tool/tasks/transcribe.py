@@ -11,6 +11,7 @@ from datetime import datetime
 from pathlib import Path
 
 from vlog_tool.config import AppConfig
+from vlog_tool.identity import _identity_to_dict, resolve_identity
 from vlog_tool.log import format_duration
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
@@ -244,6 +245,10 @@ def run_transcribe_all(
                 "segments": segments,
                 "generated_at": datetime.now().isoformat(),
             }
+            idx = compressed_stem.split("_", 1)[0] if "_" in compressed_stem else ""
+            transcript_identity = resolve_identity(compressed_video, config.paths.input_dir, idx)
+            transcript["_schema_version"] = 2
+            transcript["media_identity"] = _identity_to_dict(transcript_identity)
             write_json_atomic(out_path, transcript)
             state.mark(orig_stem, "transcribe", "done")
             seg_info = f"{len(segments)} 段" if segments else "无有效内容"
@@ -332,6 +337,10 @@ def run_transcribe_one(
             "segments": segments,
             "generated_at": datetime.now().isoformat(),
         }
+        idx = video_path.stem.split("_", 1)[0] if "_" in video_path.stem else ""
+        transcript_identity = resolve_identity(video_path, config.paths.input_dir, idx)
+        transcript["_schema_version"] = 2
+        transcript["media_identity"] = _identity_to_dict(transcript_identity)
         transcripts_dir = config.paths.output_dir / config.whisper.transcripts_subdir
         transcripts_dir.mkdir(parents=True, exist_ok=True)
         out_path = transcripts_dir / f"{video_path.stem}_transcript.json"
