@@ -11,6 +11,7 @@ from pathlib import Path
 from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.config import AppConfig
 from vlog_tool.cut import cut_one, parse_time_range
+from vlog_tool.identity import load_identity
 from vlog_tool.log import format_duration, timed
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.tasks._helpers import _eta_line
@@ -164,13 +165,25 @@ def run_cut_all(
             # Apply segment offset for original source with split videos
             offset = 0.0
             if source == "original":
-                comp_candidates = sorted(comp_dir.glob(f"{idx}_*"))
-                if comp_candidates:
-                    stem = comp_candidates[0].stem
-                    offset = _compute_segment_offset(stem, comp_dir, video_path, ffprobe)
-                    if offset:
-                        start += offset
-                        end += offset
+                # Prefer media_identity.segment_offset_sec from analysis JSON
+                text_json_paths = sorted(config.texts_dir.glob(f"{idx}_*.json"))
+                if text_json_paths:
+                    try:
+                        data = json.loads(text_json_paths[0].read_text(encoding="utf-8"))
+                        identity = load_identity(data)
+                        if identity is not None and identity.segment_offset_sec:
+                            offset = identity.segment_offset_sec
+                    except Exception:
+                        pass
+                # Fall back to vmeta-based computation for v1 files
+                if offset == 0.0:
+                    comp_candidates = sorted(comp_dir.glob(f"{idx}_*"))
+                    if comp_candidates:
+                        stem = comp_candidates[0].stem
+                        offset = _compute_segment_offset(stem, comp_dir, video_path, ffprobe)
+                if offset:
+                    start += offset
+                    end += offset
 
             clip_stem = f"{idx}_{sanitize_name(title, max_len=30)}_seg_{i:03d}"
             clip_path = out_root / f"{clip_stem}.mp4"
