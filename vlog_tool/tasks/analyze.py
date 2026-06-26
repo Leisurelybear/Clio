@@ -13,6 +13,7 @@ from vlog_tool._constants import VIDEO_EXTS
 from vlog_tool.ai.token_usage import FileTokenUsageStore
 from vlog_tool.analyze import analyze_video
 from vlog_tool.config import AppConfig
+from vlog_tool.identity import _identity_to_dict, resolve_identity
 from vlog_tool.log import format_duration, timed
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
@@ -155,6 +156,9 @@ def _process_video_item(
 
     analysis["index"] = idx_val
     analysis["source_file"] = original.name
+    identity = resolve_identity(compressed, config.paths.input_dir, idx_str)
+    analysis["_schema_version"] = 2
+    analysis["media_identity"] = _identity_to_dict(identity)
 
     stem = _build_stem(idx_val, analysis.get("title", original.stem), config)
     final_text = config.texts_dir / f"{stem}.txt"
