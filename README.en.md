@@ -7,7 +7,7 @@
 [![CI](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml/badge.svg)](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/Leisurelybear/vlog-editing-helper/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/Leisurelybear/vlog-editing-helper)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
-![tests](https://img.shields.io/badge/tests-640%2B-brightgreen)
+![tests](https://img.shields.io/badge/tests-860%2B-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **English** · [简体中文](README.md)
@@ -205,7 +205,7 @@ vlog-video-analysis/
 │   ├── ai/                    # 🧠 AI adapters (Gemini / OpenAI compat)
 │   ├── tasks/                 # 📂 Step implementations
 │   ├── ui/                    # 🌐 Web UI (stdlib only, zero deps)
-│   └── tests/                 # 🧪 640+ unit tests
+│   └── tests/                 # 🧪 860+ unit tests
 └── output/
     ├── compressed/            # 🗜️ Compressed videos
     ├── texts/                 # 📝 AI analysis JSON
@@ -223,7 +223,7 @@ vlog-video-analysis/
 ```bash
 python -m pytest vlog_tool/tests/ -v
 
-# 640+ tests · GitHub Actions CI (Ubuntu + Windows · 3.11 / 3.12)
+# 860+ tests · GitHub Actions CI (Ubuntu + Windows · 3.11 / 3.12)
 # Code style: ruff (format + lint)
 ```
 

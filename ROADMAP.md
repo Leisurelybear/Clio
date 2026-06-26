@@ -43,8 +43,8 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 **Background**: `server.py` has 6% coverage, `fs.py` has 12% coverage. These are security-sensitive and critical files with minimal testing.
 
 **Sub-tasks**:
-- [ ] U-010a: Add integration tests for `server.py` dispatch logic (do_GET/do_PUT/do_POST routing)
-- [ ] U-010b: Add tests for `fs.py` directory browsing (boundary cases, permission errors)
+- [x] U-010a: Add tests for `server.py` dispatch logic (do_GET/do_PUT/do_POST routing) — 90% coverage
+- [x] U-010b: Add tests for `fs.py` directory browsing (boundary cases, permission errors) — 96% coverage
 - [ ] U-010c: Add tests for `whisper_routes.py` install/cancel/model management flows
 
 ### U-008: fs.py Path Restriction + Auth for LAN Mode (Phase 1 — Security)

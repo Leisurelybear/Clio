@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-06-26
+
+### Added
+- U-010a/b: Unit tests for 13 previously uncovered modules — overall coverage 82% → 89% (864 tests)
+- New test files: `test_fs.py`, `test_static_files.py`, `test_token_routes.py`, `test_processing_state_routes.py`,
+  `test_server.py`, `test_config_cache.py`, `test_refine_routes.py`, `test_shutdown.py`, `test_session_log.py`,
+  `test_token_usage.py`, `test_reindex.py`, `test_export.py`, `test_export_routes.py`
+
+### Changed
+- README badge: tests 640+ → 860+
+
 ## 2026-06-25
 
 ### Added
