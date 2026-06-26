@@ -227,6 +227,23 @@ class TestLoadConfig:
         with pytest.raises(FileNotFoundError):
             load_config("/nonexistent/config.yaml")
 
+    def test_provider_ttl_min_from_config(self, tmp_path):
+        cfg_path = tmp_path / "config.yaml"
+        cfg_path.write_text(
+            "paths:\n  input_dir: .\n  output_dir: ./output\n"
+            "proxy:\n  enabled: false\n"
+            "ai:\n  provider_ttl_min: 120\n"
+            "  providers:\n    g:\n      type: gemini\n      api_key: k\n"
+            "  tasks:\n    t:\n      provider: g\n      model: m\n",
+            encoding="utf-8",
+        )
+        cfg = load_config(cfg_path)
+        assert cfg.ai.provider_ttl_min == 120
+
+    def test_provider_ttl_min_default(self, tmp_config):
+        cfg = load_config(tmp_config / "config.yaml")
+        assert cfg.ai.provider_ttl_min == 60
+
     def test_with_project_dir_no_project_yaml(self, tmp_config):
         """project_dir without project.yaml returns base config."""
         cfg = load_config(tmp_config / "config.yaml", project_dir=tmp_config)

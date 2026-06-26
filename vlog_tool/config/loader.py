@@ -233,6 +233,7 @@ def load_config(
             tasks=_parse_tasks(ai_raw.get("tasks")),
             context=_load_context(ai_raw, base, project_dir=project_dir),
             debug_print_prompt=ai_raw.get("debug_print_prompt", False),
+            provider_ttl_min=ai_raw.get("provider_ttl_min", 60),
         )
     else:
         ai = _legacy_ai_config(raw)
