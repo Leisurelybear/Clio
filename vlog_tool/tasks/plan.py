@@ -9,6 +9,7 @@ from pathlib import Path
 from vlog_tool.ai.token_usage import FileTokenUsageStore
 from vlog_tool.analyze import plan_daily_vlog
 from vlog_tool.config import AppConfig
+from vlog_tool.identity import load_identity
 from vlog_tool.log import timed
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
@@ -54,7 +55,12 @@ def run_plan_vlog(
         except (ValueError, TypeError):
             print(f"  [跳过] 无效 index '{raw_idx}' 在 {json_file.name}")
             continue
-        source_stem = Path(data.get("source_file", "")).stem or json_file.stem
+        # Use media_identity.original_stem for v2 files
+        identity = load_identity(data)
+        if identity is not None:
+            source_stem = identity.original_stem
+        else:
+            source_stem = Path(data.get("source_file", "")).stem or json_file.stem
         clips.append(
             {
                 "index": format_index(idx, config.naming.index_width),
@@ -79,9 +85,18 @@ def run_plan_vlog(
         for tf in sorted(trans_dir.glob("*_transcript.json")):
             try:
                 data = json.loads(tf.read_text(encoding="utf-8"))
-                stem = data.get("source_stem", "")
+                # Try v2 identity first, then fall back to v1 source_stem → extract_orig_stem
+                identity = load_identity(data)
+                if identity is not None:
+                    stem = identity.original_stem
+                else:
+                    stem = data.get("source_stem", "")
+                    # Fallback: extract original stem from compressed stem
+                    if "_" in stem:
+                        stem = stem.split("_", 1)[1]
+                    stem = __import__("re").sub(r"_seg\d+$", "", stem)
                 if stem:
-                    transcripts_map[stem] = data
+                    transcripts_map[stem.lower()] = data
             except (json.JSONDecodeError, KeyError):
                 continue
     if config.plan.use_transcripts and not transcripts_map:
