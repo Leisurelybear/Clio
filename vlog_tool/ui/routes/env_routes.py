@@ -8,16 +8,17 @@ from typing import TYPE_CHECKING
 from vlog_tool.config import _load_dotenv
 
 if TYPE_CHECKING:
-    from http.server import BaseHTTPRequestHandler
+    from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 
-def _dotenv_path(handler: BaseHTTPRequestHandler) -> Path | None:
-    config_path: Path | None = getattr(handler, "config_path", None)
+def _dotenv_path(handler: HandlerProtocol) -> Path | None:
+    config_path: Path | None = handler.config_path
     if config_path and config_path.is_file():
         return config_path.parent / ".env"
+    return None
 
 
-def handle_get_env(handler: BaseHTTPRequestHandler, qs: dict) -> None:
+def handle_get_env(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     env_path = _dotenv_path(handler)
     if env_path and env_path.is_file():
         text = env_path.read_text(encoding="utf-8")
@@ -31,7 +32,7 @@ def handle_get_env(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     handler._send_json({"path": str(env_path) if env_path else "", "content": text})
 
 
-def handle_put_env(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
+def handle_put_env(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
     env_path = _dotenv_path(handler)
     if not env_path:
         return handler._send_json({"ok": False, "error": "config_path not available"}, 500)
