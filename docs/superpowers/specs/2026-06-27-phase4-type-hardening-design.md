@@ -18,6 +18,8 @@ The goal of Phase 4 is to **establish explicit, maintainable type contracts** ac
 
 This is not about eliminating mypy errors for their own sake. Each fix should make the contract clearer or catch a real potential bug.
 
+Success is measured by **stronger type contracts**, not by eliminating every mypy error. A well-understood remaining type error is preferable to an unnecessary architectural refactoring.
+
 ## 2. Strategy: Incremental Strict Mode
 
 Rather than fixing all 243 errors at once, we apply mypy controls **per-module** and progressively expand the strict subset. Each module, once clean, is added to a `strict_modules` list that CI enforces.
@@ -50,15 +52,7 @@ Phase 4d: CI gate for clean subset
 
 **Problem**: `_data: dict` defaults to `dict[str, object]` in Python 3.11+ with `dict` bare annotation. Arithmetic and method calls on `object` fail mypy checks.
 
-**Fix**: Use `TypedDict` for the progress data shape, or explicitly type `_data: dict[str, Any]` and add assertions before arithmetic operations:
-
-```python
-total: int = self._data.get("total", 0)  # type: ignore[assignment]
-current: int = self._data.get("current", 0)
-eta_sec: float | None = self._data.get("eta_sec")
-```
-
-Alternatively, cast in getter methods where the shape is known.
+**Fix**: Define a `ProgressData` `TypedDict` with known fields (`total`, `current`, `phase`, `status`, `eta_sec`, `message`, `logs`). Use `cast()` in getter/update methods where the dict shape is well-known. Avoid widening to `dict[str, Any]` — that weakens the type contract established elsewhere.
 
 ### 3.3 `export/__init__.py` (1 error)
 
@@ -156,8 +150,10 @@ class HandlerProtocol(Protocol):
 
 **Note on `_config_cache`**: Some routes access it via `type(handler)._config_cache` (class-level). Since it's declared as an instance attribute in `HandlerProtocol`, mypy may still complain. Two options:
 - a) Access via `handler._config_cache` instead (works at runtime because class attrs are visible from instances)
-- b) Keep `type: ignore[attr-defined]` on class-level accesses with a short rationale comment
+- b) Keep `type: ignore[attr-defined]` on class-level accesses with a short rationale comment (`# class attr visible from instance`)
 - Recommended: option (a) — simpler and still correct at runtime
+
+Temporary `type: ignore[attr-defined]` is acceptable only when genuinely unavoidable (e.g., fundamentally dynamic dispatch). Each suppression must include an inline comment explaining why it is necessary and what would need to change to remove it.
 
 ### 4.4 File list to update (~15 files)
 
@@ -237,6 +233,23 @@ python -m mypy vlog_tool/config/ vlog_tool/utils.py --check-untyped-defs
 2. When core is clean → CI fails if core regresses
 3. After route Protocol → add route modules
 4. After all annotations complete → switch to `--strict` for entire project
+
+### 6.4 Long-term direction
+
+The module list should eventually move from the CI workflow YAML into `mypy.ini` (or `pyproject.toml` under `[tool.mypy]`), keeping CI itself simple. This also makes local runs consistent with CI:
+
+```ini
+# future mypy.ini (post-Phase 4)
+[mypy-vlog_tool.config.*]
+check_untyped_defs = True
+
+[mypy-vlog_tool.progress]
+check_untyped_defs = True
+
+# ... repeat per cleaned module
+```
+
+However, during Phase 4 the per-module list is still in flux, so keep it in the CI workflow file and defer migration to `mypy.ini` until the list is stable.
 
 ## 7. Error Budget Summary
 
