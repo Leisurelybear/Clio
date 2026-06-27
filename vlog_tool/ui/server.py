@@ -16,6 +16,7 @@ from dataclasses import dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlparse
 
 from vlog_tool.config import AppConfig
@@ -134,11 +135,17 @@ def make_handler(
         "lastVideo": None,
     }
 
-    class Handler(BaseHTTPRequestHandler):
+    # isort: split
+    from vlog_tool.ui.handler_protocol import HandlerProtocol
+
+    class Handler(BaseHTTPRequestHandler, HandlerProtocol):
         _project_states: dict[str, _ServerState]
-        _config_cache: ConfigCache
-        DEFAULT_PROJECT: dict = {}
-        server: BaseHTTPRequestHandler
+        _config_cache: ClassVar[ConfigCache]
+        DEFAULT_PROJECT: dict[str, Any] = {}
+        input_dir: Path
+        output_dir: Path
+        config_path: Path | None
+        _api_token: str | None
 
         def _get_state(self, project_key: str) -> _ServerState:
             states = self.__class__._project_states
@@ -177,7 +184,7 @@ def make_handler(
             self.end_headers()
             self.wfile.write(body)
 
-        def _send_bytes(self, data: bytes, content_type: str) -> None:
+        def _send_bytes(self, data: bytes, content_type: str = "application/octet-stream") -> None:
             self.send_response(200)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(data)))
