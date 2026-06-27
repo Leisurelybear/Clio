@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from vlog_tool.ai.token_usage import FileTokenUsageStore
 from vlog_tool.analyze import refine_script, refine_text
@@ -31,7 +31,7 @@ def _mark_busy(path: str, busy: bool) -> None:
             _refining.discard(path)
 
 
-def handle_post_refine(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
+def handle_post_refine(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle POST /api/refine.
 
     Body: {file: str, type: "texts"|"scripts", context?: str}

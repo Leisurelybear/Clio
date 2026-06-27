@@ -20,7 +20,7 @@ from vlog_tool.utils import get_duration_sec, resolve_binary
 from vlog_tool.vmeta import VideoMeta
 
 if TYPE_CHECKING:
-    from http.server import BaseHTTPRequestHandler
+    from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 _SEG_RE = re.compile(r"^(.+)_seg(\d+)$")
 
@@ -37,7 +37,7 @@ def _parse_segment_info(stem: str) -> tuple[str | None, int | None]:
     return m.group(1), int(m.group(2))
 
 
-def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
+def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/videos. Sends JSON response directly."""
 
     proj_input = handler._resolve_project_input(qs)
@@ -118,8 +118,8 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                     "source": "compressed",
                     "index": idx,
                     "title": text_titles.get(idx, ""),
-                    "text_json": (text_sidecars.get(idx) or [None])[0],
-                    "script_json": (script_sidecars.get(idx) or [None])[0],
+                    "text_json": next((x for x in text_sidecars.get(idx, []) if x is not None), None),
+                    "script_json": next((x for x in script_sidecars.get(idx, []) if x is not None), None),
                     "transcript_file": (
                         text_identities[idx].original_stem
                         if idx in text_identities and text_identities[idx].original_stem in transcripts_set
@@ -162,15 +162,15 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                 # legacy estimation for files without .vmeta
                 missing = [m for m in members if m[0] not in offsets]
                 if missing and total > 1 and _ffprobe:
-                    orig: Path | None = None
+                    orig_video: Path | None = None
                     for ext in VIDEO_EXTS:
                         candidate = proj_input / f"{gk}{ext}"
                         if candidate.is_file():
-                            orig = candidate
+                            orig_video = candidate
                             break
-                    if orig is not None:
+                    if orig_video is not None:
                         try:
-                            dur = get_duration_sec(orig, _ffprobe)
+                            dur = get_duration_sec(orig_video, _ffprobe)
                             seg_dur = dur / total
                             for i, (member_idx, _) in enumerate(missing):
                                 offsets[member_idx] = round(i * seg_dur, 1)
@@ -206,35 +206,35 @@ def handle_get_videos(handler: BaseHTTPRequestHandler, qs: dict) -> None:
                     )
                     continue
                 # Compute per-segment offsets
-                offsets: dict[str, float] = {}
+                seg_offsets: dict[str, float] = {}
                 if len(comp) > 1 and _ffprobe:
                     try:
                         dur = get_duration_sec(p, _ffprobe)
                         seg_dur = dur / len(comp)
                         for i, (_, idx) in enumerate(comp):
-                            offsets[idx] = round(i * seg_dur, 1)
+                            seg_offsets[idx] = round(i * seg_dur, 1)
                     except Exception:
                         pass
                 segment_matches = [{"source": "compressed", "file": cf, "index": ci} for cf, ci in comp]
                 for c_file, c_idx in comp:
-                    v: dict[str, Any] = {
+                    seg_v: dict[str, Any] = {
                         "file": f"{c_idx}_{p.name}",
                         "source": "original",
                         "index": c_idx,
                         "title": text_titles.get(c_idx, ""),
-                        "offset_sec": offsets.get(c_idx, 0.0),
-                        "text_json": (text_sidecars.get(c_idx) or [None])[0],
-                        "script_json": (script_sidecars.get(c_idx) or [None])[0],
+                        "offset_sec": seg_offsets.get(c_idx, 0.0),
+                        "text_json": next((x for x in text_sidecars.get(c_idx, []) if x is not None), None),
+                        "script_json": next((x for x in script_sidecars.get(c_idx, []) if x is not None), None),
                         "transcript_file": p.stem if p.stem in transcripts_set else None,
                         "match": {"source": "compressed", "file": c_file, "index": c_idx},
                     }
                     if len(segment_matches) > 1:
-                        v["segment_matches"] = segment_matches
-                    videos.append(v)
+                        seg_v["segment_matches"] = segment_matches
+                    videos.append(seg_v)
     handler._send_json({"videos": videos, "source": source, "groups": groups})
 
 
-def handle_get_video(handler: BaseHTTPRequestHandler, qs: dict) -> None:
+def handle_get_video(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/video. Sends video range response directly."""
 
     proj_input = handler._resolve_project_input(qs)
@@ -254,7 +254,7 @@ def handle_get_video(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     handler._send_video_range(vp)
 
 
-def handle_get_vmeta(handler: BaseHTTPRequestHandler, qs: dict, stem: str) -> None:
+def handle_get_vmeta(handler: HandlerProtocol, qs: dict[str, Any], stem: str) -> None:
     """Handle GET /api/vmeta/{stem} → .vmeta JSON content."""
     if not stem:
         return handler._send_json({"ok": False, "error": "missing stem"}, 400)

@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from vlog_tool.ui.services.file_service import _create_project_yaml, _save_atomic
 from vlog_tool.ui.services.project_service import (
@@ -22,7 +22,7 @@ if TYPE_CHECKING:
     from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 
-def handle_get_project(handler: HandlerProtocol, qs: dict[str, str]) -> None:
+def handle_get_project(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/project."""
     proj_input = handler._resolve_project_input(qs)
     proj_file = proj_input / "project.json"
@@ -43,7 +43,7 @@ def handle_get_project(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     handler._send_json(merged)
 
 
-def handle_get_projects(handler: HandlerProtocol, qs: dict[str, str]) -> None:
+def handle_get_projects(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/projects."""
     req_project = qs.get("project", [None])[0]
     req_input_dir = qs.get("input_dir", [None])[0]
@@ -71,7 +71,7 @@ def handle_get_projects(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     handler._send_json({"projects": projects, "last_project": last_project_name})
 
 
-def handle_put_project(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
+def handle_put_project(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle PUT /api/project."""
     proj_input = handler._resolve_project_input(qs)
     proj_file = proj_input / "project.json"

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import tempfile
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import yaml
 
@@ -21,7 +21,7 @@ if TYPE_CHECKING:
     from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 
-def handle_get_config(handler: HandlerProtocol, qs: dict[str, str]) -> None:
+def handle_get_config(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/config."""
     proj_input = handler._resolve_project_input(qs)
     proj_out = handler._get_project_output(proj_input)
@@ -39,7 +39,7 @@ def handle_get_config(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     )
 
 
-def handle_get_config_raw(handler: HandlerProtocol, qs: dict[str, str]) -> None:
+def handle_get_config_raw(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/config/raw."""
 
     config_path = handler.config_path
@@ -49,8 +49,8 @@ def handle_get_config_raw(handler: HandlerProtocol, qs: dict[str, str]) -> None:
         return handler._send_json({"error": "config file not available"}, 500)
     proj_input = handler._resolve_project_input(qs)
     # Always try to load project.yaml if it exists (proj_input may equal default dir)
-    proj_yaml = proj_input / "project.yaml"
-    if not proj_yaml.is_file():
+    proj_yaml: Path | None = proj_input / "project.yaml"
+    if proj_yaml is not None and not proj_yaml.is_file():
         # Non-default project without project.yaml => needs init
         if proj_input != input_dir:
             return handler._send_json({"needs_init": True})
@@ -72,7 +72,7 @@ def handle_get_config_raw(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     handler._send_json(raw)
 
 
-def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
+def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle PUT /api/config/raw."""
     config_path = handler.config_path
     input_dir = handler.input_dir
@@ -129,7 +129,7 @@ def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, str], obj: dic
     handler._send_json({"ok": True, "path": str(config_path)})
 
 
-def handle_post_config_init(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
+def handle_post_config_init(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle POST /api/config/init."""
     config_path = handler.config_path
     input_dir = handler.input_dir

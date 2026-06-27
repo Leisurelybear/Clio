@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from vlog_tool.pipeline import run_cut_all
 from vlog_tool.ui.services.file_service import _is_safe_basename, _save_atomic
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 
-def handle_get_plans(handler: HandlerProtocol, qs: dict[str, str]) -> None:
+def handle_get_plans(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/plans."""
     proj_out = handler._get_project_output(qs)
     plans_dir = proj_out / "plans"
@@ -26,7 +26,7 @@ def handle_get_plans(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     handler._send_json({"plans": plans})
 
 
-def handle_get_plan(handler: HandlerProtocol, qs: dict[str, str]) -> None:
+def handle_get_plan(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/plan."""
     day = qs.get("day", [""])[0]
     if not _is_safe_basename(day) or not day:
@@ -38,7 +38,7 @@ def handle_get_plan(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     handler._send_bytes(p.read_bytes(), "application/json; charset=utf-8")
 
 
-def handle_put_plan(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
+def handle_put_plan(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle PUT /api/plan."""
     day = qs.get("day", [""])[0]
     if not _is_safe_basename(day) or not day:

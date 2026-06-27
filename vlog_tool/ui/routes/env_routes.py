@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from vlog_tool.config import _load_dotenv
 
@@ -18,7 +18,7 @@ def _dotenv_path(handler: HandlerProtocol) -> Path | None:
     return None
 
 
-def handle_get_env(handler: HandlerProtocol, qs: dict[str, str]) -> None:
+def handle_get_env(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     env_path = _dotenv_path(handler)
     if env_path and env_path.is_file():
         text = env_path.read_text(encoding="utf-8")
@@ -32,7 +32,7 @@ def handle_get_env(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     handler._send_json({"path": str(env_path) if env_path else "", "content": text})
 
 
-def handle_put_env(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
+def handle_put_env(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     env_path = _dotenv_path(handler)
     if not env_path:
         return handler._send_json({"ok": False, "error": "config_path not available"}, 500)

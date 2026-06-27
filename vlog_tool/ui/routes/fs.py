@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from vlog_tool.ui.handler_protocol import HandlerProtocol
@@ -28,7 +28,7 @@ def _is_allowed_path(resolved: Path) -> bool:
     return False
 
 
-def handle_get_fs_dirs(handler: HandlerProtocol, qs: dict[str, str]) -> None:
+def handle_get_fs_dirs(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/fs/dirs."""
     dir_path = qs.get("path", [""])[0]
     if not dir_path:

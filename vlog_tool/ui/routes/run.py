@@ -8,7 +8,7 @@ import re
 import threading
 import traceback
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from vlog_tool.pipeline import run_analyze_all, run_compress_all, run_generate_scripts, run_pipeline_steps
 from vlog_tool.progress import ProgressTracker
@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 
-def handle_get_run_status(handler: HandlerProtocol, qs: dict[str, str]) -> None:
+def handle_get_run_status(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/run/status."""
     proj_input = handler._resolve_project_input(qs)
     state = handler._get_state(str(proj_input.resolve()))  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
@@ -45,7 +45,7 @@ def handle_get_run_status(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     handler._send_json(data)
 
 
-def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
+def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle POST /api/run/start."""
     day_label = obj.get("day_label", "day1")
     steps = obj.get("steps")
@@ -91,7 +91,7 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, str], obj: dic
     handler._send_json({"ok": True, "message": f"pipeline started ({label})"})
 
 
-def handle_post_run_cancel(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
+def handle_post_run_cancel(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle POST /api/run/cancel."""
     proj_input = handler._resolve_project_input(qs)
     state = handler._get_state(str(proj_input.resolve()))  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
@@ -99,7 +99,7 @@ def handle_post_run_cancel(handler: HandlerProtocol, qs: dict[str, str], obj: di
     handler._send_json({"ok": True, "message": "取消请求已发送"})
 
 
-def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
+def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle POST /api/rerun."""
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)

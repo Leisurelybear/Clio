@@ -6,7 +6,9 @@ import json
 import math
 import re
 from pathlib import Path
+from typing import Any
 
+from vlog_tool.ui.handler_protocol import HandlerProtocol
 from vlog_tool.ui.services.file_service import _is_safe_basename, _save_atomic
 
 _MAX_SEGMENT_TEXT_LENGTH = 5000
@@ -24,7 +26,7 @@ def _resolve_stem(file: str) -> str | None:
     return stem
 
 
-def _transcript_path(handler, qs: dict, video: str) -> Path | None:
+def _transcript_path(handler: HandlerProtocol, qs: dict[str, Any], video: str) -> Path | None:
     stem = _resolve_stem(video)
     if not stem:
         return None
@@ -37,7 +39,7 @@ def _transcript_path(handler, qs: dict, video: str) -> Path | None:
     return transcripts_dir / f"{stem}_transcript.json"
 
 
-def handle_get_transcripts(handler, qs: dict) -> None:
+def handle_get_transcripts(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     video = qs.get("video", [None])[0]
     if not video:
         return handler._send_json({"ok": False, "error": "missing video param"}, 400)
@@ -54,7 +56,7 @@ def handle_get_transcripts(handler, qs: dict) -> None:
         handler._send_json({"ok": False, "error": str(e)}, 500)
 
 
-def handle_put_transcripts(handler, qs: dict, obj: dict) -> None:
+def handle_put_transcripts(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     video = qs.get("video", [None])[0]
     if not video:
         return handler._send_json({"ok": False, "error": "missing video param"}, 400)
@@ -94,7 +96,7 @@ def handle_put_transcripts(handler, qs: dict, obj: dict) -> None:
         handler._send_json({"ok": False, "error": str(e)}, 500)
 
 
-def handle_post_transcripts(handler, qs: dict, obj: dict) -> None:
+def handle_post_transcripts(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     video = qs.get("video", [None])[0]
     if not video:
         return handler._send_json({"ok": False, "error": "missing video param"}, 400)

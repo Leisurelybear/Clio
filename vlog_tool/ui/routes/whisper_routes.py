@@ -12,10 +12,11 @@ from pathlib import Path
 
 from vlog_tool.config import WhisperModelSize
 from vlog_tool.transcribe import _resolve_cache_dir, check_whisper
+from vlog_tool.ui.handler_protocol import HandlerProtocol
 from vlog_tool.utils import run_subprocess
 
 
-def handle_get_whisper_check(handler, qs: dict | None = None) -> None:
+def handle_get_whisper_check(handler: HandlerProtocol, qs: dict | None = None) -> None:
     installed = check_whisper()
     cuda = False
     if installed:
@@ -74,7 +75,7 @@ _INSTALL_THREAD: threading.Thread | None = None
 _INSTALL_CANCEL = threading.Event()
 
 
-def _install_progress_path(handler, qs: dict | None = None) -> Path:
+def _install_progress_path(handler: HandlerProtocol, qs: dict | None = None) -> Path:
     proj_out = handler._get_project_output(qs or {})
     return proj_out / ".whisper_install.json"
 
@@ -90,7 +91,7 @@ def _write_install_progress(path: Path, data: dict) -> None:
         tmp.unlink(missing_ok=True)
 
 
-def handle_get_whisper_install_status(handler, qs: dict | None = None) -> None:
+def handle_get_whisper_install_status(handler: HandlerProtocol, qs: dict | None = None) -> None:
     path = _install_progress_path(handler, qs)
     if path.is_file():
         try:
@@ -108,7 +109,7 @@ def handle_get_whisper_install_status(handler, qs: dict | None = None) -> None:
     handler._send_json(data)
 
 
-def handle_post_whisper_install(handler, qs: dict | None = None) -> None:
+def handle_post_whisper_install(handler: HandlerProtocol, qs: dict | None = None) -> None:
     global _INSTALL_THREAD
 
     with _INSTALL_LOCK:
@@ -136,7 +137,7 @@ def handle_post_whisper_install(handler, qs: dict | None = None) -> None:
     handler._send_json({"ok": True, "message": "whisper install started"})
 
 
-def handle_post_whisper_install_cancel(handler, qs: dict | None = None) -> None:
+def handle_post_whisper_install_cancel(handler: HandlerProtocol, qs: dict | None = None) -> None:
     """POST /api/whisper/install/cancel — cancel ongoing download."""
     global _INSTALL_CANCEL
     _INSTALL_CANCEL.set()
@@ -228,7 +229,7 @@ def _find_model_file(cache_dir: Path, model_name: str) -> Path | None:
     return None
 
 
-def _run_install(handler, qs: dict | None, progress_path: Path) -> None:
+def _run_install(handler: HandlerProtocol, qs: dict | None, progress_path: Path) -> None:
     proj_input = handler._resolve_project_input(qs or {})
     cfg = handler._get_config(proj_input)
 
@@ -382,7 +383,7 @@ def _run_install(handler, qs: dict | None, progress_path: Path) -> None:
 # ── Whisper model management ─────────────────────────────────────────────────
 
 
-def _get_cache_dir(handler, qs: dict | None = None) -> Path:
+def _get_cache_dir(handler: HandlerProtocol, qs: dict | None = None) -> Path:
     proj_input = handler._resolve_project_input(qs or {})
     cfg = handler._get_config(proj_input)
     return _resolve_cache_dir(cfg)
@@ -440,7 +441,7 @@ def _format_bytes(n: int) -> str:
     return f"{n / (1024 * 1024 * 1024):.2f} GB"
 
 
-def handle_get_whisper_models(handler, qs: dict | None = None) -> None:
+def handle_get_whisper_models(handler: HandlerProtocol, qs: dict | None = None) -> None:
     """GET /api/whisper/models — list cached models and available model sizes."""
     cache_dir = _get_cache_dir(handler, qs)
     cached = _list_cached_models(cache_dir)
@@ -471,7 +472,7 @@ def handle_get_whisper_models(handler, qs: dict | None = None) -> None:
     )
 
 
-def handle_post_whisper_model_delete(handler, qs: dict, obj: dict) -> None:
+def handle_post_whisper_model_delete(handler: HandlerProtocol, qs: dict, obj: dict) -> None:
     """POST /api/whisper/models/delete — delete a cached model."""
     model_name = (obj.get("name") or "").strip()
     if not model_name:
@@ -495,7 +496,7 @@ def handle_post_whisper_model_delete(handler, qs: dict, obj: dict) -> None:
     handler._send_json({"ok": True, "deleted": deleted})
 
 
-def handle_put_whisper_model(handler, qs: dict, obj: dict) -> None:
+def handle_put_whisper_model(handler: HandlerProtocol, qs: dict, obj: dict) -> None:
     """PUT /api/whisper/model — set active model size."""
     model_name = (obj.get("model_size") or "").strip()
     if not model_name:
