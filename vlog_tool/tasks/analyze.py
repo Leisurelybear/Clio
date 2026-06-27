@@ -6,7 +6,7 @@ import json
 import re
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from vlog_tool._constants import VIDEO_EXTS
@@ -17,6 +17,7 @@ from vlog_tool.identity import _identity_to_dict, load_identity, resolve_identit
 from vlog_tool.log import format_duration, timed
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
+from vlog_tool.schema import add_schema_version
 from vlog_tool.tasks._helpers import (
     ClipRecord,
     _build_stem,
@@ -87,6 +88,7 @@ def _process_video_item(
     tracker: ProgressTracker | None,
     state: ProcessingState,
     error_count: list[int],
+    cancel_event: threading.Event | None = None,
 ) -> ClipRecord | None:
     idx_val = int(idx_str)
 
@@ -146,10 +148,23 @@ def _process_video_item(
         state.mark(original.stem, "analyze", "skipped")
         return None
 
+    # Check cancel_event before starting analysis
+    if cancel_event and cancel_event.is_set():
+        print(f"  [取消] 分析 {compressed.name} 被取消")
+        state.mark(original.stem, "analyze", "cancelled")
+        return None
+
     print(f"  [{compressed.name}] 分析中...")
     t0 = time.monotonic()
     try:
-        analysis = analyze_video(str(compressed), config, progress_callback=lambda msg: None, token_store=token_store)
+        # Pass cancel_event to analyze_video if supported
+        analysis = analyze_video(
+            str(compressed),
+            config,
+            progress_callback=lambda msg: None,
+            token_store=token_store,
+            cancel_event=cancel_event,
+        )
     except Exception as e:
         elapsed_total = time.monotonic() - t0
         print(f"  [错误] 分析 {compressed.name} 失败: {e}（耗时 {format_duration(elapsed_total)}）")
@@ -163,7 +178,7 @@ def _process_video_item(
     analysis["index"] = idx_val
     analysis["source_file"] = original.name
     identity = resolve_identity(compressed, config.paths.input_dir, idx_str)
-    analysis["_schema_version"] = 2
+    add_schema_version(analysis)
     analysis["media_identity"] = _identity_to_dict(identity)
 
     stem = _build_stem(idx_val, analysis.get("title", original.stem), config)
@@ -269,28 +284,59 @@ def run_analyze_all(
             tracker.update(phase="analyze", total=total, current=0)
 
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            futures = []
-            for compressed, original, idx_str in items:
+            # Check cancel_event before submitting any tasks
+            if cancel_event and cancel_event.is_set():
+                print("[取消] 分析步骤被用户终止")
+                return records
+
+            # Submit a bounded number of futures (avoid queueing all at once)
+            batch_size = min(max_workers, len(items))
+            for i in range(0, len(items), batch_size):
+                batch = items[i : i + batch_size]
+                # Check cancel_event before each batch submission
                 if cancel_event and cancel_event.is_set():
-                    print("[取消] analyze 步骤被用户终止")
+                    print("[取消] 取消剩余任务提交")
                     break
-                f = pool.submit(
-                    _process_video_item,
-                    compressed,
-                    original,
-                    idx_str,
-                    config,
-                    token_store,
-                    overwrite,
-                    tracker,
-                    state,
-                    error_count,
-                )
-                futures.append(f)
-            for future in as_completed(futures):
-                result = future.result()
-                if result is not None:
-                    records.append(result)
+
+                batch_futures: list[Future] = []
+                for compressed, original, idx_str in batch:
+                    # Check cancel_event before each submission
+                    if cancel_event and cancel_event.is_set():
+                        print("[取消] 取消剩余任务提交")
+                        break
+
+                    f = pool.submit(
+                        _process_video_item,
+                        compressed,
+                        original,
+                        idx_str,
+                        config,
+                        token_store,
+                        overwrite,
+                        tracker,
+                        state,
+                        error_count,
+                        cancel_event,
+                    )
+                    batch_futures.append(f)
+
+                # Process completed futures from this batch before submitting next
+                for future in as_completed(batch_futures):
+                    try:
+                        result = future.result()
+                        if result is not None:
+                            records.append(result)
+                    except Exception as e:
+                        print(f"  [错误] 任务执行失败: {e}")
+                        error_count[0] += 1
+
+                # Cancel remaining pending futures if cancelled mid-batch
+                if cancel_event and cancel_event.is_set():
+                    print("[取消] 取消未开始任务")
+                    for f in batch_futures:
+                        if not f.done():
+                            f.cancel()
+                    break
 
     records.sort(key=lambda r: r.index)
 
