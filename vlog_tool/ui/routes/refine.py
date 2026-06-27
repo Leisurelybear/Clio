@@ -47,9 +47,9 @@ def handle_post_refine(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) 
     proj_input = handler._resolve_project_input(qs)
     proj_out = handler._get_project_output(proj_input)
     if ftype == "texts":
-        p = handler._resolve_texts(fname, proj_out)  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
+        p = handler._resolve_texts(fname, proj_out)
     else:
-        p = handler._resolve_in("scripts", fname, proj_out)  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
+        p = handler._resolve_in("scripts", fname, proj_out)
 
     if p is None:
         return handler._send_json({"ok": False, "error": "forbidden or not found"}, 404)

@@ -16,7 +16,7 @@ def handle_get_texts(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/texts."""
     proj_out = handler._get_project_output(qs)
     fname = qs.get("file", [""])[0]
-    p = handler._resolve_texts(fname, proj_out)  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
+    p = handler._resolve_texts(fname, proj_out)
     if p is None:
         return handler.send_error(HTTPStatus.NOT_FOUND)
     handler._send_bytes(p.read_bytes(), "application/json; charset=utf-8")
@@ -36,7 +36,7 @@ def handle_put_texts(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) ->
     """Handle PUT /api/texts."""
     proj_out = handler._get_project_output(qs)
     fname = qs.get("file", [""])[0]
-    p = handler._resolve_texts(fname, proj_out)  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
+    p = handler._resolve_texts(fname, proj_out)
     if p is None:
         return handler._send_json({"ok": False, "error": "forbidden or not found"}, 403)
     data = json.dumps(obj, ensure_ascii=False, indent=2).encode("utf-8")
