@@ -9,6 +9,7 @@ import time
 from collections.abc import Callable
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 from vlog_tool.config import AppConfig
 from vlog_tool.identity import _identity_to_dict, resolve_identity
@@ -203,15 +204,11 @@ def run_transcribe_all(
 
         def _on_extract_progress(pct: int) -> None:
             if tracker:
-                tracker.update(
-                    phase="transcribe", current=pct, total=100, message=f"{compressed_stem}: 提取音频 ({pct}%)"
-                )
+                tracker.update(phase="transcribe", message=f"{compressed_stem}: 提取音频 ({pct}%)")
 
         def _on_transcribe_progress(pct: int) -> None:
             if tracker:
-                tracker.update(
-                    phase="transcribe", current=pct, total=100, message=f"{compressed_stem}: Whisper 转录 ({pct}%)"
-                )
+                tracker.update(phase="transcribe", message=f"{compressed_stem}: Whisper 转录 ({pct}%)")
 
         wav_path = _extract_audio(
             audio_source,
@@ -236,8 +233,11 @@ def run_transcribe_all(
             continue
 
         try:
+            if tracker:
+                tracker.update(phase="transcribe", message=f"{compressed_stem}: 加载 Whisper 模型...")
+                tracker.log(f"{compressed_stem}: 加载 Whisper 模型...")
             segments = transcribe_audio(wav_path, config, progress_callback=_on_transcribe_progress)
-            transcript = {
+            transcript: dict[str, Any] = {
                 "source_video": original_video.name,
                 "source_stem": compressed_stem,
                 "language": config.whisper.language,
@@ -262,11 +262,12 @@ def run_transcribe_all(
         except KeyboardInterrupt:
             raise
         except Exception as e:
-            print(f"  [错误] {compressed_stem}: {e}")
+            err_msg = str(e)
+            print(f"  [错误] {compressed_stem}: {err_msg}")
             state.mark(orig_stem, "transcribe", "error")
             if tracker:
                 tracker.next(message=f"失败 {compressed_stem}")
-                tracker.log(f"转录 {compressed_stem} 失败")
+                tracker.log(f"转录 {compressed_stem} 失败: {err_msg}")
             error_count += 1
             continue
         finally:
@@ -325,11 +326,13 @@ def run_transcribe_one(
             progress_callback(10)
         t1 = time.time()
         segments = transcribe_audio(
-            wav_path, config, progress_callback=lambda pct: progress_callback(10 + int(pct * 0.8))
+            wav_path,
+            config,
+            progress_callback=(lambda pct: progress_callback(10 + int(pct * 0.8))) if progress_callback else None,
         )
         t2 = time.time()
         print(f"  [transcribe_one] Whisper 完成: {len(segments)} 段, 耗时 {t2 - t1:.1f}s")
-        transcript = {
+        transcript: dict[str, Any] = {
             "source_video": video_path.name,
             "source_stem": video_path.stem,
             "language": config.whisper.language,
