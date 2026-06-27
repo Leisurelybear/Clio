@@ -5,8 +5,22 @@ import os
 import threading
 import time
 from pathlib import Path
+from typing import TypedDict
 
 from vlog_tool import session_log as _session_log
+
+
+class ProgressData(TypedDict):
+    phase: str
+    current: int
+    total: int
+    message: str
+    status: str
+    started_at: str
+    eta_sec: float | None
+    rerun: bool
+    rerun_video: str | None
+    logs: list[str]
 
 
 class ProgressTracker:
@@ -26,7 +40,7 @@ class ProgressTracker:
         self._path = output_dir / ".progress.json"
         self._lock = threading.Lock()
         self._start = time.monotonic()
-        self._data = {
+        self._data: ProgressData = {
             "phase": "",
             "current": 0,
             "total": 0,
@@ -94,7 +108,7 @@ class ProgressTracker:
     def log(self, line: str) -> None:
         """Append a log line (shown in UI log view)."""
         with self._lock:
-            self._data.setdefault("logs", []).append(line)
+            self._data["logs"].append(line)
             if len(self._data["logs"]) > 100:
                 self._data["logs"] = self._data["logs"][-100:]
             self._flush()
