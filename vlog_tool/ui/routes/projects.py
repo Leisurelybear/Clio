@@ -19,10 +19,10 @@ from vlog_tool.ui.services.project_service import (
 )
 
 if TYPE_CHECKING:
-    from http.server import BaseHTTPRequestHandler
+    from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 
-def handle_get_project(handler: BaseHTTPRequestHandler, qs: dict) -> None:
+def handle_get_project(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     """Handle GET /api/project."""
     proj_input = handler._resolve_project_input(qs)
     proj_file = proj_input / "project.json"
@@ -43,7 +43,7 @@ def handle_get_project(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     handler._send_json(merged)
 
 
-def handle_get_projects(handler: BaseHTTPRequestHandler, qs: dict) -> None:
+def handle_get_projects(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     """Handle GET /api/projects."""
     req_project = qs.get("project", [None])[0]
     req_input_dir = qs.get("input_dir", [None])[0]
@@ -71,7 +71,7 @@ def handle_get_projects(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     handler._send_json({"projects": projects, "last_project": last_project_name})
 
 
-def handle_put_project(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
+def handle_put_project(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
     """Handle PUT /api/project."""
     proj_input = handler._resolve_project_input(qs)
     proj_file = proj_input / "project.json"
@@ -92,7 +92,7 @@ def handle_put_project(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> 
     handler._send_json({"ok": True})
 
 
-def handle_post_project_create(handler: BaseHTTPRequestHandler, obj: dict) -> None:
+def handle_post_project_create(handler: HandlerProtocol, obj: dict) -> None:
     """Handle POST /api/project/create."""
     config_path = handler.config_path
 
@@ -132,7 +132,7 @@ def handle_post_project_create(handler: BaseHTTPRequestHandler, obj: dict) -> No
     )
 
 
-def handle_post_project_add(handler: BaseHTTPRequestHandler, obj: dict) -> None:
+def handle_post_project_add(handler: HandlerProtocol, obj: dict) -> None:
     """Handle POST /api/project/add."""
     config_path = handler.config_path
 
@@ -171,7 +171,7 @@ def handle_post_project_add(handler: BaseHTTPRequestHandler, obj: dict) -> None:
     handler._send_json({"ok": True, "project": {"name": name, "input_dir": str(input_path)}})
 
 
-def handle_post_project_remove(handler: BaseHTTPRequestHandler, obj: dict) -> None:
+def handle_post_project_remove(handler: HandlerProtocol, obj: dict) -> None:
     """Handle POST /api/project/remove."""
     config_path = handler.config_path
     project_name = (obj.get("name") or "").strip()
