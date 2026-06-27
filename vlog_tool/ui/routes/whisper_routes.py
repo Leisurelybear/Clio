@@ -9,6 +9,7 @@ import sys as _sys
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 from vlog_tool.config import WhisperModelSize
 from vlog_tool.transcribe import _resolve_cache_dir, check_whisper
@@ -16,7 +17,7 @@ from vlog_tool.ui.handler_protocol import HandlerProtocol
 from vlog_tool.utils import run_subprocess
 
 
-def handle_get_whisper_check(handler: HandlerProtocol, qs: dict | None = None) -> None:
+def handle_get_whisper_check(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     installed = check_whisper()
     cuda = False
     if installed:
@@ -30,7 +31,7 @@ def handle_get_whisper_check(handler: HandlerProtocol, qs: dict | None = None) -
     cache_path = None
     model_cached = False
     try:
-        proj_input = handler._resolve_project_input(qs or {})
+        proj_input = handler._resolve_project_input(qs)
         cfg = handler._get_config(proj_input)
         cache_dir = _resolve_cache_dir(cfg)
         if cache_dir.is_dir():
@@ -75,8 +76,8 @@ _INSTALL_THREAD: threading.Thread | None = None
 _INSTALL_CANCEL = threading.Event()
 
 
-def _install_progress_path(handler: HandlerProtocol, qs: dict | None = None) -> Path:
-    proj_out = handler._get_project_output(qs or {})
+def _install_progress_path(handler: HandlerProtocol, qs: dict[str, Any]) -> Path:
+    proj_out = handler._get_project_output(qs)
     return proj_out / ".whisper_install.json"
 
 
@@ -91,7 +92,7 @@ def _write_install_progress(path: Path, data: dict) -> None:
         tmp.unlink(missing_ok=True)
 
 
-def handle_get_whisper_install_status(handler: HandlerProtocol, qs: dict | None = None) -> None:
+def handle_get_whisper_install_status(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     path = _install_progress_path(handler, qs)
     if path.is_file():
         try:
@@ -109,7 +110,7 @@ def handle_get_whisper_install_status(handler: HandlerProtocol, qs: dict | None 
     handler._send_json(data)
 
 
-def handle_post_whisper_install(handler: HandlerProtocol, qs: dict | None = None) -> None:
+def handle_post_whisper_install(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     global _INSTALL_THREAD
 
     with _INSTALL_LOCK:
@@ -118,7 +119,7 @@ def handle_post_whisper_install(handler: HandlerProtocol, qs: dict | None = None
             return
         progress_path = _install_progress_path(handler, qs)
 
-        def _worker():
+        def _worker() -> None:
             try:
                 _run_install(handler, qs, progress_path)
             except Exception as e:
@@ -137,7 +138,7 @@ def handle_post_whisper_install(handler: HandlerProtocol, qs: dict | None = None
     handler._send_json({"ok": True, "message": "whisper install started"})
 
 
-def handle_post_whisper_install_cancel(handler: HandlerProtocol, qs: dict | None = None) -> None:
+def handle_post_whisper_install_cancel(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """POST /api/whisper/install/cancel — cancel ongoing download."""
     global _INSTALL_CANCEL
     _INSTALL_CANCEL.set()
@@ -167,7 +168,7 @@ _KNOWN_MODEL_SIZES: dict[str, int] = {
 }
 
 
-def _get_model_file_size(repo_id: str, cfg) -> int:
+def _get_model_file_size(repo_id: str, cfg: Any) -> int:
     """Get the remote model file size via HEAD request, with known-size fallback."""
     import requests as _req
     from huggingface_hub import hf_hub_url
@@ -190,7 +191,7 @@ def _get_model_file_size(repo_id: str, cfg) -> int:
     return 0
 
 
-def _download_error_detail(e: Exception, cfg) -> str:
+def _download_error_detail(e: Exception, cfg: Any) -> str:
     """Build a user-friendly error message for download failures."""
     proxy_url = cfg.proxy.url if (cfg.proxy.enabled and cfg.proxy.url) else None
     endpoint = cfg.whisper.hf_endpoint or "https://huggingface.co"
@@ -229,8 +230,8 @@ def _find_model_file(cache_dir: Path, model_name: str) -> Path | None:
     return None
 
 
-def _run_install(handler: HandlerProtocol, qs: dict | None, progress_path: Path) -> None:
-    proj_input = handler._resolve_project_input(qs or {})
+def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Path) -> None:
+    proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
 
     # Step 1: ensure huggingface_hub is installed
@@ -383,8 +384,8 @@ def _run_install(handler: HandlerProtocol, qs: dict | None, progress_path: Path)
 # ── Whisper model management ─────────────────────────────────────────────────
 
 
-def _get_cache_dir(handler: HandlerProtocol, qs: dict | None = None) -> Path:
-    proj_input = handler._resolve_project_input(qs or {})
+def _get_cache_dir(handler: HandlerProtocol, qs: dict[str, Any]) -> Path:
+    proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
     return _resolve_cache_dir(cfg)
 
@@ -441,13 +442,13 @@ def _format_bytes(n: int) -> str:
     return f"{n / (1024 * 1024 * 1024):.2f} GB"
 
 
-def handle_get_whisper_models(handler: HandlerProtocol, qs: dict | None = None) -> None:
+def handle_get_whisper_models(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """GET /api/whisper/models — list cached models and available model sizes."""
     cache_dir = _get_cache_dir(handler, qs)
     cached = _list_cached_models(cache_dir)
     available = list(WhisperModelSize)
     # Get current configured model
-    proj_input = handler._resolve_project_input(qs or {})
+    proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
     current_model = cfg.whisper.model_size
     # Disk space info
@@ -472,7 +473,7 @@ def handle_get_whisper_models(handler: HandlerProtocol, qs: dict | None = None) 
     )
 
 
-def handle_post_whisper_model_delete(handler: HandlerProtocol, qs: dict, obj: dict) -> None:
+def handle_post_whisper_model_delete(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """POST /api/whisper/models/delete — delete a cached model."""
     model_name = (obj.get("name") or "").strip()
     if not model_name:
@@ -496,7 +497,7 @@ def handle_post_whisper_model_delete(handler: HandlerProtocol, qs: dict, obj: di
     handler._send_json({"ok": True, "deleted": deleted})
 
 
-def handle_put_whisper_model(handler: HandlerProtocol, qs: dict, obj: dict) -> None:
+def handle_put_whisper_model(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """PUT /api/whisper/model — set active model size."""
     model_name = (obj.get("model_size") or "").strip()
     if not model_name:
@@ -516,10 +517,13 @@ def handle_put_whisper_model(handler: HandlerProtocol, qs: dict, obj: dict) -> N
     proj_yaml = proj_input / "project.yaml"
     import yaml
 
-    with open(proj_yaml, "a", encoding="utf-8") as f:
-        pass
-    with open(proj_yaml, encoding="utf-8") as f:
-        raw = yaml.safe_load(f) or {}
+    # Create project.yaml if it doesn't exist, with proper structure
+    if not proj_yaml.is_file():
+        proj_yaml.parent.mkdir(parents=True, exist_ok=True)
+        raw: dict[str, Any] = {}
+    else:
+        with open(proj_yaml, encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
     raw.setdefault("whisper", {})["model_size"] = model_name
     suffix = os.urandom(4).hex()
     tmp = proj_yaml.parent / f"{proj_yaml.name}.{suffix}.tmp"
