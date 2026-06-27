@@ -477,7 +477,7 @@ def handle_post_whisper_model_delete(handler, qs: dict, obj: dict) -> None:
     if not model_name:
         handler._send_json({"ok": False, "error": "missing model name"}, 400)
         return
-    cache_dir = _get_cache_dir(handler)
+    cache_dir = _get_cache_dir(handler, qs)
     if not cache_dir.is_dir():
         handler._send_json({"ok": False, "error": "cache dir not found"}, 404)
         return
