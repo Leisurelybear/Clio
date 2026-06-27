@@ -275,7 +275,7 @@ def plan_daily_vlog(
 
     # 后处理：过滤掉 segment 中引用不存在的 index 的项
     # 用整数比较（去零填充），兼容 "001"、"1"、1 等不同格式
-    valid_ints = set()
+    valid_ints: set[int | str] = set()
     for c in clips:
         idx = c.get("index")
         try:

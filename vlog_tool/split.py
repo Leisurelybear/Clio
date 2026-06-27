@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
-from vlog_tool.utils import get_duration_sec, run_ffmpeg, write_json_atomic
+from vlog_tool.utils import JsonValue, get_duration_sec, run_ffmpeg, write_json_atomic
 
 
 def split_video(
@@ -100,7 +101,7 @@ def split_video(
 
         manifest_target = manifest_dir or output_dir
         manifest_path = manifest_target / f"{video_path.stem}_split_manifest.json"
-        write_json_atomic(manifest_path, manifest)
+        write_json_atomic(manifest_path, cast(JsonValue, manifest))
     except BaseException:
         for f in segments:
             f.unlink(missing_ok=True)
