@@ -3,11 +3,13 @@ from __future__ import annotations
 import sys
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from vlog_tool.config import load_config
 from vlog_tool.transcribe import PROJECT_ROOT, _resolve_cache_dir
 from vlog_tool.utils import run_subprocess
 
+_snapshot_download: Any
 try:
     from huggingface_hub import snapshot_download as _snapshot_download
 except ImportError:
