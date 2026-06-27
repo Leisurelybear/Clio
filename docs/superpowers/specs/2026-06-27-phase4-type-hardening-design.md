@@ -4,7 +4,21 @@
 **Source**: `docs/analysis/2026-06-26-project-review.md` §6 Phase 4  
 **Current state**: 243 mypy errors in 39 files (checked 117 source files)
 
-## 1. Strategy: Incremental Strict Mode
+## 0. Implementation Principles
+
+- **Smallest change necessary** — fix the specific type error, not the surrounding code.
+- **Preserve existing runtime behavior** — no behavioral changes unless required for correctness.
+- **Avoid architectural refactoring** — unless explicitly required by the spec.
+- **Prefer local fixes over broad redesigns** — a `cast()` or inline assertion is better than rewriting a module.
+- **Keep each change independently reviewable** — one module per commit.
+
+## 1. Goal
+
+The goal of Phase 4 is to **establish explicit, maintainable type contracts** across the stable parts of the codebase before progressively enabling stricter static analysis.
+
+This is not about eliminating mypy errors for their own sake. Each fix should make the contract clearer or catch a real potential bug.
+
+## 2. Strategy: Incremental Strict Mode
 
 Rather than fixing all 243 errors at once, we apply mypy controls **per-module** and progressively expand the strict subset. Each module, once clean, is added to a `strict_modules` list that CI enforces.
 
@@ -22,9 +36,9 @@ Phase 4d: CI gate for clean subset
 - The 120+ route handler errors are noisy but low-risk; fixing them doesn't improve type safety until the Protocol exists
 - Core module errors (config, progress, export) are the real contract risks
 
-## 2. Phase 4a: Core Module Typing
+## 3. Phase 4a: Core Module Typing
 
-### 2.1 `config/loader.py` + `config/validators.py` (5 errors)
+### 3.1 `config/loader.py` + `config/validators.py` (5 errors)
 
 **Problem**: `type.__dataclass_fields__` is unrecognized by mypy because `type` is generic.
 
@@ -32,7 +46,7 @@ Phase 4d: CI gate for clean subset
 
 **File**: `vlog_tool/config/loader.py:115`, `vlog_tool/config/validators.py:5`, `vlog_tool/tests/test_config_descriptions.py:40`
 
-### 2.2 `progress.py` (8 errors)
+### 3.2 `progress.py` (8 errors)
 
 **Problem**: `_data: dict` defaults to `dict[str, object]` in Python 3.11+ with `dict` bare annotation. Arithmetic and method calls on `object` fail mypy checks.
 
@@ -46,19 +60,25 @@ eta_sec: float | None = self._data.get("eta_sec")
 
 Alternatively, cast in getter methods where the shape is known.
 
-### 2.3 `export/__init__.py` (1 error)
+### 3.3 `export/__init__.py` (1 error)
 
 **Problem**: `FORMAT_REGISTRY: dict[str, type]` has value type `type`, but actual values are `Callable[[...], Path]`.
 
 **Fix**: Change type to `dict[str, Callable[..., Path]]` or define a `FormatExporter` Protocol.
 
-### 2.4 `utils.py` / `utils_expanded.py`
+### 3.4 `utils.py` / `utils_expanded.py`
 
 **Problem**: `write_json_atomic` typed narrower than usage. Several functions accept `str | Path` but callers pass mixed types.
 
-**Fix**: Widen JSON types — accept `Any` for JSON-serializable data, add proper overloads where needed.
+**Fix**: Introduce a reusable `JsonValue` recursive type alias instead of widening directly to `Any`:
 
-### 2.5 `analyze.py`, `split.py`, `transcribe.py`, `cut.py`, `factory.py`
+```python
+JsonValue: TypeAlias = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+```
+
+Use `JsonValue` for JSON-serializable data in public API signatures. Fall back to `Any` only when the value is genuinely unconstrained (e.g., generic container fields).
+
+### 3.5 `analyze.py`, `split.py`, `transcribe.py`, `cut.py`, `factory.py`
 
 **Problem**: Various type mismatches — `Path` vs `str`, `int` vs `str` in sets, `None` not callable, variable redefinition.
 
@@ -71,21 +91,21 @@ Alternatively, cast in getter methods where the shape is known.
 - `factory.py:60,62,94`: `object` has no `.close()` — cast or Protocol
 - `whisper_cli.py:14,89`: incompatible overloads — add `type: ignore` or fix kwargs
 
-### 2.6 Test file fixes (~30 errors)
+### 3.6 Test file fixes (~30 errors)
 
 **Problem**: Tests use `SimpleNamespace` as `AppConfig` mock.
 
 **Fix**: Use `unittest.mock.create_autospec(AppConfig)` or `TestingAppConfig` dataclass. For simple cases, widen the production function signature to accept `Any` for config (since `AppConfig` is already a dataclass with no special methods).
 
-### 2.7 `pipeline.py` (2 errors)
+### 3.7 `pipeline.py` (2 errors)
 
 **Problem**: `cancel_event` typed as `callable` (builtins) vs `Callable`.
 
 **Fix**: Change to `Callable` import from `typing`.
 
-## 3. Phase 4b: Route Handler Protocol
+## 4. Phase 4b: Route Handler Protocol
 
-### 3.1 Problem
+### 4.1 Problem
 
 Every route module references methods dynamically attached in `make_handler()`:
 
@@ -98,51 +118,48 @@ handler._get_project_output = lambda qs: ...
 
 Mypy sees `BaseHTTPRequestHandler` and reports ~120 errors for missing attributes.
 
-### 3.2 Solution: `HandlerProtocol`
+### 4.2 Solution: `HandlerProtocol`
 
-Define a `Protocol` in `vlog_tool/ui/handler_protocol.py`:
+Define a `Protocol` in `vlog_tool/ui/handler_protocol.py`. Expose only stable cross-route capabilities — do not mirror every dynamically attached helper or duplicate the entire handler implementation. Route-specific helpers can remain dynamically typed until they become stable contracts.
 
 ```python
-from typing import Protocol, Any, runtime_checkable
+from typing import Protocol, Any
 from pathlib import Path
 from vlog_tool.config import AppConfig
 
 class HandlerProtocol(Protocol):
-    """Typed interface for dynamic handler methods/attrs attached in make_handler()."""
-    # Instance methods
+    """Minimal typed interface for stable cross-route handler capabilities."""
     def _send_json(self, data: Any, status: int = 200) -> None: ...
     def _send_bytes(self, data: bytes, content_type: str = "application/octet-stream", status: int = 200) -> None: ...
     def _send_static(self, rel: str) -> None: ...
     def _resolve_project_input(self, qs: dict[str, str]) -> Path | None: ...
     def _get_project_output(self, qs: dict[str, str]) -> Path | None: ...
     def _get_config(self, project_dir: str | None = None) -> AppConfig: ...
-    def _get_state(self, project: str | None) -> Any: ...
-    def _resolve_texts(self, project_path: Path, qs: dict[str, str]) -> Path | None: ...
-    def _resolve_in(self, project_path: Path, subdir: str, qs: dict[str, str]) -> Path | None: ...
     def _send_video_range(self, path: Path, range_header: str | None) -> None: ...
 
-    # Class-level attributes (set via make_handler)
+    # Stable class-level attributes (set via make_handler)
     config_path: Path
     input_dir: Path | None
     output_dir: Path | None
-    DEFAULT_PROJECT: str
     _api_token: str | None
-    _config_cache: dict  # used via cls._config_cache in some routes
+    _config_cache: dict
 ```
 
-### 3.3 Migration
+**Rationale for omission**: `_get_state`, `_resolve_texts`, `_resolve_in`, `DEFAULT_PROJECT` are route-specific helpers used by 1-2 call sites. Keeping them off the Protocol avoids committing to unstable contracts. Those call sites keep a local `type: ignore[attr-defined]` with a brief rationale comment until the helper stabilizes.
+
+### 4.3 Migration
 
 1. Create `vlog_tool/ui/handler_protocol.py`
 2. Import `HandlerProtocol` and change function signatures in all route modules
 3. In `server.py`, annotate the handler class as conforming to `HandlerProtocol`:
-   - Change `class Handler(BaseHTTPRequestHandler):` → `class Handler(BaseHTTPRequestHandler, HandlerProtocol):` (runtime: Protocol has no runtime impact with `@runtime_checkable`, but without the decorator it's purely structural)
+   - Change `class Handler(BaseHTTPRequestHandler):` → `class Handler(BaseHTTPRequestHandler):` — since `HandlerProtocol` is structural (not `@runtime_checkable`), mypy infers conformance from the instance's attributes at call sites. No runtime base class change needed.
 
 **Note on `_config_cache`**: Some routes access it via `type(handler)._config_cache` (class-level). Since it's declared as an instance attribute in `HandlerProtocol`, mypy may still complain. Two options:
 - a) Access via `handler._config_cache` instead (works at runtime because class attrs are visible from instances)
-- b) Keep `type: ignore[attr-defined]` on class-level accesses and explain why
+- b) Keep `type: ignore[attr-defined]` on class-level accesses with a short rationale comment
 - Recommended: option (a) — simpler and still correct at runtime
 
-### 3.4 File list to update (~15 files)
+### 4.4 File list to update (~15 files)
 
 All under `vlog_tool/ui/routes/`:
 - `config_routes.py`, `env_routes.py`, `export.py`, `fs.py`, `plan.py`
@@ -152,16 +169,16 @@ All under `vlog_tool/ui/routes/`:
 
 Plus: `vlog_tool/ui/server.py` (add Protocol conformance annotation), `vlog_tool/pipeline.py` (fix `cancel_event` type)
 
-## 4. Phase 4c: Artifact Schema Versions
+## 5. Phase 4c: Artifact Schema Versions
 
-### 4.1 Design
+### 5.1 Design
 
 - Add `_schema_version: int` to generated JSON artifacts
-- Define `ARTIFACT_SCHEMA_VERSION = 1` in a central location (e.g., `vlog_tool/config/models.py` or new `vlog_tool/schema.py`)
+- Define `ARTIFACT_SCHEMA_VERSION = 1` in a central location (e.g., new `vlog_tool/schema.py`)
 - Write version on creation; read and warn on mismatch (no automatic migration)
 - Tracked artifacts: analysis JSON, voiceover JSON, plan JSON, transcript JSON, progress JSON, processing state JSON
 
-### 4.2 Implementation
+### 5.2 Implementation
 
 ```python
 # vlog_tool/schema.py
@@ -179,7 +196,7 @@ def check_schema_version(data: dict, label: str = "artifact") -> bool:
     return True
 ```
 
-### 4.3 Integration points
+### 5.3 Integration points
 
 - `vlog_tool/analyze.py`: after generating analysis JSON → `add_schema_version()` before write
 - `vlog_tool/tasks/scripts.py`: after generating voiceover JSON → `add_schema_version()`
@@ -190,9 +207,9 @@ def check_schema_version(data: dict, label: str = "artifact") -> bool:
 
 Reading side: log a warning on version mismatch, but continue processing (backward compatibility).
 
-## 5. Phase 4d: CI Gate
+## 6. Phase 4d: CI Gate
 
-### 5.1 mypy configuration
+### 6.1 mypy configuration
 
 In `.github/workflows/test.yml`, add a step after the current test run:
 
@@ -205,7 +222,7 @@ The module list grows as each module is cleaned. Initially empty (gate only acti
 
 **Why `--check-untyped-defs` instead of `--strict`?** `--strict` also enables `disallow_untyped_defs`, `disallow_any_unimported`, etc., which would add errors for every unannotated function. We fix existing errors first, then progressively add annotations. `--check-untyped-defs` checks function bodies of untyped functions — strict enough to catch contract violations, loose enough not to require full annotation coverage immediately.
 
-### 5.2 Local workflow
+### 6.2 Local workflow
 
 ```bash
 # Check cleaned module
@@ -214,14 +231,14 @@ python -m mypy vlog_tool/config/ --check-untyped-defs
 python -m mypy vlog_tool/config/ vlog_tool/utils.py --check-untyped-defs
 ```
 
-### 5.3 CI integration plan
+### 6.3 CI integration plan
 
 1. First module clean → add to CI list (with `--check-untyped-defs`)
 2. When core is clean → CI fails if core regresses
 3. After route Protocol → add route modules
 4. After all annotations complete → switch to `--strict` for entire project
 
-## 6. Error Budget Summary
+## 7. Error Budget Summary
 
 | Module | Current errors | Target | Priority |
 |--------|---------------|--------|----------|
@@ -241,17 +258,25 @@ python -m mypy vlog_tool/config/ vlog_tool/utils.py --check-untyped-defs
 | `server.py` | 5 | 0 | P2 (Phase 4b) |
 | `main.py` | 2 | 0 | P3 |
 
-## 7. Verification
+## 8. Implementation Guardrails
 
-After each fix batch:
-1. `python -m pytest vlog_tool/tests/ -q` — 901 must pass
-2. `ruff check vlog_tool/` — must be clean
-3. `python -m mypy <fixed_module> --check-untyped-defs` — 0 errors for fixed modules
-4. Overall error count decreases
+- **Prefer stronger typing over `Any` where practical** — use `JsonValue`, `TypedDict`, or `Protocol` before falling back to `Any`.
+- **Avoid `type: ignore` unless there is no reasonable alternative** — prefer `cast()`, guard clauses, or fixing the root cause. Each `type: ignore` must include a brief inline rationale comment.
+- **If a fix requires architectural redesign, stop** — leave a `# TODO(phase4): ...` comment and continue with the remaining tasks. Flag the issue in the commit message.
+- **One module per commit** — keeps each change independently reviewable and easy to revert.
 
-## 8. Non-goals
+## 9. Verification
 
-- Not fixing P3-level mypy issues in tests (unless they block CI)
-- Not refactoring route handlers into class-based views
-- Not adding automatic migration for schema version mismatches
-- Not adding new features — pure type/schema hardening
+Each implementation step must pass before commit:
+1. `python -m pytest vlog_tool/tests/ -q` — all tests pass
+2. `ruff check vlog_tool/` — clean
+3. `python -m mypy <target_module> --check-untyped-defs` — 0 errors for the fixed module
+4. Runtime behavior is unchanged — no new crashes, no changed output format
+
+## 10. Non-goals
+
+- No architectural refactoring (route handler class-based views, pipeline restructuring, etc.)
+- No automatic schema migration for version mismatches (warn-only)
+- No project-wide `--strict` typing in this phase (only the cleaned subset)
+- No new features — pure type/schema hardening with minimal behavioral change
+- No fixing P3-level mypy issues in tests unless they block CI
