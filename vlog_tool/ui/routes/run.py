@@ -84,6 +84,9 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
             except Exception:
                 tracker.error("pipeline failed")
                 traceback.print_exc()
+            finally:
+                with state.run_lock:
+                    state.run_thread = None
 
         state.run_thread = threading.Thread(target=_run, daemon=True)
         state.run_thread.start()
@@ -232,6 +235,9 @@ def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -
             print(f"  [rerun] ✗ rerun failed: {e}")
             tracker.error(f"rerun failed: {e}")
             traceback.print_exc()
+        finally:
+            with state.run_lock:
+                state.run_thread = None
 
     with state.run_lock:
         if state.run_thread is not None and state.run_thread.is_alive():
