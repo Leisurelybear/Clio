@@ -36,7 +36,20 @@ def _transcript_path(handler: HandlerProtocol, qs: dict[str, Any], video: str) -
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
     transcripts_dir = proj_out / cfg.whisper.transcripts_subdir
-    return transcripts_dir / f"{stem}_transcript.json"
+    # Try compressed stem first (e.g., "001_GX010682_transcript.json")
+    compressed_path = transcripts_dir / f"{stem}_transcript.json"
+    if compressed_path.is_file():
+        return compressed_path
+    # Fallback: try original stem (e.g., "GX010682_transcript.json")
+    # Strip index prefix if present (e.g., "001_" from "001_GX010682")
+    orig_stem = stem
+    if "_" in stem:
+        _, orig_stem = stem.split("_", 1)
+        orig_stem = _SEG_SUFFIX_RE.sub("", orig_stem)
+        orig_path = transcripts_dir / f"{orig_stem}_transcript.json"
+        if orig_path.is_file():
+            return orig_path
+    return None
 
 
 def handle_get_transcripts(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
