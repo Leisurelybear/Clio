@@ -47,10 +47,14 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
         return handler._send_json({"ok": False, "error": "source must be compressed|original"}, 400)
     comp_dir = proj_out / "compressed"
 
-    # texts/scripts sidecars are keyed by the compressed index in both views
-    text_sidecars: dict[str, list[str]] = {}
+    # -- Build text/script sidecar lookup ----------------------------------
+    # Two lookup strategies for the same data:
+    #   1) compressed_file → texts JSON filename (exact, for v2+ data)
+    #   2) index (zero-padded) → texts JSON filename (fallback for v1 data)
+    text_by_compressed: dict[str, str] = {}  # compressed_basename  → texts_json_filename
+    text_sidecars: dict[str, list[str]] = {}  # zero-padded index    → [texts_json_filenames]
     text_titles: dict[str, str] = {}
-    text_identities: dict[str, Any] = {}  # index -> MediaIdentity (for v2)
+    text_identities: dict[str, Any] = {}
     for td in _find_texts_dirs(proj_out):
         for f in sorted(td.iterdir()):
             if f.suffix != ".json":
@@ -59,22 +63,17 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                 data = json.loads(f.read_text(encoding="utf-8"))
             except Exception:
                 continue
-            # Extract index from filename first (e.g. "009_机场廊桥初见" → "009").
-            # This avoids int-vs-zero-padded-string mismatch: data["index"] is an
-            # int (9), but compressed video lookup keys are zero-padded ("009").
+            # Strategy 1: exact compressed → texts mapping (v2+)
+            comp_name: str | None = data.get("compressed_file")
+            if comp_name:
+                text_by_compressed[comp_name] = f.name
+            # Strategy 2: index-based fallback (v1)
             if "_" in f.stem:
                 idx = f.stem.split("_", 1)[0]
             else:
                 idx = str(data.get("index", ""))
                 if not idx:
                     continue
-            text_sidecars.setdefault(idx, []).append(f.name)
-            if idx not in text_titles:
-                text_titles[idx] = data.get("title", "")
-            if idx not in text_identities:
-                identity = load_identity(data)
-                if identity is not None:
-                    text_identities[idx] = identity
             text_sidecars.setdefault(idx, []).append(f.name)
             if idx not in text_titles:
                 text_titles[idx] = data.get("title", "")
@@ -129,7 +128,8 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                     "source": "compressed",
                     "index": idx,
                     "title": text_titles.get(idx, ""),
-                    "text_json": next((x for x in text_sidecars.get(idx, []) if x is not None), None),
+                    "text_json": text_by_compressed.get(p.name)
+                    or next((x for x in text_sidecars.get(idx, []) if x is not None), None),
                     "script_json": next((x for x in script_sidecars.get(idx, []) if x is not None), None),
                     "transcript_file": (
                         text_identities[idx].original_stem
@@ -234,7 +234,8 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                         "index": c_idx,
                         "title": text_titles.get(c_idx, ""),
                         "offset_sec": seg_offsets.get(c_idx, 0.0),
-                        "text_json": next((x for x in text_sidecars.get(c_idx, []) if x is not None), None),
+                        "text_json": text_by_compressed.get(c_file)
+                        or next((x for x in text_sidecars.get(c_idx, []) if x is not None), None),
                         "script_json": next((x for x in script_sidecars.get(c_idx, []) if x is not None), None),
                         "transcript_file": p.stem if p.stem in transcripts_set else None,
                         "match": {"source": "compressed", "file": c_file, "index": c_idx},

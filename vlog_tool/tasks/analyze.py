@@ -177,6 +177,7 @@ def _process_video_item(
 
     analysis["index"] = idx_val
     analysis["source_file"] = original.name
+    analysis["compressed_file"] = compressed.name  # stable lookup key for videos.py
     identity = resolve_identity(compressed, config.paths.input_dir, idx_str)
     add_schema_version(analysis)
     analysis["media_identity"] = _identity_to_dict(identity)
