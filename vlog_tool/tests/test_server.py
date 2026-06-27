@@ -743,3 +743,121 @@ class TestDoPOST:
         handler.rfile = io.BytesIO(raw)
         handler.do_POST()
         handler.send_response.assert_called_once_with(400)
+
+
+# ===========================================================================
+# Auth tests
+# ===========================================================================
+
+
+class TestAuth:
+    """Token-based auth for sensitive routes.
+
+    Default handler_cls has _api_token="" (no auth).
+    Tests that need auth use auth_cls fixture with _api_token="test-token-789".
+    """
+
+    @pytest.fixture
+    def auth_cls(self, handler_cls):
+        handler_cls._api_token = "test-token-789"
+        yield handler_cls
+        handler_cls._api_token = ""
+
+    # --- GET route auth ---
+
+    def test_sensitive_get_returns_401_without_token(self, auth_cls):
+        """GET /api/env without token returns 401."""
+        handler = _build_handler(auth_cls, path="/api/env")
+        handler.do_GET()
+        handler.send_response.assert_called_once_with(401)
+
+    @patch("vlog_tool.ui.server.handle_get_env")
+    def test_sensitive_get_works_with_bearer_token(self, mock_fn, auth_cls):
+        """GET /api/env with valid Bearer token works."""
+        handler = _build_handler(auth_cls, path="/api/env")
+        handler.headers.get.side_effect = lambda k, d=None: "Bearer test-token-789" if k == "Authorization" else "0"
+        handler.do_GET()
+        mock_fn.assert_called_once()
+
+    @patch("vlog_tool.ui.server.handle_get_env")
+    def test_sensitive_get_works_with_query_token(self, mock_fn, auth_cls):
+        """GET /api/env with ?token= in URL works."""
+        handler = _build_handler(auth_cls, path="/api/env?token=test-token-789")
+        handler.do_GET()
+        mock_fn.assert_called_once()
+
+    def test_sensitive_get_config_raw_returns_401_without_token(self, auth_cls):
+        """GET /api/config/raw without token returns 401."""
+        handler = _build_handler(auth_cls, path="/api/config/raw")
+        handler.do_GET()
+        handler.send_response.assert_called_once_with(401)
+
+    @patch("vlog_tool.ui.server.handle_get_fs_dirs")
+    def test_sensitive_get_fs_dirs_returns_401_without_token(self, mock_fn, auth_cls):
+        """GET /api/fs/dirs without token returns 401."""
+        handler = _build_handler(auth_cls, path="/api/fs/dirs")
+        handler.do_GET()
+        handler.send_response.assert_called_once_with(401)
+
+    @patch("vlog_tool.ui.server.handle_get_video")
+    def test_sensitive_get_video_returns_401_without_token(self, mock_fn, auth_cls):
+        """GET /api/video without token returns 401."""
+        handler = _build_handler(auth_cls, path="/api/video?file=test.mp4")
+        handler.do_GET()
+        handler.send_response.assert_called_once_with(401)
+
+    @patch("vlog_tool.ui.server.handle_get_video")
+    def test_video_works_with_query_token(self, mock_fn, auth_cls):
+        """GET /api/video with ?token= works."""
+        handler = _build_handler(auth_cls, path="/api/video?file=test.mp4&token=test-token-789")
+        handler.do_GET()
+        mock_fn.assert_called_once()
+
+    def test_non_sensitive_get_works_without_token(self, auth_cls):
+        """GET /api/config (non-sensitive) works without token."""
+        handler = _build_handler(auth_cls, path="/api/config")
+        with patch("vlog_tool.ui.server.handle_get_config") as mock_fn:
+            handler.do_GET()
+            mock_fn.assert_called_once()
+
+    # --- PUT route auth ---
+
+    def test_put_returns_401_without_token(self, auth_cls):
+        """PUT without token returns 401."""
+        handler = _build_handler(auth_cls, path="/api/project", method="PUT")
+        handler.headers.get.return_value = "2"
+        handler.rfile = io.BytesIO(b"{}")
+        handler.do_PUT()
+        handler.send_response.assert_called_once_with(401)
+
+    @patch("vlog_tool.ui.server.handle_put_project")
+    def test_put_works_with_bearer_token(self, mock_fn, auth_cls):
+        """PUT with valid Bearer token works."""
+        handler = _build_handler(auth_cls, path="/api/project", method="PUT")
+        handler.headers = MagicMock()
+        handler.headers.get.side_effect = lambda k, d=None: {
+            "Authorization": "Bearer test-token-789",
+            "Content-Length": "2",
+        }.get(k, d)
+        handler.rfile = io.BytesIO(b"{}")
+        handler.do_PUT()
+        mock_fn.assert_called_once()
+
+    # --- POST route auth ---
+
+    def test_post_returns_401_without_token(self, auth_cls):
+        """POST without token returns 401."""
+        handler = _build_handler(auth_cls, path="/api/run/start", method="POST")
+        handler.headers.get.return_value = "2"
+        handler.rfile = io.BytesIO(b"{}")
+        handler.do_POST()
+        handler.send_response.assert_called_once_with(401)
+
+    # --- No auth needed for default (empty token) ---
+
+    def test_unprotected_default_no_auth(self, handler_cls):
+        """Default handler (empty token) works without auth."""
+        with patch("vlog_tool.ui.server.handle_get_env") as mock_fn:
+            handler = _build_handler(handler_cls, path="/api/env")
+            handler.do_GET()
+            mock_fn.assert_called_once()
