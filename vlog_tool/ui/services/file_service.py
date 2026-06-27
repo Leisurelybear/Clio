@@ -202,7 +202,7 @@ def _find_compressed_for_original(stem: str, comp_dir: Path) -> list[tuple[str, 
 
     # Legacy fallback: directory scan
     needle = stem.lower()
-    matches: list[tuple[str, str]] = []
+    fallback_matches: list[tuple[str, str]] = []
     for p in sorted(comp_dir.iterdir()):
         if p.suffix.lower() not in VIDEO_EXTS or "_" not in p.stem:
             continue
@@ -211,11 +211,11 @@ def _find_compressed_for_original(stem: str, comp_dir: Path) -> list[tuple[str, 
             return [(p.name, idx)]
         seg_prefix = needle + "_seg"
         if rest.lower().startswith(seg_prefix) and rest.lower()[len(seg_prefix) :].isdigit():
-            matches.append((p.name, idx))
-    if not matches:
+            fallback_matches.append((p.name, idx))
+    if not fallback_matches:
         return None
-    matches.sort(key=lambda m: m[1])
-    return matches
+    fallback_matches.sort(key=lambda m: m[1])
+    return fallback_matches
 
 
 def _coerce_config_types(new_val: Any, ref_val: Any) -> Any:

@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import copy
 import threading
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from vlog_tool.config import AppConfig, load_config
 
@@ -22,7 +24,7 @@ class ConfigCache:
     - Returns deep copies to prevent caller mutation.
     """
 
-    def __init__(self, config_path: Path | None, maxsize: int = 20, on_load: callable | None = None) -> None:
+    def __init__(self, config_path: Path | None, maxsize: int = 20, on_load: Callable[..., Any] | None = None) -> None:
         self._config_path = config_path
         self._maxsize = maxsize
         self._on_load = on_load
@@ -45,7 +47,7 @@ class ConfigCache:
                 del self._cache[key]
                 self._meta.pop(key, None)
 
-            new_config = load_config(self._config_path, project_dir=project_input)
+            new_config = load_config(self._config_path or "config.yaml", project_dir=project_input)
 
             if len(self._cache) >= self._maxsize:
                 oldest_key = next(iter(self._cache))
