@@ -187,6 +187,7 @@ def _legacy_ai_config(raw: dict) -> AIConfig:
     gemini_raw = raw.get("gemini", {})
     api_key = os.environ.get("GEMINI_API_KEY") or gemini_raw.get("api_key", "")
     model = gemini_raw.get("model", "gemini-2.5-flash")
+    video_model = gemini_raw.get("video_model", "gemini-2.5-flash-lite")
     return AIConfig(
         providers={
             "gemini": ProviderConfig(
@@ -198,7 +199,7 @@ def _legacy_ai_config(raw: dict) -> AIConfig:
             ),
         },
         tasks={
-            "video_analyze": TaskConfig(provider="gemini", model=model),
+            "video_analyze": TaskConfig(provider="gemini", model=video_model),
             "voiceover": TaskConfig(provider="gemini", model=model),
             "vlog_plan": TaskConfig(provider="gemini", model=model),
         },
