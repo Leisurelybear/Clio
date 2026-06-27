@@ -2,7 +2,7 @@ from vlog_tool.config.models import AppConfig
 
 
 def _filter_dc(raw: dict, dc: type) -> dict:
-    fields = {f.name for f in dc.__dataclass_fields__.values()}
+    fields = {f.name for f in getattr(dc, "__dataclass_fields__", {}).values()}
     return {k: v for k, v in raw.items() if k in fields}
 
 

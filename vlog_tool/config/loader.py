@@ -112,7 +112,7 @@ def _upgrade_config_file(yaml_path: Path) -> None:
         section = raw.get(section_name)
         if not isinstance(section, dict):
             continue
-        for fd in dc_type.__dataclass_fields__.values():
+        for fd in getattr(dc_type, "__dataclass_fields__", {}).values():
             if fd.name in section:
                 continue
             val = _resolve_field_default(fd)
