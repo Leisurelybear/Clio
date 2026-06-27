@@ -203,8 +203,8 @@ def run_cut_all(
             text_json = None
             matching_texts = sorted(config.texts_dir.glob(f"{idx}_*.json"))
             if matching_texts:
-                src = matching_texts[0]
-                data = json.loads(src.read_text(encoding="utf-8"))
+                text_path = matching_texts[0]
+                data = json.loads(text_path.read_text(encoding="utf-8"))
                 data["_cut_info"] = {
                     "seg_index": i,
                     "timeline": timeline,
