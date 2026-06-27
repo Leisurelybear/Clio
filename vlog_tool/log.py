@@ -118,11 +118,12 @@ def _install_excepthook(logger: logging.Logger) -> None:
             sys.__excepthook__(exc_type, exc_value, exc_tb)
             return
         tb_text = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
-        sys.__stderr__.write(tb_text)
-        try:
-            sys.__stderr__.flush()
-        except Exception:
-            pass
+        if sys.__stderr__ is not None:
+            sys.__stderr__.write(tb_text)
+            try:
+                sys.__stderr__.flush()
+            except Exception:
+                pass
         logger.error(tb_text.rstrip())
 
     sys.excepthook = hook
