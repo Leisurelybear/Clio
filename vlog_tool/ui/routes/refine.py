@@ -12,7 +12,7 @@ from vlog_tool.tasks.refine import _load_analysis_for_script
 from vlog_tool.ui.services.file_service import _save_atomic
 
 if TYPE_CHECKING:
-    from http.server import BaseHTTPRequestHandler
+    from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 _refining: set[str] = set()
 _refining_lock = threading.Lock()
@@ -31,7 +31,7 @@ def _mark_busy(path: str, busy: bool) -> None:
             _refining.discard(path)
 
 
-def handle_post_refine(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
+def handle_post_refine(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
     """Handle POST /api/refine.
 
     Body: {file: str, type: "texts"|"scripts", context?: str}
@@ -47,9 +47,9 @@ def handle_post_refine(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> 
     proj_input = handler._resolve_project_input(qs)
     proj_out = handler._get_project_output(proj_input)
     if ftype == "texts":
-        p = handler._resolve_texts(fname, proj_out)
+        p = handler._resolve_texts(fname, proj_out)  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
     else:
-        p = handler._resolve_in("scripts", fname, proj_out)
+        p = handler._resolve_in("scripts", fname, proj_out)  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
 
     if p is None:
         return handler._send_json({"ok": False, "error": "forbidden or not found"}, 404)
