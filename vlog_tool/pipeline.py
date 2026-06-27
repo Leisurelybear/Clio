@@ -4,6 +4,8 @@ All public symbols are re-exported for backward compatibility."""
 from __future__ import annotations
 
 import threading
+from collections.abc import Callable
+from typing import Any
 
 # Keep these orchestration-specific items in pipeline.py
 from vlog_tool.config import AppConfig
@@ -59,7 +61,7 @@ _STEP_LABELS = {
     "label": "烧录序号标注",
 }
 
-_STEP_FUNCS = {
+_STEP_FUNCS: dict[str, Callable[..., Any]] = {
     "compress": run_compress_all,
     "analyze": run_analyze_all,
     "voiceover": run_generate_scripts,
