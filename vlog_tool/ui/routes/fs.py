@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from http.server import BaseHTTPRequestHandler
+    from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 from vlog_tool.ui.services.file_service import _list_drives
 
@@ -28,7 +28,7 @@ def _is_allowed_path(resolved: Path) -> bool:
     return False
 
 
-def handle_get_fs_dirs(handler: BaseHTTPRequestHandler, qs: dict) -> None:
+def handle_get_fs_dirs(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     """Handle GET /api/fs/dirs."""
     dir_path = qs.get("path", [""])[0]
     if not dir_path:

@@ -10,10 +10,10 @@ from vlog_tool.pipeline import run_cut_all
 from vlog_tool.ui.services.file_service import _is_safe_basename, _save_atomic
 
 if TYPE_CHECKING:
-    from http.server import BaseHTTPRequestHandler
+    from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 
-def handle_get_plans(handler: BaseHTTPRequestHandler, qs: dict) -> None:
+def handle_get_plans(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     """Handle GET /api/plans."""
     proj_out = handler._get_project_output(qs)
     plans_dir = proj_out / "plans"
@@ -26,7 +26,7 @@ def handle_get_plans(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     handler._send_json({"plans": plans})
 
 
-def handle_get_plan(handler: BaseHTTPRequestHandler, qs: dict) -> None:
+def handle_get_plan(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     """Handle GET /api/plan."""
     day = qs.get("day", [""])[0]
     if not _is_safe_basename(day) or not day:
@@ -38,7 +38,7 @@ def handle_get_plan(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     handler._send_bytes(p.read_bytes(), "application/json; charset=utf-8")
 
 
-def handle_put_plan(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
+def handle_put_plan(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
     """Handle PUT /api/plan."""
     day = qs.get("day", [""])[0]
     if not _is_safe_basename(day) or not day:
@@ -50,7 +50,7 @@ def handle_put_plan(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> Non
     handler._send_json({"ok": True, "path": str(p)})
 
 
-def handle_post_cut(handler: BaseHTTPRequestHandler, qs: dict[str, list[str]], obj: dict) -> None:
+def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dict) -> None:
     """Handle POST /api/cut."""
     day_label = obj.get("day_label", "day1")
     if not _is_safe_basename(day_label):
