@@ -37,6 +37,7 @@ class TextAIProvider(Protocol):
     def close(self) -> None: ...
 
 
+@runtime_checkable
 class VideoAIProvider(TextAIProvider, Protocol):
     """支持视频理解的 AI 能力。"""
 

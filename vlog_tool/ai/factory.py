@@ -3,13 +3,14 @@ from __future__ import annotations
 import threading
 import time
 from dataclasses import dataclass
+from typing import Any
 
 from vlog_tool.ai.base import TaskName, TextAIProvider, VideoAIProvider
 from vlog_tool.ai.gemini import GeminiProvider
 from vlog_tool.ai.openai_compat import OpenAICompatProvider
 from vlog_tool.config import AppConfig, TaskConfig
 
-_PROVIDER_TYPES = {
+_PROVIDER_TYPES: dict[str, type[Any]] = {
     "gemini": GeminiProvider,
     "openai": OpenAICompatProvider,
     "openai_compat": OpenAICompatProvider,
@@ -26,7 +27,7 @@ _provider_cache: dict[tuple, _CachedEntry] = {}
 _provider_cache_lock = threading.Lock()
 
 
-def _build_provider(config: AppConfig, provider_name: str):
+def _build_provider(config: AppConfig, provider_name: str) -> TextAIProvider:
     provider_cfg = config.ai.providers.get(provider_name)
     if not provider_cfg:
         raise ValueError(f"未定义的 AI 厂家: {provider_name}")
