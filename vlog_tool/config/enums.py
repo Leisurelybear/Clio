@@ -1,4 +1,4 @@
-from enum import StrEnum
+from vlog_tool._str_enum import StrEnum
 
 
 class WhisperModelSize(StrEnum):
