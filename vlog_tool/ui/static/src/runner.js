@@ -11,6 +11,7 @@ let _runPollTimer = null;
 let _lastRunDay = 'day1';
 let _pollErrorCount = 0;
 let _runActive = false;  // true while a pipeline is running; prevents double-click + stale render
+let _lastProgressSnapshot = null;  // {current, total, message, timestamp} for stale detection
 
 const STEPS_KEY = 'vlog_ui_run_steps';
 
@@ -217,6 +218,7 @@ async function pollRunStatus() {
     const s = await api('GET', '/api/run/status');
     if (s.rerun) return;
     if (s.status === 'idle' || s.status === 'unknown') {
+      _lastProgressSnapshot = null;
       _runActive = false;
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
       const cancelBtn = $('btn-run-cancel');
@@ -257,10 +259,24 @@ async function pollRunStatus() {
           <div style="background:#333;border-radius:3px;height:8px;margin:8px 0">
             <div style="background:#4a9eff;border-radius:3px;height:100%;width:${pct}%"></div>
           </div>
+          <div id="stale-warn" style="display:none;margin-top:8px;padding:8px;background:var(--warning-bg,#2a2520);border:1px solid var(--warning-border,#b8860b);border-radius:6px;font-size:var(--text-sm)">
+            ⏳ 进度长时间未更新，可能正在后台下载模型（约 1-2 GB）或网络连接异常<br>
+            <span style="color:var(--text-secondary)">可前往 <a href="#" id="link-stale-settings" style="text-decoration:underline;color:var(--accent)" onclick="event.preventDefault();import('./sidebar.js').then(function(m){m.selectConfig()})">设置 → Whisper 模型管理</a> 检查模型状态</span>
+          </div>
           ${logsHtml}
         `;
+        // 超时停滞检测：如果 current/total/message 无变化超过 60 秒，显示提示
+        const snapKey = s.current + '/' + s.total + '/' + s.message;
+        const now = Date.now();
+        if (!_lastProgressSnapshot || _lastProgressSnapshot.key !== snapKey) {
+          _lastProgressSnapshot = { key: snapKey, timestamp: now };
+        } else if (now - _lastProgressSnapshot.timestamp > 60000) {
+          var staleEl = $('stale-warn');
+          if (staleEl) staleEl.style.display = '';
+        }
       }
     } else if (s.status === 'done') {
+      _lastProgressSnapshot = null;
       _runActive = false;
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
@@ -301,6 +317,7 @@ async function pollRunStatus() {
       await import('./sidebar.js').then(mod => mod.loadVideos());
       if (state.currentEntity === 'plan') import('./sidebar.js').then(mod => mod.selectPlan());
     } else if (s.status === 'cancelled') {
+      _lastProgressSnapshot = null;
       _runActive = false;
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
@@ -311,6 +328,7 @@ async function pollRunStatus() {
       setStatus('流水线已取消', 'warn');
       renderProcessingState($('run-state-container'));
     } else if (s.status === 'error') {
+      _lastProgressSnapshot = null;
       _runActive = false;
       _stopRunPoll();
       if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
