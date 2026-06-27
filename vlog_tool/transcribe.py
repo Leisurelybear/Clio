@@ -97,15 +97,31 @@ def _get_model(config: AppConfig):
                         return _whisper_model
                     except (ValueError, RuntimeError, OSError) as e:
                         is_last = ct == compute_types[-1]
+                        err_str = str(e)
                         if device == "cuda" and is_last:
-                            print(f"  [警告] CUDA 加载失败 ({e})，回退到 CPU")
+                            print(f"  [警告] CUDA 加载失败 ({err_str})，回退到 CPU")
                             device = "cpu"
                             break
                         if device != "cuda" and is_last:
-                            print(f"  [错误] 模型加载失败: {e}")
+                            print(f"  [错误] 模型加载失败: {err_str}")
                             print("  [提示] 请执行 `python main.py whisper install` 预下载模型到本地缓存")
                             ep = config.whisper.hf_endpoint or "未设置（使用官方地址）"
                             print(f"  [提示] 国内用户需在设置中配置 hf_endpoint（当前: {ep}）")
+                            if (
+                                "tls" in err_str.lower()
+                                or "handshake" in err_str.lower()
+                                or "eof" in err_str.lower()
+                                or "connect" in err_str.lower()
+                            ):
+                                print("  [提示] 可能是网络/代理问题导致模型下载失败，建议：")
+                                print("         1. 在配置中设置 hf_endpoint: https://hf-mirror.com")
+                                print("         2. 或执行 `python main.py whisper install` 手动下载")
+                            if "cublas" in err_str.lower() or "library" in err_str.lower():
+                                print("  [提示] 可能是 CUDA 库缺失，建议：")
+                                print("         1. 在配置中设置 whisper.device: cpu（跳过 CUDA）")
+                                print(
+                                    "         2. 或安装 CUDA 运行时: pip install nvidia-cublas-cu12 nvidia-cudnn-cu12"
+                                )
                             raise
                         print(f"  [警告] {device} {ct} 加载失败 ({e})，尝试下一个 compute type")
                         continue
@@ -130,11 +146,11 @@ def transcribe_audio(
     progress_callback: Callable[[int], None] | None = None,
 ) -> list[dict]:
     lang = config.whisper.language
-    model = _get_model(config)
     if progress_callback:
         progress_callback(0)
 
     try:
+        model = _get_model(config)
         segments_iter, info = model.transcribe(
             str(audio_path),
             language=None if lang == "auto" else lang,
@@ -148,7 +164,7 @@ def transcribe_audio(
     except (RuntimeError, OSError) as e:
         err = str(e)
         if "cublas" in err.lower() or "cuda" in err.lower() or "library" in err.lower():
-            print(f"  [警告] CUDA 推理失败 ({e})，回退到 CPU 重试")
+            print(f"  [警告] CUDA 模型加载/推理失败 ({e})，回退到 CPU 重试")
             _clear_model_cache()
             _orig_device = config.whisper.device
             config.whisper.device = "cpu"
@@ -164,6 +180,11 @@ def transcribe_audio(
                     best_of=5,
                     temperature=0.0,
                 )
+            except (RuntimeError, OSError):
+                print("  [错误] CPU 回退也失败，可能是 cuBLAS 库缺失")
+                print("  [提示] 请在配置中设置 whisper.device: cpu，或安装 CUDA 运行时:")
+                print("         pip install nvidia-cublas-cu12 nvidia-cudnn-cu12")
+                raise
             finally:
                 config.whisper.device = _orig_device
         else:
