@@ -205,6 +205,24 @@
   <div class="rerun-logs" id="rerun-logs"></div>
 </div>
 
+<!-- Auth Modal -->
+<div id="modal-auth" class="modal" style="display:none;">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog" style="max-width:400px;">
+    <h3>需要 API Token</h3>
+    <p style="color:var(--text-secondary);margin-bottom:var(--space-4);">
+      该服务需要身份验证。请在终端中查找启动时打印的 API Token 并粘贴到下方。
+    </p>
+    <label>
+      <span>API Token</span>
+      <input id="auth-token-input" type="text" placeholder="粘贴 API Token" style="width:100%;box-sizing:border-box;font-family:monospace;">
+    </label>
+    <div class="modal-actions">
+      <button id="auth-submit" class="btn-primary">验证</button>
+    </div>
+  </div>
+</div>
+
 <script type="module" src="/static/src/main.js"></script>
 </body>
 </html>

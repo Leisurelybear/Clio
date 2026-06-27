@@ -14,7 +14,9 @@ function playVideoSegment(file, seekTo) {
       doSeek();
     };
     const projParam = state.currentProjectName ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
-    player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${projParam}`;
+    const tokenParam = sessionStorage.getItem('api_token');
+    const extraParam = tokenParam ? `&token=${encodeURIComponent(tokenParam)}` : '';
+    player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${projParam}${extraParam}`;
   }
 }
 

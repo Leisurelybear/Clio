@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { $, $$, escapeHtml, setStatus, updateSidebarDay } from './utils.js';
-import { api } from './api.js';
+import { api, submitToken } from './api.js';
 import { initLayout } from './layout.js';
 import { setupPlayer } from './viewer.js';
 import { save, initProjectConfig, renderActiveTab, refineCurrentFile } from './editor.js';
@@ -45,6 +45,14 @@ async function init() {
   }
   if (urlInputDir) {
     state.currentProjectInputDir = urlInputDir;
+  }
+
+  // Auto-capture token from URL
+  const urlToken = urlParams.get('token');
+  if (urlToken) {
+    sessionStorage.setItem('api_token', urlToken);
+    const newUrl = location.pathname + (location.hash || '');
+    history.replaceState(null, '', newUrl);
   }
 
   // 新建/打开项目模态框（必须在 try 之前绑定，空状态时也会用到）
@@ -224,6 +232,11 @@ async function init() {
   }
   const rerunClose = $('rerun-close');
   if (rerunClose) rerunClose.onclick = hideRerunProgress;
+  // Wire up auth modal
+  document.getElementById('auth-submit')?.addEventListener('click', submitToken);
+  document.getElementById('auth-token-input')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitToken();
+  });
   // ---- End event handlers ----
 
   try {

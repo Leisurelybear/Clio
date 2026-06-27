@@ -1,7 +1,13 @@
 import { state } from './state.js';
 
+let _showingAuth = false;
+
 async function api(method, url, body) {
   const opts = { method, headers: {} };
+  const token = sessionStorage.getItem('api_token');
+  if (token) {
+    opts.headers['Authorization'] = `Bearer ${token}`;
+  }
   if (body !== undefined) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
@@ -16,6 +22,13 @@ async function api(method, url, body) {
     url += `${sep}input_dir=${encodeURIComponent(state.currentProjectInputDir)}`;
   }
   const r = await fetch(url, opts);
+  if (r.status === 401) {
+    if (!_showingAuth) {
+      _showingAuth = true;
+      document.getElementById('modal-auth').style.display = 'flex';
+    }
+    throw new Error('HTTP 401: 需要 API Token');
+  }
   if (!r.ok) {
     const txt = await r.text();
     let detail = txt;
@@ -55,4 +68,13 @@ function icon(name, size = 18) {
   return `<span class="icon"><svg viewBox="0 0 24 24">${d}</svg></span>`;
 }
 
-export { api, icon };
+function submitToken() {
+  const input = document.getElementById('auth-token-input');
+  const token = input.value.trim();
+  if (!token) return;
+  sessionStorage.setItem('api_token', token);
+  _showingAuth = false;
+  location.reload();
+}
+
+export { api, icon, submitToken };
