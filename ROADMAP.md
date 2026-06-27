@@ -5,6 +5,47 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
+## Project Review Remediation Plan (2026-06-26)
+
+**Source**: `docs/analysis/2026-06-26-project-review.md` §6
+
+### Phase 1: High-confidence bug fixes ✅
+- [x] 1. Parse `ai.provider_ttl_min` — commit `538064b`
+- [x] 2. Fix `.env` hot reload (`_load_dotenv` override=True) — commit `e717ab4`
+- [x] 3. Fix duplicate run progress clobbering — commit `c54fc17`
+- [x] 4. Fix Whisper route project query + model save — commit `f4b84e0`
+
+### Phase 2: Canonical media identity ✅
+- [x] 1. `MediaIdentity` dataclass + `identity.py` — commit `2c95f18`
+- [x] 2. Analysis JSON writes `media_identity` — commit `7179b30`
+- [x] 3. Transcript JSON writes `media_identity` — commit `83c6132`
+- [x] 4. `ClipRecord.identity` field — commit `5a86c95`
+- [x] 5. Plan transcript injection fix — commit `943472e`
+- [x] 6. JianYing export identity + offset — commit `cd717a0`
+- [x] 7. UI videos route transcript matching — commit `0ce946f`
+- [x] 8. cut.py prefers `media_identity` offset — commit `7ba48aa`
+- [x] 9. Full regression (889→901 passed) — commit `ae56e6d`
+
+### Phase 3: Security hardening ✅
+- [x] 1. Backend auth — `ServerConfig`, `--token` CLI, `_require_auth()`, auto-generate on non-localhost — commit `767bc92`
+- [x] 2. Frontend auth — `api.js` Bearer header + 401 modal, video `?token=` URL, auto-capture from URL — commit `767bc92`
+- [x] 3. Auth tests (12 test cases) — commit `ae56e6d`
+- [ ] 4. Update README/UI docs with safe hosting guidance
+
+### Phase 4: Type and schema hardening ⏸️
+- [ ] 1. Fix type contracts in config, utils, progress, vmeta, export
+- [ ] 2. Introduce route handler protocols
+- [ ] 3. Add artifact schema versions and validators
+- [ ] 4. Make mypy fail CI for the cleaned subset
+
+### Phase 5: Maintainability cleanup
+- [ ] 1. Split large frontend modules
+- [ ] 2. Split Whisper route module
+- [ ] 3. Replace normal-mode debug prints with structured logging
+- [ ] 4. Add golden tests for export formats
+
+---
+
 ## In Progress
 
 ### U-002: ProviderManager (Phase 2 — Short-term)
@@ -632,6 +673,16 @@ All B-046~B-052 covered by 163 new tests:
 
 | Commit | Description |
 | --- | --- |
+| `ae56e6d` | test(server): auth tests for sensitive routes (12 cases) |
+| `767bc92` | feat(server): add token-based auth for LAN-exposed UI |
+| `7ba48aa` | fix(tasks): prefer media_identity offset_sec for cut segment offset |
+| `0ce946f` | fix(ui): use media_identity for transcript matching in videos route |
+| `cd717a0` | fix(export): use media_identity for source resolution, apply segment offset |
+| `943472e` | fix(plan): match transcripts by original_stem from media_identity |
+| `5a86c95` | refactor(tasks): add identity field to ClipRecord dataclass |
+| `83c6132` | fix(transcribe): write media_identity block in transcript JSON |
+| `7179b30` | fix(analyze): write media_identity + _schema_version in analysis JSON |
+| `2c95f18` | feat(identity): add MediaIdentity dataclass with resolve/load helpers |
 | `fa5fee1` | test: add unit tests for files/overwrite params across all pipeline steps (R-018) |
 | `95b539f` | fix(review): address code review - fix label.py shadow, plan.py overwrite gate, add type validation and tests (R-018) |
 | `5b0a9c0` | feat(ui): wire selection mode to runner - send files/overwrite params, show badge (R-018d/e) |
