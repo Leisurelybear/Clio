@@ -84,7 +84,7 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
     print("\nAI 任务配置:")
     for task_name, task_cfg in config.ai.tasks.items():
         provider = config.ai.providers.get(task_cfg.provider)
-        key_ok = provider and provider.api_key not in PLACEHOLDER_KEYS
+        key_ok = provider is not None and provider.api_key not in PLACEHOLDER_KEYS
         detail = f"{task_cfg.provider}/{task_cfg.model}"
         if provider and not key_ok:
             env_name = provider.api_key_env or "<未设置 api_key_env>"
@@ -373,8 +373,8 @@ def main(argv: list[str] | None = None) -> int:
             print(f"已更新 {updated} 个 project.yaml")
             if errors:
                 print("错误:")
-                for e in errors:
-                    print(f"  - {e}")
+                for err in errors:
+                    print(f"  - {err}")
             return 0
         elif args.command == "serve":
             return run_ui(
