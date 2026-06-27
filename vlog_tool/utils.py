@@ -15,6 +15,7 @@ from vlog_tool._constants import VIDEO_EXTENSIONS
 from vlog_tool.shutdown import register_process, unregister_process
 
 T = TypeVar("T")
+JsonValue = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 
 # ---- subprocess wrappers for cross-platform encoding safety ----
 # On Chinese Windows text=True defaults to GBK, which crashes on UTF-8
@@ -202,7 +203,7 @@ def get_duration_sec(video_path: Path, ffprobe: str) -> float:
     return float(raw)
 
 
-def write_json_atomic(path: Path, data: dict, *, ensure_ascii: bool = False, indent: int = 2) -> None:
+def write_json_atomic(path: Path, data: JsonValue, *, ensure_ascii: bool = False, indent: int = 2) -> None:
     """Write JSON to a file using tmp + rename for crash safety."""
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(path.suffix + f".tmp.{os.urandom(4).hex()}")
