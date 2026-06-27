@@ -42,8 +42,11 @@ jobs:
       run: ruff format --check
 
     - name: Type check (mypy)
-      run: mypy vlog_tool/ --exclude vlog_tool/ai/ 2>&1 || true
-      # mypy is advisory only — non-zero exit doesn't fail the job
+      run: |
+        # Phase 4d: CI gate for type hardening
+        # Core modules with strict checking (excluding AI module)
+        mypy vlog_tool/config/ vlog_tool/progress.py vlog_tool/export/__init__.py vlog_tool/log.py vlog_tool/schema.py vlog_tool/_str_enum.py --check-untyped-defs --show-error-codes
+        echo "Core module type check passed"
 
     - name: Import check
       run: python -c "import vlog_tool; print('import OK')"
