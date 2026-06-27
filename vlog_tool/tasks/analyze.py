@@ -121,7 +121,11 @@ def _process_video_item(
             tracker.log(f"跳过 {compressed.name}（已分析）")
         state.mark(original.stem, "analyze", "skipped")
         print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
-        identity = load_identity(analysis) or resolve_identity(compressed, config.paths.input_dir, idx_str)
+        identity = (
+            resolve_identity(compressed, config.paths.input_dir, idx_str)
+            if analysis is None
+            else load_identity(analysis) or resolve_identity(compressed, config.paths.input_dir, idx_str)
+        )
         return ClipRecord(
             index=idx_val,
             stem=json_path.stem,
