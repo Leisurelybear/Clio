@@ -59,11 +59,22 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                 data = json.loads(f.read_text(encoding="utf-8"))
             except Exception:
                 continue
-            idx = str(data.get("index", ""))
-            if not idx:
-                if "_" not in f.stem:
-                    continue
+            # Extract index from filename first (e.g. "009_机场廊桥初见" → "009").
+            # This avoids int-vs-zero-padded-string mismatch: data["index"] is an
+            # int (9), but compressed video lookup keys are zero-padded ("009").
+            if "_" in f.stem:
                 idx = f.stem.split("_", 1)[0]
+            else:
+                idx = str(data.get("index", ""))
+                if not idx:
+                    continue
+            text_sidecars.setdefault(idx, []).append(f.name)
+            if idx not in text_titles:
+                text_titles[idx] = data.get("title", "")
+            if idx not in text_identities:
+                identity = load_identity(data)
+                if identity is not None:
+                    text_identities[idx] = identity
             text_sidecars.setdefault(idx, []).append(f.name)
             if idx not in text_titles:
                 text_titles[idx] = data.get("title", "")
