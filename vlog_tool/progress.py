@@ -8,9 +8,13 @@ from pathlib import Path
 from typing import TypedDict
 
 from vlog_tool import session_log as _session_log
+from vlog_tool.schema import ARTIFACT_SCHEMA_VERSION
 
 
 class ProgressData(TypedDict):
+    """Structure of the .progress.json file."""
+
+    _schema_version: int
     phase: str
     current: int
     total: int
@@ -41,6 +45,7 @@ class ProgressTracker:
         self._lock = threading.Lock()
         self._start = time.monotonic()
         self._data: ProgressData = {
+            "_schema_version": ARTIFACT_SCHEMA_VERSION,
             "phase": "",
             "current": 0,
             "total": 0,

@@ -13,6 +13,7 @@ from vlog_tool.identity import load_identity
 from vlog_tool.log import timed
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
+from vlog_tool.schema import add_schema_version
 from vlog_tool.utils import format_index, write_json_atomic, write_text_atomic
 
 
@@ -117,6 +118,7 @@ def run_plan_vlog(
         )
         if config.plan.use_transcripts:
             plan["_transcripts_missing"] = not transcripts_map
+    add_schema_version(plan)
     write_json_atomic(out_json, plan)
     if tracker:
         tracker.log(f"规划 {day_label} ✓")

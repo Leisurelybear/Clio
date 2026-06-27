@@ -13,6 +13,7 @@ from vlog_tool.config import AppConfig
 from vlog_tool.log import timed
 from vlog_tool.processing_state import ProcessingState
 from vlog_tool.progress import ProgressTracker
+from vlog_tool.schema import add_schema_version
 from vlog_tool.tasks._helpers import _eta_line
 from vlog_tool.utils import write_json_atomic, write_text_atomic
 
@@ -65,6 +66,7 @@ def run_generate_scripts(
             script = generate_voiceover(data, template, config, token_store=token_store)
             elapsed_total += time.monotonic() - t0
             completed += 1
+            add_schema_version(script)
             write_json_atomic(out, script)
             state.mark(orig_stem, "voiceover", "done")
             if tracker:

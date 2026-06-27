@@ -5,6 +5,8 @@ import os
 import threading
 from pathlib import Path
 
+from vlog_tool.schema import ARTIFACT_SCHEMA_VERSION
+
 _STEPS = ["compress", "analyze", "voiceover", "transcribe", "plan", "label"]
 
 
@@ -25,10 +27,12 @@ class ProcessingState:
     def _load(self) -> dict:
         if self._path.is_file():
             try:
-                return json.loads(self._path.read_text(encoding="utf-8"))
+                data = json.loads(self._path.read_text(encoding="utf-8"))
+                data.setdefault("_schema_version", ARTIFACT_SCHEMA_VERSION)
+                return data
             except (json.JSONDecodeError, OSError):
                 pass
-        return {"version": 1, "steps": list(_STEPS), "files": {}}
+        return {"_schema_version": ARTIFACT_SCHEMA_VERSION, "version": 1, "steps": list(_STEPS), "files": {}}
 
     def _flush(self) -> None:
         self._path.parent.mkdir(parents=True, exist_ok=True)
