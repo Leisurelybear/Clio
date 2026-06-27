@@ -32,17 +32,36 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] 3. Auth tests (12 test cases) — commit `ae56e6d`
 - [ ] 4. Update README/UI docs with safe hosting guidance
 
-### Phase 4: Type and schema hardening ⏸️
-- [ ] 1. Fix type contracts in config, utils, progress, vmeta, export
-- [ ] 2. Introduce route handler protocols
-- [ ] 3. Add artifact schema versions and validators
-- [ ] 4. Make mypy fail CI for the cleaned subset
+### Phase 4: Type and schema hardening ✅
+- [x] 1. Fix type contracts in config, utils, progress, vmeta, export
+- [x] 2. Introduce route handler protocols
+- [x] 3. Add artifact schema versions and validators
+- [x] 4. Make mypy fail CI for the cleaned subset
 
 ### Phase 5: Maintainability cleanup
 - [ ] 1. Split large frontend modules
 - [ ] 2. Split Whisper route module
 - [ ] 3. Replace normal-mode debug prints with structured logging
 - [ ] 4. Add golden tests for export formats
+
+### Phase 6: Global vs Project Config Separation
+
+**Background**: Currently global `config.yaml` and per-project `project.yaml` share the same schema and merge at load time. This makes it impossible to distinguish "app-wide defaults" (providers, whisper model management) from "project-specific overrides" (which provider to use, AI context). Users have no UI-level understanding of which settings are global vs local.
+
+**Design goals**:
+- Global config (`config.yaml`): defines providers (API keys, model names, base URLs), Whisper model download paths, UI listen address/port, default paths
+- Project config (`project.yaml`): selects which provider/task binding to use, sets AI context, configures pipeline steps, overrides analysis parameters
+- No schema overlap: a setting lives in exactly one layer, never both
+- UI explicitly shows which layer each setting comes from, with tab switcher
+
+**Sub-tasks**:
+- [ ] 1. Design spec: define exact schema boundary between global and project config
+- [ ] 2. Backend: split `load_config` into `load_global_config` + `load_project_config` with separate caches
+- [ ] 3. Backend: `/api/config/global` and `/api/config/project` REST endpoints (no more "raw" catch-all)
+- [ ] 4. UI: Settings tab split into "Global" and "Project" sub-tabs
+- [ ] 5. UI: Global tab shows providers/formats; Project tab shows task binding/context/steps
+- [ ] 6. Migration: existing merged config.yaml auto-migrates to the new structure on first run
+- [ ] 7. Provider configuration is exclusively global — API keys never stored in project.yaml
 
 ---
 
