@@ -16,20 +16,11 @@ _SEG_SUFFIX_RE = re.compile(r"_seg\d+$")
 
 
 def _resolve_stem(file: str) -> str | None:
-    """Extract source stem from video filename.
-    Strips index prefix and _segNN suffix to find the original source stem.
-    E.g., '001_GL010683_seg01.mp4' -> 'GL010683', 'GL010683.MP4' -> 'GL010683'.
-    """
     safe = _is_safe_basename(file)
     if not safe:
         return None
     name = file.rsplit(".", 1)[0]
-    parts = name.split("_", 1)
-    if len(parts) >= 2 and parts[0].isdigit():
-        stem = parts[1]
-    else:
-        stem = name
-    stem = _SEG_SUFFIX_RE.sub("", stem)
+    stem = _SEG_SUFFIX_RE.sub("", name)
     return stem
 
 

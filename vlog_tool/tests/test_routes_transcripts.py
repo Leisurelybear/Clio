@@ -42,17 +42,17 @@ class TestHandleGetTranscripts:
         handler = _handler_with_config(tmp_path)
         (tmp_path / "transcripts").mkdir()
         transcript = {
-            "source_stem": "GL010683",
+            "source_stem": "001_GL010683",
             "segments": [{"start": 0.0, "end": 2.0, "text": "hello"}],
         }
-        (tmp_path / "transcripts" / "GL010683_transcript.json").write_text(json.dumps(transcript), encoding="utf-8")
+        (tmp_path / "transcripts" / "001_GL010683_transcript.json").write_text(json.dumps(transcript), encoding="utf-8")
 
         handler._send_json = MagicMock()
         handle_get_transcripts(handler, {"video": ["001_GL010683.mp4"]})
         handler._send_json.assert_called_once()
         args = handler._send_json.call_args
         assert args[0][0]["ok"] is True
-        assert args[0][0]["source_stem"] == "GL010683"
+        assert args[0][0]["source_stem"] == "001_GL010683"
 
     def test_not_found(self, tmp_path: Path):
         handler = _handler_with_config(tmp_path)
@@ -68,10 +68,10 @@ class TestHandlePutTranscripts:
         handler = _handler_with_config(tmp_path)
         (tmp_path / "transcripts").mkdir()
         transcript = {
-            "source_stem": "GL010683",
+            "source_stem": "001_GL010683",
             "segments": [{"start": 0.0, "end": 2.0, "text": "old text"}],
         }
-        tf = tmp_path / "transcripts" / "GL010683_transcript.json"
+        tf = tmp_path / "transcripts" / "001_GL010683_transcript.json"
         tf.write_text(json.dumps(transcript), encoding="utf-8")
 
         handler._send_json = MagicMock()
