@@ -17,13 +17,13 @@ from vlog_tool.ui.services.file_service import _find_original_for_compressed, _f
 from vlog_tool.ui.services.project_service import _project_output_dir
 
 if TYPE_CHECKING:
-    from http.server import BaseHTTPRequestHandler
+    from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 
-def handle_get_run_status(handler: BaseHTTPRequestHandler, qs: dict) -> None:
+def handle_get_run_status(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     """Handle GET /api/run/status."""
     proj_input = handler._resolve_project_input(qs)
-    state = handler._get_state(str(proj_input.resolve()))
+    state = handler._get_state(str(proj_input.resolve()))  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
     progress_file = handler._get_project_output(qs) / ".progress.json"
     if progress_file.is_file():
         try:
@@ -45,13 +45,13 @@ def handle_get_run_status(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     handler._send_json(data)
 
 
-def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
+def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
     """Handle POST /api/run/start."""
     day_label = obj.get("day_label", "day1")
     steps = obj.get("steps")
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
-    state = handler._get_state(str(proj_input.resolve()))
+    state = handler._get_state(str(proj_input.resolve()))  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
     if "use_transcripts" in obj:
         cfg.plan.use_transcripts = obj["use_transcripts"]
     files_list = obj.get("files")
@@ -91,19 +91,19 @@ def handle_post_run_start(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
     handler._send_json({"ok": True, "message": f"pipeline started ({label})"})
 
 
-def handle_post_run_cancel(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
+def handle_post_run_cancel(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
     """Handle POST /api/run/cancel."""
     proj_input = handler._resolve_project_input(qs)
-    state = handler._get_state(str(proj_input.resolve()))
+    state = handler._get_state(str(proj_input.resolve()))  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
     state.cancel_event.set()
     handler._send_json({"ok": True, "message": "取消请求已发送"})
 
 
-def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
+def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
     """Handle POST /api/rerun."""
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
-    state = handler._get_state(str(proj_input.resolve()))
+    state = handler._get_state(str(proj_input.resolve()))  # type: ignore[attr-defined]  # TODO(phase4): add to Protocol when stable
     proj_out = _project_output_dir(proj_input)
 
     video_basename = (obj.get("video") or "").strip()
@@ -212,7 +212,7 @@ def handle_post_rerun(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> N
                     original_video,
                     cancel_event=cancel_event,
                     progress_callback=lambda pct: tracker.update(
-                        phase="transcribe", current=pct, total=100, message=f"{video_basename}: 转录 ({pct}%)"
+                        phase="transcribe", message=f"{video_basename}: 转录 ({pct}%)"
                     ),
                 )
                 if "error" in result:
