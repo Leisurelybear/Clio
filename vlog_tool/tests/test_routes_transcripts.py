@@ -284,7 +284,7 @@ class TestHandleGetWhisperModels:
                 return_value=_DISK_USAGE(0, 0, 500 * 1024 * 1024),
             ),
         ):
-            handle_get_whisper_models(handler)
+            handle_get_whisper_models(handler, {})
 
         args = handler._send_json.call_args
         data = args[0][0]
@@ -316,7 +316,7 @@ class TestHandleGetWhisperModels:
                 return_value=_DISK_USAGE(0, 0, 500 * 1024 * 1024),
             ),
         ):
-            handle_get_whisper_models(handler)
+            handle_get_whisper_models(handler, {})
 
         args = handler._send_json.call_args
         data = args[0][0]
