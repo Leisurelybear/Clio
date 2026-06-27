@@ -58,7 +58,7 @@ class TestGet:
         mock_load.return_value = mock_cfg
         cache = ConfigCache(None)
         result = cache.get(None)
-        mock_load.assert_called_once_with(None, project_dir=None)
+        mock_load.assert_called_once_with("config.yaml", project_dir=None)
         assert result is not mock_cfg  # deep copy
 
     @patch("vlog_tool.ui.services.config_cache.load_config")
@@ -68,7 +68,7 @@ class TestGet:
         cache = ConfigCache(None)
         proj = Path("/my/project")
         result = cache.get(proj)
-        mock_load.assert_called_once_with(None, project_dir=proj)
+        mock_load.assert_called_once_with("config.yaml", project_dir=proj)
         assert result is not mock_cfg
 
     @patch("vlog_tool.ui.services.config_cache.load_config")
