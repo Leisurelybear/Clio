@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from http.server import BaseHTTPRequestHandler
-
 from vlog_tool.export import export_plan
+from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 
 def handle_post_export(
-    handler: BaseHTTPRequestHandler,
+    handler: HandlerProtocol,
     qs: dict[str, list[str]],
     obj: dict,
 ) -> None:
