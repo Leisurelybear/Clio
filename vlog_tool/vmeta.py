@@ -6,8 +6,9 @@ import hashlib
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from typing import cast
 
-from vlog_tool.utils import write_json_atomic
+from vlog_tool.utils import JsonValue, write_json_atomic
 
 VMETA_EXT = ".vmeta"
 VINDEX_EXT = ".vindex"
@@ -161,7 +162,7 @@ class VideoIndex:
             "is_split": self.is_split,
             "segments": [asdict(s) for s in self.segments],
         }
-        write_json_atomic(index_path, data)
+        write_json_atomic(index_path, cast(JsonValue, data))
         return index_path
 
     @staticmethod

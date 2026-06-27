@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 from vlog_tool.export.jianying import export_plan_to_jianying
 
-FORMAT_REGISTRY: dict[str, type] = {"jianying": export_plan_to_jianying}
+FORMAT_REGISTRY: dict[str, Callable[..., Path]] = {"jianying": export_plan_to_jianying}
 
 
 def export_plan(
