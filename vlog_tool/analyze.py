@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -136,7 +137,12 @@ def _call_ai(
     debug_print: bool = False,
     token_store=None,
     task_name: str = "",
+    cancel_event: threading.Event | None = None,
 ) -> str:
+    # Check cancel_event before starting AI call
+    if cancel_event and cancel_event.is_set():
+        raise RuntimeError(f"{label} 被用户取消")
+
     if debug_print:
         print("=" * 60)
         print(f"[DEBUG PROMPT] {label} ({provider_id}/{model})")
@@ -168,6 +174,7 @@ def analyze_video(
     config: AppConfig,
     progress_callback: Callable[[str], None] | None = None,
     token_store=None,
+    cancel_event: threading.Event | None = None,
 ) -> dict:
     provider, model = get_video_provider(config, TaskName.VIDEO_ANALYZE)
     prompt = _wrap_with_context(ANALYZE_PROMPT, config)
@@ -180,7 +187,12 @@ def analyze_video(
         debug_print=config.ai.debug_print_prompt,
         token_store=token_store,
         task_name=TaskName.VIDEO_ANALYZE,
+        cancel_event=cancel_event,
     )
+    # Check cancel_event after AI call but before validation
+    if cancel_event and cancel_event.is_set():
+        raise RuntimeError("分析被用户取消")
+
     return _validate_analysis(extract_json(text), video_path)
 
 

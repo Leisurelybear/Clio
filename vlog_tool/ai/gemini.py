@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import mimetypes
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -64,7 +65,7 @@ class GeminiProvider:
 
     def _retryable_types(self):
         """返回 with_retry 需要的异常类型元组。"""
-        types_list = [OSError]
+        types_list: list[type[Exception]] = [OSError]
         if _HAS_GENAI_ERRORS:
             types_list.append(_genai_errors.ClientError)
             types_list.append(_genai_errors.ServerError)
@@ -91,9 +92,18 @@ class GeminiProvider:
             should_retry=lambda e: self._is_retryable(e),
         )
 
-    def _wait_for_file(self, uploaded, timeout: float = 300, on_progress: Callable[[str], None] | None = None):
+    def _wait_for_file(
+        self,
+        uploaded,
+        timeout: float = 300,
+        on_progress: Callable[[str], None] | None = None,
+        cancel_event: threading.Event | None = None,
+    ):
         deadline = time.monotonic() + timeout
         while uploaded.state == types.FileState.PROCESSING:
+            # Check for cancellation
+            if cancel_event and cancel_event.is_set():
+                raise RuntimeError("视频处理被用户取消")
             if time.monotonic() > deadline:
                 raise TimeoutError(f"视频处理超时（{timeout}s）: {uploaded.name}")
             waited = int(time.monotonic() - (deadline - timeout))
@@ -138,13 +148,25 @@ class GeminiProvider:
         return self._call_with_retry(_do, model, model)
 
     def analyze_video(
-        self, video_path: str, prompt: str, model: str, progress_callback: Callable[[str], None] | None = None
+        self,
+        video_path: str,
+        prompt: str,
+        model: str,
+        progress_callback: Callable[[str], None] | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> AIResponse:
         uploaded = None
         try:
+            # Store cancel_event for use in helper methods
+            self._cancel_event = cancel_event
+
             if progress_callback:
                 progress_callback("上传视频到 Gemini...")
             self._maybe_wait()
+            # Check cancellation before upload
+            if cancel_event and cancel_event.is_set():
+                raise RuntimeError("视频分析被用户取消")
+
             # 用 BytesIO 避免 google-genai 2.8.0 的 bug：
             # 非 ASCII 文件名会作为 HTTP header 值发送，导致
             # UnicodeEncodeError: 'ascii' codec can't encode character
@@ -159,7 +181,8 @@ class GeminiProvider:
                 )
             if progress_callback:
                 progress_callback("等待 Gemini 处理...")
-            uploaded = self._wait_for_file(uploaded, on_progress=progress_callback)
+            # Pass cancel_event to _wait_for_file
+            uploaded = self._wait_for_file(uploaded, on_progress=progress_callback, cancel_event=cancel_event)
 
             if progress_callback:
                 progress_callback("AI 分析中...")
@@ -174,7 +197,7 @@ class GeminiProvider:
 
             return self._call_with_retry(_do, f"视频 {model}", model)
         finally:
-            if uploaded is not None:
+            if uploaded is not None and uploaded.name is not None:
                 try:
                     self._client.files.delete(name=uploaded.name)
                 except Exception:
