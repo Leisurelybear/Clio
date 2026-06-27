@@ -6,6 +6,7 @@ import json
 import threading
 from typing import TYPE_CHECKING
 
+from vlog_tool.ai.token_usage import FileTokenUsageStore
 from vlog_tool.analyze import refine_script, refine_text
 from vlog_tool.tasks.refine import _load_analysis_for_script
 from vlog_tool.ui.services.file_service import _save_atomic
@@ -64,13 +65,15 @@ def handle_post_refine(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> 
 
     config = handler._get_config(proj_input)
 
+    token_store = FileTokenUsageStore(str(proj_out))
+
     _mark_busy(abs_path, True)
     try:
         if ftype == "texts":
-            refined = refine_text(data, config, context_override=context_override)
+            refined = refine_text(data, config, context_override=context_override, token_store=token_store)
         else:
             analysis = _load_analysis_for_script(p, config.texts_dir)
-            refined = refine_script(data, analysis, config, context_override=context_override)
+            refined = refine_script(data, analysis, config, context_override=context_override, token_store=token_store)
     except Exception as e:
         return handler._send_json({"ok": False, "error": f"refine failed: {e}"}, 500)
     finally:
