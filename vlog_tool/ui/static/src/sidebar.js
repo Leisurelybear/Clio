@@ -370,6 +370,7 @@ async function selectVideo(file) {
   state.texts = null;
   state.voiceover = null;
   state.transcript = null;
+  state._refineError = null;
 
   const v = state.videos.find(x => x.file === file);
   if (!v) return;

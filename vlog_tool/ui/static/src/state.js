@@ -28,6 +28,7 @@ const state = {
   _previewEndTime: null,
   selectionMode: false,
   selectedFiles: [],
+  refining: null,  // {type: 'texts'|'scripts', file: string} when AI refine in progress
 };
 
 function clearSelection() {

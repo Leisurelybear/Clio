@@ -96,12 +96,19 @@ function renderTexts() {
 }
 
 function renderRefineUI(type) {
+  const isRefining = state.refining?.type === type;
+  const btnText = isRefining ? '⏳ AI 审阅中...' : 'AI 审阅修正';
+  const statusHtml = isRefining
+    ? '<span class="loading">正在请求 AI，请稍候...</span>'
+    : state._refineError && !state.refining
+      ? `<span class="err">${escapeHtml(state._refineError)}</span>`
+      : '';
   return `
     <hr>
     <h3>AI 审阅修正</h3>
     <label>临时上下文（可选，如更正建议）<textarea id="refine-context-${type}" rows="2" placeholder="例如：地名写错了，请修正为正确的拼音"></textarea></label>
-    <button id="btn-refine-${type}" class="btn btn-secondary">AI 审阅修正</button>
-    <p id="refine-status-${type}" class="status"></p>
+    <button id="btn-refine-${type}" class="btn btn-secondary"${isRefining ? ' disabled' : ''}>${btnText}</button>
+    <p id="refine-status-${type}" class="status">${statusHtml}</p>
   `;
 }
 
@@ -112,32 +119,35 @@ async function refineCurrentFile(type) {
   if (!v[fileField]) { setStatus(`当前视频没有 ${type} JSON`, 'err'); return; }
   const label = type === 'texts' ? '素材分析' : '口播文案';
   if (!confirm(`确定要提交 AI 审阅修正「${label}」吗？当前未保存的修改将丢失。`)) return;
-  const btn = $(`btn-refine-${type}`);
-  const status = $(`refine-status-${type}`);
   const ctx = $(`refine-context-${type}`).value.trim();
-  if (btn.disabled) return;
-  btn.disabled = true;
-  btn.textContent = '⏳ AI 审阅中...';
-  status.className = 'status';
-  status.innerHTML = '<span class="loading">正在请求 AI，请稍候...</span>';
+  if (state.refining) return;
+
+  state._refineError = null;
+  const refineFile = v[fileField];
+  state.refining = { type, file: refineFile };
+  renderActiveTab();
+
   try {
-    const r = await api('POST', '/api/refine', { file: v[fileField], type, context: ctx || undefined });
+    const r = await api('POST', '/api/refine', { file: refineFile, type, context: ctx || undefined });
     if (r.error) throw new Error(r.error);
     if (type === 'texts') state.texts = r.data;
     else state.voiceover = r.data;
-    if (type === 'texts') renderTexts();
-    else renderVoiceover();
-    status.innerHTML = `<span class="ok">AI 审阅完成</span>`;
+    if (state.refining?.file === refineFile) state.refining = null;
+    if (state.currentVideo === v.file && state.currentTab === type) {
+      if (type === 'texts') renderTexts();
+      else renderVoiceover();
+    }
     setStatus(`${label}已 AI 审阅修正`, 'ok');
   } catch (e) {
-    if (e.message.includes('正在 AI 审阅')) {
-      status.innerHTML = `<span class="warn">该文件正在 AI 审阅中（其他页面已触发），请等待完成</span>`;
-    } else {
-      status.innerHTML = `<span class="err">修正失败: ${escapeHtml(e.message)}</span>`;
+    if (state.refining?.file === refineFile) {
+      if (e.message.includes('正在 AI 审阅')) {
+        state._refineError = '该文件正在 AI 审阅中（其他页面已触发），请等待完成';
+      } else {
+        state._refineError = `修正失败: ${e.message}`;
+      }
+      state.refining = null;
+      if (state.currentVideo === v.file && state.currentTab === type) renderActiveTab();
     }
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'AI 审阅修正';
   }
 }
 
