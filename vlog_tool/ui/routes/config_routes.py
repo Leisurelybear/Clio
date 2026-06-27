@@ -18,10 +18,10 @@ from vlog_tool.ui.services.file_service import (
 from vlog_tool.ui.services.project_service import _project_output_dir
 
 if TYPE_CHECKING:
-    from http.server import BaseHTTPRequestHandler
+    from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 
-def handle_get_config(handler: BaseHTTPRequestHandler, qs: dict) -> None:
+def handle_get_config(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     """Handle GET /api/config."""
     proj_input = handler._resolve_project_input(qs)
     proj_out = handler._get_project_output(proj_input)
@@ -39,7 +39,7 @@ def handle_get_config(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     )
 
 
-def handle_get_config_raw(handler: BaseHTTPRequestHandler, qs: dict) -> None:
+def handle_get_config_raw(handler: HandlerProtocol, qs: dict[str, str]) -> None:
     """Handle GET /api/config/raw."""
 
     config_path = handler.config_path
@@ -72,7 +72,7 @@ def handle_get_config_raw(handler: BaseHTTPRequestHandler, qs: dict) -> None:
     handler._send_json(raw)
 
 
-def handle_put_config_raw(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
+def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
     """Handle PUT /api/config/raw."""
     config_path = handler.config_path
     input_dir = handler.input_dir
@@ -129,7 +129,7 @@ def handle_put_config_raw(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) 
     handler._send_json({"ok": True, "path": str(config_path)})
 
 
-def handle_post_config_init(handler: BaseHTTPRequestHandler, qs: dict, obj: dict) -> None:
+def handle_post_config_init(handler: HandlerProtocol, qs: dict[str, str], obj: dict) -> None:
     """Handle POST /api/config/init."""
     config_path = handler.config_path
     input_dir = handler.input_dir
