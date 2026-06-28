@@ -196,7 +196,12 @@ def analyze_video(
     return _validate_analysis(extract_json(text), video_path)
 
 
-def generate_voiceover(clip_data: dict, template: str, config: AppConfig, token_store=None) -> dict:
+def generate_voiceover(
+    clip_data: dict, template: str, config: AppConfig, token_store=None, cancel_event: threading.Event | None = None
+) -> dict:
+    if cancel_event and cancel_event.is_set():
+        raise RuntimeError("voiceover 被用户取消")
+
     provider, model = get_task_provider(config, TaskName.VOICEOVER)
 
     timeline_text = "\n".join(

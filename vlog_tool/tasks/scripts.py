@@ -63,7 +63,7 @@ def run_generate_scripts(
             if tracker:
                 tracker.next(message=f"生成口播 {json_file.stem}")
             t0 = time.monotonic()
-            script = generate_voiceover(data, template, config, token_store=token_store)
+            script = generate_voiceover(data, template, config, token_store=token_store, cancel_event=cancel_event)
             elapsed_total += time.monotonic() - t0
             completed += 1
             add_schema_version(script)
