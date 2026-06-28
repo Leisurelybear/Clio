@@ -2,8 +2,39 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 from vlog_tool.export import export_plan
 from vlog_tool.ui.handler_protocol import HandlerProtocol
+
+
+def _copy_draft_to_jianying(
+    draft_output_dir: Path,
+    jianying_draft_dir: str,
+    day_label: str,
+) -> Path | None:
+    """Copy generated draft to JianYing draft directory.
+
+    Returns the target draft directory path, or None if skipped.
+    """
+    if not jianying_draft_dir:
+        return None
+    target_base = Path(os.path.expanduser(jianying_draft_dir))
+    if not target_base.is_dir():
+        return None
+
+    draft_name = f"vlog_export_{day_label}"
+    target_dir = target_base / draft_name
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    src = draft_output_dir / "draft_content.json"
+    if not src.is_file():
+        return None
+
+    dst = target_dir / "draft_content.json"
+    dst.write_bytes(src.read_bytes())
+    return target_dir
 
 
 def handle_post_export(
@@ -39,4 +70,11 @@ def handle_post_export(
         handler._send_json({"ok": False, "error": str(e)}, 400)
         return
 
-    handler._send_json({"ok": True, "path": str(result_path)})
+    result = {"ok": True, "path": str(result_path)}
+
+    if cfg.export.auto_copy_draft and cfg.export.jianying_draft_dir:
+        jy_dir = _copy_draft_to_jianying(result_path, cfg.export.jianying_draft_dir, day)
+        if jy_dir:
+            result["jianying_draft"] = str(jy_dir)
+
+    handler._send_json(result)

@@ -135,6 +135,9 @@ plan:
 export:
   canvas_ratio: 16:9      # 16:9 | 9:16 | 1:1 — 剪映导出画布比例
   output_subdir: export
+  # jianying_draft_dir: "~/Movies/JianyingPro/User Data/Projects/"     # macOS
+  # jianying_draft_dir: "%USERPROFILE%\\AppData\\Local\\JianyingPro\\User Data\\Projects\\"  # Windows
+  # auto_copy_draft: true   # 导出后自动复制草稿到剪映目录
 
 # Whisper ASR 语音转录（需要额外安装 faster-whisper: python main.py whisper install）
 # 运行时检测安装，未安装则自动跳过，不会报错

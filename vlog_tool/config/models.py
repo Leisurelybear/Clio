@@ -123,6 +123,8 @@ class ServerConfig:
 class ExportConfig:
     canvas_ratio: str = "16:9"
     output_subdir: str = "export"
+    jianying_draft_dir: str = ""  # 剪映草稿目录，空字符串=不自动复制
+    auto_copy_draft: bool = False
 
 
 CANVAS_PRESETS: dict[str, dict[str, int | float]] = {
