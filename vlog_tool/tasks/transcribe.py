@@ -296,6 +296,9 @@ def run_transcribe_one(
     """单文件转录（供 UI rerun 使用）。"""
     import time
 
+    if not check_whisper():
+        return {"error": "faster-whisper 未安装，无法转录。执行: python main.py whisper install"}
+
     t0 = time.time()
     print(f"  [transcribe_one] 开始处理: {video_path.name}")
     if not video_path.is_file():
