@@ -30,7 +30,7 @@ def proxy_disabled():
 
 @pytest.fixture
 def proxy_enabled():
-    return ProxyConfig(enabled=True, url="socks5://127.0.0.1:1080")
+    return ProxyConfig(enabled=True, url="http://127.0.0.1:1080")
 
 
 class TestInit:
