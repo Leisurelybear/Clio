@@ -16,6 +16,11 @@ class RateLimiter:
         self._logged = False
 
     def __enter__(self) -> None:
+        """单线程限流上下文管理器。
+
+        注意：__enter__ 在锁内 sleep，多线程场景应使用 acquire()。
+        使用 acquire() 时调用方在锁外 sleep，避免锁阻塞。
+        """
         wait = 0.0
         with self._lock:
             now = time.monotonic()
@@ -24,8 +29,10 @@ class RateLimiter:
                 if not self._logged:
                     print(f"  [限流] 等待 {wait:.1f}s（每 {self._interval:.1f}s 一次）")
                     self._logged = True
-            self._next_at = time.monotonic() + self._interval
-            self._logged = False
+                self._next_at += self._interval
+            else:
+                self._next_at = now + self._interval
+                self._logged = False
         if wait > 0:
             time.sleep(wait)
 

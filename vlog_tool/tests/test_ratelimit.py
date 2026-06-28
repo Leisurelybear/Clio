@@ -41,7 +41,7 @@ class TestRateLimiterContext:
                 with rl:
                     pass
         mock_sleep.assert_called_once_with(5.0)
-        assert rl._next_at == 101.0
+        assert rl._next_at == 106.0
 
     def test_exact_interval_no_wait(self):
         rl = RateLimiter(60)
@@ -73,15 +73,16 @@ class TestRateLimiterContext:
         captured = capsys.readouterr()
         assert "限流" in captured.out
 
+        # Second rate-limited call should NOT log again (flag stays True)
         rl._next_at = 300.0
         with patch("vlog_tool.ratelimit.time.monotonic", return_value=100.0):
             with patch("vlog_tool.ratelimit.time.sleep"):
                 with rl:
                     pass
         captured2 = capsys.readouterr()
-        assert "限流" in captured2.out
+        assert "限流" not in captured2.out
 
-    def test_resets_logged_flag_on_exit(self):
+    def test_logged_remains_true_while_rate_limited(self):
         rl = RateLimiter(10)
         rl._next_at = 200.0
         assert rl._logged is False
@@ -89,6 +90,15 @@ class TestRateLimiterContext:
             with patch("vlog_tool.ratelimit.time.sleep"):
                 with rl:
                     pass
+        assert rl._logged is True
+
+    def test_resets_logged_flag_when_not_rate_limited(self):
+        rl = RateLimiter(10)
+        rl._next_at = 0.0
+        assert rl._logged is False
+        with patch("vlog_tool.ratelimit.time.monotonic", return_value=100.0):
+            with rl:
+                pass
         assert rl._logged is False
 
 
