@@ -7,7 +7,7 @@ import {
 } from './utils.js';
 import { api, icon } from './api.js';
 
-let _runPollTimer = null;
+let _runEventSource = null;
 let _lastRunDay = 'day1';
 let _pollErrorCount = 0;
 let _runActive = false;  // true while a pipeline is running; prevents double-click + stale render
@@ -118,9 +118,7 @@ function renderRun() {
   if (_runActive) { runBtn.disabled = true; runBtn.textContent = '运行中...'; }
   const cancelBtn = $('btn-run-cancel');
   if (cancelBtn) cancelBtn.onclick = cancelRun;
-  if (_runPollTimer) clearInterval(_runPollTimer);
-  _runPollTimer = setInterval(pollRunStatus, 2000);
-  pollRunStatus();
+  _startRunSSE();
 }
 
 function togglePlanSubOptions() {
@@ -167,7 +165,7 @@ async function startRun() {
     return;
   }
   _lastRunDay = ($('run-day')?.value.trim() || state.currentDay);
-  if (_runPollTimer) clearInterval(_runPollTimer);
+  _stopRunSSE();
   try {
     const body = {
       day_label: _lastRunDay,
@@ -186,7 +184,7 @@ async function startRun() {
       _runActive = true;
       setStatus(r.message || '流水线已启动', 'ok');
       $('run-progress').innerHTML = '<p class="muted">流水线已启动，等待进度...</p>';
-      _runPollTimer = setInterval(pollRunStatus, 2000);
+      _startRunSSE();
     } else {
       throw new Error(r.error || '启动失败');
     }
@@ -210,13 +208,41 @@ async function cancelRun() {
   }
 }
 
-async function pollRunStatus() {
+function _startRunSSE() {
+  _stopRunSSE();
+  let url = '/api/run/stream';
+  let sep = '?';
+  if (state.currentProjectName) {
+    url += sep + 'project=' + encodeURIComponent(state.currentProjectName);
+    sep = '&';
+  }
+  if (state.currentProjectInputDir) {
+    url += sep + 'input_dir=' + encodeURIComponent(state.currentProjectInputDir);
+  }
+  _runEventSource = new EventSource(url);
+  _runEventSource.onmessage = (event) => {
+    try {
+      const s = JSON.parse(event.data);
+      _handleRunStatus(s);
+    } catch { /* ignore parse errors */ }
+  };
+  _runEventSource.onerror = () => {
+    // EventSource auto-reconnects on connection loss
+  };
+}
+
+function _stopRunSSE() {
+  if (_runEventSource) {
+    _runEventSource.close();
+    _runEventSource = null;
+  }
+}
+
+function _handleRunStatus(s) {
   const prog = $('run-progress');
   const btn = $('btn-run-start');
   if (!prog) return;
-  try {
-    const s = await api('GET', '/api/run/status');
-    if (s.rerun) return;
+  if (s.rerun) return;
     if (s.status === 'idle' || s.status === 'unknown') {
       _lastProgressSnapshot = null;
       _runActive = false;
@@ -353,10 +379,7 @@ async function pollRunStatus() {
 }
 
 function _stopRunPoll() {
-  if (_runPollTimer) {
-    clearInterval(_runPollTimer);
-    _runPollTimer = null;
-  }
+  _stopRunSSE();
 }
 
 const _STEP_LABELS_SHORT = { compress: '压缩', analyze: '分析', voiceover: '口播', transcribe: '转录' };
@@ -388,7 +411,6 @@ async function renderProcessingState(container) {
 export {
   renderRun,
   startRun,
-  pollRunStatus,
   _stopRunPoll,
   updateRunFilesBadge,
 };

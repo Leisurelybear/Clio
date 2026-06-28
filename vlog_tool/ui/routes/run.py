@@ -20,6 +20,54 @@ if TYPE_CHECKING:
     from vlog_tool.ui.handler_protocol import HandlerProtocol
 
 
+import time
+
+
+def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
+    """GET /api/run/stream — SSE endpoint for real-time run status."""
+    proj_input = handler._resolve_project_input(qs)
+    state = handler._get_state(str(proj_input.resolve()))
+    progress_file = handler._get_project_output(qs) / ".progress.json"
+
+    handler.send_response(200)
+    handler.send_header("Content-Type", "text/event-stream")
+    handler.send_header("Cache-Control", "no-cache")
+    handler.send_header("Connection", "keep-alive")
+    handler.send_header("X-Accel-Buffering", "no")
+    handler.end_headers()
+
+    last_data = ""
+    try:
+        while True:
+            if progress_file.is_file():
+                raw = progress_file.read_text(encoding="utf-8")
+                if raw != last_data:
+                    last_data = raw
+                    parsed = json.loads(raw)
+                    with state.run_lock:
+                        running = state.run_thread is not None and state.run_thread.is_alive()
+                    parsed["running"] = running
+                    if parsed.get("status") == "running" and not running:
+                        parsed["status"] = "idle"
+                    msg = json.dumps(parsed, ensure_ascii=False)
+                    handler.wfile.write(f"data: {msg}\n\n".encode())
+                    handler.wfile.flush()
+
+                    if parsed.get("status") in ("done", "error", "cancelled"):
+                        break
+            else:
+                if last_data != "_idle":
+                    last_data = "_idle"
+                    handler.wfile.write(b'data: {"status":"idle"}\n\n')
+                    handler.wfile.flush()
+
+            time.sleep(0.5)
+    except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+        pass  # Client disconnected
+    except Exception:
+        pass
+
+
 def handle_get_run_status(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/run/status."""
     proj_input = handler._resolve_project_input(qs)

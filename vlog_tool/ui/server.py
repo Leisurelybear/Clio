@@ -51,6 +51,7 @@ from vlog_tool.ui.routes.projects import (
 from vlog_tool.ui.routes.refine import handle_post_refine
 from vlog_tool.ui.routes.run import (
     handle_get_run_status,
+    handle_get_run_stream,
     handle_post_rerun,
     handle_post_run_cancel,
     handle_post_run_start,
@@ -279,6 +280,8 @@ def make_handler(
                 return handle_get_plans(self, qs)
             if path == "/api/run/status":
                 return handle_get_run_status(self, qs)
+            if path == "/api/run/stream":
+                return handle_get_run_stream(self, qs)
             if path == "/api/plan":
                 return handle_get_plan(self, qs)
             if path == "/api/processing-state":
