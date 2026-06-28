@@ -7,12 +7,15 @@ Target format: JianYing 5.9 (plain JSON, unencrypted).
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from pathlib import Path
 
 from vlog_tool.cut import parse_time_range
 from vlog_tool.identity import load_identity
 from vlog_tool.utils import find_videos, get_duration_sec
+
+logger = logging.getLogger("vlog_tool.export.jianying")
 
 
 def _to_microseconds(seconds: float) -> int:
@@ -52,36 +55,36 @@ def _build_index_to_source(texts_dir: Path) -> dict[str, str]:
     """
     mapping: dict[str, str] = {}
     if not texts_dir.is_dir():
-        print(f"  [debug] texts_dir 不存在: {texts_dir}")
+        logger.debug("texts_dir 不存在: %s", texts_dir)
         return mapping
     for p in sorted(texts_dir.glob("*.json")):
         try:
             data = json.loads(p.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError) as e:
-            print(f"  [debug] 读取失败 {p}: {e}")
+            logger.debug("读取失败 %s: %s", p, e)
             continue
         raw_idx = data.get("index")
         if raw_idx is None:
-            print(f"  [debug] 跳过(无index): {p.name}")
+            logger.debug("跳过(无index): %s", p.name)
             continue
 
         # Prefer media_identity.original_stem for v2, fall back to source_file for v1
         identity = load_identity(data)
         if identity is not None:
             stem = identity.original_stem
-            print(f"  [debug] 文件={p.name}, index={raw_idx!r}, media_identity.original_stem={stem!r}")
+            logger.debug("文件=%s, index=%r, media_identity.original_stem=%r", p.name, raw_idx, stem)
         else:
             source = data.get("source_file", "")
-            print(f"  [debug] 文件={p.name}, index={raw_idx!r}, source_file={source!r}")
+            logger.debug("文件=%s, index=%r, source_file=%r", p.name, raw_idx, source)
             if not source:
-                print("  [debug] 跳过: 缺少 source_file 且无 media_identity")
+                logger.debug("跳过: 缺少 source_file 且无 media_identity")
                 continue
             stem = Path(source).stem
 
         idx_str = str(raw_idx)
         mapping[idx_str] = stem
         mapping[idx_str.zfill(3)] = stem
-        print(f"  [debug] 映射: {idx_str} -> {stem}, {idx_str.zfill(3)} -> {stem}")
+        logger.debug("映射: %s -> %s, %s -> %s", idx_str, stem, idx_str.zfill(3), stem)
     return mapping
 
 
@@ -336,9 +339,9 @@ def export_plan_to_jianying(
 
     index_to_source = _build_index_to_source(texts_dir) if texts_dir else {}
     index_to_offset = _build_index_to_offset(texts_dir) if texts_dir else {}
-    print(f"  [debug] texts_dir={texts_dir}, index_to_source={index_to_source}")
+    logger.debug("texts_dir=%s, index_to_source=%s", texts_dir, index_to_source)
     if texts_dir:
-        print(f"  [debug] texts_dir exists={texts_dir.is_dir()}, files={list(texts_dir.glob('*.json'))}")
+        logger.debug("texts_dir exists=%s, files=%s", texts_dir.is_dir(), list(texts_dir.glob("*.json")))
     materials, index_to_material_id, seq_text_ids = _build_materials(plan_data, input_dir, ffprobe, index_to_source)
     tracks = _build_tracks(plan_data, index_to_material_id, seq_text_ids, index_to_offset)
 
