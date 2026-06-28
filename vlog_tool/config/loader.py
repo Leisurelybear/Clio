@@ -13,6 +13,7 @@ from vlog_tool.config.models import (
     AnalyzeConfig,
     AppConfig,
     CompressConfig,
+    ExportConfig,
     NamingConfig,
     PathsConfig,
     PlanConfig,
@@ -41,6 +42,7 @@ _SECTION_DC_MAP: dict[str, type] = {
     "script": ScriptConfig,
     "plan": PlanConfig,
     "whisper": WhisperConfig,
+    "export": ExportConfig,
 }
 
 _MISSING = object()
@@ -266,6 +268,7 @@ def load_config(
         ),
         plan=PlanConfig(**_filter_dc(raw.get("plan", {}), PlanConfig)),
         whisper=_parse_whisper(raw.get("whisper", {})),
+        export=ExportConfig(**_filter_dc(raw.get("export", {}), ExportConfig)),
     )
     _validate_config(config)
     return config

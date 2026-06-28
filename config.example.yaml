@@ -132,6 +132,10 @@ plan:
   target_duration_sec: 180
 #   use_transcripts: true
 
+export:
+  canvas_ratio: 16:9      # 16:9 | 9:16 | 1:1 — 剪映导出画布比例
+  output_subdir: export
+
 # Whisper ASR 语音转录（需要额外安装 faster-whisper: python main.py whisper install）
 # 运行时检测安装，未安装则自动跳过，不会报错
 whisper:
