@@ -189,8 +189,20 @@ def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -
                     ),
                     "压缩视频",
                 ),
-                ("analyze", lambda: run_analyze_all(cfg, tracker=tracker, single_file=original_video), "AI 分析"),
-                ("voiceover", lambda: run_generate_scripts(cfg, tracker=tracker, single_file=texts_json), "生成口播"),
+                (
+                    "analyze",
+                    lambda: run_analyze_all(
+                        cfg, tracker=tracker, single_file=original_video, cancel_event=cancel_event
+                    ),
+                    "AI 分析",
+                ),
+                (
+                    "voiceover",
+                    lambda: run_generate_scripts(
+                        cfg, tracker=tracker, single_file=texts_json, cancel_event=cancel_event
+                    ),
+                    "生成口播",
+                ),
             ]:
                 if task not in (step_name, "all"):
                     continue
