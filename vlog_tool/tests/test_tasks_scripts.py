@@ -16,7 +16,7 @@ def cfg(tmp_path) -> AppConfig:
     scripts.mkdir()
     template = tmp_path / "vlog_template.md"
     template.write_text("Template: {title}")
-    analyze = MagicMock(skip_existing=True, texts_subdir="texts", compressed_subdir="compressed")
+    analyze = MagicMock(skip_existing=True, texts_subdir="texts", compressed_subdir="compressed", max_workers=1)
     script = MagicMock(scripts_subdir="scripts", template_file=template)
     plan = MagicMock(plans_subdir="plans")
     return AppConfig(
@@ -44,7 +44,7 @@ class TestRunGenerateScripts:
         cfg = AppConfig(
             paths=MagicMock(output_dir=tmp_path, ffmpeg="", ffprobe=""),
             script=MagicMock(scripts_subdir="scripts", template_file=template),
-            analyze=MagicMock(skip_existing=True, texts_subdir="texts", compressed_subdir="compressed"),
+            analyze=MagicMock(skip_existing=True, texts_subdir="texts", compressed_subdir="compressed", max_workers=1),
             plan=MagicMock(plans_subdir="plans"),
         )
         mock_gen.return_value = {"title": "t", "voiceover": "hello", "edit_tip": ""}
