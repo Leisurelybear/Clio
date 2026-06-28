@@ -120,6 +120,19 @@ class ServerConfig:
 
 
 @dataclass
+class ExportConfig:
+    canvas_ratio: str = "16:9"
+    output_subdir: str = "export"
+
+
+CANVAS_PRESETS: dict[str, dict[str, int | float]] = {
+    "16:9": {"width": 1920, "height": 1080, "ratio": 16 / 9},
+    "9:16": {"width": 1080, "height": 1920, "ratio": 9 / 16},
+    "1:1": {"width": 1080, "height": 1080, "ratio": 1.0},
+}
+
+
+@dataclass
 class AppConfig:
     paths: PathsConfig
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
@@ -131,6 +144,7 @@ class AppConfig:
     script: ScriptConfig = field(default_factory=ScriptConfig)
     plan: PlanConfig = field(default_factory=PlanConfig)
     whisper: WhisperConfig = field(default_factory=WhisperConfig)
+    export: ExportConfig = field(default_factory=ExportConfig)
 
     @property
     def compressed_dir(self) -> Path:

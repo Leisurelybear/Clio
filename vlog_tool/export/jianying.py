@@ -11,6 +11,7 @@ import logging
 import uuid
 from pathlib import Path
 
+from vlog_tool.config.models import CANVAS_PRESETS
 from vlog_tool.cut import parse_time_range
 from vlog_tool.identity import load_identity
 from vlog_tool.utils import find_videos, get_duration_sec
@@ -321,6 +322,7 @@ def export_plan_to_jianying(
     day_label: str = "day1",
     ffprobe: str | None = None,
     texts_dir: Path | None = None,
+    canvas_ratio: str = "16:9",
 ) -> Path:
     """Generate JianYing draft from plan JSON.
 
@@ -357,11 +359,7 @@ def export_plan_to_jianying(
         "name": plan_data.get("day_title", day_label),
         "duration": total_duration_us,
         "fps": 30,
-        "canvas_config": {
-            "width": 1920,
-            "height": 1080,
-            "ratio": 1.7777777777777777,
-        },
+        "canvas_config": CANVAS_PRESETS.get(canvas_ratio, CANVAS_PRESETS["16:9"]),
         "platform": {
             "app_source": "lv",
             "app_version": "5.9.0",
