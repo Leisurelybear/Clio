@@ -227,6 +227,9 @@ def main(argv: list[str] | None = None) -> int:
     p_export.add_argument("--day", default="day1", help="日 vlog 标签（默认 day1）")
     p_export.add_argument("--output", type=Path, default=None, help="输出目录（默认 output/export/<day>_<format>/）")
 
+    p_verify = sub.add_parser("verify", help="校验压缩文件与原始视频的完整性")
+    p_verify.add_argument("-i", "--input", type=Path, help="指定项目目录（默认使用配置文件中的 input_dir）")
+
     p_reindex = sub.add_parser("reindex", help="重建 .vmeta / .vindex sidecar 文件")
     p_reindex.add_argument(
         "--project",
@@ -292,7 +295,11 @@ def main(argv: list[str] | None = None) -> int:
     context_override = (getattr(args, "context", "") or "").strip() or None
 
     try:
-        if args.command == "reindex":
+        if args.command == "verify":
+            from vlog_tool.tasks.verify import run_verify
+
+            return run_verify(config)
+        elif args.command == "reindex":
             from vlog_tool.tasks.reindex import run_reindex
 
             return run_reindex(config)
