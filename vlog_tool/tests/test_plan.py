@@ -20,10 +20,11 @@ def test_plan_prompt_includes_transcripts():
             "location": "巴黎",
             "highlights": [],
             "suggested_use": "开场",
+            "source_stem": "GL010683",
         }
     ]
     transcripts_map = {
-        "GL010683": {"segments": [{"start": 0.0, "end": 2.5, "text": "今天天气真好", "avg_logprob": -0.1}]}
+        "gl010683": {"segments": [{"start": 0.0, "end": 2.5, "text": "今天天气真好", "avg_logprob": -0.1}]}
     }
     cfg = MagicMock(spec=AppConfig)
     cfg.ai = MagicMock(debug_print_prompt=False)
@@ -37,12 +38,14 @@ def test_plan_prompt_includes_transcripts():
     provider_mock = MagicMock()
     with (
         patch("vlog_tool.analyze.get_task_provider", return_value=(provider_mock, "deepseek-chat")),
-        patch("vlog_tool.analyze._wrap_with_context", return_value="prompt"),
+        patch("vlog_tool.analyze._wrap_with_context", return_value="prompt") as mock_wrap,
         patch("vlog_tool.analyze._call_ai", return_value="{}"),
         patch("vlog_tool.analyze.extract_json", return_value={"sequence": [], "day_title": "test"}),
     ):
         result = plan_daily_vlog(clips, cfg, "day1", transcripts_map=transcripts_map)
         assert result["day_title"] == "test"
+        args, _ = mock_wrap.call_args
+        assert "今天天气真好" in args[0]
 
 
 def test_plan_no_transcript_fallback():

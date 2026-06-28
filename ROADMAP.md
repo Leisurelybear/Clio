@@ -509,6 +509,33 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-018d: Selected video highlight style + count display + selection mode badge
 - [x] R-018e: Disable run button + hint text when nothing selected
 
+### R-018 Follow-up: Compact JSON in Debug Prompt Output
+
+**Background**: `debug_print_prompt` prints the full prompt to console, but injected JSON (clips list, transcripts, analysis data) uses `json.dumps(..., indent=2)`, rendering across dozens of lines. This makes the log hard to scroll through and defeats the purpose of a quick debug glance.
+
+**Request**: Before `print(prompt)` in `_call_ai()`, compact all embedded JSON to single-line format. Suggestion: change all `json.dumps(...)` in prompt-formatting paths (`analyze.py:248/278/333/338/374/375`) to `indent=None` — the AI does not need pretty-printed JSON, and it reduces token count slightly.
+
+## Feature R-019: Run Panel Prompt Injection
+
+**Background**: The run panel (▶ Run) currently has no way to inject custom instructions during pipeline execution. To optimize AI output (e.g., "focus on food scenes", "use more dramatic language", "prefer close-up shots"), users must either edit `config.ai.context` (persists to all runs) or use refine's context textarea (post-hoc, per-video). There is no transient, per-run prompt injection that applies context to all AI calls in a single pipeline run.
+
+**Acceptance Criteria**:
+- Run panel shows a collapsible "高级提示词 (Advanced Prompt)" section below step checkboxes
+- Users write free-form instructions that get injected into ALL AI calls during this pipeline run
+- Optionally tag instructions per-step (e.g., `[analyze] focus on landmarks`, `[voiceover] use conversational tone`)
+- Backend: `POST /api/run/start` accepts `context_override: string` and optional `task_prompts: dict[str, str]`
+- Pipeline propagates `context_override` → `_wrap_with_context()` → all task prompt chains
+- Instructions are transient — they do not persist in config.yaml after pipeline completes
+- Existing `config.ai.context` (project-level) and `trip_context.md` still apply; injected prompt is the highest-priority layer
+
+**Sub-tasks**:
+- [ ] R-019a: Backend: extend `handle_post_run_start` to accept `context_override` and `task_prompts` in request body
+- [ ] R-019b: Backend: pass `context_override` through `run_pipeline_steps` → each task → `_call_ai()` / `_wrap_with_context()`
+- [ ] R-019c: Frontend: add collapsible prompt section in run panel (runner.js), send values in POST body
+- [ ] R-019d: Frontend: add per-step tag hint placeholder (e.g. `[voiceover]`, `[plan]`, `[analyze]`)
+- [ ] R-019e: Ensure existing `debug_print_prompt` (R-018) shows injected prompt in debug output
+- [ ] R-019f: Add tests for context_override propagation through pipeline steps
+
 ## Documentation Maintenance (from 2026-06-10 Full Review)
 
 | ID | Issue | Description | Status |
@@ -656,6 +683,7 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | B-079 | `log.py` `_TeeWriter.__getattr__` passes through `close`/`writelines`/`truncate` | Intercept and raise AttributeError | ✅ `947a320` |
 | B-080 | `openai_compat.py` hardcoded `attempts=3` ignores configured `retry_attempts` | Read from `cfg.retry_attempts` + `+1` conversion | ✅ `ef2311d` |
 | B-081 | `gemini.py` `retry_attempts` semantics inconsistent with openai_compat (missing `+1`) | Align to `max(1, cfg.retry_attempts + 1)` | ✅ `ef68308` |
+| B-098 | `plan.py` stores transcript_map key as `stem.lower()`, `analyze.py` lookup uses original case — every clip misses, `TRANSCRIPT_CONTEXT` never injected | Unify to `.lower()` on lookup side in `analyze.py` | 🆕 |
 | B-082 | `ai/factory.py` provider cache not thread-safe + no test cleanup mechanism | Add lock + `_clear_provider_cache()` + autouse fixture | ✅ `ef68308` |
 | B-083 | `ui/routes/run.py` `obj.get("index")` unsanitized used as glob pattern | `re.sub(r"[^a-zA-Z0-9_-]", "")` filter | ✅ `bebf21f` |
 | B-084 | `ui/static/src/editor.js` `save()` data references not captured at call site | Capture `planData/textsData/voiceoverData/configRaw` | ✅ `bebf21f` |

@@ -254,7 +254,7 @@ def plan_daily_vlog(
         transcript_info = []
         for clip in clips:
             clip_stem = clip.get("source_stem", "")
-            trans = transcripts_map.get(clip_stem) if clip_stem else None
+            trans = transcripts_map.get(clip_stem.lower()) if clip_stem else None
             if trans is None:
                 continue
             matched = []
