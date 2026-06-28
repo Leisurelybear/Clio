@@ -139,7 +139,7 @@ def run_transcribe_all(
             tracker.error(msg)
         return 0
 
-    transcripts_dir = config.paths.output_dir / config.whisper.transcripts_subdir
+    transcripts_dir = config.transcripts_dir
     transcripts_dir.mkdir(parents=True, exist_ok=True)
 
     compressed_dir = config.paths.output_dir / config.analyze.compressed_subdir
@@ -345,7 +345,7 @@ def run_transcribe_one(
         transcript_identity = resolve_identity(video_path, config.paths.input_dir, idx)
         add_schema_version(transcript)
         transcript["media_identity"] = _identity_to_dict(transcript_identity)
-        transcripts_dir = config.paths.output_dir / config.whisper.transcripts_subdir
+        transcripts_dir = config.transcripts_dir
         transcripts_dir.mkdir(parents=True, exist_ok=True)
         out_path = transcripts_dir / f"{video_path.stem}_transcript.json"
         write_json_atomic(out_path, transcript)

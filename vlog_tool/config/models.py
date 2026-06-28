@@ -149,5 +149,9 @@ class AppConfig:
         return self.paths.output_dir / self.plan.plans_subdir
 
     @property
+    def transcripts_dir(self) -> Path:
+        return self.paths.output_dir / self.whisper.transcripts_subdir
+
+    @property
     def summary_csv(self) -> Path:
         return self.paths.output_dir / "summary.csv"

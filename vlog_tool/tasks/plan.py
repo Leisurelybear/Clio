@@ -81,7 +81,7 @@ def run_plan_vlog(
 
     # 加载 transcript 数据
     transcripts_map: dict[str, dict] = {}
-    trans_dir = config.paths.output_dir / config.whisper.transcripts_subdir
+    trans_dir = config.transcripts_dir
     if trans_dir.is_dir() and config.whisper.enabled and config.plan.use_transcripts:
         for tf in sorted(trans_dir.glob("*_transcript.json")):
             try:

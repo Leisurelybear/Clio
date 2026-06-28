@@ -27,7 +27,11 @@ def cfg():
     c.analyze.skip_existing = True
     c.analyze.compressed_subdir = "compressed"
     c.analyze.max_analyze_duration_min = 30
+    c.transcripts_dir = c.paths.output_dir / c.whisper.transcripts_subdir
     return c
+
+    # Note: test overrides cfg.paths.output_dir before calling run_transcribe_all.
+    # The transcripts_dir property uses output_dir / transcripts_subdir internally.
 
 
 class TestRunTranscribeAll:
@@ -46,6 +50,7 @@ class TestRunTranscribeAll:
         (inp / "GL010683.mp4").touch()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
+        cfg.transcripts_dir = output / "transcripts"
 
         (compressed / "001_GL010683.mp4").touch()
         split_dir = compressed / "split"
@@ -102,6 +107,7 @@ class TestRunTranscribeAll:
         (inp / "GL010683.mp4").touch()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
+        cfg.transcripts_dir = output / "transcripts"
 
         transcripts = output / "transcripts"
         transcripts.mkdir(parents=True)
@@ -130,6 +136,7 @@ class TestRunTranscribeAll:
         (inp / "GL010683.mp4").touch()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
+        cfg.transcripts_dir = output / "transcripts"
 
         transcripts = output / "transcripts"
         transcripts.mkdir(parents=True)
@@ -179,6 +186,7 @@ class TestRunTranscribeAll:
         (inp / "GL010683.mp4").touch()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
+        cfg.transcripts_dir = output / "transcripts"
 
         transcripts = output / "transcripts"
         transcripts.mkdir(parents=True)
@@ -205,6 +213,7 @@ class TestRunTranscribeAll:
         (inp / "GL010683.mp4").touch()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
+        cfg.transcripts_dir = output / "transcripts"
 
         transcripts = output / "transcripts"
         transcripts.mkdir(parents=True)
@@ -261,6 +270,7 @@ class TestRunTranscribeOne:
         video.write_text("fake video")
 
         cfg.paths.output_dir = tmp_path / "output"
+        cfg.transcripts_dir = cfg.paths.output_dir / "transcripts"
 
         with (
             patch("vlog_tool.tasks.transcribe._extract_audio", return_value=tmp_path / "fake.wav"),
