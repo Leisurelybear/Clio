@@ -33,7 +33,6 @@ def auto_reindex_if_needed(config: AppConfig, ffprobe: str | None = None) -> boo
     if not compressed_dir.is_dir():
         return False
 
-    import os
     import re as _re
 
     # 找所有带数字前缀的压缩视频
@@ -55,27 +54,21 @@ def auto_reindex_if_needed(config: AppConfig, ffprobe: str | None = None) -> boo
     if not missing:
         return False
 
-    # 全屏阻截：清屏 → 显示重建提示 → 完成后恢复
-    os.system("cls" if os.name == "nt" else "clear")
+    # 显示重建提示（不清屏，避免在服务/CI 场景丢失日志）
     _W = 60
-    print("!" * _W)
-    print("!!" + " " * (_W - 4) + "!!")
-    print("!!  视频索引重建中...".ljust(_W - 1) + "!!")
-    print(f"!!  检测到 {len(missing)}/{len(groups)} 个原视频缺少索引文件".ljust(_W - 1) + "!!")
-    print("!!" + " " * (_W - 4) + "!!")
-    print("!!  请勿中断操作".ljust(_W - 1) + "!!")
-    print("!!" + " " * (_W - 4) + "!!")
-    print("!" * _W)
+    print()
+    print("=" * _W)
+    print("  视频索引重建中...".center(_W))
+    print(f"  检测到 {len(missing)}/{len(groups)} 个原视频缺少索引文件".center(_W))
+    print("  请勿中断操作".center(_W))
+    print("=" * _W)
     print()
     run_reindex(config, ffprobe)
     print()
-    print("!" * _W)
-    print("!!" + " " * (_W - 4) + "!!")
-    print("!!  ✅ 索引重建完成，继续执行...".ljust(_W - 1) + "!!")
-    print("!!" + " " * (_W - 4) + "!!")
-    print("!" * _W)
+    print("=" * _W)
+    print("  ✅ 索引重建完成，继续执行...".center(_W))
+    print("=" * _W)
     _time.sleep(1.5)
-    os.system("cls" if os.name == "nt" else "clear")
     return True
 
 
