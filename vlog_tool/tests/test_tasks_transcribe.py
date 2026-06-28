@@ -30,9 +30,6 @@ def cfg():
     c.transcripts_dir = c.paths.output_dir / c.whisper.transcripts_subdir
     return c
 
-    # Note: test overrides cfg.paths.output_dir before calling run_transcribe_all.
-    # The transcripts_dir property uses output_dir / transcripts_subdir internally.
-
 
 class TestRunTranscribeAll:
     @patch("vlog_tool.tasks.transcribe._extract_audio")
