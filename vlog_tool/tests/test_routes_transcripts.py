@@ -8,9 +8,9 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from vlog_tool.ui.routes.transcripts import handle_get_transcripts, handle_put_transcripts
+from vlog_tool.ui.routes.whisper_download import _format_bytes
+from vlog_tool.ui.routes.whisper_models import _list_cached_models
 from vlog_tool.ui.routes.whisper_routes import (
-    _format_bytes,
-    _list_cached_models,
     handle_get_whisper_check,
     handle_get_whisper_install_status,
     handle_get_whisper_models,
@@ -109,7 +109,7 @@ class TestHandleGetWhisperCheck:
         handler._send_json = MagicMock()
 
         with (
-            patch("vlog_tool.ui.routes.whisper_routes.check_whisper", return_value=True),
+            patch("vlog_tool.ui.routes.whisper_check.check_whisper", return_value=True),
             patch("ctranslate2.get_cuda_device_count", return_value=1),
         ):
             handle_get_whisper_check(handler, {})
@@ -122,7 +122,7 @@ class TestHandleGetWhisperCheck:
         handler = MagicMock()
         handler._send_json = MagicMock()
 
-        with patch("vlog_tool.ui.routes.whisper_routes.check_whisper", return_value=False):
+        with patch("vlog_tool.ui.routes.whisper_check.check_whisper", return_value=False):
             handle_get_whisper_check(handler, {})
             args = handler._send_json.call_args
             assert args[0][0]["installed"] is False
@@ -199,7 +199,7 @@ class TestHandleGetWhisperInstallStatus:
         handler._send_json = MagicMock()
         alive = MagicMock()
         alive.is_alive.return_value = True
-        with patch("vlog_tool.ui.routes.whisper_routes._INSTALL_THREAD", alive):
+        with patch("vlog_tool.ui.routes.whisper_download._INSTALL_THREAD", alive):
             handle_get_whisper_install_status(handler, {})
         args = handler._send_json.call_args
         assert args[0][0]["progress_pct"] == 42
@@ -241,7 +241,7 @@ class TestHandlePostWhisperInstall:
     def test_starts_download(self, tmp_path: Path):
         handler = self._make_handler(tmp_path)
         handler._send_json = MagicMock()
-        with patch("vlog_tool.ui.routes.whisper_routes._INSTALL_THREAD", None):
+        with patch("vlog_tool.ui.routes.whisper_download._INSTALL_THREAD", None):
             handle_post_whisper_install(handler, {})
         handler._send_json.assert_called_once_with({"ok": True, "message": "whisper install started"})
 
@@ -253,7 +253,7 @@ class TestHandlePostWhisperInstall:
         alive = threading.Event()
         dummy = threading.Thread(target=alive.wait)
         dummy.start()
-        with patch("vlog_tool.ui.routes.whisper_routes._INSTALL_THREAD", dummy):
+        with patch("vlog_tool.ui.routes.whisper_download._INSTALL_THREAD", dummy):
             handle_post_whisper_install(handler, {})
         alive.set()
         dummy.join()
@@ -278,9 +278,9 @@ class TestHandleGetWhisperModels:
         handler._send_json = MagicMock()
 
         with (
-            patch("vlog_tool.ui.routes.whisper_routes._resolve_cache_dir", return_value=cache_dir),
+            patch("vlog_tool.ui.routes.whisper_models._resolve_cache_dir", return_value=cache_dir),
             patch(
-                "vlog_tool.ui.routes.whisper_routes.shutil.disk_usage",
+                "vlog_tool.ui.routes.whisper_models.shutil.disk_usage",
                 return_value=_DISK_USAGE(0, 0, 500 * 1024 * 1024),
             ),
         ):
@@ -302,7 +302,6 @@ class TestHandleGetWhisperModels:
         handler._get_config.return_value = cfg
         cache_dir = tmp_path / "models"
         cache_dir.mkdir()
-        # Create cached model
         model_dir = cache_dir / "models--Systran--faster-whisper-medium"
         snapshots = model_dir / "snapshots" / "abc123"
         snapshots.mkdir(parents=True)
@@ -310,9 +309,9 @@ class TestHandleGetWhisperModels:
         handler._send_json = MagicMock()
 
         with (
-            patch("vlog_tool.ui.routes.whisper_routes._resolve_cache_dir", return_value=cache_dir),
+            patch("vlog_tool.ui.routes.whisper_models._resolve_cache_dir", return_value=cache_dir),
             patch(
-                "vlog_tool.ui.routes.whisper_routes.shutil.disk_usage",
+                "vlog_tool.ui.routes.whisper_models.shutil.disk_usage",
                 return_value=_DISK_USAGE(0, 0, 500 * 1024 * 1024),
             ),
         ):
@@ -343,7 +342,7 @@ class TestHandlePostWhisperModelDelete:
         (model_dir / "model.bin").write_text("dummy")
         handler._send_json = MagicMock()
 
-        with patch("vlog_tool.ui.routes.whisper_routes._resolve_cache_dir", return_value=cache_dir):
+        with patch("vlog_tool.ui.routes.whisper_models._resolve_cache_dir", return_value=cache_dir):
             handle_post_whisper_model_delete(handler, {}, {"name": "small"})
 
         assert not model_dir.exists()
@@ -360,7 +359,7 @@ class TestHandlePostWhisperModelDelete:
         cache_dir.mkdir()
         handler._send_json = MagicMock()
 
-        with patch("vlog_tool.ui.routes.whisper_routes._resolve_cache_dir", return_value=cache_dir):
+        with patch("vlog_tool.ui.routes.whisper_models._resolve_cache_dir", return_value=cache_dir):
             handle_post_whisper_model_delete(handler, {}, {"name": "large-v3"})
 
         args = handler._send_json.call_args
