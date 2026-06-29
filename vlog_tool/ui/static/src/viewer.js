@@ -3,6 +3,7 @@ import { $, parseTimecode, fmtTime, setStatus, escapeHtml } from './utils.js';
 import { icon } from './api.js';
 
 function playVideoSegment(file, seekTo) {
+  state.currentVideo = file;
   const player = $('player');
   const doSeek = () => { player.currentTime = seekTo; player.play().catch(() => {}); };
   $('player-name').textContent = file;
