@@ -236,6 +236,65 @@ function _playPreviewSegment() {
   _setPlayBtnPause();
 }
 
+function _autoSwitchSegment(file) {
+  if (state.currentVideo === file) return;
+  state.currentVideo = file;
+  state.dirty = false;
+  state.texts = null;
+  state.voiceover = null;
+  state.transcript = null;
+
+  $('player-name').textContent = file;
+
+  import('./sidebar-data.js').then(mod => mod.renderVideoList());
+
+  const v = state.videos.find(x => x.file === file);
+  if (!v) return;
+
+  Promise.all([
+    v.text_json
+      ? import('./api.js').then(m => m.api('GET', `/api/texts?file=${encodeURIComponent(v.text_json)}`)).then(d => { state.texts = d; }).catch(() => {})
+      : Promise.resolve(),
+    v.script_json
+      ? import('./api.js').then(m => m.api('GET', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`)).then(d => { state.voiceover = d; }).catch(() => {})
+      : Promise.resolve(),
+    v.transcript_file
+      ? import('./api.js').then(m => m.api('GET', `/api/transcripts?video=${encodeURIComponent(v.file)}`)).then(d => { state.transcript = d; }).catch(() => {})
+      : Promise.resolve(),
+  ]).then(() => {
+    import('./editor.js').then(mod => mod.renderActiveTab());
+  });
+}
+
+function _checkSegmentBoundary(player) {
+  const currentFile = state.currentVideo;
+  if (!currentFile) return;
+  const curVid = state.videos.find(v => v.file === currentFile);
+  if (!curVid || !curVid.segment_matches || curVid.segment_matches.length < 2) return;
+
+  const parts = currentFile.split('_');
+  if (parts.length < 2) return;
+  const origStem = parts.slice(1).join('_');
+
+  const segments = state.videos
+    .filter(v => v.source === 'original' && v.file.endsWith(origStem))
+    .sort((a, b) => (a.offset_sec || 0) - (b.offset_sec || 0));
+
+  if (segments.length < 2) return;
+
+  let activeSeg = segments[0];
+  for (let i = segments.length - 1; i >= 0; i--) {
+    if (player.currentTime >= (segments[i].offset_sec || 0)) {
+      activeSeg = segments[i];
+      break;
+    }
+  }
+
+  if (activeSeg.file !== currentFile) {
+    _autoSwitchSegment(activeSeg.file);
+  }
+}
+
 function setupPlayer() {
   const player = $('player');
   // 播放速度控制
@@ -249,6 +308,10 @@ function setupPlayer() {
     if (state.previewActive && !player.seeking && state._previewEndTime !== null && player.currentTime >= state._previewEndTime) {
       state.previewIndex++;
       _playPreviewSegment();
+      return;
+    }
+    if (state.source === 'original' && state.currentEntity === 'video') {
+      _checkSegmentBoundary(player);
     }
   };
   player.onloadedmetadata = () => {
