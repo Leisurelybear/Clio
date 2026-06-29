@@ -299,6 +299,8 @@ async function init() {
       renderVideoList(); // 显示空状态
     }
   } catch (e) {
+    $('proj-name').textContent = '(加载失败)';
+    $('proj-name-sidebar').textContent = '(加载失败)';
     setStatus('Init failed: ' + e.message, 'err');
   }
 }

@@ -9,9 +9,8 @@ import { api, icon } from './api.js';
 
 let _runEventSource = null;
 let _lastRunDay = 'day1';
-let _pollErrorCount = 0;
-let _runActive = false;  // true while a pipeline is running; prevents double-click + stale render
-let _lastProgressSnapshot = null;  // {current, total, message, timestamp} for stale detection
+let _runActive = false;
+let _lastProgressSnapshot = null;
 
 const STEPS_KEY = 'vlog_ui_run_steps';
 
@@ -238,7 +237,7 @@ function _stopRunSSE() {
   }
 }
 
-function _handleRunStatus(s) {
+async function _handleRunStatus(s) {
   const prog = $('run-progress');
   const btn = $('btn-run-start');
   if (!prog) return;
@@ -365,17 +364,6 @@ function _handleRunStatus(s) {
       setStatus('流水线出错', 'err');
       renderProcessingState($('run-state-container'));
     }
-    _pollErrorCount = 0;
-  } catch (e) {
-    _pollErrorCount++;
-    if (_pollErrorCount >= 5) {
-      _runActive = false;
-      _stopRunPoll();
-      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
-      prog.innerHTML = `<p class="err">✗ 状态更新失败（连续 5 次错误）</p><p>${escapeHtml(e.message)}</p>`;
-      setStatus('状态更新失败', 'err');
-    }
-  }
 }
 
 function _stopRunPoll() {

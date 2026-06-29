@@ -36,7 +36,11 @@ async function loadProjects() {
 }
 
 async function loadConfig() {
-  state.config = await api('GET', '/api/config');
+  try {
+    state.config = await api('GET', '/api/config');
+  } catch {
+    state.config = { input_dir: '(加载失败)', output_dir: '' };
+  }
   $('proj-name').textContent = state.config.input_dir;
   $('proj-name').title = `input: ${state.config.input_dir}\noutput: ${state.config.output_dir}`;
 }
