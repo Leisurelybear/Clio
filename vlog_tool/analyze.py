@@ -245,7 +245,7 @@ def plan_daily_vlog(
     first_idx = clips[0].get("index", "001") if clips else "001"
 
     base = PLAN_PROMPT.format(
-        clips_json=json.dumps(clips, ensure_ascii=False, indent=2),
+        clips_json=json.dumps(clips, ensure_ascii=False, indent=None),
         max_clips=config.plan.max_clips_per_day,
         target_duration_sec=config.plan.target_duration_sec,
         example_index=first_idx,
@@ -275,7 +275,7 @@ def plan_daily_vlog(
                     }
                 )
         if transcript_info:
-            transcript_json = json.dumps(transcript_info, ensure_ascii=False, indent=2)
+            transcript_json = json.dumps(transcript_info, ensure_ascii=False, indent=None)
             base += TRANSCRIPT_CONTEXT.format(transcripts_json=transcript_json)
     prompt = _wrap_with_context(f"日 vlog 标签: {day_label}\n\n{base}", config)
     text = _call_ai(
@@ -330,12 +330,12 @@ def refine_text(
     if fix:
         base = REFINE_TEXT_FIX_PROMPT.format(
             fix_instruction=fix.strip(),
-            existing_json=json.dumps(analysis, ensure_ascii=False, indent=2),
+            existing_json=json.dumps(analysis, ensure_ascii=False, indent=None),
         )
         label = "AI refine (定向)"
     else:
         base = REFINE_TEXT_PROMPT.format(
-            existing_json=json.dumps(analysis, ensure_ascii=False, indent=2),
+            existing_json=json.dumps(analysis, ensure_ascii=False, indent=None),
         )
         label = "AI refine 素材"
     prompt = _wrap_with_context(base, config, context_override=context_override)
@@ -371,8 +371,8 @@ def refine_script(
     fix 非空时切换为定向修正模式（同 refine_text）。
     """
     provider, model = get_task_provider(config, TaskName.REFINE_TEXT)
-    analysis_json = json.dumps(analysis, ensure_ascii=False, indent=2) if analysis else "（无）"
-    existing_json = json.dumps(script, ensure_ascii=False, indent=2)
+    analysis_json = json.dumps(analysis, ensure_ascii=False, indent=None) if analysis else "（无）"
+    existing_json = json.dumps(script, ensure_ascii=False, indent=None)
     if fix:
         base = REFINE_SCRIPT_FIX_PROMPT.format(
             fix_instruction=fix.strip(),
