@@ -160,8 +160,8 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                     "indices": [m[0] for m in members],
                     "total": total,
                 }
-                # compute segment offset from .vmeta first, then fallback to estimation
                 offsets: dict[str, float] = {}
+                durations: dict[str, float] = {}
                 for member_idx, seg_num in members:
                     for v in videos:
                         if v["index"] == member_idx:
@@ -169,8 +169,8 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                             meta = VideoMeta.read(comp_file)
                             if meta and meta.split_info:
                                 offsets[member_idx] = meta.split_info.offset_sec
+                                durations[member_idx] = meta.split_info.segment_duration_sec
                             break
-                # legacy estimation for files without .vmeta
                 missing = [m for m in members if m[0] not in offsets]
                 if missing and total > 1 and _ffprobe:
                     orig_video: Path | None = None
@@ -185,6 +185,7 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                             seg_dur = dur / total
                             for i, (member_idx, _) in enumerate(missing):
                                 offsets[member_idx] = round(i * seg_dur, 1)
+                                durations[member_idx] = round(seg_dur, 1)
                         except Exception:
                             pass
                 for member_idx, seg_num in members:
@@ -192,6 +193,7 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                         if v["index"] == member_idx:
                             v["segment_label"] = f"{seg_num}/{total}"
                             v["offset_sec"] = offsets.get(member_idx, 0.0)
+                            v["duration_sec"] = durations.get(member_idx, 0.0)
                             break
     else:  # original
         if proj_input.is_dir():

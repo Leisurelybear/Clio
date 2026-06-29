@@ -1,8 +1,61 @@
 import { state } from './state.js';
 import { $, $$, escapeHtml, parseTimecode, fmtTime, markDirty, setStatus } from './utils.js';
 import { api, icon } from './api.js';
+import { playVideoSegment } from './viewer.js';
+import { renderVideoList } from './sidebar.js';
 import { renderRefineUI, refineCurrentFile } from './editor-refine.js';
 
+
+function _jumpToTranscriptTime(timeSec) {
+  const player = $('player');
+  const currentVideo = state.videos.find(x => x.file === state.currentVideo);
+  if (!currentVideo) return;
+
+  if (state.source === 'original') {
+    player.currentTime = timeSec + (currentVideo.offset_sec || 0);
+    player.play().catch(() => {});
+    return;
+  }
+
+  // compressed mode: find which split segment contains the time
+  const groupKey = currentVideo.group_key;
+  if (!groupKey) {
+    player.currentTime = timeSec;
+    player.play().catch(() => {});
+    return;
+  }
+
+  const candidates = state.videos.filter(
+    v => v.group_key === groupKey && v.offset_sec != null && v.duration_sec > 0
+  );
+  if (candidates.length <= 1) {
+    player.currentTime = timeSec;
+    player.play().catch(() => {});
+    return;
+  }
+
+  candidates.sort((a, b) => a.offset_sec - b.offset_sec);
+  let target = candidates[0];
+  for (let i = 0; i < candidates.length; i++) {
+    const v = candidates[i];
+    const end = v.offset_sec + v.duration_sec;
+    if (timeSec >= v.offset_sec && timeSec < end) {
+      target = v;
+      break;
+    }
+    if (timeSec >= v.offset_sec) target = v;
+  }
+
+  const seekTo = timeSec - target.offset_sec;
+  if (target.file !== state.currentVideo) {
+    state.currentVideo = target.file;
+    renderVideoList();
+    playVideoSegment(target.file, seekTo);
+  } else {
+    player.currentTime = seekTo;
+    player.play().catch(() => {});
+  }
+}
 
 export function renderTexts() {
   const t = state.texts;
@@ -41,10 +94,7 @@ export function renderTexts() {
     `;
     li.onclick = (e) => {
       if (e.target.tagName === 'TEXTAREA') return;
-      const p = $('player');
-      const curV = state.videos.find(x => x.file === state.currentVideo);
-      p.currentTime = parseTimecode(seg.start) + (curV?.offset_sec || 0);
-      p.play().catch(() => {});
+      _jumpToTranscriptTime(parseTimecode(seg.start));
     };
     li.querySelector('textarea').oninput = (e) => {
       seg.description = e.target.value;
@@ -206,10 +256,7 @@ export function renderTranscript() {
       <div class="seg-text" data-seg-index="${i}">${escapeHtml(seg.text || '')}</div>
     `;
     li.onclick = () => {
-      const player = $('player');
-      const v = state.videos.find(x => x.file === state.currentVideo);
-      player.currentTime = seg.start + (v?.offset_sec || 0);
-      player.play().catch(() => {});
+      _jumpToTranscriptTime(seg.start);
     };
     const textDiv = li.querySelector('.seg-text');
     textDiv.ondblclick = (e) => {
