@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-30
+
+### Fixed
+- Auto-highlight next segment when original video crosses segment boundary (viewer.js): playing a split original video now auto-jumps sidebar selection and loads the next segment's texts/voiceover without reloading the player (f0059db)
+
 ## 2026-06-26
 
 ### Added
