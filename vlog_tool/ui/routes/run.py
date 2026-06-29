@@ -6,6 +6,7 @@ import copy
 import json
 import re
 import threading
+import time
 import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -18,9 +19,6 @@ from vlog_tool.ui.services.project_service import _project_output_dir
 
 if TYPE_CHECKING:
     from vlog_tool.ui.handler_protocol import HandlerProtocol
-
-
-import time
 
 
 def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
@@ -64,8 +62,8 @@ def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
             time.sleep(0.5)
     except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
         pass  # Client disconnected
-    except Exception:
-        pass
+    except json.JSONDecodeError:
+        pass  # Corrupted progress file (being written concurrently)
 
 
 def handle_get_run_status(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
