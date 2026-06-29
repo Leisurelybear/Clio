@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import yaml
 
-from vlog_tool.ui.routes.whisper_download import _install_progress_path
+from vlog_tool.ui.routes.whisper_download import (
+    _install_progress_path,
+    handle_post_whisper_install_cancel,
+)
 from vlog_tool.ui.routes.whisper_models import _get_cache_dir
 from vlog_tool.ui.routes.whisper_routes import (
     handle_get_whisper_check,
@@ -191,3 +195,58 @@ class TestPutWhisperModelPersistence:
         handle_put_whisper_model(handler, qs, {"model_size": "invalid"})
 
         assert not (proj_input / "project.yaml").exists()
+
+
+class TestHandlePostWhisperInstallCancel:
+    """Verify handle_post_whisper_install_cancel."""
+
+    def test_cancel_updates_progress_file(self, tmp_path: Path) -> None:
+        """Cancel should reset progress file status to idle."""
+        proj_input = tmp_path / "input"
+        proj_input.mkdir()
+        proj_output = tmp_path / "output"
+        proj_output.mkdir()
+        handler = _make_handler(proj_input, proj_output)
+        qs = {"project": "test"}
+
+        progress_file = _install_progress_path(handler, qs)
+        progress_file.parent.mkdir(parents=True, exist_ok=True)
+        progress_file.write_text('{"status": "downloading", "progress_pct": 42}', encoding="utf-8")
+
+        handle_post_whisper_install_cancel(handler, qs)
+
+        data = json.loads(progress_file.read_text(encoding="utf-8"))
+        assert data["status"] == "idle"
+        assert data["progress_pct"] == 0
+        assert "取消" in data["message"]
+        handler._send_json.assert_called_once_with({"ok": True, "message": "cancel requested"})
+
+    def test_cancel_without_progress_file(self, tmp_path: Path) -> None:
+        """Cancel should succeed even if no progress file exists."""
+        proj_input = tmp_path / "input"
+        proj_input.mkdir()
+        proj_output = tmp_path / "output"
+        proj_output.mkdir()
+        handler = _make_handler(proj_input, proj_output)
+        qs = {"project": "test"}
+
+        handle_post_whisper_install_cancel(handler, qs)
+
+        handler._send_json.assert_called_once_with({"ok": True, "message": "cancel requested"})
+
+    def test_cancel_with_corrupted_progress_file(self, tmp_path: Path) -> None:
+        """Cancel should not crash on corrupted progress file."""
+        proj_input = tmp_path / "input"
+        proj_input.mkdir()
+        proj_output = tmp_path / "output"
+        proj_output.mkdir()
+        handler = _make_handler(proj_input, proj_output)
+        qs = {"project": "test"}
+
+        progress_file = _install_progress_path(handler, qs)
+        progress_file.parent.mkdir(parents=True, exist_ok=True)
+        progress_file.write_text("not valid json", encoding="utf-8")
+
+        handle_post_whisper_install_cancel(handler, qs)
+
+        handler._send_json.assert_called_once_with({"ok": True, "message": "cancel requested"})
