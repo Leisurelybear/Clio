@@ -11,7 +11,6 @@ from pathlib import Path
 from typing import Any
 
 import requests as _req
-from huggingface_hub import hf_hub_url
 
 from vlog_tool.transcribe import _resolve_cache_dir
 from vlog_tool.ui.handler_protocol import HandlerProtocol
@@ -214,6 +213,8 @@ def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Pa
                 "message": f"正在下载模型 {model_name} ({_format_bytes(total_size) if total_size else '...'})...",
             },
         )
+
+        from huggingface_hub import hf_hub_url
 
         url = hf_hub_url(repo_id, filename="model.bin")
         proxy_url = cfg.proxy.url if (cfg.proxy.enabled and cfg.proxy.url) else None
