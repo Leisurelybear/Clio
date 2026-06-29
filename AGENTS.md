@@ -14,7 +14,7 @@ An **AI preprocessing pipeline**: raw travel vlog footage → ffmpeg compression
 - **google-genai** (Gemini 2.5 Flash video File API)
 - **httpx** (DeepSeek / OpenAI compatible calls)
 - **PyYAML** (config parsing)
-- **pytest** (unit tests, auto-run in CI; **864 test cases**)
+- **pytest** (unit tests, auto-run in CI; **914 test cases**)
 
 Dependencies in `requirements.txt`; `setup.ps1`/`setup.sh` creates venv + installs ffmpeg + copies `.env` in one click.
 
@@ -41,8 +41,10 @@ vlog-video-analysis/
 │   ├── tasks/                 Pipeline steps (per-step modules)
 │   ├── ui/                    Web UI (stdlib http.server)
 │   │   ├── server.py          HTTP server
-│   │   ├── routes/            Route handlers (refine, transcripts, whisper)
+│   │   ├── routes/            Route handlers (split into focused modules)
 │   │   └── static/            Frontend (no build step, ES modules)
+│   │       └── src/           ES modules: sidebar.js, sidebar-data.js,
+│   │                           sidebar-rerun.js, sidebar-browse.js, ...
 │   └── ai/                    AI providers
 │       ├── base.py            TaskName enum, Provider Protocol
 │       ├── factory.py         Provider lookup by name

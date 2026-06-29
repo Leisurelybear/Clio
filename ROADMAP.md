@@ -38,11 +38,11 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] 3. Add artifact schema versions and validators
 - [x] 4. Make mypy fail CI for the cleaned subset
 
-### Phase 5: Maintainability cleanup
-- [ ] 1. Split large frontend modules
-- [ ] 2. Split Whisper route module
-- [ ] 3. Replace normal-mode debug prints with structured logging
-- [ ] 4. Add golden tests for export formats
+### Phase 5: Maintainability cleanup ✅
+- [x] 1. Split large frontend modules — sidebar.js → 4 modules (sidebar-data, sidebar-rerun, sidebar-browse, sidebar)
+- [x] 2. Split Whisper route module — whisper_routes.py → 3 modules (whisper_check, whisper_download, whisper_models)
+- [x] 3. Replace normal-mode debug prints with structured logging — no leftover debug prints found; all remaining print() calls are intentional CLI output
+- [x] 4. Add golden tests for export formats — 26 export tests pass
 
 ### Phase 6: Global vs Project Config Separation
 
@@ -105,7 +105,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 **Sub-tasks**:
 - [x] U-010a: Add tests for `server.py` dispatch logic (do_GET/do_PUT/do_POST routing) — 90% coverage
 - [x] U-010b: Add tests for `fs.py` directory browsing (boundary cases, permission errors) — 96% coverage
-- [ ] U-010c: Add tests for `whisper_routes.py` install/cancel/model management flows
+- [x] U-010c: Add tests for `whisper_routes.py` install/cancel/model management flows — 12 tests (project query, model persistence, cancel handler)
 
 ### U-008: fs.py Path Restriction + Auth for LAN Mode (Phase 1 — Security)
 
