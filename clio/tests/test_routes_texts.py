@@ -1,0 +1,108 @@
+from __future__ import annotations
+
+import json
+from http import HTTPStatus
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+
+@pytest.fixture
+def handler():
+    h = MagicMock()
+    h._get_project_output.return_value = "/output"
+    return h
+
+
+class TestHandleGetTexts:
+    def test_not_found(self, handler):
+        handler._resolve_texts.return_value = None
+        from clio.ui.routes.texts import handle_get_texts
+
+        handle_get_texts(handler, {"file": ["001.json"]})
+        handler.send_error.assert_called_once_with(HTTPStatus.NOT_FOUND)
+
+    def test_sends_file(self, handler):
+        handler._resolve_texts.return_value = MagicMock()
+        handler._resolve_texts.return_value.read_bytes.return_value = b'{"key": "val"}'
+        from clio.ui.routes.texts import handle_get_texts
+
+        handle_get_texts(handler, {"file": ["001.json"]})
+        handler._send_bytes.assert_called_once()
+        data = handler._send_bytes.call_args.args[0]
+        assert json.loads(data) == {"key": "val"}
+
+    def test_passes_query_string(self, handler):
+        handler._resolve_texts.return_value = MagicMock()
+        handler._resolve_texts.return_value.read_bytes.return_value = b"{}"
+        from clio.ui.routes.texts import handle_get_texts
+
+        handle_get_texts(handler, {"file": ["001.json"], "project": ["proj1"]})
+        handler._resolve_texts.assert_called_once_with("001.json", "/output")
+
+
+class TestHandleGetVoiceover:
+    def test_not_found(self, handler):
+        handler._resolve_in.return_value = None
+        from clio.ui.routes.texts import handle_get_voiceover
+
+        handle_get_voiceover(handler, {"file": ["001.json"]})
+        handler.send_error.assert_called_once_with(HTTPStatus.NOT_FOUND)
+
+    def test_sends_file(self, handler):
+        handler._resolve_in.return_value = MagicMock()
+        handler._resolve_in.return_value.read_bytes.return_value = b'{"voiceover": "hello"}'
+        from clio.ui.routes.texts import handle_get_voiceover
+
+        handle_get_voiceover(handler, {"file": ["001.json"]})
+        handler._send_bytes.assert_called_once()
+        data = handler._send_bytes.call_args.args[0]
+        assert json.loads(data)["voiceover"] == "hello"
+
+    def test_resolves_in_scripts_dir(self, handler):
+        handler._resolve_in.return_value = MagicMock()
+        handler._resolve_in.return_value.read_bytes.return_value = b"{}"
+        from clio.ui.routes.texts import handle_get_voiceover
+
+        handle_get_voiceover(handler, {"file": ["001.json"]})
+        handler._resolve_in.assert_called_once_with("scripts", "001.json", "/output")
+
+
+class TestHandlePutTexts:
+    def test_forbidden(self, handler):
+        handler._resolve_texts.return_value = None
+        from clio.ui.routes.texts import handle_put_texts
+
+        handle_put_texts(handler, {"file": ["001.json"]}, {"key": "val"})
+        handler._send_json.assert_called_once()
+        resp = handler._send_json.call_args.args[0]
+        assert resp["ok"] is False
+
+    @patch("clio.ui.routes.texts._save_atomic")
+    def test_saves_file(self, mock_save, handler):
+        handler._resolve_texts.return_value = MagicMock()
+        from clio.ui.routes.texts import handle_put_texts
+
+        handle_put_texts(handler, {"file": ["001.json"]}, {"key": "val"})
+        mock_save.assert_called_once()
+        handler._send_json.assert_called_once_with({"ok": True, "path": str(handler._resolve_texts.return_value)})
+
+
+class TestHandlePutVoiceover:
+    def test_forbidden(self, handler):
+        handler._resolve_in.return_value = None
+        from clio.ui.routes.texts import handle_put_voiceover
+
+        handle_put_voiceover(handler, {"file": ["001.json"]}, {"voiceover": "test"})
+        handler._send_json.assert_called_once()
+        resp = handler._send_json.call_args.args[0]
+        assert resp["ok"] is False
+
+    @patch("clio.ui.routes.texts._save_atomic")
+    def test_saves_file(self, mock_save, handler):
+        handler._resolve_in.return_value = MagicMock()
+        from clio.ui.routes.texts import handle_put_voiceover
+
+        handle_put_voiceover(handler, {"file": ["001.json"]}, {"voiceover": "test"})
+        mock_save.assert_called_once()
+        handler._send_json.assert_called_once_with({"ok": True, "path": str(handler._resolve_in.return_value)})

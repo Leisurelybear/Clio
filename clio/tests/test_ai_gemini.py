@@ -1,0 +1,386 @@
+from __future__ import annotations
+
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from clio.config import ProviderConfig, ProxyConfig
+
+
+def _make_cfg(**kwargs) -> ProviderConfig:
+    defaults = dict(
+        name="gemini",
+        type="gemini",
+        api_key="test-key",
+        api_key_env="GEMINI_API_KEY",
+        base_url="",
+        requests_per_minute=0,
+        poll_interval_sec=5,
+        retry_attempts=2,
+        max_tokens=4096,
+    )
+    defaults.update(kwargs)
+    return ProviderConfig(**defaults)
+
+
+@pytest.fixture
+def proxy_disabled():
+    return ProxyConfig(enabled=False, url="")
+
+
+@pytest.fixture
+def proxy_enabled():
+    return ProxyConfig(enabled=True, url="http://127.0.0.1:1080")
+
+
+class TestInit:
+    def test_missing_api_key_raises(self):
+        cfg = _make_cfg(api_key="")
+        with pytest.raises(ValueError, match="缺少 API Key"):
+            from clio.ai.gemini import GeminiProvider
+
+            GeminiProvider(cfg, ProxyConfig(enabled=False, url=""))
+
+    def test_creates_client_without_proxy(self, proxy_disabled):
+        with patch("clio.ai.gemini.genai.Client") as mock_client_cls:
+            from clio.ai.gemini import GeminiProvider
+
+            p = GeminiProvider(_make_cfg(), proxy_disabled)
+            mock_client_cls.assert_called_once_with(api_key="test-key", http_options=None)
+            assert p._poll_interval == 5
+            assert p._retry_attempts == 3  # retry_attempts+1
+
+    def test_creates_client_with_proxy(self, proxy_enabled):
+        with (
+            patch("clio.ai.gemini.genai.Client") as mock_client_cls,
+            patch("clio.ai.gemini.types.HttpOptions") as mock_http_opts,
+        ):
+            from clio.ai.gemini import GeminiProvider
+
+            GeminiProvider(_make_cfg(), proxy_enabled)
+            mock_http_opts.assert_called_once()
+            mock_client_cls.assert_called_once()
+
+    def test_rate_limiter_disabled(self, proxy_disabled):
+        with patch("clio.ai.gemini.genai.Client"):
+            from clio.ai.gemini import GeminiProvider
+
+            p = GeminiProvider(_make_cfg(requests_per_minute=0), proxy_disabled)
+            assert p._rl is None
+
+    def test_rate_limiter_enabled(self, proxy_disabled):
+        with patch("clio.ai.gemini.genai.Client"):
+            from clio.ai.gemini import GeminiProvider
+
+            p = GeminiProvider(_make_cfg(requests_per_minute=10), proxy_disabled)
+            assert p._rl is not None
+
+
+class TestIsRetryable:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        with patch("clio.ai.gemini.genai.Client"):
+            from clio.ai.gemini import GeminiProvider
+
+            self._prov = GeminiProvider(_make_cfg(), ProxyConfig(enabled=False, url=""))
+            yield
+
+    def test_oserror_is_retryable(self):
+        assert self._prov._is_retryable(OSError("connection reset"))
+
+    def test_client_error_429_is_retryable(self):
+        from google.genai import errors as genai_errors
+
+        e = genai_errors.ClientError(code=429, response_json={})
+        assert self._prov._is_retryable(e)
+
+    def test_client_error_400_not_retryable(self):
+        from google.genai import errors as genai_errors
+
+        e = genai_errors.ClientError(code=400, response_json={})
+        assert not self._prov._is_retryable(e)
+
+    def test_client_error_resource_exhausted_retryable(self):
+        from google.genai import errors as genai_errors
+
+        e = genai_errors.ClientError(code=200, response_json={})
+        e.status = "RESOURCE_EXHAUSTED"
+        assert self._prov._is_retryable(e)
+
+    def test_server_error_is_retryable(self):
+        from google.genai import errors as genai_errors
+
+        e = genai_errors.ServerError(code=500, response_json={})
+        assert self._prov._is_retryable(e)
+
+    def test_arbitrary_exception_not_retryable(self):
+        assert not self._prov._is_retryable(ValueError("bad input"))
+
+    def test_no_genai_errors_fallback(self):
+        with (
+            patch("clio.ai.gemini.genai.Client"),
+            patch("clio.ai.gemini._HAS_GENAI_ERRORS", False),
+        ):
+            from clio.ai.gemini import GeminiProvider
+
+            prov = GeminiProvider(_make_cfg(), ProxyConfig(enabled=False, url=""))
+            assert prov._is_retryable(OSError("reset"))
+            assert not prov._is_retryable(ValueError("nope"))
+
+
+class TestCallWithRetry:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        with patch("clio.ai.gemini.genai.Client"):
+            from clio.ai.gemini import GeminiProvider
+
+            self._prov = GeminiProvider(_make_cfg(), ProxyConfig(enabled=False, url=""))
+            yield
+
+    def test_success(self):
+        fn = MagicMock(return_value="ok")
+        result = self._prov._call_with_retry(fn, "test", "model")
+        assert result == "ok"
+        fn.assert_called_once()
+
+    def test_non_retryable_wraps_as_runtime(self):
+        fn = MagicMock(side_effect=ValueError("bad"))
+        with pytest.raises(RuntimeError, match="不可重试错误"):
+            self._prov._call_with_retry(fn, "test", "model")
+
+    def test_retryable_passes_through_to_with_retry(self):
+        fn = MagicMock(side_effect=OSError("reset"))
+        with pytest.raises(OSError, match="reset"):
+            self._prov._call_with_retry(fn, "test", "model")
+        assert fn.call_count >= 1
+
+
+class TestWaitForFile:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        with patch("clio.ai.gemini.genai.Client") as mock_cls:
+            from clio.ai.gemini import GeminiProvider
+
+            self._client_mock = MagicMock()
+            mock_cls.return_value = self._client_mock
+            self._prov = GeminiProvider(_make_cfg(), ProxyConfig(enabled=False, url=""))
+            yield
+
+    def test_already_active(self):
+        from google.genai import types
+
+        uploaded = MagicMock(spec=types.File)
+        uploaded.state = types.FileState.ACTIVE
+        result = self._prov._wait_for_file(uploaded, timeout=10)
+        assert result is uploaded
+
+    def test_processing_to_active(self):
+        from google.genai import types
+
+        processed = MagicMock(spec=types.File)
+        processed.name = "files/test123"
+        processed.state = types.FileState.PROCESSING
+        active = MagicMock(spec=types.File)
+        active.state = types.FileState.ACTIVE
+
+        self._client_mock.files.get.return_value = active
+        with patch("clio.ai.gemini.time.sleep"):
+            with patch("clio.ai.gemini.time.monotonic", side_effect=[0, 1, 2]):
+                result = self._prov._wait_for_file(processed, timeout=300)
+        assert result.state == types.FileState.ACTIVE
+
+    def test_processing_to_failed(self):
+        from google.genai import types
+
+        uploaded = MagicMock(spec=types.File)
+        uploaded.name = "files/test123"
+        uploaded.state = types.FileState.PROCESSING
+        failed = MagicMock()
+        failed.name = "files/test123"
+        failed.state = types.FileState.FAILED
+
+        self._client_mock.files.get.return_value = failed
+        with patch("clio.ai.gemini.time.sleep"):
+            with patch("clio.ai.gemini.time.monotonic", side_effect=[0, 1, 2]):
+                with pytest.raises(RuntimeError, match="视频处理失败"):
+                    self._prov._wait_for_file(uploaded, timeout=300)
+
+    def test_timeout(self):
+        from google.genai import types
+
+        uploaded = MagicMock(spec=types.File)
+        uploaded.name = "files/test123"
+        uploaded.state = types.FileState.PROCESSING
+
+        with patch("clio.ai.gemini.time.sleep"):
+            with patch("clio.ai.gemini.time.monotonic", side_effect=[0, 301, 302]):
+                with pytest.raises(TimeoutError, match="视频处理超时"):
+                    self._prov._wait_for_file(uploaded, timeout=300)
+
+    def test_on_progress_called(self):
+        from google.genai import types
+
+        uploaded = MagicMock(spec=types.File)
+        uploaded.name = "files/test123"
+        uploaded.state = types.FileState.PROCESSING
+        active = MagicMock(spec=types.File)
+        active.state = types.FileState.ACTIVE
+
+        self._client_mock.files.get.return_value = active
+        callback = MagicMock()
+        with patch("clio.ai.gemini.time.sleep"):
+            with patch("clio.ai.gemini.time.monotonic", side_effect=[0, 2, 3]):
+                self._prov._wait_for_file(uploaded, timeout=300, on_progress=callback)
+        callback.assert_called()
+
+
+class TestGenerateText:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        with patch("clio.ai.gemini.genai.Client") as mock_cls:
+            from clio.ai.gemini import GeminiProvider
+
+            self._client_mock = MagicMock()
+            mock_cls.return_value = self._client_mock
+            self._prov = GeminiProvider(_make_cfg(), ProxyConfig(enabled=False, url=""))
+            yield
+
+    def test_success(self):
+        response_mock = MagicMock()
+        response_mock.text = "hello world"
+        self._client_mock.models.generate_content.return_value = response_mock
+
+        result = self._prov.generate_text("hi", "gemini-2.5-flash")
+        assert result.text == "hello world"
+        self._client_mock.models.generate_content.assert_called_once_with(model="gemini-2.5-flash", contents="hi")
+
+    def test_empty_response(self):
+        response_mock = MagicMock()
+        response_mock.text = ""
+        self._client_mock.models.generate_content.return_value = response_mock
+
+        result = self._prov.generate_text("hi", "gemini-2.5-flash")
+        assert result.text == ""
+
+
+class TestAnalyzeVideo:
+    @pytest.fixture(autouse=True)
+    def _setup(self, tmp_path):
+        with patch("clio.ai.gemini.genai.Client") as mock_cls:
+            from clio.ai.gemini import GeminiProvider
+
+            self._client_mock = MagicMock()
+            mock_cls.return_value = self._client_mock
+            self._prov = GeminiProvider(_make_cfg(), ProxyConfig(enabled=False, url=""))
+
+            self._video = tmp_path / "test.mp4"
+            self._video.write_bytes(b"\x00" * 1024)
+            yield
+
+    def test_success(self, tmp_path):
+        from google.genai import types
+
+        uploaded = MagicMock(spec=types.File)
+        uploaded.name = "files/test123"
+        uploaded.state = types.FileState.ACTIVE
+        self._client_mock.files.upload.return_value = uploaded
+        self._client_mock.files.get.return_value = uploaded
+
+        response_mock = MagicMock()
+        response_mock.text = "analysis result"
+        self._client_mock.models.generate_content.return_value = response_mock
+
+        result = self._prov.analyze_video(str(self._video), "describe this", "gemini-2.5-flash")
+        assert result.text == "analysis result"
+        self._client_mock.files.delete.assert_called_once_with(name="files/test123")
+
+    def test_file_too_large(self, tmp_path):
+        big = tmp_path / "big.mp4"
+        big.write_bytes(b"\x00" * (201 * 1024 * 1024))
+        with pytest.raises(ValueError, match="文件过大"):
+            self._prov.analyze_video(str(big), "desc", "gemini-2.5-flash")
+
+    def test_cleanup_on_failure(self, tmp_path):
+        from google.genai import types
+
+        uploaded = MagicMock(spec=types.File)
+        uploaded.name = "files/test123"
+        uploaded.state = types.FileState.ACTIVE
+        self._client_mock.files.upload.return_value = uploaded
+        self._client_mock.files.get.return_value = uploaded
+
+        self._client_mock.models.generate_content.side_effect = RuntimeError("AI failed")
+
+        with pytest.raises(RuntimeError, match="AI failed"):
+            self._prov.analyze_video(str(self._video), "desc", "gemini-2.5-flash")
+        self._client_mock.files.delete.assert_called_once_with(name="files/test123")
+
+    def test_upload_uses_stream(self, tmp_path):
+        from google.genai import types
+
+        uploaded = MagicMock(spec=types.File)
+        uploaded.name = "files/test123"
+        uploaded.state = types.FileState.ACTIVE
+        self._client_mock.files.upload.return_value = uploaded
+        self._client_mock.files.get.return_value = uploaded
+
+        response_mock = MagicMock()
+        response_mock.text = "ok"
+        self._client_mock.models.generate_content.return_value = response_mock
+
+        self._prov.analyze_video(str(self._video), "desc", "gemini-2.5-flash")
+
+        call = self._client_mock.files.upload.call_args
+        assert call is not None
+        assert "file" in call.kwargs
+        assert "config" in call.kwargs
+        assert isinstance(call.kwargs["config"], types.UploadFileConfig)
+
+    def test_progress_callback(self, tmp_path):
+        from google.genai import types
+
+        uploaded = MagicMock(spec=types.File)
+        uploaded.name = "files/test123"
+        uploaded.state = types.FileState.ACTIVE
+        self._client_mock.files.upload.return_value = uploaded
+        self._client_mock.files.get.return_value = uploaded
+
+        response_mock = MagicMock()
+        response_mock.text = "ok"
+        self._client_mock.models.generate_content.return_value = response_mock
+
+        callback = MagicMock()
+        self._prov.analyze_video(str(self._video), "desc", "gemini-2.5-flash", progress_callback=callback)
+        assert callback.call_count >= 1
+
+
+class TestRetryableTypes:
+    @pytest.fixture(autouse=True)
+    def _setup(self):
+        with patch("clio.ai.gemini.genai.Client"):
+            from clio.ai.gemini import GeminiProvider
+
+            self._prov = GeminiProvider(_make_cfg(), ProxyConfig(enabled=False, url=""))
+            yield
+
+    def test_includes_oserror(self):
+        types = self._prov._retryable_types()
+        assert OSError in types
+
+    def test_includes_client_and_server_errors(self):
+        from google.genai import errors as genai_errors
+
+        types = self._prov._retryable_types()
+        assert genai_errors.ClientError in types
+        assert genai_errors.ServerError in types
+
+    def test_no_genai_errors_fallback(self):
+        with (
+            patch("clio.ai.gemini.genai.Client"),
+            patch("clio.ai.gemini._HAS_GENAI_ERRORS", False),
+        ):
+            from clio.ai.gemini import GeminiProvider
+
+            prov = GeminiProvider(_make_cfg(), ProxyConfig(enabled=False, url=""))
+            types = prov._retryable_types()
+            assert types == (OSError,)

@@ -8,12 +8,12 @@ import os
 import sys
 from pathlib import Path
 
-from vlog_tool.config import apply_run_paths, load_config
-from vlog_tool.log import setup_logging
-from vlog_tool.shutdown import before_stop, install_hooks
-from vlog_tool.ui import run as run_ui
-from vlog_tool.ui.services.file_service import _migrate_project_configs
-from vlog_tool.utils import discover_ffmpeg_bin, find_videos
+from clio.config import apply_run_paths, load_config
+from clio.log import setup_logging
+from clio.shutdown import before_stop, install_hooks
+from clio.ui import run as run_ui
+from clio.ui.services.file_service import _migrate_project_configs
+from clio.utils import discover_ffmpeg_bin, find_videos
 
 PLACEHOLDER_KEYS = {"your_api_key_here", "YOUR_API_KEY", ""}
 
@@ -110,7 +110,7 @@ def cmd_tokens(args):
     config = load_config(args.config)
     import json
 
-    from vlog_tool.ai.token_usage import FileTokenUsageStore
+    from clio.ai.token_usage import FileTokenUsageStore
 
     store = FileTokenUsageStore(str(config.paths.output_dir))
     stats = store.get_stats()
@@ -260,7 +260,7 @@ def main(argv: list[str] | None = None) -> int:
         return run_check(config_path, getattr(args, "input", None))
 
     elif args.command == "transcribe":
-        from vlog_tool.tasks.transcribe import run_transcribe_all
+        from clio.tasks.transcribe import run_transcribe_all
 
         config = load_config(config_path)
         if getattr(args, "input", None):
@@ -270,7 +270,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     elif args.command == "whisper":
-        from vlog_tool.whisper_cli import run_whisper_check, run_whisper_install
+        from clio.whisper_cli import run_whisper_check, run_whisper_install
 
         if args.whisper_command == "install":
             return run_whisper_install(config_path)
@@ -295,48 +295,48 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "verify":
-            from vlog_tool.tasks.verify import run_verify
+            from clio.tasks.verify import run_verify
 
             return run_verify(config)
         elif args.command == "reindex":
-            from vlog_tool.tasks.reindex import run_reindex
+            from clio.tasks.reindex import run_reindex
 
             return run_reindex(config)
         elif args.command == "compress":
-            from vlog_tool.pipeline import run_compress_all
-            from vlog_tool.tasks.reindex import auto_reindex_if_needed
+            from clio.pipeline import run_compress_all
+            from clio.tasks.reindex import auto_reindex_if_needed
 
             auto_reindex_if_needed(config)
             run_compress_all(config, single_file=single_file)
         elif args.command == "analyze":
-            from vlog_tool.pipeline import run_analyze_all
-            from vlog_tool.tasks.reindex import auto_reindex_if_needed
+            from clio.pipeline import run_analyze_all
+            from clio.tasks.reindex import auto_reindex_if_needed
 
             auto_reindex_if_needed(config)
             run_analyze_all(config, single_file=single_file)
         elif args.command == "scripts":
-            from vlog_tool.pipeline import run_generate_scripts
+            from clio.pipeline import run_generate_scripts
 
             run_generate_scripts(config, single_file=single_file)
         elif args.command == "label":
-            from vlog_tool.pipeline import run_label_videos
-            from vlog_tool.tasks.reindex import auto_reindex_if_needed
+            from clio.pipeline import run_label_videos
+            from clio.tasks.reindex import auto_reindex_if_needed
 
             auto_reindex_if_needed(config)
             run_label_videos(config)
         elif args.command == "plan":
-            from vlog_tool.pipeline import run_plan_vlog
-            from vlog_tool.tasks.reindex import auto_reindex_if_needed
+            from clio.pipeline import run_plan_vlog
+            from clio.tasks.reindex import auto_reindex_if_needed
 
             auto_reindex_if_needed(config)
             config.plan.use_transcripts = not getattr(args, "no_transcripts", False)
             run_plan_vlog(config, args.day)
         elif args.command == "run":
-            from vlog_tool.pipeline import run_full_pipeline
+            from clio.pipeline import run_full_pipeline
 
             run_full_pipeline(config, args.day)
         elif args.command == "refine":
-            from vlog_tool.pipeline import run_refine_scripts, run_refine_texts
+            from clio.pipeline import run_refine_scripts, run_refine_texts
 
             if not config.ai.context and not context_override:
                 print(
@@ -362,8 +362,8 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"错误: {e}", file=sys.stderr)
                 return 1
         elif args.command == "cut":
-            from vlog_tool.pipeline import run_cut_all
-            from vlog_tool.tasks.reindex import auto_reindex_if_needed
+            from clio.pipeline import run_cut_all
+            from clio.tasks.reindex import auto_reindex_if_needed
 
             auto_reindex_if_needed(config)
             run_cut_all(
@@ -395,7 +395,7 @@ def main(argv: list[str] | None = None) -> int:
             cmd_tokens(args)
             return 0
         elif args.command == "export":
-            from vlog_tool.export import export_plan
+            from clio.export import export_plan
 
             plan_path = config.plans_dir / f"{args.day}_plan.json"
             out_dir = args.output or config.paths.output_dir / "export" / f"{args.day}_{args.format}"
