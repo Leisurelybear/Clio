@@ -148,9 +148,7 @@ class TestRunCompressAll:
             (cfg.paths.input_dir / name).write_bytes(b"\x00" * 1000)
 
         monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
-        monkeypatch.setattr(
-            "clio.tasks.compress.find_videos", lambda *a, **kw: list(cfg.paths.input_dir.iterdir())
-        )
+        monkeypatch.setattr("clio.tasks.compress.find_videos", lambda *a, **kw: list(cfg.paths.input_dir.iterdir()))
 
         compressed = []
 

@@ -109,7 +109,7 @@ def test_transcribe_default(mock_run, cli_runner, config_path):
     assert cfg_arg.analyze.skip_existing is True
 
 
-@patch("main.apply_run_paths")
+@patch("clio.main.apply_run_paths")
 @patch("clio.tasks.transcribe.run_transcribe_all")
 def test_transcribe_with_input(mock_run, mock_apply, cli_runner, config_path, tmp_path):
     """-i 参数应传递给 apply_run_paths"""

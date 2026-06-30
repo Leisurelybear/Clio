@@ -49,9 +49,7 @@ class TestRunPipelineStepsCancel:
         with (
             patch("clio.pipeline._STEP_FUNCS", fake_funcs),
             patch("builtins.print"),
-            patch(
-                "clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)
-            ),
+            patch("clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)),
         ):
             run_pipeline_steps(config, steps=["compress", "analyze"], cancel_event=cancel_event)
 
@@ -73,9 +71,7 @@ class TestRunPipelineStepsCancel:
         with (
             patch("clio.pipeline._STEP_FUNCS", fake_funcs),
             patch("builtins.print"),
-            patch(
-                "clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)
-            ),
+            patch("clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)),
         ):
             run_pipeline_steps(config, steps=["compress"], cancel_event=cancel_event)
 
@@ -98,9 +94,7 @@ class TestRunPipelineStepsCancel:
         with (
             patch("clio.pipeline._STEP_FUNCS", fake_funcs),
             patch("builtins.print"),
-            patch(
-                "clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)
-            ),
+            patch("clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)),
         ):
             run_pipeline_steps(config, steps=["transcribe"], cancel_event=cancel_event)
 
@@ -125,9 +119,7 @@ class TestRunPipelineStepsCancel:
         with (
             patch("clio.pipeline._STEP_FUNCS", fake_funcs),
             patch("builtins.print"),
-            patch(
-                "clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)
-            ),
+            patch("clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)),
         ):
             run_pipeline_steps(config, steps=list(fake_funcs), cancel_event=cancel_event)
 
@@ -151,9 +143,7 @@ class TestRunPipelineStepsCancel:
         with (
             patch("clio.pipeline._STEP_FUNCS", fake_funcs),
             patch("builtins.print"),
-            patch(
-                "clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)
-            ),
+            patch("clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)),
         ):
             run_pipeline_steps(config, steps=list(fake_funcs), files=["001_A", "002_B"])
 
@@ -177,9 +167,7 @@ class TestRunPipelineStepsCancel:
         with (
             patch("clio.pipeline._STEP_FUNCS", fake_funcs),
             patch("builtins.print"),
-            patch(
-                "clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)
-            ),
+            patch("clio.pipeline.timed", lambda msg: MagicMock(__enter__=lambda s: None, __exit__=lambda *a: None)),
         ):
             run_pipeline_steps(config, steps=list(fake_funcs), overwrite=True)
 

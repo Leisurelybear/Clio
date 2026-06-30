@@ -271,9 +271,7 @@ class TestRunTranscribeOne:
 
         with (
             patch("clio.tasks.transcribe._extract_audio", return_value=tmp_path / "fake.wav"),
-            patch(
-                "clio.tasks.transcribe.transcribe_audio", return_value=[{"start": 0.0, "end": 1.0, "text": "test"}]
-            ),
+            patch("clio.tasks.transcribe.transcribe_audio", return_value=[{"start": 0.0, "end": 1.0, "text": "test"}]),
         ):
             (tmp_path / "fake.wav").touch()
             result = run_transcribe_one(cfg, video)
