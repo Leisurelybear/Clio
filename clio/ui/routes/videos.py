@@ -48,10 +48,12 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     comp_dir = proj_out / "compressed"
 
     # -- Build text/script sidecar lookup ----------------------------------
-    # Two lookup strategies for the same data:
+    # Three lookup strategies for the same data:
     #   1) compressed_file → texts JSON filename (exact, for v2+ data)
-    #   2) index (zero-padded) → texts JSON filename (fallback for v1 data)
+    #   2) compressed_stem → texts JSON filename (segment-specific, stem without extension)
+    #   3) index (zero-padded) → texts JSON filename (fallback for v1 data)
     text_by_compressed: dict[str, str] = {}  # compressed_basename  → texts_json_filename
+    text_by_compressed_stem: dict[str, str] = {}  # compressed_stem   → texts_json_filename
     text_sidecars: dict[str, list[str]] = {}  # zero-padded index    → [texts_json_filenames]
     text_titles: dict[str, str] = {}
     text_identities: dict[str, Any] = {}
@@ -67,7 +69,9 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
             comp_name: str | None = data.get("compressed_file")
             if comp_name:
                 text_by_compressed[comp_name] = f.name
-            # Strategy 2: index-based fallback (v1)
+                # Strategy 2: also index by stem (no extension) for segment matching
+                text_by_compressed_stem[Path(comp_name).stem] = f.name
+            # Strategy 3: index-based fallback (v1)
             if "_" in f.stem:
                 idx = f.stem.split("_", 1)[0]
             else:
@@ -81,7 +85,14 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                 identity = load_identity(data)
                 if identity is not None:
                     text_identities[idx] = identity
-    script_sidecars: dict[str, list[str]] = {}
+
+    # Script lookup: same three strategies
+    script_by_compressed_stem: dict[str, str] = {}  # compressed_stem → script filename
+    script_sidecars: dict[str, list[str]] = {}  # zero-padded index → [script_filenames]
+    # Build reverse map: text_stem → compressed_stem for O(1) script lookup
+    text_stem_to_compressed: dict[str, str] = {}
+    for cstem, tname in text_by_compressed_stem.items():
+        text_stem_to_compressed[Path(tname).stem] = cstem
     sd = proj_out / "scripts"
     if sd.is_dir():
         for f in sorted(sd.iterdir()):
@@ -89,6 +100,10 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                 continue
             idx = f.stem.split("_", 1)[0]
             script_sidecars.setdefault(idx, []).append(f.name)
+            text_stem = f.stem[: -len("_voiceover")] if f.stem.endswith("_voiceover") else f.stem
+            cstem = text_stem_to_compressed.get(text_stem)
+            if cstem:
+                script_by_compressed_stem[cstem] = f.name
 
     # build transcript lookup: original stem -> bool
     cfg = handler._get_config(proj_input)
@@ -129,8 +144,10 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                     "index": idx,
                     "title": text_titles.get(idx, ""),
                     "text_json": text_by_compressed.get(p.name)
+                    or text_by_compressed_stem.get(p.stem)
                     or next((x for x in text_sidecars.get(idx, []) if x is not None), None),
-                    "script_json": next((x for x in script_sidecars.get(idx, []) if x is not None), None),
+                    "script_json": script_by_compressed_stem.get(p.stem)
+                    or next((x for x in script_sidecars.get(idx, []) if x is not None), None),
                     "transcript_file": (
                         text_identities[idx].original_stem
                         if idx in text_identities and text_identities[idx].original_stem in transcripts_set

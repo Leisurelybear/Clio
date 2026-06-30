@@ -674,7 +674,7 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | B-094 | `/api/fs/dirs` no path restriction, exposes full filesystem in LAN mode | Add root restriction + token auth (see U-008) | 🆕 |
 | B-095 | `server.py` only 6% test coverage, no integration tests for dispatch/error paths | Add HTTP-level tests (see U-010) | 🆕 |
 | B-096 | `whisper_routes.py` 48% coverage — new feature, test lagging behind | Add tests for install/cancel/model management flows | 🆕 |
-| B-097 | `videos.py:101` `text_sidecars.get(idx)[0]` always picks first text file for all split segments, each segment should map to its own text/script sidecar | Match by segment-specific filename pattern instead of `[0]` | 📝 new |
+| B-097 | `videos.py:101` `text_sidecars.get(idx)[0]` always picks first text file for all split segments, each segment should map to its own text/script sidecar | Add compressed_stem map for segment-specific text/script matching | ✅ `(this commit)` |
 | B-074 | `analyze.py:_wrap_with_context` reads `trip_context.md` from disk on every AI call | Module-level `_trip_context_cache` | ✅ `fe57a7f` |
 | B-075 | `ui/server.py` Range request doesn't support suffix `bytes=-N` | Empty start + non-empty end → suffix calculation | ✅ `d2591a9` |
 | B-076 | `utils/discover_ffmpeg_bin` hardcoded `G:/ffmpeg` | Remove, use `FFMPEG_HOME` env var instead | ✅ `74c34f5` |
@@ -683,7 +683,7 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | B-079 | `log.py` `_TeeWriter.__getattr__` passes through `close`/`writelines`/`truncate` | Intercept and raise AttributeError | ✅ `947a320` |
 | B-080 | `openai_compat.py` hardcoded `attempts=3` ignores configured `retry_attempts` | Read from `cfg.retry_attempts` + `+1` conversion | ✅ `ef2311d` |
 | B-081 | `gemini.py` `retry_attempts` semantics inconsistent with openai_compat (missing `+1`) | Align to `max(1, cfg.retry_attempts + 1)` | ✅ `ef68308` |
-| B-098 | `plan.py` stores transcript_map key as `stem.lower()`, `analyze.py` lookup uses original case — every clip misses, `TRANSCRIPT_CONTEXT` never injected | Unify to `.lower()` on lookup side in `analyze.py` | 🆕 |
+| B-098 | `plan.py` stores transcript_map key as `stem.lower()`, `analyze.py` lookup uses original case — every clip misses, `TRANSCRIPT_CONTEXT` never injected | Unify to `.lower()` on lookup side in `analyze.py` | ✅ `cb2174f` |
 | B-082 | `ai/factory.py` provider cache not thread-safe + no test cleanup mechanism | Add lock + `_clear_provider_cache()` + autouse fixture | ✅ `ef68308` |
 | B-083 | `ui/routes/run.py` `obj.get("index")` unsanitized used as glob pattern | `re.sub(r"[^a-zA-Z0-9_-]", "")` filter | ✅ `bebf21f` |
 | B-084 | `ui/static/src/editor.js` `save()` data references not captured at call site | Capture `planData/textsData/voiceoverData/configRaw` | ✅ `bebf21f` |
