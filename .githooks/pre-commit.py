@@ -55,8 +55,16 @@ if fmt.returncode != 0:
     print("[pre-commit] ruff format failed, check output above")
     sys.exit(1)
 
-# Re-stage formatted files
-subprocess.run(["git", "add", *staged], cwd=REPO_ROOT)
+# Only re-stage files that ruff actually modified
+diff_result = subprocess.run(
+    ["git", "diff", "--name-only", "--", *staged],
+    capture_output=True,
+    text=True,
+    cwd=REPO_ROOT,
+)
+if diff_result.returncode == 0 and diff_result.stdout.strip():
+    modified = [f for f in diff_result.stdout.splitlines() if f]
+    subprocess.run(["git", "add", *modified], cwd=REPO_ROOT)
 
 # Lint check (only errors, ignore warnings like F811)
 check = subprocess.run([*RUFF, "check", "--select", "F,E,I", *staged], cwd=REPO_ROOT)
