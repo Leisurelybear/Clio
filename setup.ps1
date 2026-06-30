@@ -1,11 +1,11 @@
-# Vlog 工具一键配置脚本（PowerShell）
+# Clio 一键配置脚本（PowerShell）
 # 用法: .\setup.ps1
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = $PSScriptRoot
 Set-Location $ProjectRoot
 
-Write-Host "=== Vlog 剪辑辅助工具 - 环境配置 ===" -ForegroundColor Cyan
+Write-Host "=== Clio - 环境配置 ===" -ForegroundColor Cyan
 
 # ---- Python 版本检查（项目要求 3.11+）----
 $pyCmdStr = "python"
@@ -139,7 +139,7 @@ if ($whisperAnswer -eq 'y' -or $whisperAnswer -eq 'Y') {
     .\.venv\Scripts\python.exe -m pip install -r requirements-whisper.txt
     if ($LASTEXITCODE -ne 0) {
         Write-Host "     Whisper 依赖安装失败，跳过后续步骤" -ForegroundColor Red
-        Write-Host "     可后续运行 'python main.py whisper install' 单独安装" -ForegroundColor DarkYellow
+        Write-Host "     可后续运行 'python -m clio whisper install' 单独安装" -ForegroundColor DarkYellow
     } else {
         # 检测 CUDA 显卡（nvidia-smi 可能在非标准路径）
         $nvidiaSmi = Get-Command nvidia-smi -ErrorAction SilentlyContinue
@@ -168,7 +168,7 @@ if ($whisperAnswer -eq 'y' -or $whisperAnswer -eq 'Y') {
         }
     }
 } else {
-    Write-Host "     跳过 Whisper 安装，后续可运行 'python main.py whisper install' 单独安装" -ForegroundColor DarkYellow
+    Write-Host "     跳过 Whisper 安装，后续可运行 'python -m clio whisper install' 单独安装" -ForegroundColor DarkYellow
 }
 
 # 2. ffmpeg
@@ -230,4 +230,4 @@ if ($hooksPath -ne ".githooks") {
 Write-Host ""
 Write-Host "=== 环境检查 ===" -ForegroundColor Cyan
 Write-Host "  注意: 请先编辑 .env 填入 API Key，再运行环境检查" -ForegroundColor DarkYellow
-Write-Host "  .\.venv\Scripts\python.exe main.py check" -ForegroundColor Cyan
+Write-Host "  .\.venv\Scripts\python.exe -m clio check" -ForegroundColor Cyan

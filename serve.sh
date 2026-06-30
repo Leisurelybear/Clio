@@ -8,4 +8,4 @@ if [ ! -f ".venv/bin/python" ]; then
 fi
 
 echo "Starting web UI..."
-exec .venv/bin/python main.py serve "$@"
+exec .venv/bin/python -m clio serve "$@"

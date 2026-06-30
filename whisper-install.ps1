@@ -9,7 +9,7 @@ if (-not (Test-Path ".venv\Scripts\python.exe")) {
 }
 
 Write-Host "Installing faster-whisper and pre-downloading model..." -ForegroundColor Cyan
-.\.venv\Scripts\python.exe main.py whisper install
+.\.venv\Scripts\python.exe -m clio whisper install
 if ($LASTEXITCODE -eq 0) {
     Write-Host "Whisper 安装完成，模型已预下载到本地。" -ForegroundColor Green
 } else {

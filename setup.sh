@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-echo "=== Vlog 剪辑辅助工具 - 环境配置 ==="
+echo "=== Clio - 环境配置 ==="
 
 # ---- Python 版本检查（项目要求 3.11+）----
 pyVer=$(python3 --version 2>&1) || {
@@ -94,7 +94,7 @@ if [ "$whisperAnswer" = "y" ] || [ "$whisperAnswer" = "Y" ]; then
     echo "[2b] 安装 faster-whisper 及推理依赖..."
     if ! .venv/bin/python -m pip install -r requirements-whisper.txt; then
         echo "     Whisper 依赖安装失败，跳过后续步骤" >&2
-        echo "     可后续运行 'python main.py whisper install' 单独安装" >&2
+        echo "     可后续运行 'python -m clio whisper install' 单独安装" >&2
     else
         if command -v nvidia-smi &>/dev/null; then
             echo "     检测到 NVIDIA GPU，安装 CUDA 运行时加速..."
@@ -112,7 +112,7 @@ if [ "$whisperAnswer" = "y" ] || [ "$whisperAnswer" = "Y" ]; then
         fi
     fi
 else
-    echo "     跳过 Whisper 安装，后续可运行 'python main.py whisper install' 单独安装"
+    echo "     跳过 Whisper 安装，后续可运行 'python -m clio whisper install' 单独安装"
 fi
 
 # 2. ffmpeg
@@ -177,9 +177,9 @@ fi
 echo ""
 echo "=== 环境检查 ==="
 echo "  注意: 请先编辑 .env 填入 API Key，再运行环境检查"
-echo "  .venv/bin/python main.py check"
+echo "  .venv/bin/python -m clio check"
 
 echo ""
 echo "配置完成后运行:"
 echo "  source .venv/bin/activate"
-echo "  python main.py run --day day1"
+echo "  python -m clio run --day day1"
