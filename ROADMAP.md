@@ -179,7 +179,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-004a: Backend `GET /api/config/raw` returns config raw dict; `PUT /api/config/raw` validates and writes back (with .bak backup)
 - [x] R-004b: UI adds "Settings" tab; renders full config as nested form (dict / list / scalar)
 - [x] R-004c: UI form editing + save (confirm dialog → PUT → restart prompt + validation error red text)
-- [x] R-004d: Docs: `vlog_tool/ui/README.md` add "Settings" tab usage
+- [x] R-004d: Docs: `clio/ui/README.md` add "Settings" tab usage
 
 ## Feature R-005: UI Pipeline Runner
 
@@ -195,11 +195,11 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Runs in a background thread; UI must not freeze due to analyze
 
 **Sub-tasks**:
-- [x] R-005a: `vlog_tool/progress.py` ProgressTracker: writes `output/.progress.json` (phase / current / total / message / started_at / eta / status)  ← `29bcb35`
+- [x] R-005a: `clio/progress.py` ProgressTracker: writes `output/.progress.json` (phase / current / total / message / started_at / eta / status)  ← `29bcb35`
 - [x] R-005b: Integrate into `pipeline.run_analyze_all`: call `tracker.update` at key nodes of compress / analyze / scripts / plan / label  ← `29bcb35`
 - [x] R-005c: Backend `POST /api/run/start` (daemon thread + lock to prevent concurrency); `GET /api/run/status` reads `.progress.json`  ← `29bcb35`
 - [x] R-005d: UI header "Run" button + progress panel (polls every 2s, renders phase / [i/N] / ETA / status)  ← `29bcb35`
-- [x] R-005e: Docs: `vlog_tool/ui/README.md` add run panel  ← `29bcb35`
+- [x] R-005e: Docs: `clio/ui/README.md` add run panel  ← `29bcb35`
 - [x] R-005f: Run panel uses checkboxes to select steps, only runs selected steps  ← `a8daa63`
 - [x] R-005g: Fix ProgressTracker.done() parameter passing bug  ← `a8daa63`
 
@@ -217,7 +217,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-001a: Backend `/api/videos?source=compressed|original` supports dual sources  ← `88679ee`
 - [x] R-001b: Backend `/api/video?source=original` serves from `input_dir`  ← `88679ee`
 - [x] R-001c: UI adds source toggle in header, refetches list on switch  ← `f1d09ac`
-- [x] R-001d: `vlog_tool/ui/README.md` add toggle description + edge case docs  ← `ec83f48`
+- [x] R-001d: `clio/ui/README.md` add toggle description + edge case docs  ← `ec83f48`
 - [x] R-001e: Edge case: originals have no `001_` index prefix; UI matches by basename, marks matched/unmatched in list  ← split into `88679ee` (backend helper) + `f1d09ac` (UI match-badge)
 
 ## Feature R-006: Sidebar Hierarchy (Project-level vs Video-level)
@@ -234,9 +234,9 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Grayed entries: `opacity: 0.4; cursor: not-allowed;` + `title="Requires R-004 / R-005"`
 
 **Sub-tasks**:
-- [x] R-006a: `vlog_tool/ui/static/index.html` + `style.css`: sidebar two-section structure + grayed styles  ← `a648e60`
-- [x] R-006b: `vlog_tool/ui/static/app.js`: state.currentEntity + selectPlan + right panel content dispatch; plan content extracted from tab as independent rendering branch  ← `c42d347`
-- [x] R-006c: `vlog_tool/ui/README.md`: updated layout diagram + project-level section description  ← `778c44a`
+- [x] R-006a: `clio/ui/static/index.html` + `style.css`: sidebar two-section structure + grayed styles  ← `a648e60`
+- [x] R-006b: `clio/ui/static/app.js`: state.currentEntity + selectPlan + right panel content dispatch; plan content extracted from tab as independent rendering branch  ← `c42d347`
+- [x] R-006c: `clio/ui/README.md`: updated layout diagram + project-level section description  ← `778c44a`
 - [!] R-006d: When switching source in plan view, player should auto-switch to the corresponding video in the new source (not clear the player). Current behavior: `setSource` in plan branch only clears the player — user must click the video in the left sidebar or a plan segment to load. Proposed fix: in plan branch, use `state.currentVideo?.index` to find the corresponding file in `state.videos` and call `playVideoSegment`.
 
 ## Feature R-007: Multi-Project Switching in UI
@@ -328,8 +328,8 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Generates `manifest.md` on completion: each sequence lists output file / time range / title
 
 **Sub-tasks**:
-- [x] R-002a: `vlog_tool/cut.py`: `cut_one(video, start, end, out, *, reencode=False)` wraps ffmpeg
-- [x] R-002b: `vlog_tool/cut.py`: `parse_time_range("00:00-00:20")` reuses existing utils logic
+- [x] R-002a: `clio/cut.py`: `cut_one(video, start, end, out, *, reencode=False)` wraps ffmpeg
+- [x] R-002b: `clio/cut.py`: `parse_time_range("00:00-00:20")` reuses existing utils logic
 - [x] R-002c: `pipeline.py`: `run_cut_all(config, day, output_dir, reencode=False)` + progress
 - [x] R-002d: `main.py`: `cut` subcommand (`--day`, `--output`, `--reencode`)
 - [x] R-002e: Copy accompanying texts JSON to `cuts/<day>/` (renamed `001_xxx_seg_03.json`)
@@ -463,7 +463,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Sub-tasks**:
 - [x] N-01a: Design spec (`docs/superpowers/specs/2026-06-25-jianying-export-design.md`)
-- [x] N-01b: `vlog_tool/export/` package with FORMAT_REGISTRY
+- [x] N-01b: `clio/export/` package with FORMAT_REGISTRY
 - [x] N-01c: `export_plan_to_jianying()` core builder
 - [x] N-01d: CLI `export` subcommand
 - [x] N-01e: UI `POST /api/export` route + plan view button
@@ -541,7 +541,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | ID | Issue | Description | Status |
 | --- | --- | --- | --- |
 | D-001 | AGENTS.md §7 commit list out of date | Last entry is R-007, missing 6 new commits | ✅ Updated |
-| D-002 | vlog_tool/ui/README.md run status description outdated | "▶ Run grayed (requires R-005)" — R-005 is complete | ✅ Fixed |
+| D-002 | clio/ui/README.md run status description outdated | "▶ Run grayed (requires R-005)" — R-005 is complete | ✅ Fixed |
 | D-003 | README.md / README.en.md missing per-project config | `project.yaml` layered config not in user docs | ✅ Added |
 | D-004 | config.example.yaml model name doesn't match actual usage | Example has `deepseek-chat`, config.yaml uses `deepseek-v4-flash`, should add comment note | ✅ Added comment |
 
@@ -705,7 +705,7 @@ All B-046~B-052 covered by 163 new tests:
 | B-009 | AI occasionally outputs non-pure JSON, `extract_json` parsing fails | Trailing comma repair via regex fallback + 6 new tests | ✅ `badb621` |
 | B-011 | New users `python main.py check` false failure (unfriendly messages) | Optimize check step messages, platform-agnostic setup script hint | ✅ `bdcc678` |
 | B-010 | (Pending further confirmation) | — | |
-| B-019 | `VIDEO_EXTS` duplicate definition (utils.py includes .avi/.mkv, server.py does not) | Move to `vlog_tool/_constants.py` for unified reference | ✅ `4ac5785` |
+| B-019 | `VIDEO_EXTS` duplicate definition (utils.py includes .avi/.mkv, server.py does not) | Move to `clio/_constants.py` for unified reference | ✅ `4ac5785` |
 | B-020 | `_write_csv` `format_index(rec.index, 3)` hardcoded `3` instead of using config | Use `config.naming.index_width` instead | ✅ `4ac5785` |
 
 ## Performance Optimizations
@@ -843,7 +843,7 @@ All B-046~B-052 covered by 163 new tests:
 | `e72ba10` | fix(ui): create per-segment entries in original video view for plan segment playback |
 | `c59880d` | feat(analyze): add progress_callback for per-file upload/wait/AI/disk granularity |
 | `6c2ab33` | chore: add pre-commit hook to auto-format staged .py files with ruff |
-| `4d146d0` | style: ruff format vlog_tool/ui/services/file_service.py and project_service.py |
+| `4d146d0` | style: ruff format clio/ui/services/file_service.py and project_service.py |
 | `2f1d56c` | docs: add config hot-reload audit spec (R-015) and update ROADMAP |
 | `e3f87a1` | feat(config): add migrate-config subcommand to inject provider defaults |
 | `a276225` | fix: batch P2/P3 bug fixes (B-005/B-017/B-018/B-042/B-044/B-045/B-059) and config injection |
@@ -906,7 +906,7 @@ Items found already implemented during code-audit of ROADMAP:
 
 | ID | Description | Key Evidence |
 |----|-------------|-------------|
-| **U-001a** | `config_cache.py` with LRU + mtime + thread-safe | `vlog_tool/ui/services/config_cache.py` (79 lines) |
+| **U-001a** | `config_cache.py` with LRU + mtime + thread-safe | `clio/ui/services/config_cache.py` (79 lines) |
 | **U-001b** | `_resolve_project_input` + `resolve_last_project_config` in `project_service.py` | `project_service.py:resolve_project_input, resolve_last_project_config` |
 | **U-001c** | `send_video_range` + `resolve_texts`/`resolve_in` in `file_service.py` | `file_service.py:send_video_range, resolve_texts, resolve_in` |
 | **U-001d** | `server.py` reduced to ~360 lines, route dispatch only | `server.py` (363 lines) |

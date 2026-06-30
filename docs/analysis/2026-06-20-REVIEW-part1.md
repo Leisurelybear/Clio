@@ -25,7 +25,7 @@
 ## 1. ui/server.py 已成为“上帝对象”
 
 文件：
-`vlog_tool/ui/server.py`
+`clio/ui/server.py`
 
 规模：约 547 行
 
@@ -66,7 +66,7 @@ ui/
 
 文件：
 
-`vlog_tool/ai/factory.py`
+`clio/ai/factory.py`
 
 发现：
 
@@ -105,7 +105,7 @@ ProviderManager
 
 文件：
 
-`vlog_tool/config.py`
+`clio/config.py`
 
 规模：约 405 行
 

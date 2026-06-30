@@ -11,10 +11,10 @@ A new AI task touches the prompt constants, analysis function, pipeline orchestr
 
 ## Implementation
 
-1. `vlog_tool/ai/base.py` — add enum value to `TaskName`
-2. `vlog_tool/prompts.py` — add prompt constant
-3. `vlog_tool/analyze.py` — add `task_xxx()` function, reuse `_wrap_with_context()`
-4. `vlog_tool/pipeline.py` — add `run_xxx_all()` with `cancel_event` propagation
+1. `clio/ai/base.py` — add enum value to `TaskName`
+2. `clio/prompts.py` — add prompt constant
+3. `clio/analyze.py` — add `task_xxx()` function, reuse `_wrap_with_context()`
+4. `clio/pipeline.py` — add `run_xxx_all()` with `cancel_event` propagation
 5. `main.py` — register subcommand, reuse `_add_io_args()`
 6. Update READMEs
 

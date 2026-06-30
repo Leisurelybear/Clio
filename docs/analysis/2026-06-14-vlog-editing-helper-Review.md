@@ -28,7 +28,7 @@
 
 #### P0-001：全局 `config.yaml` 保存后 `_config_cache` 未失效
 
-**文件**：`vlog_tool/ui/routes/config_routes.py`，`handle_put_config_raw()`
+**文件**：`clio/ui/routes/config_routes.py`，`handle_put_config_raw()`
 
 **问题**：当写入的是全局 `config.yaml`（非 `project.yaml`）时，代码写盘后未对 `_config_cache` 做任何清理。后续所有的流水线调用（`/api/run/start` 等）仍然拿到旧配置，新 API key、新 provider 设置全部无效，直到服务重启。
 
@@ -50,7 +50,7 @@ with handler.__class__._config_cache_lock:
 
 #### P0-002：`run_analyze_all` 扫描 glob 仅覆盖 `*.mp4`，丢失 `.mov`/`.m4v` 等格式
 
-**文件**：`vlog_tool/tasks/analyze.py`，`run_analyze_all()`，line 73
+**文件**：`clio/tasks/analyze.py`，`run_analyze_all()`，line 73
 
 **问题**：压缩任务的输出强制为 `.mp4`（`compress.py` 中固定后缀），但 `glob("*.mp4")` 只扫描 `.mp4` 文件，如果未来支持其他压缩格式输出则会静默丢失。`single_file` 分支（line 64）的 glob 同样仅匹配 `*.mp4`。更重要的是，该问题与 `VIDEO_EXTS` 常量已提取但未被 analyze 使用的割裂形成了隐患。
 
@@ -73,7 +73,7 @@ def _glob_compressed(d: Path) -> list[Path]:
 
 #### P1-001：`sidebar.js` 使用 `segment_matches` 字段，但后端从未返回该字段
 
-**文件**：`vlog_tool/ui/static/src/sidebar.js` line 119；`vlog_tool/ui/routes/videos.py`
+**文件**：`clio/ui/static/src/sidebar.js` line 119；`clio/ui/routes/videos.py`
 
 **问题**：`sidebar.js` `renderVideoItem()` 中有如下逻辑：`if (v.segment_matches && v.segment_matches.length > 1)`。但翻查 `handle_get_videos` 的完整返回 JSON，original 视图的每个视频条目只有 `match` 字段（单个对象），从未有 `segment_matches` 字段（数组）。该分支永远不会执行，多段视频在 original 视图下显示的 match badge 是错误状态（"无对应"或单个匹配），而非"→ 压：N 段"。
 
@@ -83,7 +83,7 @@ def _glob_compressed(d: Path) -> list[Path]:
 
 #### P1-002：`analyze.py` 中 `trip_context.md` 路径硬编码相对于包安装位置，而非项目目录
 
-**文件**：`vlog_tool/analyze.py`，`_wrap_with_context()`，line 33
+**文件**：`clio/analyze.py`，`_wrap_with_context()`，line 33
 
 **问题**：`trip_ctx = Path(__file__).parent.parent / "templates" / "trip_context.md"` 定位到的是 Python 包本身所在目录的 `templates/`，而非用户运行 `main.py` 的工作目录。当项目被 `pip install -e .` 安装或从不同工作目录运行时，定位可能不符合预期；更关键的是，多项目场景下每个项目应有自己的 `trip_context`，但此处总是读同一份全局文件。
 
@@ -96,7 +96,7 @@ def _glob_compressed(d: Path) -> list[Path]:
 
 #### P1-003：多处 `hasattr(handler.server, ...)` 防御代码表明属性绑定不可靠
 
-**文件**：`vlog_tool/ui/routes/config_routes.py`（3 处）、`routes/projects.py`（5 处）
+**文件**：`clio/ui/routes/config_routes.py`（3 处）、`routes/projects.py`（5 处）
 
 **问题**：`config_path` 和 `input_dir` 既可能在 `handler.server` 上，也可能直接在 `handler` 上，导致路由代码中出现 `handler.server.config_path if hasattr(handler.server, "config_path") else getattr(handler, "config_path", None)` 这类三元嵌套，散布 8 次以上。当某处漏了 `hasattr` 守护时可能 `AttributeError`。
 
@@ -106,7 +106,7 @@ def _glob_compressed(d: Path) -> list[Path]:
 
 #### P1-004：`_config_cache` 无 TTL 也无 LRU，大量项目切换后内存泄漏
 
-**文件**：`vlog_tool/ui/server.py`，`_config_cache`
+**文件**：`clio/ui/server.py`，`_config_cache`
 
 **问题**：`_config_cache` 是纯 `dict`，只有在 `/api/projects` 触发显式清除时才删除过时条目，且没有上限。如果用户长期运行服务并频繁切换项目，cache 会无限增长。`config_hot_reload_audit` 文档也记录了这个问题。
 
@@ -269,12 +269,12 @@ def _glob_compressed(d: Path) -> list[Path]:
 
 | 亮点 | 位置 | 说明 |
 | --- | --- | --- |
-| 视频分割（`split.py`） | `vlog_tool/split.py` | 支持超长视频自动按时长切段，再分别上传 Gemini，优雅解决 Gemini 视频长度限制 |
+| 视频分割（`split.py`） | `clio/split.py` | 支持超长视频自动按时长切段，再分别上传 Gemini，优雅解决 Gemini 视频长度限制 |
 | 分组显示（segment grouping） | `routes/videos.py` + `sidebar.js` | 分段压缩的视频在 UI 中按原始文件名分组折叠，设计到位 |
-| `RateLimiter` | `vlog_tool/ratelimit.py` | 线程安全的令牌桶实现，接口简洁（context manager），API 调用限流透明 |
+| `RateLimiter` | `clio/ratelimit.py` | 线程安全的令牌桶实现，接口简洁（context manager），API 调用限流透明 |
 | config.yaml 热重载（partial） | `config_routes.py` + `server.py` | `project.yaml` 保存后立即生效（`cache.pop`），设计方向正确 |
-| `_constants.py` 集中常量 | `vlog_tool/_constants.py` | 消除 B-019 重复定义，且区分了 `VIDEO_EXTENSIONS`（扫描用）和 `VIDEO_EXTS`（服务用） |
-| 任务层拆分完整 | `vlog_tool/tasks/` | 6 个独立 task 文件，`pipeline.py` 仅 96 行，各阶段可独立测试 |
+| `_constants.py` 集中常量 | `clio/_constants.py` | 消除 B-019 重复定义，且区分了 `VIDEO_EXTENSIONS`（扫描用）和 `VIDEO_EXTS`（服务用） |
+| 任务层拆分完整 | `clio/tasks/` | 6 个独立 task 文件，`pipeline.py` 仅 96 行，各阶段可独立测试 |
 | 多项目注册表 | `project_service.py` | `projects.json` + `last_project` 设计干净，支持跨目录项目管理 |
 
 ---

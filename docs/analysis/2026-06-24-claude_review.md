@@ -14,7 +14,7 @@ Bug · 缺陷 · 架构 · 优化 · 新功能
 
 ## 1. 已确认 Bug
 ### B-01 · RateLimiter.__enter__ 持有锁期间 sleep（高风险）
-**文件**：`vlog_tool/ratelimit.py`，`__enter__` 方法
+**文件**：`clio/ratelimit.py`，`__enter__` 方法
 **问题**：`__enter__` 在 `with self._lock:` 内部调用 `time.sleep(wait)`。`ThreadingHTTPServer` 使用线程池，多个请求并发时，第二个线程在 sleep 结束前无法通过锁，导致所有 API 调用被串行化，限流等待时间叠加而非并行消化。
 **影响**：10 个视频并发分析时，实际吞吐量可能只有串行的 1/N。
 **已有修复路径**：同文件已有 `acquire()` 方法（锁外 sleep），但 `analyze_video` 等调用的仍是 `__enter__`，未切换。
@@ -39,7 +39,7 @@ def __enter__(self):
 ```
 
 ### B-02 · plan 步骤不调用 state.mark()（状态矩阵永远 null）
-**文件**：`vlog_tool/tasks/plan.py`，`run_plan_vlog` 末尾
+**文件**：`clio/tasks/plan.py`，`run_plan_vlog` 末尾
 **问题**：plan 步骤在 `for clip in clips` 循环里调用 `state.mark(source_stem, 'plan', 'done')`，但 `source_stem` 取自 `clip.get('source_stem', '')`，而 `clips` 是从 `texts_dir/*.json` 读取重建的临时 dict，其 `source_stem` 字段依赖 JSON 里的 `source_file` 字段。若 `source_file` 为空（早期版本生成的 JSON），`source_stem` 为空字符串，`mark()` 以空 key 写入，UI 状态矩阵里 plan 列永远显示 null。
 **影响**：用户在 UI 看不到 plan 步骤的完成状态。
 
@@ -49,7 +49,7 @@ source_stem = Path(data.get('source_file', '')).stem or json_file.stem.split('_'
 ```
 
 ### B-03 · _resolve_original 无 stem_cache 时回退 rglob（O(N²) 复杂度）
-**文件**：`vlog_tool/tasks/analyze.py`，`_resolve_original`
+**文件**：`clio/tasks/analyze.py`，`_resolve_original`
 **问题**：当 `stem_cache=None` 时，`_try_find` 内对每个视频调用 `input_dir.rglob(f'{stem}{ext}')`，遍历整个输入目录。`run_analyze_all` 中已有 `_build_stem_to_path` 构建缓存，但 single_file 分支没有传入缓存，直接触发 rglob 路径。
 **影响**：大型项目（100+ 视频）单文件重跑时耗时显著增加。
 
@@ -59,7 +59,7 @@ orig_path = _resolve_original(config.paths.input_dir, compressed.stem, stem_cach
 ```
 
 ### B-04 · transcribe 步骤向 state.mark() 传入压缩文件 stem 而非原始文件 stem
-**文件**：`vlog_tool/tasks/transcribe.py`，`run_transcribe_all`
+**文件**：`clio/tasks/transcribe.py`，`run_transcribe_all`
 **问题**：跳过逻辑里 `state.mark(compressed_stem, 'transcribe', 'skipped')`，但 `ProcessingState` 的 key 约定是原始视频 stem（其他步骤均如此）。导致跳过记录写到错误的 key，UI 状态矩阵不一致。
 
 **修复**：统一使用 `orig_stem`（已在后续成功路径中正确使用）
@@ -69,7 +69,7 @@ state.mark(orig_stem, 'transcribe', 'skipped')  # 非 compressed_stem
 ```
 
 ### B-05 · whisper_routes 中 PyThreadState_SetAsyncExc 线程杀死不安全
-**文件**：`vlog_tool/ui/routes/whisper_routes.py`（ROADMAP U-007 已确认）
+**文件**：`clio/ui/routes/whisper_routes.py`（ROADMAP U-007 已确认）
 **问题**：取消 Whisper 模型下载时通过 `ctypes.pythonapi.PyThreadState_SetAsyncExc` 向线程注入异常。C 扩展（如 `hf_hub_download` 的 urllib3 底层）会忽略该注入，导致资源泄漏（文件句柄、socket）且 Python 状态不一致。
 
 **修复步骤（参照 ROADMAP U-007）**
@@ -78,7 +78,7 @@ state.mark(orig_stem, 'transcribe', 'skipped')  # 非 compressed_stem
 3. 移除 ctypes 线程杀死代码。
 
 ### B-06 · cut 任务 _resolve_video_path 仅搜索 input_dir 一级目录
-**文件**：`vlog_tool/tasks/cut.py`，`_resolve_video_path`，`source='original'` 分支
+**文件**：`clio/tasks/cut.py`，`_resolve_video_path`，`source='original'` 分支
 **问题**：循环 `for p in sorted(input_dir.iterdir())` 只遍历顶层，不递归。若原始视频在子目录（GoPro 按日期分目录），找不到视频，静默跳过该片段。
 
 **修复**：改用 rglob 或 `find_videos(input_dir, recursive=True)`
@@ -90,14 +90,14 @@ for p in find_videos(input_dir, recursive=True):
 ```
 
 ### B-07 · _write_csv 对每条记录调用 probe_video_info（O(N) ffprobe 进程）
-**文件**：`vlog_tool/tasks/_helpers.py`，`_write_csv`
+**文件**：`clio/tasks/_helpers.py`，`_write_csv`
 **问题**：`probe_video_info` 启动子进程，对 100 个视频调用 100 次 ffprobe。`run_analyze_all` 中已有 `get_duration_sec` 的结果，但未传入 `ClipRecord`。
 **影响**：100 个视频生成 CSV 额外耗时 10~30 秒。
 
 **修复**：在 `ClipRecord` 增加 `duration_sec` 字段，analyze 步骤写入，`_write_csv` 直接读取，避免重复 probe。
 
 ### B-08 · server.py _cancel_event 跨项目共享（多项目切换 bug）
-**文件**：`vlog_tool/ui/server.py`，Handler 类属性
+**文件**：`clio/ui/server.py`，Handler 类属性
 **问题**：`_cancel_event`、`_run_thread`、`_run_lock` 均是 Handler 的类属性（class-level），在多项目模式下所有项目共享同一个取消事件。项目 A 运行时点击取消，会同时取消项目 B 的任务。
 
 **修复**：将 run 状态从类属性移到实例字典（或 `ThreadingHTTPServer` 的 server 对象上），按 `project_key` 隔离。
@@ -108,12 +108,12 @@ for p in find_videos(input_dir, recursive=True):
 
 **建议实现路径**
 1. 逆向剪映草稿格式（`draft_content.json`），已有社区文档可参考。
-2. 新增 `vlog_tool/export/jianying.py`，将 `plan.sequence[]` 转为 `draft_content.json`。
+2. 新增 `clio/export/jianying.py`，将 `plan.sequence[]` 转为 `draft_content.json`。
 3. 主要字段映射：`sequence[].use_timeline` → 剪辑时间戳，`source_stem` → 素材路径，`voiceover` → 文字轨道。
 4. CLI 新增 `main.py export --format jianying --day day1`。
 
 ### F-02 · analyze 步骤串行调用 Gemini，无并发
-**文件**：`vlog_tool/tasks/analyze.py`，`run_analyze_all`
+**文件**：`clio/tasks/analyze.py`，`run_analyze_all`
 **问题**：`for i, (compressed, original, idx_str) in enumerate(items)` 是纯串行循环。Gemini 上传 + 处理单个视频约需 30~120 秒，10 个视频需要 5~20 分钟。Gemini API 支持并发请求（受 RPM 限制），`RateLimiter.acquire()` 已设计为非阻塞就是为此。
 
 **修复**：使用 `ThreadPoolExecutor`，worker 数 = `min(len(items), rpm/60 的并发上限)`
@@ -127,7 +127,7 @@ with ThreadPoolExecutor(max_workers=config.analyze.max_workers) as pool:
 ```
 
 ### F-03 · fs.py 目录遍历无路径限制（LAN 模式安全风险）
-**文件**：`vlog_tool/ui/routes/fs.py`（ROADMAP U-008 已确认）
+**文件**：`clio/ui/routes/fs.py`（ROADMAP U-008 已确认）
 **问题**：`GET /api/fs/dirs?path=/etc` 可遍历整个文件系统。在 `--host 0.0.0.0` 模式下，局域网内任何设备均可列出服务器全部目录。
 
 **修复步骤**
@@ -147,13 +147,13 @@ with ThreadPoolExecutor(max_workers=config.analyze.max_workers) as pool:
 **修复**：Run 面板增加 Day 输入框 / 下拉（从已有 plan 文件名推断可用 day）。
 
 ### F-06 · transcribe 步骤转录原始视频而非压缩视频
-**文件**：`vlog_tool/tasks/transcribe.py`，`_extract_audio` 输入为 `original_video`
+**文件**：`clio/tasks/transcribe.py`，`_extract_audio` 输入为 `original_video`
 **问题**：对 4K GoPro 原片提取音频，ffmpeg 需要解析 4K 视频流（即使 `-vn` 跳过视频编码，demux 仍有开销），比从压缩的 640p 文件提取慢 2~5 倍。
 
 **修复**：如果 `compressed_video` 存在且可读，优先从 `compressed_video` 提取音频（仅需要音频轨，画质无关）。
 
 ### F-07 · plan 步骤的 transcript 注入无降级提示
-**文件**：`vlog_tool/tasks/plan.py`
+**文件**：`clio/tasks/plan.py`
 **问题**：若 `whisper.enabled=true` 但 `transcripts_dir` 为空（用户未运行转录步骤），plan 静默降级为不含 transcript 的规划，无任何提示。用户以为规划已用上语音信息，实际没有。
 
 **修复**：若 `use_transcripts=true` 但 `transcripts_map` 为空，打印明确警告并在 plan JSON 增加 `_transcripts_missing: true` 标记。
@@ -176,7 +176,7 @@ class ServerState:
 ```
 
 ### A-02 · do_GET / do_PUT / do_POST 路由表硬编码 if-elif 链
-**文件**：`vlog_tool/ui/server.py`
+**文件**：`clio/ui/server.py`
 **问题**：三个 HTTP method 分发函数各有约 30 个 if-elif 分支，无法静态分析、无路由前缀聚合，每次新增 endpoint 都需要修改中央 `server.py`。
 
 **建议**：引入极简路由表（不依赖 Flask/FastAPI）
@@ -200,7 +200,7 @@ def do_GET(self):
 **优化方案**：ROADMAP Phase 2 已规划切换 FastAPI + SSE；短期可将轮询间隔设为 500ms，或增加 `X-Accel-Buffering: no` 头支持 SSE 流式输出（stdlib http.server 也可实现）。
 
 ### A-04 · AI Provider 无连接池 TTL / 热重载（ROADMAP U-002）
-**文件**：`vlog_tool/ai/factory.py`，`_provider_cache`
+**文件**：`clio/ai/factory.py`，`_provider_cache`
 **问题**：`_provider_cache` 全局字典永不过期。长时间运行的 serve 命令会积累过期的 HTTP session（尤其 `GeminiProvider` 的 `httpx.Client`）。config hot-reload 后旧 provider 仍在使用旧 api_key。
 
 **规划**：已在 ROADMAP U-002 中规划 `ProviderManager`，建议优先实现。
@@ -264,7 +264,7 @@ while True:
 ```
 
 ### O-05 · Gemini 上传后不删除文件的异常路径
-**文件**：`vlog_tool/ai/gemini.py`，`analyze_video`，finally 块
+**文件**：`clio/ai/gemini.py`，`analyze_video`，finally 块
 **问题**：finally 块中 `self._client.files.delete(name=uploaded.name)` 若抛异常被静默忽略，Gemini Files API 的上传文件不会被清理，占用配额直到自动过期（默认 48h）。
 
 **优化**：记录删除失败并打印 warning，方便用户手动清理
@@ -274,19 +274,19 @@ except Exception as e:
 ```
 
 ### O-06 · OpenAICompatProvider 超时硬编码 120s
-**文件**：`vlog_tool/ai/openai_compat.py`
+**文件**：`clio/ai/openai_compat.py`
 **问题**：`httpx.Client(timeout=120.0)` 硬编码，对慢速 API（如本地 Ollama 加载大模型）不够用，对快速 API 又太长导致错误感知延迟。
 
 **优化**：从 `ProviderConfig` 读取 `timeout` 字段（默认 120），在 `config.yaml` 中可配置。
 
 ### O-07 · extract_json 的 JSON 解析无长度保护
-**文件**：`vlog_tool/utils.py`（推断）
+**文件**：`clio/utils.py`（推断）
 **问题**：AI 偶发返回超长 markdown 包裹的 JSON，`extract_json` 需要扫描整个字符串。若 AI 返回异常大的响应（如重复内容），解析时间可能较长。
 
 **优化**：对 AI 响应长度加上限保护（如 1MB），超出则截断并告警。
 
 ### O-08 · UI 前端无单元测试
-**文件**：`vlog_tool/ui/static/*.js`
+**文件**：`clio/ui/static/*.js`
 **问题**：`app.js`、`player.js` 等前端代码无测试。ROADMAP 已提到 Node 22 内置 test runner 方案，建议实施。
 
 **建议**：对核心纯函数（时间戳解析、plan sequence 渲染、state 管理）提取模块，用 `node:test + import assertions` 测试。
@@ -297,7 +297,7 @@ except Exception as e:
 
 **实现方案**
 1. 分析剪映草稿目录结构（`draft_content.json` 格式，社区已有逆向文档）。
-2. 新建 `vlog_tool/export/jianying.py`：
+2. 新建 `clio/export/jianying.py`：
    - 将 `plan.sequence[]` 映射为剪映时间线片段
    - 将 `voiceover` 文本映射为文字轨道或字幕轨道
    - 将 `use_timeline` 时间戳转为 `draft_content` 的 `timeRange` 格式
@@ -332,7 +332,7 @@ ROADMAP R-010 已提及，但未排期。
 
 **实现方案**
 1. analyze 步骤让 AI 在 JSON 中返回 `cover_timestamp: MM:SS`（建议封面时刻）。
-2. 新增 `vlog_tool/tasks/cover.py`：`ffmpeg -ss {ts} -vframes 1` 提取 JPEG。
+2. 新增 `clio/tasks/cover.py`：`ffmpeg -ss {ts} -vframes 1` 提取 JPEG。
 3. UI plan 视图显示各段落的封面候选帧缩略图。
 
 ### N-06 · 语音转录结果与 timeline 自动对齐
@@ -367,7 +367,7 @@ ROADMAP R-010 已提及，但未排期。
 ## 7. 快速修复代码片段
 ### 7.1 B-01 修复：RateLimiter.__enter__
 ```python
-# vlog_tool/ratelimit.py
+# clio/ratelimit.py
 def __enter__(self) -> None:
     wait = self.acquire()   # ← 在锁外计算等待时间
     if wait > 0:
@@ -379,7 +379,7 @@ def __exit__(self, *exc_info) -> None:
 
 ### 7.2 B-04 修复：transcribe state.mark key
 ```python
-# vlog_tool/tasks/transcribe.py，第一个 skip 分支
+# clio/tasks/transcribe.py，第一个 skip 分支
 # 原来：
 # state.mark(compressed_stem, 'transcribe', 'skipped')
 # 修复后（orig_stem 已在下方定义，提前取出即可）：
@@ -391,7 +391,7 @@ if not overwrite and config.analyze.skip_existing and out_path.exists():
 
 ### 7.3 A-05 修复：label 步骤补 state.mark
 ```python
-# vlog_tool/tasks/label.py，run_label_videos 末尾
+# clio/tasks/label.py，run_label_videos 末尾
 state = ProcessingState(config.paths.output_dir)
 
 # 在循环内成功写出后添加：
@@ -403,7 +403,7 @@ state.mark(json_file.stem.split('_', 1)[-1], 'label', 'skipped')
 
 ### 7.4 B-08 修复：ServerState 隔离
 ```python
-# vlog_tool/ui/server.py
+# clio/ui/server.py
 from dataclasses import dataclass, field
 import threading
 
@@ -425,7 +425,7 @@ def make_handler(config, config_path=None):
 
 ### 7.5 F-02 修复：analyze 并发骨架
 ```python
-# vlog_tool/tasks/analyze.py
+# clio/tasks/analyze.py
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 max_workers = getattr(config.analyze, 'max_workers', 1)

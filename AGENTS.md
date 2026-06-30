@@ -23,7 +23,7 @@ Dependencies in `requirements.txt`; `setup.ps1`/`setup.sh` creates venv + instal
 ```
 vlog-video-analysis/
 ├── main.py                    CLI entry
-├── vlog_tool/
+├── clio/
 │   ├── config/                AppConfig + load_config (config package)
 │   ├── shutdown.py            beforeStop hook
 │   ├── pipeline.py            High-level pipeline orchestration
@@ -54,7 +54,7 @@ vlog-video-analysis/
 ├── config.example.yaml / .env.example
 ├── requirements.txt / requirements-locked.txt
 ├── .github/workflows/test.yml
-└── vlog_tool/tests/            pytest unit tests (864 cases)
+└── clio/tests/            pytest unit tests (864 cases)
 ```
 
 > See `docs/superpowers/agents/directory-tree.md` for full tree with file-level annotations and test coverage details.
@@ -88,7 +88,7 @@ vlog-video-analysis/
 
 ### 4.5 Prompts
 
-- All in `vlog_tool/prompts.py` as constants
+- All in `clio/prompts.py` as constants
 - Trip context injected via `_wrap_with_context()` before all prompts
 - Output format: JSON (for `extract_json()` parsing)
 
@@ -139,9 +139,9 @@ For new features: **discuss plan first → user confirms → implement → one c
 
 ```bash
 # Full run
-python -m pytest vlog_tool/tests/ -v
+python -m pytest clio/tests/ -v
 # Single module
-python -m pytest vlog_tool/tests/test_utils.py -v
+python -m pytest clio/tests/test_utils.py -v
 ```
 
 GitHub Actions runs tests on Python 3.11/3.12 (Ubuntu + Windows).

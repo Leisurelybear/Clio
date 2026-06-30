@@ -1,4 +1,4 @@
-# 🎬 Vlog Editing Helper — AI Preprocessing Pipeline
+# 🎬 Clio — AI Preprocessing Pipeline
 
 > 🧠 **Raw footage → Compress → AI understands → Voiceover scripts → Edit plan → CapCut final cut**
 >
@@ -195,7 +195,7 @@ vlog-video-analysis/
 ├── templates/
 │   ├── trip_context.md        # 🗺️ Trip background (auto-injected)
 │   └── vlog_template.md       # 📝 Voiceover template (customizable)
-├── vlog_tool/
+├── clio/
 │   ├── compress.py            # 🗜️ ffmpeg wrapper
 │   ├── analyze.py             # 🤖 AI analysis logic
 │   ├── transcribe.py          # 🎙️ Whisper ASR
@@ -221,7 +221,7 @@ vlog-video-analysis/
 ## 🧪 Testing & Quality
 
 ```bash
-python -m pytest vlog_tool/tests/ -v
+python -m pytest clio/tests/ -v
 
 # 860+ tests · GitHub Actions CI (Ubuntu + Windows · 3.11 / 3.12)
 # Code style: ruff (format + lint)
@@ -253,7 +253,7 @@ python -m pytest vlog_tool/tests/ -v
 | [AGENTS.md](AGENTS.md) | 🧑‍💻 AI maintenance manual (structure / conventions / gotchas) |
 | [ROADMAP.md](ROADMAP.md) | 🗺️ Feature tracking & roadmap |
 | [docs/cli-reference.md](docs/cli-reference.md) | 📖 Full CLI reference |
-| [vlog_tool/ui/README.md](vlog_tool/ui/README.md) | 🖥️ Web UI detailed guide |
+| [clio/ui/README.md](clio/ui/README.md) | 🖥️ Web UI detailed guide |
 
 ---
 

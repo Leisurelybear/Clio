@@ -1,4 +1,4 @@
-# 🎬 Vlog 剪辑辅助工具 — AI 预处理流水线
+# 🎬 Clio — AI 预处理流水线
 
 > 🧠 **原片 → 压缩 → AI 理解 → 口播文案 → 剪辑规划 → 剪映成片**
 >
@@ -193,7 +193,7 @@ vlog-video-analysis/
 ├── templates/
 │   ├── trip_context.md        # 🗺️ 行程背景（自动注入 AI）
 │   └── vlog_template.md       # 📝 口播模板（可自定义）
-├── vlog_tool/
+├── clio/
 │   ├── compress.py            # 🗜️ ffmpeg 压缩
 │   ├── analyze.py             # 🤖 AI 分析逻辑
 │   ├── transcribe.py          # 🎙️ Whisper 转录
@@ -220,7 +220,7 @@ vlog-video-analysis/
 
 ```bash
 # 跑全部测试
-python -m pytest vlog_tool/tests/ -v
+python -m pytest clio/tests/ -v
 
 # 860+ 用例 · GitHub Actions CI（Ubuntu + Windows · 3.11 / 3.12）
 # 代码风格: ruff (format + lint)
@@ -252,7 +252,7 @@ python -m pytest vlog_tool/tests/ -v
 | [AGENTS.md](AGENTS.md) | 🧑‍💻 AI 接手维护手册（项目结构 / 约定 / 踩坑记录） |
 | [ROADMAP.md](ROADMAP.md) | 🗺️ 需求追踪 & 路线图 |
 | [docs/cli-reference.md](docs/cli-reference.md) | 📖 完整 CLI 命令参考 |
-| [vlog_tool/ui/README.md](vlog_tool/ui/README.md) | 🖥️ Web UI 详细说明 |
+| [clio/ui/README.md](clio/ui/README.md) | 🖥️ Web UI 详细说明 |
 
 ---
 

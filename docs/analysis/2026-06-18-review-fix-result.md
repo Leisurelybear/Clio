@@ -6,13 +6,13 @@
 
 | 文件 | 改动 | 原因 |
 |------|------|------|
-| `vlog_tool/tasks/cut.py` | +13/-4 | P0-1: 改用 `write_json_atomic`/`write_text_atomic`；R-4: 添加 `cancel_event` 支持 |
-| `vlog_tool/ui/server.py` | +3/-1 | P0-2: project.json 迁移改用 `write_json_atomic` |
-| `vlog_tool/tasks/plan.py` | +1/-1 | P0-4: transcript 加载条件追加 `config.plan.use_transcripts` |
-| `vlog_tool/compress.py` | +30/-2 | R-2: 用 `_get_audio_bitrate()` (ffprobe) 替代 128kbps 魔数 |
-| `vlog_tool/tasks/analyze.py` | +22/-2 | R-3: `run_analyze_all` 启动时一次性 `_build_stem_to_path` 缓存，避免每次 rglob 全目录扫描 |
-| `vlog_tool/cut.py` | +4/-1 | R-4: `cut_one` 添加 `cancel_event` 参数并传给 `run_ffmpeg` |
-| `vlog_tool/pipeline.py` | +1/-1 | Q-2: `run_pipeline_steps` 增加 `"cut"` 到 cancel_event 传递列表 |
+| `clio/tasks/cut.py` | +13/-4 | P0-1: 改用 `write_json_atomic`/`write_text_atomic`；R-4: 添加 `cancel_event` 支持 |
+| `clio/ui/server.py` | +3/-1 | P0-2: project.json 迁移改用 `write_json_atomic` |
+| `clio/tasks/plan.py` | +1/-1 | P0-4: transcript 加载条件追加 `config.plan.use_transcripts` |
+| `clio/compress.py` | +30/-2 | R-2: 用 `_get_audio_bitrate()` (ffprobe) 替代 128kbps 魔数 |
+| `clio/tasks/analyze.py` | +22/-2 | R-3: `run_analyze_all` 启动时一次性 `_build_stem_to_path` 缓存，避免每次 rglob 全目录扫描 |
+| `clio/cut.py` | +4/-1 | R-4: `cut_one` 添加 `cancel_event` 参数并传给 `run_ffmpeg` |
+| `clio/pipeline.py` | +1/-1 | Q-2: `run_pipeline_steps` 增加 `"cut"` 到 cancel_event 传递列表 |
 
 ## 已确认无需修改项
 
