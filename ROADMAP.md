@@ -467,7 +467,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] N-01c: `export_plan_to_jianying()` core builder
 - [x] N-01d: CLI `export` subcommand
 - [x] N-01e: UI `POST /api/export` route + plan view button
-- [!] N-01f: Video resolution — `_resolve_video` needs to use source_file from texts/*.json (debugging, see 4c9f7db, 673619e)
+- [x] N-01f: Video resolution — `_resolve_video` needs to use source_file from texts/*.json (debugging, see 4c9f7db, 2d23b38) ✅
 
 - (None)
 
@@ -529,12 +529,12 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Existing `config.ai.context` (project-level) and `trip_context.md` still apply; injected prompt is the highest-priority layer
 
 **Sub-tasks**:
-- [ ] R-019a: Backend: extend `handle_post_run_start` to accept `context_override` and `task_prompts` in request body
-- [ ] R-019b: Backend: pass `context_override` through `run_pipeline_steps` → each task → `_call_ai()` / `_wrap_with_context()`
-- [ ] R-019c: Frontend: add collapsible prompt section in run panel (runner.js), send values in POST body
-- [ ] R-019d: Frontend: add per-step tag hint placeholder (e.g. `[voiceover]`, `[plan]`, `[analyze]`)
-- [ ] R-019e: Ensure existing `debug_print_prompt` (R-018) shows injected prompt in debug output
-- [ ] R-019f: Add tests for context_override propagation through pipeline steps
+- [x] R-019a: Backend: extend `handle_post_run_start` to accept `context_override` and `task_prompts` in request body
+- [x] R-019b: Backend: pass `context_override` through `run_pipeline_steps` → each task → `_call_ai()` / `_wrap_with_context()`
+- [x] R-019c: Frontend: add collapsible prompt section in run panel (runner.js), send values in POST body
+- [x] R-019d: Frontend: add per-step tag hint placeholder (e.g. `[voiceover]`, `[plan]`, `[analyze]`)
+- [x] R-019e: Ensure existing `debug_print_prompt` (R-018) shows injected prompt in debug output — `_wrap_with_context` already prints context_override in prompt
+- [ ] R-019f: Add tests for context_override propagation through pipeline steps (deferred)
 
 ## Documentation Maintenance (from 2026-06-10 Full Review)
 
@@ -899,6 +899,13 @@ All B-046~B-052 covered by 163 new tests:
 | `25128d1` | feat(ai): retry transient API failures with exponential backoff |
 
 ---
+
+## ✅ Recently Completed (2026-07-01)
+
+| Commit | Description |
+| --- | --- |
+| `43a922b` | feat(ui): run panel prompt injection (R-019) |
+| `05edab2` | fix(ui): segment-specific text/script matching in video list (B-097) |
 
 ## ✅ Recently Completed (Verified 2026-06-21 Code Review)
 
