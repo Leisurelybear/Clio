@@ -42,7 +42,7 @@ Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cros
 | AGENTS.md §7 commit history overly long (100+ entries) | Should trim to ~30 | Periodic cleanup |
 | `transcribe.py` low-confidence segs silently dropped | Information loss for downstream | **U-009** |
 | `server.py` 6% coverage + `fs.py` 12% coverage | Security-sensitive untested surface | **U-010** |
-| `videos.py:101` `(text_sidecars.get(idx) or [None])[0]` maps all split segments to first sidecar | All split segments share same text/script in UI | **B-097** |
+| ~~`videos.py:101` sidecar mapping — all split segments to first sidecar~~ | ~~All split segments share same text/script in UI~~ | ~~B-097~~ ✅ `05edab2` |
 
 ### Tracking
 

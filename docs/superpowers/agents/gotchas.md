@@ -64,7 +64,8 @@ See `vlog_tool/compress.py:24`.
 
 ### 9.11 Pre-commit Hook
 
-- The project provides a Python script at `.githooks/pre-commit` that auto-runs `ruff format` on staged `.py` files and re-stages them
+- The project provides a Python script at `.githooks/pre-commit` that auto-runs `ruff format` on staged `.py` files and only re-stages files that ruff actually modified (via `git diff --name-only`)
+- This prevents unintended staging of workspace changes the user didn't `git add`
 - `setup.ps1` auto-sets `git config core.hooksPath .githooks`
 - Manual config: `git config core.hooksPath .githooks`
 - The hook depends on `ruff` in `.venv`; if not found, it silently skips (does not block the commit)
@@ -126,15 +127,14 @@ See `vlog_tool/compress.py:24`.
 - Both `main.py` and `server.py` call `install_hooks()` at startup and `before_stop()` in their `finally` blocks
 - Any new ffmpeg subprocess creation must follow the same register/unregister pattern
 
-### 9.20 Split Segment Sidecar Mapping (`videos.py:101`)
+### 9.20 Split Segment Sidecar Mapping (`videos.py`) — ✅ Fixed (B-097, `05edab2`)
 
-- `videos.py:101` `(text_sidecars.get(idx) or [None])[0]` always maps **all** split segments of the same video to the **first** text/script sidecar file
-- Example: `001_GL010683_seg01.mp4`, `_seg02.mp4`, `_seg03.mp4` all get `text_json` pointing to `001_巴黎铁塔_part1.json`
-- Affected features: texts tab display, voiceover tab display, save, refine — all read from `v.text_json` / `v.script_json`
-- Root cause: sidecars are keyed by index prefix (e.g. `001`), but segments are not differentiated by their `_segNN` suffix
-- Filenames like `001_巴黎铁塔_part1.json` itself has no `_segNN` marker, making it impossible to distinguish which segment it belongs to from the filename alone
-- Fix requires either: (a) embedding `_segNN` into sidecar filenames, or (b) matching by compressed file stem rather than index prefix
-- Tracked as B-097
+- **Fixed**: `videos.py` now uses a 3-strategy lookup chain for text/script sidecars:
+  1. Exact compressed filename (v2+ data with `compressed_file` field)
+  2. Compressed stem (no extension) — enables segment-specific matching
+  3. Zero-padded index (v1 fallback)
+- Script files additionally build a reverse map via `text_stem_to_compressed` to match `_voiceover` files back to their compressed stems
+- The `_parse_segment_info` regex also expanded to support `_partNN`, `_ptNN`, `_chunkNN` (case-insensitive) in addition to `_segNN` (B-073, `f2465cd`)
 
 ### 9.21 Config Auto-Upgrade: Dataclass Defaults Injection
 

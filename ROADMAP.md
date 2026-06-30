@@ -656,16 +656,16 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | ID | Issue | Fix Approach | Status |
 | --- | --- | --- | --- |
 | B-042 | `gemini.py:41` `_wait_for_file` no timeout, permanently blocks when file processing hangs | Add `timeout` parameter with `time.monotonic()` check | ✅ `a276225` |
-| B-043 | `.githooks/pre-commit:21` `git add` may stage workspace changes user didn't intend to commit | Only stage ruff-formatted files: check if ruff changed them before `git add` | ✅ `(this commit)` |
+| B-043 | `.githooks/pre-commit:21` `git add` may stage workspace changes user didn't intend to commit | Only stage ruff-formatted files: check if ruff changed them before `git add` | ✅ `25fe130` |
 | B-044 | `_helpers.py:51` `_eta_line` always shows `1/total` when `completed=0`, but actual progress may be 3rd, 4th entry | Use `i` instead of hardcoded `1` | ✅ `a276225` |
 | B-045 | `sidebar.js:177` video list rendering piles up `{ once: true }` click listeners on `document`, close dropdown logic fails | Use event delegation + persistent handler, or `removeEventListener` before rendering | ✅ `a276225` |
 | B-059 | `_parse_providers` doesn't read `requests_per_minute` and `retry_attempts` from YAML | `cfg.get("requests_per_minute", 0)` + `retry_attempts` default unified to 2 | ✅ `a276225` |
 | B-060 | Original video view split segment index lost — each original file only uses `comp[0]`, plan referencing `002`/`003` returns 404 | Iterate all matches in `comp`, create independent video entries for each split segment | ✅ `c59880d` |
 | B-072 | `tasks/compress.py` corrupted `.mp4` permanently skipped by `skip_existing` without retry | Add ffprobe integrity check before skip | ✅ `6c3c231` |
-| B-073 | `routes/videos.py` `_parse_segment_info` only recognizes `001_GL010683_seg01` format | Relax naming convention assumptions, support custom naming | ✅ `(this commit)` |
+| B-073 | `routes/videos.py` `_parse_segment_info` only recognizes `001_GL010683_seg01` format | Relax naming convention assumptions, support custom naming | ✅ `f2465cd` |
 | B-086 | `server.py:524` hardcodes `config_path.parent / "projects.json"` instead of calling `_registry_path()` | Use `_registry_path(config_path)` for consistency | ✅ U-004 |
 | B-087 | `serve.ps1`/`serve.sh` hardcodes project directory paths | Remove hardcoded paths, make distributable | ✅ `fcbccf5` |
-| B-088 | `ROADMAP.md` 925 lines — completed features not archived | Archive completed sections to separate file | ✅ `(this commit)` |
+| B-088 | `ROADMAP.md` 925 lines — completed features not archived | Archive completed sections to separate file | ✅ `88d7238` |
 | B-089 | `AGENTS.md` §7 commit history 100+ entries too long | Trim to ~30 most recent, archive rest | 🆕 |
 | B-090 | `pipeline.py` cancel_event not propagated to analyze/scripts/plan/label | Add `cancel_event` param + loop check to all 4 functions (see U-005) | ✅ U-005 |
 | B-091 | `RateLimiter.__enter__` holds lock during `time.sleep()`, blocks parallel AI calls | Split acquire() from sleep (see U-006) | ✅ `already in U-006` |

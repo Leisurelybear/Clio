@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-07-01
+
+### Added
+- R-019: Run panel prompt injection — context_override textarea and task_prompts in POST /api/run (43a922b)
+
+### Fixed
+- B-097: Segment-specific text/script matching in video list — 3-strategy lookup replaces index-based [0] fallback (05edab2)
+- B-073: `_parse_segment_info` now supports `_partNN`, `_ptNN`, `_chunkNN` in addition to `_segNN` (f2465cd)
+- B-043: Pre-commit hook only re-stages files actually modified by ruff, not all staged files (25fe130)
+
+### Changed
+- B-088: ROADMAP archived — commit log, test coverage verification, code review audit moved to docs/archive/2026-07-01-roadmap-archive.md (88d7238)
+- R-019f: context_override propagation — non-AI tasks swallow with `**kwargs`, AI tasks pass with explicit `context_override` param
+
 ## 2026-06-30
 
 ### Fixed
