@@ -22,11 +22,12 @@ from clio.vmeta import VideoMeta
 if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
 
-_SEG_RE = re.compile(r"^(.+)_seg(\d+)$")
+_SEG_RE = re.compile(r"^(.+)_(?:seg|part|pt|chunk)(\d+)$", re.IGNORECASE)
 
 
 def _parse_segment_info(stem: str) -> tuple[str | None, int | None]:
     """Extract group info from a compressed stem like '001_GL010683_seg01'.
+    Also supports _partNN, _ptNN, _chunkNN suffixes (case-insensitive).
     Returns (group_key, segment_number) or (None, None).
     """
     if "_" not in stem:

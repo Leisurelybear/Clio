@@ -42,6 +42,26 @@ class TestParseSegmentInfo:
     def test_only_seg_prefix(self):
         assert _parse_segment_info("_seg01") == (None, None)  # no underscore prefix → stem split gives "_seg01"
 
+    def test_part_pattern(self):
+        gk, sn = _parse_segment_info("001_GX010456_part07")
+        assert gk == "GX010456"
+        assert sn == 7
+
+    def test_pt_pattern(self):
+        gk, sn = _parse_segment_info("001_GX010456_pt03")
+        assert gk == "GX010456"
+        assert sn == 3
+
+    def test_chunk_pattern_case_insensitive(self):
+        gk, sn = _parse_segment_info("001_GX010456_Chunk02")
+        assert gk == "GX010456"
+        assert sn == 2
+
+    def test_seg_pattern_uppercase(self):
+        gk, sn = _parse_segment_info("001_GX010456_SEG05")
+        assert gk == "GX010456"
+        assert sn == 5
+
     def test_empty_string(self):
         assert _parse_segment_info("") == (None, None)
 
