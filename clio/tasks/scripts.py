@@ -7,6 +7,7 @@ import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Any
 
 from clio.ai.token_usage import FileTokenUsageStore
 from clio.analyze import generate_voiceover
@@ -27,6 +28,7 @@ def _process_one_script(
     overwrite: bool,
     state: ProcessingState,
     tracker: ProgressTracker | None,
+    context_override: str | None = None,
 ) -> bool | str:
     """Process a single voiceover script. Returns True (ok), False (skipped), or error string."""
     if cancel_event and cancel_event.is_set():
@@ -45,7 +47,9 @@ def _process_one_script(
 
     if tracker:
         tracker.next(message=f"生成口播 {json_file.stem}")
-    script = generate_voiceover(data, template, config, token_store=token_store, cancel_event=cancel_event)
+    script = generate_voiceover(
+        data, template, config, token_store=token_store, cancel_event=cancel_event, context_override=context_override
+    )
     add_schema_version(script)
     write_json_atomic(out, script)
     state.mark(orig_stem, "voiceover", "done")
@@ -70,6 +74,8 @@ def run_generate_scripts(
     cancel_event: threading.Event | None = None,
     files: list[str] | None = None,
     overwrite: bool = False,
+    context_override: str | None = None,
+    **kwargs: Any,
 ) -> None:
     config.scripts_dir.mkdir(parents=True, exist_ok=True)
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
@@ -99,7 +105,7 @@ def run_generate_scripts(
                 print(f"  [口播] {json_file.stem}")
                 t0 = time.monotonic()
                 result = _process_one_script(
-                    json_file, config, template, token_store, cancel_event, overwrite, state, tracker
+                    json_file, config, template, token_store, cancel_event, overwrite, state, tracker, context_override
                 )
                 elapsed = time.monotonic() - t0
                 if isinstance(result, str) and result == "cancelled":
@@ -125,6 +131,7 @@ def run_generate_scripts(
                         overwrite,
                         state,
                         tracker,
+                        context_override,
                     )
                     futures[f] = json_file
 

@@ -73,6 +73,12 @@ function renderRun() {
     <h3>运行流水线</h3>
     <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
     <div class="run-step-list">${stepChecks}</div>
+    <details class="run-prompt-section" style="margin:12px 0">
+      <summary style="cursor:pointer;font-size:var(--text-sm);color:var(--text-secondary);user-select:none">⌨ 高级提示词（可选）</summary>
+      <div style="margin-top:8px">
+        <textarea id="run-context-override" class="run-prompt-input" placeholder="在本次运行时临时向所有 AI 添加额外指令。&#10;&#10;每条指令一行，支持按步骤前缀:&#10;[analyze] 注意画面中的食物特写&#10;[voiceover] 使用更口语化的风格&#10;[plan] 优先选取运动镜头&#10;&#10;不带前缀的指令将应用于所有步骤。&#10;这些提示仅在本次运行有效，不会保存到配置中。" rows="4" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input,#1e1e1e);color:var(--text-primary);font-size:var(--text-sm);resize:vertical;font-family:inherit"></textarea>
+      </div>
+    </details>
     <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
       <button id="btn-run-start" class="btn-primary">${getRunButtonText()}</button>
       <span id="run-files-badge" class="run-files-badge" style="display:none"></span>
@@ -177,6 +183,10 @@ async function startRun() {
     const overwriteCb = $('run-overwrite');
     if (overwriteCb && overwriteCb.checked) {
       body.overwrite = true;
+    }
+    const contextOverride = $('run-context-override')?.value?.trim();
+    if (contextOverride) {
+      body.context_override = contextOverride;
     }
     const r = await api('POST', '/api/run/start', body);
     if (r.ok) {

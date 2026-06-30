@@ -8,6 +8,7 @@ import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from pathlib import Path
+from typing import Any
 
 from clio._constants import VIDEO_EXTS
 from clio.ai.token_usage import FileTokenUsageStore
@@ -89,6 +90,7 @@ def _process_video_item(
     state: ProcessingState,
     error_count: list[int],
     cancel_event: threading.Event | None = None,
+    context_override: str | None = None,
 ) -> ClipRecord | None:
     idx_val = int(idx_str)
 
@@ -164,6 +166,7 @@ def _process_video_item(
             progress_callback=lambda msg: None,
             token_store=token_store,
             cancel_event=cancel_event,
+            context_override=context_override,
         )
     except Exception as e:
         elapsed_total = time.monotonic() - t0
@@ -212,6 +215,8 @@ def run_analyze_all(
     cancel_event: threading.Event | None = None,
     files: list[str] | None = None,
     overwrite: bool = False,
+    context_override: str | None = None,
+    **kwargs: Any,
 ) -> list[ClipRecord]:
     """Analyze already-compressed videos using AI (compress step must precede this).
 
@@ -318,6 +323,7 @@ def run_analyze_all(
                         state,
                         error_count,
                         cancel_event,
+                        context_override,
                     )
                     batch_futures.append(f)
 

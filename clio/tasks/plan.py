@@ -24,6 +24,7 @@ def run_plan_vlog(
     cancel_event: threading.Event | None = None,
     files: list[str] | None = None,
     overwrite: bool = False,
+    context_override: str | None = None,
 ) -> None:
     config.plans_dir.mkdir(parents=True, exist_ok=True)
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
@@ -115,6 +116,7 @@ def run_plan_vlog(
             transcripts_map=transcripts_map,
             use_transcripts=config.plan.use_transcripts,
             token_store=token_store,
+            context_override=context_override,
         )
         if config.plan.use_transcripts:
             plan["_transcripts_missing"] = not transcripts_map

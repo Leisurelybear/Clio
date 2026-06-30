@@ -125,6 +125,7 @@ def run_transcribe_all(
     cancel_event: threading.Event | None = None,
     files: list[str] | None = None,
     overwrite: bool = False,
+    **kwargs: Any,
 ) -> int:
     if not config.whisper.enabled:
         print("Whisper 转录未启用（whisper.enabled=false），跳过")

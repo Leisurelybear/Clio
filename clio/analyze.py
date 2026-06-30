@@ -175,9 +175,10 @@ def analyze_video(
     progress_callback: Callable[[str], None] | None = None,
     token_store=None,
     cancel_event: threading.Event | None = None,
+    context_override: str | None = None,
 ) -> dict:
     provider, model = get_video_provider(config, TaskName.VIDEO_ANALYZE)
-    prompt = _wrap_with_context(ANALYZE_PROMPT, config)
+    prompt = _wrap_with_context(ANALYZE_PROMPT, config, context_override=context_override)
     text = _call_ai(
         "AI 视频分析",
         provider.provider_id,
@@ -197,7 +198,12 @@ def analyze_video(
 
 
 def generate_voiceover(
-    clip_data: dict, template: str, config: AppConfig, token_store=None, cancel_event: threading.Event | None = None
+    clip_data: dict,
+    template: str,
+    config: AppConfig,
+    token_store=None,
+    cancel_event: threading.Event | None = None,
+    context_override: str | None = None,
 ) -> dict:
     if cancel_event and cancel_event.is_set():
         raise RuntimeError("voiceover 被用户取消")
@@ -217,7 +223,7 @@ def generate_voiceover(
         template=template,
         target_words=config.script.target_words,
     )
-    prompt = _wrap_with_context(base, config)
+    prompt = _wrap_with_context(base, config, context_override=context_override)
     text = _call_ai(
         "AI 口播",
         provider.provider_id,
@@ -238,6 +244,7 @@ def plan_daily_vlog(
     transcripts_map: dict[str, dict] | None = None,
     use_transcripts: bool = True,
     token_store=None,
+    context_override: str | None = None,
 ) -> dict:
     provider, model = get_task_provider(config, TaskName.VLOG_PLAN)
 
@@ -277,7 +284,7 @@ def plan_daily_vlog(
         if transcript_info:
             transcript_json = json.dumps(transcript_info, ensure_ascii=False, indent=None)
             base += TRANSCRIPT_CONTEXT.format(transcripts_json=transcript_json)
-    prompt = _wrap_with_context(f"日 vlog 标签: {day_label}\n\n{base}", config)
+    prompt = _wrap_with_context(f"日 vlog 标签: {day_label}\n\n{base}", config, context_override=context_override)
     text = _call_ai(
         "AI vlog 剪辑规划",
         provider.provider_id,

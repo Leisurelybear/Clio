@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 from clio._constants import VIDEO_EXTS
 from clio.compress import compress_video
@@ -97,6 +98,7 @@ def run_compress_all(
     cancel_event: threading.Event | None = None,
     files: list[str] | None = None,
     overwrite: bool = False,
+    **kwargs: Any,
 ) -> list[ClipRecord]:
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
     ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")

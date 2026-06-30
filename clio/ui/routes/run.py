@@ -104,6 +104,8 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
     if files_list is not None and not isinstance(files_list, list):
         return handler._send_json({"ok": False, "error": "files must be a list of video names"}, 400)
     overwrite = obj.get("overwrite", False)
+    context_override = obj.get("context_override") or None
+    task_prompts = obj.get("task_prompts") or None
 
     with state.run_lock:
         if state.run_thread is not None and state.run_thread.is_alive():
@@ -126,6 +128,8 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
                     cancel_event=state.cancel_event,
                     files=files_list,
                     overwrite=overwrite,
+                    context_override=context_override,
+                    task_prompts=task_prompts,
                 )
             except Exception:
                 tracker.error("pipeline failed")

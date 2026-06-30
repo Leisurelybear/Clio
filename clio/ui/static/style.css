@@ -819,6 +819,26 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
   border-radius: var(--radius-md) var(--radius-md) 0 0;
 }
 
+.run-prompt-section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-surface);
+}
+.run-prompt-section summary {
+  font-size: var(--text-sm);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  user-select: none;
+}
+.run-prompt-section summary:hover {
+  color: var(--text-secondary);
+}
+.run-prompt-input:focus {
+  border-color: var(--accent) !important;
+  outline: none;
+}
+
 /* ── Cut Section ───────────────────────────────────────────── */
 .cut-section { margin-top: var(--space-6); padding-top: var(--space-4); border-top: 1px solid var(--border); }
 .cut-section label { display: flex; align-items: center; gap: var(--space-2); }

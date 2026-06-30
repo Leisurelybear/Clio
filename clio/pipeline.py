@@ -81,6 +81,8 @@ def run_pipeline_steps(
     cancel_event: threading.Event | None = None,
     files: list[str] | None = None,
     overwrite: bool = False,
+    context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
 ) -> None:
     """运行指定步骤列表（可选的进度跟踪）。
 
@@ -118,6 +120,10 @@ def run_pipeline_steps(
                     kwargs["files"] = files
                 if overwrite:
                     kwargs["overwrite"] = True
+                if context_override:
+                    kwargs["context_override"] = context_override
+                if task_prompts:
+                    kwargs["task_prompts"] = task_prompts
                 if step in _STEP_DAY_ARG:
                     fn(config, day_label, tracker, **kwargs)
                 else:
