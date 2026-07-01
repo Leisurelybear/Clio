@@ -187,6 +187,194 @@ def _load_context(ai_raw: dict, base: Path, project_dir: Path | None = None) -> 
     return ""
 
 
+# ---------------------------------------------------------------------------
+# V1 → V2 migration
+# ---------------------------------------------------------------------------
+
+_CONFIG_VERSION = "config_version"
+_V2 = "V2"
+
+# Sections entirely project-only (no split)
+_PROJECT_ONLY_SECTIONS = {"analyze", "script", "plan", "export"}
+
+# Sections entirely global-only (no split)
+_GLOBAL_ONLY_SECTIONS = {"proxy", "server", "naming"}
+
+# Split-section keys belonging to project
+_SPLIT_PROJECT_KEYS: dict[str, set[str]] = {
+    "paths": {"input_dir", "output_dir", "recursive"},
+    "compress": {"target_size_mb", "max_width", "split_max_min", "splits_subdir", "reencode_split"},
+    "ai": {"tasks", "context", "context_file"},
+    "whisper": {"enabled", "model_size", "language", "device", "max_segments_per_clip", "transcripts_subdir"},
+}
+
+# Split-section keys belonging to global
+_SPLIT_GLOBAL_KEYS: dict[str, set[str]] = {
+    "paths": {"ffmpeg", "ffprobe", "logs_dir"},
+    "ai": {"providers", "debug_print_prompt", "provider_ttl_min"},
+    "compress": {"codec", "fps", "remove_audio", "crf"},
+    "whisper": {"cache_dir", "hf_endpoint"},
+}
+
+
+def _is_global_key(section: str, key: str) -> bool:
+    if section in _GLOBAL_ONLY_SECTIONS:
+        return True
+    if section in _SPLIT_GLOBAL_KEYS and key in _SPLIT_GLOBAL_KEYS[section]:
+        return True
+    return False
+
+
+def _is_project_key(section: str, key: str) -> bool:
+    if section in _PROJECT_ONLY_SECTIONS:
+        return True
+    if section in _SPLIT_PROJECT_KEYS and key in _SPLIT_PROJECT_KEYS[section]:
+        return True
+    return False
+
+
+def _filter_global_only(raw: dict) -> dict:
+    """Keep only global-layer keys from a merged config dict."""
+    result: dict = {}
+    for section, value in raw.items():
+        if not isinstance(value, dict):
+            # Top-level scalars (config_version, etc.) — keep
+            result[section] = value
+            continue
+        if section in _GLOBAL_ONLY_SECTIONS:
+            result[section] = value
+        elif section in _PROJECT_ONLY_SECTIONS:
+            continue
+        elif section in _SPLIT_GLOBAL_KEYS:
+            kept = {k: v for k, v in value.items() if k in _SPLIT_GLOBAL_KEYS[section]}
+            if kept:
+                result[section] = kept
+        elif section in _SPLIT_PROJECT_KEYS:
+            kept = {k: v for k, v in value.items() if k in _SPLIT_GLOBAL_KEYS.get(section, set())}
+            if kept:
+                result[section] = kept
+        else:
+            # Unknown section — keep as-is (conservative)
+            result[section] = value
+    return result
+
+
+def _filter_project_only(raw: dict) -> dict:
+    """Keep only project-layer keys from a merged config dict."""
+    result: dict = {}
+    for section, value in raw.items():
+        if not isinstance(value, dict):
+            continue
+        if section in _PROJECT_ONLY_SECTIONS:
+            result[section] = value
+        elif section in _GLOBAL_ONLY_SECTIONS:
+            continue
+        elif section in _SPLIT_PROJECT_KEYS:
+            kept = {k: v for k, v in value.items() if k in _SPLIT_PROJECT_KEYS[section]}
+            if kept:
+                result[section] = kept
+        elif section in _SPLIT_GLOBAL_KEYS:
+            kept = {k: v for k, v in value.items() if k in _SPLIT_PROJECT_KEYS.get(section, set())}
+            if kept:
+                result[section] = kept
+        else:
+            # Unknown section — skip (conservative for project)
+            pass
+    return result
+
+
+def _migrate_v1_to_v2(config_path: Path) -> None:
+    """Migrate merged V1 config.yaml to split V2 structure."""
+    try:
+        with config_path.open(encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+    except Exception:
+        return
+
+    if not isinstance(raw, dict):
+        return
+
+    # Backup original
+    bak = config_path.with_suffix(config_path.suffix + ".bak")
+    if not bak.exists():
+        try:
+            with config_path.open(encoding="utf-8") as f:
+                bak.write_text(f.read(), encoding="utf-8")
+        except Exception:
+            pass
+
+    # Write V2 global config.yaml
+    global_raw = _filter_global_only(raw)
+    global_raw[_CONFIG_VERSION] = _V2
+    try:
+        text = yaml.dump(global_raw, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        tmp = config_path.with_suffix(".yaml.tmp")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, config_path)
+        print(f"[config] migrated config.yaml to V2 (global-only, backup at {bak.name})")
+    except Exception:
+        return
+
+    # Migrate project.yaml files
+    registry_path = config_path.parent / "projects.json"
+    if registry_path.is_file():
+        import json
+
+        try:
+            reg = json.loads(registry_path.read_text(encoding="utf-8"))
+        except Exception:
+            reg = {}
+        for p_str in reg.get("projects", []):
+            proj_dir = Path(p_str)
+            proj_yaml = proj_dir / "project.yaml"
+            if not proj_yaml.is_file():
+                continue
+            try:
+                with proj_yaml.open(encoding="utf-8") as f:
+                    proj_raw = yaml.safe_load(f) or {}
+            except Exception:
+                continue
+
+            # Back up project.yaml first
+            proj_bak = proj_yaml.with_suffix(proj_yaml.suffix + ".bak")
+            if not proj_bak.exists():
+                try:
+                    with proj_yaml.open(encoding="utf-8") as f:
+                        proj_bak.write_text(f.read(), encoding="utf-8")
+                except Exception:
+                    pass
+
+            project_out = _filter_project_only(proj_raw)
+            if not project_out:
+                # Project has nothing project-specific — remove file
+                proj_yaml.unlink(missing_ok=True)
+                print(f"[config] {proj_dir.name}/project.yaml: no project-only fields, removed")
+            else:
+                try:
+                    text = yaml.dump(project_out, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                    tmp = proj_yaml.with_suffix(".yaml.tmp")
+                    tmp.write_text(text, encoding="utf-8")
+                    os.replace(tmp, proj_yaml)
+                    print(f"[config] {proj_dir.name}/project.yaml: migrated to V2")
+                except Exception:
+                    pass
+
+
+def _migrate_if_needed(config_path: Path) -> None:
+    """Check config_version and auto-migrate if V1."""
+    try:
+        with config_path.open(encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+    except Exception:
+        return
+    if not isinstance(raw, dict):
+        return
+    version = raw.get(_CONFIG_VERSION)
+    if version == _V2:
+        return
+    _migrate_v1_to_v2(config_path)
+
+
 def _legacy_ai_config(raw: dict) -> AIConfig:
     gemini_raw = raw.get("gemini", {})
     api_key = os.environ.get("GEMINI_API_KEY") or gemini_raw.get("api_key", "")
@@ -218,6 +406,7 @@ def load_config(
     base = config_file.parent
     _load_dotenv(base)
 
+    _migrate_if_needed(config_file)
     _upgrade_config_file(config_file)
 
     with config_file.open(encoding="utf-8") as f:
