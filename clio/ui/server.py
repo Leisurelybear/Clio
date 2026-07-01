@@ -26,8 +26,12 @@ from clio.shutdown import before_stop, install_hooks
 from clio.tasks.reindex import auto_reindex_if_needed
 from clio.ui.routes.config_routes import (
     handle_get_config,
+    handle_get_config_global,
+    handle_get_config_project,
     handle_get_config_raw,
     handle_post_config_init,
+    handle_put_config_global,
+    handle_put_config_project,
     handle_put_config_raw,
 )
 from clio.ui.routes.env_routes import handle_get_env, handle_put_env
@@ -251,6 +255,8 @@ def make_handler(
             _sensitive = {
                 "/api/env",
                 "/api/config/raw",
+                "/api/config/global",
+                "/api/config/project",
                 "/api/video",
                 "/api/fs/dirs",
             }
@@ -261,6 +267,10 @@ def make_handler(
                 return handle_get_config(self, qs)
             if path == "/api/config/raw":
                 return handle_get_config_raw(self, qs)
+            if path == "/api/config/global":
+                return handle_get_config_global(self, qs)
+            if path == "/api/config/project":
+                return handle_get_config_project(self, qs)
             if path == "/api/project":
                 return handle_get_project(self, qs)
             if path == "/api/projects":
@@ -323,6 +333,10 @@ def make_handler(
 
             if path == "/api/config/raw":
                 return handle_put_config_raw(self, qs, obj)
+            if path == "/api/config/global":
+                return handle_put_config_global(self, qs, obj)
+            if path == "/api/config/project":
+                return handle_put_config_project(self, qs, obj)
             if path == "/api/project":
                 return handle_put_project(self, qs, obj)
             if path == "/api/texts":
