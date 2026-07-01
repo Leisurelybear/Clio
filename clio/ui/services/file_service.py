@@ -24,6 +24,7 @@ from typing import Any
 import yaml
 
 from clio._constants import VIDEO_EXTS
+from clio.config.loader import _filter_project_only
 from clio.vmeta import VideoIndex, VideoMeta
 
 
@@ -79,6 +80,9 @@ def _create_project_yaml(proj_input: Path, config_path: Path | None, proj_out: P
         raw["ai"].setdefault("context", "")
         _inject_provider_defaults(raw)
         _inject_whisper_defaults(raw)
+        # Strip global-only fields (providers, ffmpeg paths, codec params, etc.)
+        # to prevent API key metadata from leaking into project.yaml
+        raw = _filter_project_only(raw)
         yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
         _save_atomic(target, yml.encode("utf-8"))
         return target

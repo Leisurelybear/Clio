@@ -36,17 +36,13 @@ def _clear_session_log() -> None:
 
 @pytest.fixture
 def tmp_config(tmp_path: Path) -> Path:
-    """Create a minimal config.yaml at tmp_path and return its path."""
+    """Create a minimal config.yaml + project.yaml at tmp_path and return its path."""
     cfg = tmp_path / "config.yaml"
     cfg.write_text(
-        "paths:\n"
-        "  input_dir: .\n"
-        "  output_dir: ./output\n"
-        "  logs_dir: ./logs\n"
+        "config_version: V2\n"
         "proxy:\n"
         "  enabled: false\n"
         "ai:\n"
-        "  context: ''\n"
         "  providers:\n"
         "    gemini:\n"
         "      type: gemini\n"
@@ -55,6 +51,18 @@ def tmp_config(tmp_path: Path) -> Path:
         "      type: openai\n"
         "      api_key: test-deepseek-key\n"
         "      base_url: https://api.deepseek.com/v1\n"
+        "compress:\n"
+        "  fps: 15\n"
+        "  remove_audio: true\n",
+        encoding="utf-8",
+    )
+    proj = tmp_path / "project.yaml"
+    proj.write_text(
+        "paths:\n"
+        "  input_dir: .\n"
+        "  output_dir: ./output\n"
+        "ai:\n"
+        "  context: ''\n"
         "  tasks:\n"
         "    video_analyze:\n"
         "      provider: gemini\n"
@@ -68,8 +76,6 @@ def tmp_config(tmp_path: Path) -> Path:
         "compress:\n"
         "  target_size_mb: 5\n"
         "  max_width: 640\n"
-        "  fps: 15\n"
-        "  remove_audio: true\n"
         "  split_max_min: 15\n"
         "  splits_subdir: splits\n",
         encoding="utf-8",
@@ -87,13 +93,10 @@ def empty_dir(tmp_path: Path) -> Path:
 def config_yaml_content() -> str:
     """Return the standard config.yaml content as a string."""
     return (
-        "paths:\n"
-        "  input_dir: .\n"
-        "  output_dir: ./output\n"
+        "config_version: V2\n"
         "proxy:\n"
         "  enabled: false\n"
         "ai:\n"
-        "  context: test context\n"
         "  providers:\n"
         "    gemini:\n"
         "      type: gemini\n"
@@ -102,22 +105,13 @@ def config_yaml_content() -> str:
         "      type: openai\n"
         "      api_key_env: DEEPSEEK_API_KEY\n"
         "      base_url: https://api.deepseek.com/v1\n"
-        "  tasks:\n"
-        "    video_analyze:\n"
-        "      provider: gemini\n"
-        "      model: gemini-2.5-flash\n"
-        "    voiceover:\n"
-        "      provider: deepseek\n"
-        "      model: deepseek-chat\n"
-        "compress:\n"
-        "  target_size_mb: 5\n"
     )
 
 
 @pytest.fixture
 def loaded_config(tmp_config: Path) -> AppConfig:
-    """Load a full AppConfig from a tmp_config."""
-    return load_config(tmp_config / "config.yaml")
+    """Load a full AppConfig from a tmp_config (with project.yaml)."""
+    return load_config(tmp_config / "config.yaml", project_dir=tmp_config)
 
 
 @pytest.fixture

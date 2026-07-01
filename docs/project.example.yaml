@@ -1,0 +1,68 @@
+# 项目级配置示例（project.yaml）
+#
+# 项目级配置覆盖对应项目的个性化设置。与 config.yaml（全局配置）互补，
+# 放在 <项目>/project.yaml 中。不存在时使用默认值。
+#
+# 属于项目级的配置项：
+#   paths: input_dir, output_dir, recursive
+#   ai: tasks, context, context_file
+#   compress: target_size_mb, max_width, split_max_min, splits_subdir, reencode_split
+#   analyze, script, plan, export
+#   whisper: enabled, model_size, language, device, max_segments_per_clip, transcripts_subdir
+
+paths:
+  input_dir: "./videos"
+  output_dir: "./output"
+  recursive: false          # true = 扫描子文件夹内所有视频
+
+# AI 任务定义（provider 必须在全局 config.yaml 中声明）
+ai:
+  context: ""               # 项目特定的额外上下文（追加到 trip_context.md 之后）
+  # context_file: ./templates/trip_context.md
+  tasks:
+    video_analyze:
+      provider: gemini
+      model: gemini-2.5-flash
+    voiceover:
+      provider: deepseek
+      model: deepseek-chat
+    vlog_plan:
+      provider: deepseek
+      model: deepseek-chat
+
+compress:
+  target_size_mb: 5
+  max_width: 640
+  split_max_min: 15          # 超过此时长（分钟）自动分段
+  splits_subdir: splits
+  # reencode_split: true
+
+analyze:
+  compressed_subdir: compressed
+  texts_subdir: texts
+  skip_existing: true
+  max_analyze_duration_min: 45
+  max_workers: 1
+
+script:
+  scripts_subdir: scripts
+  template_file: ./templates/vlog_template.md
+  target_words: 80
+
+plan:
+  plans_subdir: plans
+  max_clips_per_day: 12
+  target_duration_sec: 180
+
+export:
+  canvas_ratio: 16:9
+  output_subdir: export
+
+# Whisper ASR 项目级覆盖
+whisper:
+  enabled: true
+  model_size: medium
+  language: zh
+  device: auto
+  max_segments_per_clip: 5
+  transcripts_subdir: transcripts

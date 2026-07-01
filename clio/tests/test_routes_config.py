@@ -9,8 +9,12 @@ import yaml
 
 from clio.ui.routes.config_routes import (
     handle_get_config,
+    handle_get_config_global,
+    handle_get_config_project,
     handle_get_config_raw,
     handle_post_config_init,
+    handle_put_config_global,
+    handle_put_config_project,
     handle_put_config_raw,
 )
 
@@ -169,8 +173,8 @@ class TestHandlePutConfigRaw:
         cfg.write_text(
             yaml.dump(
                 {
-                    "paths": {"input_dir": "./in", "output_dir": "./out"},
-                    "compress": {"target_size_mb": 5, "max_width": 640},
+                    "proxy": {"enabled": False},
+                    "compress": {"fps": 15, "codec": "libx264"},
                 }
             ),
             encoding="utf-8",
@@ -182,14 +186,14 @@ class TestHandlePutConfigRaw:
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
 
-        # Send string "10" that should be coerced to int via ref_raw type
-        handle_put_config_raw(handler, {}, {"compress": {"target_size_mb": "10"}})
+        # Send string "30" that should be coerced to int via ref_raw type
+        handle_put_config_raw(handler, {}, {"compress": {"fps": "30"}})
 
         handler._send_json.assert_called_once()
         args = handler._send_json.call_args
         assert args[0][0]["ok"] is True
         data = yaml.safe_load(cfg.read_text(encoding="utf-8"))
-        assert isinstance(data["compress"]["target_size_mb"], (int, float))
+        assert isinstance(data["compress"]["fps"], int)
 
     def test_put_config_includes_descriptions_in_raw_response(self, tmp_path: Path):
         """handle_get_config_raw response includes _descriptions field."""
@@ -260,3 +264,290 @@ class TestHandlePutConfigRaw:
         handler._send_json.assert_called_once()
         args = handler._send_json.call_args
         assert args[0][1] == 400
+
+
+# ===================== Per-layer GET/PUT tests =====================
+
+
+class TestHandleGetConfigGlobal:
+    """GET /api/config/global — returns global-only fields."""
+
+    def test_no_config_file(self):
+        handler = MagicMock()
+        handler.config_path = None
+        handler._send_json = MagicMock()
+        handle_get_config_global(handler, {})
+        handler._send_json.assert_called_once_with({"error": "config file not available"}, 500)
+
+    def test_strips_project_only_split_fields(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text(
+            yaml.dump(
+                {
+                    "paths": {
+                        "ffmpeg": "ffmpeg",
+                        "ffprobe": "ffprobe",
+                        "logs_dir": "./logs",
+                        "input_dir": "./input",
+                        "output_dir": "./output",
+                    },
+                    "ai": {
+                        "providers": {"test": {"type": "openai"}},
+                        "debug_print_prompt": True,
+                        "tasks": {"analyze": {"provider": "test", "model": "gpt-4"}},
+                    },
+                    "compress": {"codec": "libx264", "fps": 15, "target_size_mb": 5},
+                    "whisper": {"cache_dir": "/cache", "hf_endpoint": "", "model_size": "large", "enabled": True},
+                    "proxy": {"enabled": False, "url": ""},
+                    "naming": {"index_width": 2},
+                }
+            ),
+            encoding="utf-8",
+        )
+        handler.config_path = cfg
+        handler._send_json = MagicMock()
+        handle_get_config_global(handler, {})
+        handler._send_json.assert_called_once()
+        payload = handler._send_json.call_args[0][0]
+        assert "proxy" in payload
+        assert payload["proxy"]["enabled"] is False
+        assert "naming" in payload
+        assert payload["paths"]["ffmpeg"] == "ffmpeg"
+        assert payload["paths"]["logs_dir"] == "./logs"
+        assert "providers" in payload["ai"]
+        assert payload["ai"]["debug_print_prompt"] is True
+        assert payload["compress"]["codec"] == "libx264"
+        assert payload["compress"]["fps"] == 15
+        assert payload["whisper"]["cache_dir"] == "/cache"
+        assert payload["whisper"]["hf_endpoint"] == ""
+        assert "input_dir" not in payload["paths"]
+        assert "output_dir" not in payload["paths"]
+        assert "tasks" not in payload["ai"]
+        assert "target_size_mb" not in payload["compress"]
+        assert "model_size" not in payload["whisper"]
+        assert "enabled" not in payload["whisper"]
+
+    def test_pure_global_sections_unchanged(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text(yaml.dump({"proxy": {"enabled": True, "url": "socks5://localhost:1080"}}), encoding="utf-8")
+        handler.config_path = cfg
+        handler._send_json = MagicMock()
+        handle_get_config_global(handler, {})
+        payload = handler._send_json.call_args[0][0]
+        assert payload["proxy"]["enabled"] is True
+        assert payload["proxy"]["url"] == "socks5://localhost:1080"
+
+
+class TestHandleGetConfigProject:
+    """GET /api/config/project — returns project-only fields."""
+
+    def test_no_config_path(self):
+        handler = MagicMock()
+        handler.config_path = None
+        handler._send_json = MagicMock()
+        handle_get_config_project(handler, {})
+        handler._send_json.assert_called_once_with({"error": "config file not available"}, 500)
+
+    def test_needs_init(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_bytes(b"")
+        proj_input = tmp_path / "custom"
+        proj_input.mkdir()
+        handler.config_path = cfg
+        handler.input_dir = tmp_path
+        handler._resolve_project_input.return_value = proj_input
+        handler._send_json = MagicMock()
+        handle_get_config_project(handler, {})
+        handler._send_json.assert_called_once_with({"needs_init": True})
+
+    def test_no_project_yaml_returns_empty(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_bytes(b"")
+        handler.config_path = cfg
+        handler.input_dir = tmp_path
+        handler._resolve_project_input.return_value = tmp_path
+        handler._send_json = MagicMock()
+        handle_get_config_project(handler, {})
+        handler._send_json.assert_called_once_with({})
+
+    def test_returns_project_only_fields(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_bytes(b"")
+        proj_input = tmp_path / "project"
+        proj_input.mkdir()
+        proj_yaml = proj_input / "project.yaml"
+        proj_yaml.write_text(
+            yaml.dump(
+                {
+                    "paths": {
+                        "input_dir": "./in",
+                        "output_dir": "./out",
+                        "ffmpeg": "C:/ffmpeg.exe",
+                        "logs_dir": "./logs",
+                    },
+                    "ai": {
+                        "tasks": {"analyze": {"provider": "gemini"}},
+                        "context": "my trip",
+                        "providers": {"gemini": {"type": "gemini"}},
+                    },
+                    "compress": {"target_size_mb": 10, "max_width": 1280, "codec": "libx265", "fps": 30},
+                    "whisper": {
+                        "enabled": True,
+                        "model_size": "large",
+                        "cache_dir": "/cache",
+                        "hf_endpoint": "https://hf-mirror.com",
+                    },
+                    "analyze": {"skip_existing": True},
+                    "script": {"target_words": 300},
+                    "plan": {"max_clips_per_day": 5},
+                    "export": {"canvas_ratio": "9:16"},
+                }
+            ),
+            encoding="utf-8",
+        )
+        handler.config_path = cfg
+        handler.input_dir = tmp_path
+        handler._resolve_project_input.return_value = proj_input
+        handler._send_json = MagicMock()
+        handle_get_config_project(handler, {})
+        handler._send_json.assert_called_once()
+        payload = handler._send_json.call_args[0][0]
+        assert payload["paths"]["input_dir"] == "./in"
+        assert payload["paths"]["output_dir"] == "./out"
+        assert payload["ai"]["tasks"]["analyze"]["provider"] == "gemini"
+        assert payload["ai"]["context"] == "my trip"
+        assert payload["compress"]["target_size_mb"] == 10
+        assert payload["compress"]["max_width"] == 1280
+        assert payload["whisper"]["enabled"] is True
+        assert payload["whisper"]["model_size"] == "large"
+        assert payload["analyze"]["skip_existing"] is True
+        assert payload["script"]["target_words"] == 300
+        assert payload["plan"]["max_clips_per_day"] == 5
+        assert payload["export"]["canvas_ratio"] == "9:16"
+        assert "ffmpeg" not in payload["paths"]
+        assert "logs_dir" not in payload["paths"]
+        assert "providers" not in payload["ai"]
+        assert "codec" not in payload["compress"]
+        assert "fps" not in payload["compress"]
+        assert "cache_dir" not in payload["whisper"]
+        assert "hf_endpoint" not in payload["whisper"]
+
+
+class TestHandlePutConfigGlobal:
+    """PUT /api/config/global — writes to config.yaml, rejects project fields."""
+
+    def test_no_config_path(self):
+        handler = MagicMock()
+        handler.config_path = None
+        handler._send_json = MagicMock()
+        handle_put_config_global(handler, {}, {"proxy": {"enabled": True}})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "config_path not available"}, 500)
+
+    def test_rejects_project_fields(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text(yaml.dump({"proxy": {"enabled": False}}), encoding="utf-8")
+        handler.config_path = cfg
+        handler._send_json = MagicMock()
+        handle_put_config_global(handler, {}, {"proxy": {"enabled": True}, "analyze": {"skip_existing": True}})
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args
+        assert args[0][1] == 400
+
+    def test_writes_to_config_yaml(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text(yaml.dump({"proxy": {"enabled": False, "url": ""}}), encoding="utf-8")
+        handler.config_path = cfg
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+        handle_put_config_global(handler, {}, {"proxy": {"enabled": True, "url": "socks5://localhost:1080"}})
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args
+        assert args[0][0]["ok"] is True
+        data = yaml.safe_load(cfg.read_text(encoding="utf-8"))
+        assert data["proxy"]["enabled"] is True
+        assert data["proxy"]["url"] == "socks5://localhost:1080"
+
+    def test_preserves_existing_fields(self, tmp_path: Path):
+        """PUT with only proxy section — naming is replaced since payload is the full write."""
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text(yaml.dump({"proxy": {"enabled": False}, "naming": {"index_width": 3}}), encoding="utf-8")
+        handler.config_path = cfg
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+        handle_put_config_global(handler, {}, {"proxy": {"enabled": True, "url": "socks5://localhost:1080"}})
+        data = yaml.safe_load(cfg.read_text(encoding="utf-8"))
+        assert data["proxy"]["enabled"] is True
+        assert data["proxy"]["url"] == "socks5://localhost:1080"
+
+
+class TestHandlePutConfigProject:
+    """PUT /api/config/project — writes to project.yaml, rejects global fields."""
+
+    def test_no_config_path(self):
+        handler = MagicMock()
+        handler.config_path = None
+        handler._send_json = MagicMock()
+        handle_put_config_project(handler, {}, {"paths": {"input_dir": "./in"}})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "config_path not available"}, 500)
+
+    def test_rejects_global_fields(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_bytes(b"")
+        proj_input = tmp_path / "project"
+        proj_input.mkdir()
+        handler.config_path = cfg
+        handler.input_dir = tmp_path
+        handler._resolve_project_input.return_value = proj_input
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+        handle_put_config_project(handler, {}, {"paths": {"input_dir": "./in"}, "proxy": {"enabled": True}})
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args
+        assert args[0][1] == 400
+
+    def test_creates_project_yaml_when_missing(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text(yaml.dump({"paths": {"input_dir": "./in", "output_dir": "./out"}}), encoding="utf-8")
+        proj_input = tmp_path / "custom"
+        proj_input.mkdir()
+        handler.config_path = cfg
+        handler.input_dir = tmp_path
+        handler._resolve_project_input.return_value = proj_input
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+        handle_put_config_project(handler, {}, {"compress": {"target_size_mb": 10}})
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args
+        assert args[0][0]["ok"] is True
+        proj_yaml = proj_input / "project.yaml"
+        assert proj_yaml.is_file()
+        data = yaml.safe_load(proj_yaml.read_text(encoding="utf-8"))
+        assert data["compress"]["target_size_mb"] == 10
+
+    def test_updates_existing_project_yaml(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text(yaml.dump({"paths": {"input_dir": "./in", "output_dir": "./out"}}), encoding="utf-8")
+        proj_input = tmp_path / "project2"
+        proj_input.mkdir()
+        proj_yaml = proj_input / "project.yaml"
+        proj_yaml.write_text(yaml.dump({"compress": {"target_size_mb": 5}}), encoding="utf-8")
+        handler.config_path = cfg
+        handler.input_dir = tmp_path
+        handler._resolve_project_input.return_value = proj_input
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+        handle_put_config_project(handler, {}, {"compress": {"max_width": 1920}})
+        data = yaml.safe_load(proj_yaml.read_text(encoding="utf-8"))
+        assert data["compress"]["target_size_mb"] == 5
+        assert data["compress"]["max_width"] == 1920

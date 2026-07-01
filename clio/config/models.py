@@ -99,7 +99,7 @@ class GlobalPathsConfig:
 @dataclass
 class GlobalAIConfig:
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
-    debug_print_prompt: bool = False
+    debug_print_prompt: bool = True
     provider_ttl_min: int = 60
 
 
@@ -113,7 +113,7 @@ class GlobalCompressConfig:
 
 @dataclass
 class GlobalWhisperConfig:
-    cache_dir: str | None = None
+    cache_dir: str = ""
     hf_endpoint: str = ""
 
 
@@ -296,7 +296,7 @@ class CombinedWhisperConfig:
     _project: ProjectWhisperConfig | None
 
     @property
-    def cache_dir(self) -> str | None:
+    def cache_dir(self) -> str:
         return self._global.cache_dir
 
     @property
@@ -347,7 +347,7 @@ class AIConfig:
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
     tasks: dict[str, TaskConfig] = field(default_factory=dict)
     context: str = ""
-    debug_print_prompt: bool = False
+    debug_print_prompt: bool = True
     provider_ttl_min: int = 60
 
 
@@ -381,7 +381,7 @@ class WhisperConfig:
     language: str = "zh"
     device: str = "auto"
     max_segments_per_clip: int = 5
-    cache_dir: str | None = None
+    cache_dir: str = ""
     transcripts_subdir: str = "transcripts"
     hf_endpoint: str = ""
 

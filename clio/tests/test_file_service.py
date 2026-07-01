@@ -383,3 +383,41 @@ class TestCreateProjectYaml:
         result = _create_project_yaml(proj_input, config, tmp_path / "output")
         data = yaml.safe_load(result.read_text(encoding="utf-8"))
         assert data.get("ai", {}).get("context") == ""
+
+    def test_strips_global_fields(self, tmp_path: Path):
+        """Verify ai.providers (global-only) is NOT written to project.yaml."""
+        config = tmp_path / "config.yaml"
+        config.write_text(
+            yaml.dump(
+                {
+                    "paths": {
+                        "input_dir": "/in",
+                        "output_dir": "/out",
+                        "ffmpeg": "C:/ffmpeg.exe",
+                        "logs_dir": "./logs",
+                    },
+                    "ai": {
+                        "providers": {
+                            "gemini": {"type": "gemini", "api_key_env": "GEMINI_API_KEY"},
+                        },
+                        "context": "test context",
+                    },
+                    "compress": {"fps": 15, "codec": "libx264", "target_size_mb": 10, "crf": 32},
+                }
+            ),
+            encoding="utf-8",
+        )
+        proj_input = tmp_path / "project2"
+        proj_input.mkdir()
+        result = _create_project_yaml(proj_input, config, tmp_path / "output")
+        data = yaml.safe_load(result.read_text(encoding="utf-8"))
+        # Project fields should survive
+        assert data["paths"]["input_dir"] == str(proj_input.resolve())
+        assert data["compress"]["target_size_mb"] == 10
+        assert data["ai"]["context"] == "test context"
+        # Global-only fields should be stripped
+        assert "providers" not in data.get("ai", {})
+        assert "ffmpeg" not in data.get("paths", {})
+        assert "logs_dir" not in data.get("paths", {})
+        assert "fps" not in data.get("compress", {})
+        assert "codec" not in data.get("compress", {})

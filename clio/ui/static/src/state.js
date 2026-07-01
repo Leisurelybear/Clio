@@ -2,6 +2,9 @@
 const state = {
   config: null,
   configRaw: null,
+  configGlobal: null,
+  configProject: null,
+  configTab: 'project',  // 'project' | 'global' | 'merged'
   source: 'compressed',
   videos: [],
   currentEntity: 'video',  // 'video' | 'plan' | 'run' | 'config'

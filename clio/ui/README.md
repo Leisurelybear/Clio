@@ -59,7 +59,8 @@ python main.py serve --host 0.0.0.0     # 暴露到局域网（注意安全）
 ```
 
 点 ⚙ 设置时，右栏渲染完整 config 嵌套表单（paths / ai / compress / analyze / script / plan 等全部字段）。
-- 编辑**全局 config.yaml**：保存后需重启服务生效。
+- 编辑**全局 config.yaml**（全局 tab）：保存后需重启服务生效。
+- 编辑**项目 project.yaml**（项目 tab）：保存后立即生效。
 - 编辑**项目专属 project.yaml**（通过 `?project=X` 切换）：保存后立即生效，下次流水线运行自动加载新配置。
 校验失败（如 provider 拼写错误）时弹出错误红字，不写文件。
 
@@ -72,8 +73,9 @@ UI 只读 / 写 `config.yaml` 里 `paths.output_dir` 下的文件：
 | 分析 (texts) | sidebar → 视频 → tab「分析」 | `output/texts*/*.json` | `title`, `location`, `mood`, `summary`, `timeline[]` |
 | 口播 (scripts) | sidebar → 视频 → tab「口播」 | `output/scripts/*_voiceover.json` | `title`, `voiceover`, `edit_tip`, `duration_hint_sec` |
 | 规划 (plan) | sidebar → 📋 规划 | `output/plans/day<N>_plan.json` | `theme`, `opening_tip`, `ending_tip`, `sequence[]` |
-| 设置 (config) | sidebar → ⚙ 设置 | `project.yaml`（如存在）或 `config.yaml` | 全部字段，嵌套表单渲染 |
-| 设置 (config) | sidebar → ⚙ 设置（全局） | `config.yaml`（全字段编辑） | 保存后需重启服务 |
+| 设置 (config) | sidebar → ⚙ 设置 → 项目 tab | `project.yaml` | 项目级字段，嵌套表单渲染 |
+| 设置 (config) | sidebar → ⚙ 设置 → 全局 tab | `config.yaml`（global-only 字段） | 保存后需重启服务 |
+| 设置 (config) | sidebar → ⚙ 设置 → 合并视图 tab | 合并后配置 | 只读查看全局+项目字段来源 |
 | 多项目 | sidebar 顶部选择器 / URL `?project=name` | 自动发现 `project.json` | 支持新建、打开、切换 |
 
 `texts*` 通配同时匹配 `texts/` 和 `texts - 巴黎/` 之类的目录。

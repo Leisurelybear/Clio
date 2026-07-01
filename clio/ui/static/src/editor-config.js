@@ -92,7 +92,14 @@ export async function initProjectConfig() {
     const r = await api('POST', '/api/config/init', {});
     if (r.ok) {
       setStatus('项目配置文件已创建', 'ok');
-      state.configRaw = await api('GET', '/api/config/raw');
+      const [raw, global, project] = await Promise.all([
+        api('GET', '/api/config/raw'),
+        api('GET', '/api/config/global'),
+        api('GET', '/api/config/project'),
+      ]);
+      state.configRaw = raw;
+      state.configGlobal = global || {};
+      state.configProject = project || {};
       state._needsConfigInit = false;
       renderActiveTab();
     } else {
@@ -107,33 +114,19 @@ export async function initProjectConfig() {
 }
 
 
-export function renderConfig() {
-  const pane = $('tab-config');
-  if (state._needsConfigInit) {
-    pane.innerHTML = `
-      <h3>项目配置初始化</h3>
-      <p class="muted">该项目还没有专属配置文件。</p>
-      <p class="hint">创建后将以当前全局配置为模板，后续修改只影响本项目。</p>
-      <button id="btn-config-init" class="btn-primary" style="margin-top:12px">${icon('settings', 16)} 为该项目创建配置文件</button>
-    `;
-    const btn = $('btn-config-init');
-    if (btn) btn.onclick = initProjectConfig;
-    return;
-  }
-  if (!state.configRaw || Object.keys(state.configRaw).length === 0) {
-    pane.innerHTML = '<p class="muted">配置数据不可用</p>';
-    return;
-  }
-  const isFallback = state.configRaw._config_source === 'global_fallback';
-  const { _config_source, _needsConfigInit, _descriptions, ...configData } = state.configRaw;
-  const descs = _descriptions || {};
-  pane.innerHTML = (isFallback ? `
-    <div class="config-fallback-warn" style="background:var(--warning-bg,#fff3cd);border:1px solid var(--warning-border,#ffc107);border-radius:6px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:flex-start;gap:8px;font-size:var(--text-sm);color:var(--text-primary)">
-      <span style="font-size:18px;line-height:1">⚠️</span>
-      <span>当前显示的是全局配置（回退）。该项目没有专属 <code>project.yaml</code>，修改将影响所有项目。建议<a href="#" onclick="initProjectConfig();return false" style="text-decoration:underline;color:var(--accent)">创建专属配置</a>。</span>
-    </div>
-  ` : '') + `
-  <div style="margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
+function _tabBtn(label, tabKey, active) {
+  return `<button class="config-tab-btn${active ? ' active' : ''}" data-config-tab="${tabKey}">${label}</button>`;
+}
+
+function _renderFallbackWarn() {
+  return `<div class="config-fallback-warn" style="background:var(--warning-bg,#fff3cd);border:1px solid var(--warning-border,#ffc107);border-radius:6px;padding:10px 14px;margin-bottom:12px;display:flex;align-items:flex-start;gap:8px;font-size:var(--text-sm);color:var(--text-primary)">
+    <span style="font-size:18px;line-height:1">⚠️</span>
+    <span>当前显示的是全局配置（回退）。该项目没有专属 <code>project.yaml</code>，修改将影响所有项目。建议<a href="#" onclick="initProjectConfig();return false" style="text-decoration:underline;color:var(--accent)">创建专属配置</a>。</span>
+  </div>`;
+}
+
+function _renderEnvEditor() {
+  return `<div style="margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:12px">
     <button id="btn-env-toggle" class="btn-secondary" style="font-size:var(--text-sm)">${icon('file-text', 14)} 编辑 .env 文件</button>
     <div id="env-editor" style="display:none;margin-top:8px">
       <textarea id="env-textarea" style="width:100%;min-height:160px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,12px);padding:8px;background:var(--bg-surface);color:var(--text-primary);border:1px solid var(--border);border-radius:var(--radius-sm)" spellcheck="false"></textarea>
@@ -142,54 +135,10 @@ export function renderConfig() {
         <span id="env-save-msg" class="muted" style="font-size:var(--text-xs);align-self:center"></span>
       </div>
     </div>
-  </div>
-  <div class="config-form">${_renderConfigForm(configData, '', descs)}</div>`;
-  const ctxTextarea = pane.querySelector('textarea[data-path="ai.context"]');
-  if (ctxTextarea && !ctxTextarea.value.trim()) {
-    const btn = document.createElement('button');
-    btn.className = 'btn-primary';
-    btn.style.cssText = 'margin-top:6px;font-size:var(--text-sm);padding:5px 12px;';
-    btn.innerHTML = `${icon('plus', 14)} 添加默认模板`;
-    btn.onclick = () => {
-      const template = '## 项目背景\n- 拍摄地点：[填写拍摄地点]\n- 行程安排：[填写行程安排]\n- 人物/事件：[填写人物或事件]\n- 注意事项：[填写注意事项]\n\n请根据以上信息调整 AI 的分析和口播生成方向。';
-      ctxTextarea.value = template;
-      setDeep(state.configRaw, 'ai.context', template);
-      markDirty();
-      btn.remove();
-    };
-    ctxTextarea.parentNode.appendChild(btn);
-  }
+  </div>`;
+}
 
-  pane.querySelectorAll('[data-path]').forEach(el => {
-    const onchange = () => {
-      let val;
-      if (el.type === 'checkbox') {
-        val = el.checked;
-      } else if (el.type === 'number') {
-        val = el.value.includes('.') ? parseFloat(el.value) : (el.value === '' ? '' : parseInt(el.value, 10));
-        if (isNaN(val)) val = el.value;
-      } else {
-        val = el.value;
-      }
-      setDeep(state.configRaw, el.dataset.path, val);
-      markDirty();
-    };
-    el.onchange = onchange;
-    if (el.tagName === 'INPUT' && el.type === 'text') {
-      el.oninput = onchange;
-    }
-    if (el.tagName === 'TEXTAREA') {
-      el.oninput = onchange;
-    }
-  });
-
-  pane.querySelectorAll('.config-desc-icon').forEach(el => {
-    el.onclick = (e) => {
-      e.stopPropagation();
-      el.classList.toggle('show');
-    };
-  });
-
+function _attachEnvEditor() {
   const envToggle = $('btn-env-toggle');
   const envEditor = $('env-editor');
   const envTextarea = $('env-textarea');
@@ -227,10 +176,139 @@ export function renderConfig() {
       }
     };
   }
-
-  pane.appendChild(renderModelManagement());
-  _loadModelMgmt();
 }
+
+function _attachConfigForm(pane, sourceObj, descriptions) {
+  pane.querySelectorAll('[data-path]').forEach(el => {
+    const onchange = () => {
+      let val;
+      if (el.type === 'checkbox') {
+        val = el.checked;
+      } else if (el.type === 'number') {
+        val = el.value.includes('.') ? parseFloat(el.value) : (el.value === '' ? '' : parseInt(el.value, 10));
+        if (isNaN(val)) val = el.value;
+      } else {
+        val = el.value;
+      }
+      setDeep(sourceObj, el.dataset.path, val);
+      markDirty();
+    };
+    el.onchange = onchange;
+    if (el.tagName === 'INPUT' && el.type === 'text') {
+      el.oninput = onchange;
+    }
+    if (el.tagName === 'TEXTAREA') {
+      el.oninput = onchange;
+    }
+  });
+  pane.querySelectorAll('.config-desc-icon').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      el.classList.toggle('show');
+    };
+  });
+}
+
+function _attachContextTemplate(pane) {
+  const ctxTextarea = pane.querySelector('textarea[data-path="ai.context"]');
+  if (ctxTextarea && !ctxTextarea.value.trim()) {
+    const btn = document.createElement('button');
+    btn.className = 'btn-primary';
+    btn.style.cssText = 'margin-top:6px;font-size:var(--text-sm);padding:5px 12px;';
+    btn.innerHTML = `${icon('plus', 14)} 添加默认模板`;
+    btn.onclick = () => {
+      const template = '## 项目背景\n- 拍摄地点：[填写拍摄地点]\n- 行程安排：[填写行程安排]\n- 人物/事件：[填写人物或事件]\n- 注意事项：[填写注意事项]\n\n请根据以上信息调整 AI 的分析和口播生成方向。';
+      ctxTextarea.value = template;
+      setDeep(state.configProject, 'ai.context', template);
+      markDirty();
+      btn.remove();
+    };
+    ctxTextarea.parentNode.appendChild(btn);
+  }
+}
+
+
+export function renderConfig() {
+  const pane = $('tab-config');
+  if (state._needsConfigInit) {
+    pane.innerHTML = `
+      <h3>项目配置初始化</h3>
+      <p class="muted">该项目还没有专属配置文件。</p>
+      <p class="hint">创建后将以当前全局配置为模板，后续修改只影响本项目。</p>
+      <button id="btn-config-init" class="btn-primary" style="margin-top:12px">${icon('settings', 16)} 为该项目创建配置文件</button>
+    `;
+    const btn = $('btn-config-init');
+    if (btn) btn.onclick = initProjectConfig;
+    return;
+  }
+  if (!state.configRaw || Object.keys(state.configRaw).length === 0) {
+    pane.innerHTML = '<p class="muted">配置数据不可用</p>';
+    return;
+  }
+
+  const isFallback = state.configRaw._config_source === 'global_fallback';
+  const active = state.configTab || 'project';
+  const descs = state.configRaw._descriptions || {};
+
+  let contentHtml = '';
+  if (active === 'project') {
+    const projectData = state.configProject || {};
+    contentHtml = `<div class="config-form">${_renderConfigForm(projectData, '', descs)}</div>`;
+  } else if (active === 'global') {
+    const { _config_source, _needsConfigInit, _descriptions, ...configData } = state.configRaw;
+    const globalData = state.configGlobal || {};
+    contentHtml = _renderEnvEditor()
+      + `<div class="config-form">${_renderConfigForm(globalData, '', descs)}</div>`;
+  } else {
+    // Merged tab: read-only merged view
+    const { _config_source, _needsConfigInit, _descriptions, ...configData } = state.configRaw;
+    contentHtml = `<p class="hint" style="margin-bottom:8px">以下为全局 + 项目各层合并后的有效配置。只读。</p>
+      <div class="config-form config-merged">${_renderConfigForm(configData, '', descs)}</div>`;
+  }
+
+  pane.innerHTML = `
+    <div class="config-tab-bar">
+      ${_tabBtn('项目', 'project', active === 'project')}
+      ${_tabBtn('全局', 'global', active === 'global')}
+      ${_tabBtn('合并视图', 'merged', active === 'merged')}
+    </div>
+    ${isFallback ? _renderFallbackWarn() : ''}
+    <div id="config-tab-content">${contentHtml}</div>`;
+
+  // Tab switching
+  pane.querySelectorAll('.config-tab-btn').forEach(btn => {
+    btn.onclick = () => {
+      state.configTab = btn.dataset.configTab;
+      state.dirty = false;
+      updateSaveBtn();
+      renderConfig();
+    };
+  });
+
+  // Hide save button for merged tab (read-only)
+  const saveBtn = $('btn-save');
+  if (saveBtn) {
+    saveBtn.style.display = active === 'merged' ? 'none' : '';
+  }
+
+  // Attach change handlers for the active tab
+  if (active === 'global') {
+    _attachConfigForm(pane, state.configGlobal || {}, descs);
+    _attachEnvEditor();
+  } else if (active === 'project') {
+    _attachConfigForm(pane, state.configProject || {}, descs);
+    _attachContextTemplate(pane);
+  }
+
+  // Model management stays in global tab (system-level)
+  if (active === 'global') {
+    pane.querySelector('#config-tab-content')?.appendChild(renderModelManagement());
+    _loadModelMgmt();
+  }
+}
+
+
+
 
 
 let _logsTimer = null;

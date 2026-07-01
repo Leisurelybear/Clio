@@ -192,12 +192,15 @@ def _is_project_section(section: str) -> bool:
 def _validate_no_foreign_fields(obj: dict, layer: str) -> str | None:
     """Check obj has no fields belonging to the other layer.
     Returns error string or None."""
+    split_sections = set(_SPLIT_GLOBAL.keys()) & set(_SPLIT_PROJECT.keys())
+
     if layer == "global":
         foreign = _PROJECT_SECTIONS | set(_SPLIT_PROJECT.keys())
     else:
         foreign = _GLOBAL_SECTIONS | set(_SPLIT_GLOBAL.keys())
 
-    for section in foreign:
+    # Skip section-level check for split sections (checked at field level below)
+    for section in foreign - split_sections:
         if section in obj:
             if layer == "global":
                 return f"'{section}' 属于项目配置，不能写入全局 config.yaml"
@@ -229,15 +232,12 @@ def handle_get_config_global(handler: HandlerProtocol, qs: dict[str, Any]) -> No
     for section, val in raw.items():
         if not isinstance(val, dict):
             result[section] = val
-        elif _is_global_section(section):
-            result[section] = val
         elif section in _SPLIT_GLOBAL:
-            kept = {k: v for k, v in val.items() if k not in _SPLIT_PROJECT.get(section, set())}
+            kept = {k: v for k, v in val.items() if k in _SPLIT_GLOBAL.get(section, set())}
             if kept:
                 result[section] = kept
-    result.setdefault("ai", {})
-    result["ai"].setdefault("context", "")
-    result["_descriptions"] = CONFIG_DESCRIPTIONS
+        elif _is_global_section(section):
+            result[section] = val
     handler._send_json(result)
 
 
@@ -264,15 +264,12 @@ def handle_get_config_project(handler: HandlerProtocol, qs: dict[str, Any]) -> N
     for section, val in raw.items():
         if not isinstance(val, dict):
             continue
-        if _is_project_section(section):
-            result[section] = val
-        elif section in _SPLIT_PROJECT:
-            kept = {k: v for k, v in val.items() if k not in _SPLIT_GLOBAL.get(section, set())}
+        if section in _SPLIT_PROJECT:
+            kept = {k: v for k, v in val.items() if k in _SPLIT_PROJECT.get(section, set())}
             if kept:
                 result[section] = kept
-    result.setdefault("ai", {})
-    result["ai"].setdefault("context", "")
-    result["_descriptions"] = CONFIG_DESCRIPTIONS
+        elif _is_project_section(section):
+            result[section] = val
     handler._send_json(result)
 
 

@@ -5,6 +5,16 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from clio.config import AppConfig
+from clio.config.models import (
+    AnalyzeConfig,
+    GlobalConfig,
+    GlobalPathsConfig,
+    NamingConfig,
+    PlanConfig,
+    ProjectConfig,
+    ProjectPathsConfig,
+    ScriptConfig,
+)
 
 
 @pytest.fixture
@@ -13,21 +23,27 @@ def cfg(tmp_path) -> AppConfig:
     compressed = tmp_path / "compressed"
     texts.mkdir()
     compressed.mkdir()
-    analyze = MagicMock(skip_existing=True, texts_subdir="texts", compressed_subdir="compressed")
-    script = MagicMock(scripts_subdir="scripts")
-    plan = MagicMock(plans_subdir="plans")
-    return AppConfig(
-        paths=MagicMock(
+    project_cfg = ProjectConfig(
+        paths=ProjectPathsConfig(
             input_dir=tmp_path / "videos",
             output_dir=tmp_path,
+        ),
+        analyze=AnalyzeConfig(
+            skip_existing=True,
+            texts_subdir="texts",
+            compressed_subdir="compressed",
+        ),
+        script=ScriptConfig(scripts_subdir="scripts"),
+        plan=PlanConfig(plans_subdir="plans"),
+    )
+    global_cfg = GlobalConfig(
+        naming=NamingConfig(index_width=3),
+        paths=GlobalPathsConfig(
             ffmpeg="ffmpeg_path",
             ffprobe="",
         ),
-        analyze=analyze,
-        naming=MagicMock(index_width=3),
-        script=script,
-        plan=plan,
     )
+    return AppConfig(global_cfg=global_cfg, project_cfg=project_cfg)
 
 
 class TestRunLabelVideos:

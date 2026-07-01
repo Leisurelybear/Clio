@@ -6,6 +6,15 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from clio.config import AppConfig
+from clio.config.models import (
+    AnalyzeConfig,
+    GlobalConfig,
+    GlobalPathsConfig,
+    PlanConfig,
+    ProjectConfig,
+    ProjectPathsConfig,
+    ScriptConfig,
+)
 
 
 @pytest.fixture
@@ -16,19 +25,27 @@ def cfg(tmp_path) -> AppConfig:
     scripts.mkdir()
     template = tmp_path / "vlog_template.md"
     template.write_text("Template: {title}")
-    analyze = MagicMock(skip_existing=True, texts_subdir="texts", compressed_subdir="compressed", max_workers=1)
-    script = MagicMock(scripts_subdir="scripts", template_file=template)
-    plan = MagicMock(plans_subdir="plans")
     return AppConfig(
-        paths=MagicMock(
-            input_dir=tmp_path / "videos",
-            output_dir=tmp_path,
-            ffmpeg="",
-            ffprobe="",
+        global_cfg=GlobalConfig(
+            paths=GlobalPathsConfig(ffmpeg="", ffprobe=""),
         ),
-        analyze=analyze,
-        script=script,
-        plan=plan,
+        project_cfg=ProjectConfig(
+            paths=ProjectPathsConfig(
+                input_dir=tmp_path / "videos",
+                output_dir=tmp_path,
+            ),
+            analyze=AnalyzeConfig(
+                skip_existing=True,
+                texts_subdir="texts",
+                compressed_subdir="compressed",
+                max_workers=1,
+            ),
+            script=ScriptConfig(
+                scripts_subdir="scripts",
+                template_file=template,
+            ),
+            plan=PlanConfig(plans_subdir="plans"),
+        ),
     )
 
 
@@ -42,10 +59,23 @@ class TestRunGenerateScripts:
         template = tmp_path / "vlog_template.md"
         template.write_text("Template: {title}")
         cfg = AppConfig(
-            paths=MagicMock(output_dir=tmp_path, ffmpeg="", ffprobe=""),
-            script=MagicMock(scripts_subdir="scripts", template_file=template),
-            analyze=MagicMock(skip_existing=True, texts_subdir="texts", compressed_subdir="compressed", max_workers=1),
-            plan=MagicMock(plans_subdir="plans"),
+            global_cfg=GlobalConfig(
+                paths=GlobalPathsConfig(ffmpeg="", ffprobe=""),
+            ),
+            project_cfg=ProjectConfig(
+                paths=ProjectPathsConfig(output_dir=tmp_path),
+                analyze=AnalyzeConfig(
+                    skip_existing=True,
+                    texts_subdir="texts",
+                    compressed_subdir="compressed",
+                    max_workers=1,
+                ),
+                script=ScriptConfig(
+                    scripts_subdir="scripts",
+                    template_file=template,
+                ),
+                plan=PlanConfig(plans_subdir="plans"),
+            ),
         )
         mock_gen.return_value = {"title": "t", "voiceover": "hello", "edit_tip": ""}
 

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-02
+
+### Added
+- Phase 6: Global vs Project Config Separation — config.yaml now holds only global settings, project.yaml holds per-project overrides
+- New config format (V2): `config_version: V2` marker with auto-migration from V1
+- `GlobalConfig`/`ProjectConfig` dataclasses with `CombinedX` read-only wrappers for backward compat
+- `load_global_config()` / `load_project_config()` — per-layer loading
+- V1→V2 migration: auto-split merged config.yaml into global-only + project.yaml on first load
+- `/api/config/global` and `/api/config/project` — per-layer GET/PUT endpoints with field ownership validation
+- Frontend config tab split (Global / Project / Merged views) in editor-config.js
+- 36 new tests for V2 migration, combined wrappers, field validation, apply_run_paths
+- `docs/project.example.yaml` — project-level config example
+
+### Fixed
+- `handle_put_config_raw` — layer validation now correctly handles split sections (e.g. `compress`) at field level
+- V1→V2 migration now creates `project.yaml` for default project (not just projects.json-registered projects)
+- V1→V2 migration no longer overwrites existing `project.yaml`
+- `test_config.py` / `test_routes_config.py` — migrated 57 tests to new `AppConfig(global_cfg=..., project_cfg=...)` interface
+- `test_tasks_cut/label/scripts/refine/transcribe/reindex` — migrated tests to use real dataclass instances instead of MagicMock
+- `conftest.py` — `tmp_config` fixture now creates V2-format config.yaml + project.yaml
+
 ## 2026-07-01
 
 ### Added

@@ -104,17 +104,27 @@ async function selectConfig() {
   state.currentEntity = 'config';
   state.dirty = false;
   try {
-    const resp = await api('GET', '/api/config/raw');
-    if (resp.needs_init) {
+    const [raw, global, project] = await Promise.all([
+      api('GET', '/api/config/raw'),
+      api('GET', '/api/config/global'),
+      api('GET', '/api/config/project'),
+    ]);
+    if (raw.needs_init || project.needs_init) {
       state.configRaw = null;
+      state.configGlobal = global || {};
+      state.configProject = null;
       state._needsConfigInit = true;
     } else {
-      state.configRaw = resp;
+      state.configRaw = raw;
+      state.configGlobal = global || {};
+      state.configProject = project || {};
       state._needsConfigInit = false;
     }
   } catch (e) {
     setStatus('配置加载失败: ' + e.message, 'err');
     state.configRaw = {};
+    state.configGlobal = {};
+    state.configProject = {};
     state._needsConfigInit = false;
   }
   updateEntityUI();

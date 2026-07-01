@@ -12,7 +12,6 @@ from clio.config.models import (
     AIConfig,
     AnalyzeConfig,
     AppConfig,
-    CompressConfig,
     ExportConfig,
     GlobalAIConfig,
     GlobalCompressConfig,
@@ -20,7 +19,6 @@ from clio.config.models import (
     GlobalPathsConfig,
     GlobalWhisperConfig,
     NamingConfig,
-    PathsConfig,
     PlanConfig,
     ProjectAIConfig,
     ProjectCompressConfig,
@@ -32,7 +30,6 @@ from clio.config.models import (
     ScriptConfig,
     ServerConfig,
     TaskConfig,
-    WhisperConfig,
 )
 from clio.config.parsers import (
     _parse_providers,
@@ -40,17 +37,24 @@ from clio.config.parsers import (
 )
 from clio.config.validators import _filter_dc, _validate_config
 
-_SECTION_DC_MAP: dict[str, type] = {
-    "paths": PathsConfig,
+_GLOBAL_SECTION_DC_MAP: dict[str, type] = {
+    "paths": GlobalPathsConfig,
     "proxy": ProxyConfig,
     "server": ServerConfig,
-    "ai": AIConfig,
-    "compress": CompressConfig,
-    "analyze": AnalyzeConfig,
     "naming": NamingConfig,
+    "ai": GlobalAIConfig,
+    "compress": GlobalCompressConfig,
+    "whisper": GlobalWhisperConfig,
+}
+
+_PROJECT_SECTION_DC_MAP: dict[str, type] = {
+    "paths": ProjectPathsConfig,
+    "ai": ProjectAIConfig,
+    "compress": ProjectCompressConfig,
+    "whisper": ProjectWhisperConfig,
+    "analyze": AnalyzeConfig,
     "script": ScriptConfig,
     "plan": PlanConfig,
-    "whisper": WhisperConfig,
     "export": ExportConfig,
 }
 
@@ -104,7 +108,7 @@ def _resolve_field_default(fd: dataclasses.Field):
     return _MISSING
 
 
-def _upgrade_config_file(yaml_path: Path) -> None:
+def _upgrade_config_file(yaml_path: Path, *, section_map: dict[str, type]) -> None:
     if not yaml_path.is_file():
         return
     try:
@@ -119,7 +123,7 @@ def _upgrade_config_file(yaml_path: Path) -> None:
     added: list[str] = []
     changed = False
 
-    for section_name, dc_type in _SECTION_DC_MAP.items():
+    for section_name, dc_type in section_map.items():
         section = raw.get(section_name)
         if not isinstance(section, dict):
             continue
@@ -322,7 +326,21 @@ def _migrate_v1_to_v2(config_path: Path) -> None:
     except Exception:
         return
 
-    # Migrate project.yaml files
+    # Extract project fields from V1 config and write project.yaml if not present
+    project_out = _filter_project_only(raw)
+    if project_out:
+        proj_path = config_path.parent / "project.yaml"
+        if not proj_path.exists():
+            try:
+                text = yaml.dump(project_out, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                tmp = proj_path.with_suffix(".yaml.tmp")
+                tmp.write_text(text, encoding="utf-8")
+                os.replace(tmp, proj_path)
+                print("[config] created project.yaml from migrated V1 project fields")
+            except Exception:
+                pass
+
+    # Migrate existing project.yaml files
     registry_path = config_path.parent / "projects.json"
     if registry_path.is_file():
         import json
@@ -412,7 +430,7 @@ def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
     _load_dotenv(base)
 
     _migrate_if_needed(config_file)
-    _upgrade_config_file(config_file)
+    _upgrade_config_file(config_file, section_map=_GLOBAL_SECTION_DC_MAP)
 
     with config_file.open(encoding="utf-8") as f:
         raw: dict[str, Any] = yaml.safe_load(f) or {}
@@ -421,7 +439,7 @@ def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
     ai_raw = raw.get("ai", {})
     ai_cfg = GlobalAIConfig(
         providers=_parse_providers(ai_raw.get("providers")),
-        debug_print_prompt=ai_raw.get("debug_print_prompt", False),
+        debug_print_prompt=ai_raw.get("debug_print_prompt", True),
         provider_ttl_min=ai_raw.get("provider_ttl_min", 60),
     )
 
@@ -458,7 +476,7 @@ def load_project_config(
     if not project_yaml.is_file():
         return None
 
-    _upgrade_config_file(project_yaml)
+    _upgrade_config_file(project_yaml, section_map=_PROJECT_SECTION_DC_MAP)
 
     with project_yaml.open(encoding="utf-8") as f:
         raw: dict[str, Any] = yaml.safe_load(f) or {}

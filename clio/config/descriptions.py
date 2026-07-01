@@ -62,7 +62,7 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     "whisper.language": "转录语言。zh（中文）、en（英文）、auto（自动检测）",
     "whisper.device": "计算设备。auto（自动）、cpu（CPU）、cuda（GPU）",
     "whisper.max_segments_per_clip": "每段视频最多取前 N 条转录结果注入规划",
-    "whisper.cache_dir": "Whisper 模型缓存目录，null 使用程序默认路径",
+    "whisper.cache_dir": "Whisper 模型缓存目录，留空使用程序默认路径",
     "whisper.transcripts_subdir": "转录结果存放的子目录名",
     "whisper.hf_endpoint": "HuggingFace 镜像地址。国内推荐 hf-mirror.com，留空用官方",
 }

@@ -191,13 +191,21 @@ export async function save() {
       return;
     }
     if (entity === 'config') {
-      const r = await api('PUT', '/api/config/raw', configRaw);
+      const tab = state.configTab || 'global';
+      let r;
+      if (tab === 'global') {
+        r = await api('PUT', '/api/config/global', state.configGlobal);
+      } else if (tab === 'project') {
+        r = await api('PUT', '/api/config/project', state.configProject);
+      } else {
+        setStatus('合并视图为只读，无法保存', 'warn');
+        return;
+      }
       if (r.error) throw new Error(r.error);
       state.dirty = false;
       updateSaveBtn();
-      const isProject = r.path && r.path.endsWith('project.yaml');
       setStatus(
-        isProject ? '项目配置已保存，立即生效' : '全局配置已保存（需重启服务生效）',
+        tab === 'project' ? '项目配置已保存，立即生效' : '全局配置已保存（需重启服务生效）',
         'ok'
       );
       return;
