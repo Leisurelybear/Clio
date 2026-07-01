@@ -14,9 +14,11 @@ from clio.config.models import (
     AppConfig,
     CompressConfig,
     ExportConfig,
+    GlobalConfig,
     NamingConfig,
     PathsConfig,
     PlanConfig,
+    ProjectConfig,
     ProviderConfig,
     ProxyConfig,
     ScriptConfig,
@@ -274,6 +276,20 @@ def load_config(
     return config
 
 
+def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
+    """Load only the global config (config.yaml), return GlobalConfig.
+    Implementation will be filled in sub-task 3."""
+    from clio.config.models import GlobalConfig
+
+    return GlobalConfig()
+
+
+def load_project_config(project_dir: Path) -> ProjectConfig | None:
+    """Load project-level config (project.yaml), return ProjectConfig or None.
+    Implementation will be filled in sub-task 3."""
+    return None
+
+
 def apply_run_paths(
     config: AppConfig,
     input_dir: Path | None = None,
@@ -281,10 +297,12 @@ def apply_run_paths(
     output_by_input_name: bool = True,
 ) -> AppConfig:
     config = deepcopy(config)
+    if config.project_cfg is None:
+        return config
     if input_dir:
-        config.paths.input_dir = input_dir.resolve()
+        config.project_cfg.paths.input_dir = input_dir.resolve()
     if output_dir:
-        config.paths.output_dir = output_dir.resolve()
+        config.project_cfg.paths.output_dir = output_dir.resolve()
     elif input_dir and output_by_input_name:
-        config.paths.output_dir = (config.paths.output_dir / input_dir.name).resolve()
+        config.project_cfg.paths.output_dir = (config.project_cfg.paths.output_dir / input_dir.name).resolve()
     return config
