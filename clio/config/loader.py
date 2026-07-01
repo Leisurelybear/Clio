@@ -14,11 +14,19 @@ from clio.config.models import (
     AppConfig,
     CompressConfig,
     ExportConfig,
+    GlobalAIConfig,
+    GlobalCompressConfig,
     GlobalConfig,
+    GlobalPathsConfig,
+    GlobalWhisperConfig,
     NamingConfig,
     PathsConfig,
     PlanConfig,
+    ProjectAIConfig,
+    ProjectCompressConfig,
     ProjectConfig,
+    ProjectPathsConfig,
+    ProjectWhisperConfig,
     ProviderConfig,
     ProxyConfig,
     ScriptConfig,
@@ -29,7 +37,6 @@ from clio.config.models import (
 from clio.config.parsers import (
     _parse_providers,
     _parse_tasks,
-    _parse_whisper,
 )
 from clio.config.validators import _filter_dc, _validate_config
 
@@ -398,10 +405,8 @@ def _legacy_ai_config(raw: dict) -> AIConfig:
     )
 
 
-def load_config(
-    config_path: str | Path = "config.yaml",
-    project_dir: Path | None = None,
-) -> AppConfig:
+def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
+    """Load only the global config (config.yaml), return GlobalConfig."""
     config_file = Path(config_path).resolve()
     base = config_file.parent
     _load_dotenv(base)
@@ -412,43 +417,78 @@ def load_config(
     with config_file.open(encoding="utf-8") as f:
         raw: dict[str, Any] = yaml.safe_load(f) or {}
 
-    if project_dir is not None:
-        project_yaml = Path(project_dir).resolve() / "project.yaml"
-        _upgrade_config_file(project_yaml)
-        if project_yaml.is_file():
-            with project_yaml.open(encoding="utf-8") as f:
-                project_raw: dict[str, Any] = yaml.safe_load(f) or {}
-            raw = deep_merge(raw, project_raw)
+    # Providers use env var resolution
+    ai_raw = raw.get("ai", {})
+    ai_cfg = GlobalAIConfig(
+        providers=_parse_providers(ai_raw.get("providers")),
+        debug_print_prompt=ai_raw.get("debug_print_prompt", False),
+        provider_ttl_min=ai_raw.get("provider_ttl_min", 60),
+    )
 
-    paths_raw = raw.get("paths", {})
-    ai_raw = raw.get("ai")
-
-    if ai_raw:
-        ai = AIConfig(
-            providers=_parse_providers(ai_raw.get("providers")),
-            tasks=_parse_tasks(ai_raw.get("tasks")),
-            context=_load_context(ai_raw, base, project_dir=project_dir),
-            debug_print_prompt=ai_raw.get("debug_print_prompt", False),
-            provider_ttl_min=ai_raw.get("provider_ttl_min", 60),
-        )
-    else:
-        ai = _legacy_ai_config(raw)
-
-    config = AppConfig(
-        paths=PathsConfig(
-            input_dir=_path(paths_raw.get("input_dir", "."), base),
-            output_dir=_path(paths_raw.get("output_dir", "./output"), base),
-            ffmpeg=paths_raw.get("ffmpeg", ""),
-            ffprobe=paths_raw.get("ffprobe", ""),
-            recursive=paths_raw.get("recursive", False),
-            logs_dir=_path(paths_raw.get("logs_dir", "./logs"), base),
-        ),
+    return GlobalConfig(
         proxy=ProxyConfig(**_filter_dc(raw.get("proxy", {}), ProxyConfig)),
         server=ServerConfig(**_filter_dc(raw.get("server", {}), ServerConfig)),
-        ai=ai,
-        compress=CompressConfig(**_filter_dc(raw.get("compress", {}), CompressConfig)),
-        analyze=AnalyzeConfig(**_filter_dc(raw.get("analyze", {}), AnalyzeConfig)),
         naming=NamingConfig(**_filter_dc(raw.get("naming", {}), NamingConfig)),
+        paths=GlobalPathsConfig(
+            ffmpeg=raw.get("paths", {}).get("ffmpeg", ""),
+            ffprobe=raw.get("paths", {}).get("ffprobe", ""),
+            logs_dir=_path(raw.get("paths", {}).get("logs_dir", "./logs"), base),
+        ),
+        ai=ai_cfg,
+        compress=GlobalCompressConfig(
+            codec=raw.get("compress", {}).get("codec", "libx264"),
+            fps=raw.get("compress", {}).get("fps", 15),
+            remove_audio=raw.get("compress", {}).get("remove_audio", True),
+            crf=raw.get("compress", {}).get("crf", 32),
+        ),
+        whisper=GlobalWhisperConfig(
+            cache_dir=raw.get("whisper", {}).get("cache_dir"),
+            hf_endpoint=raw.get("whisper", {}).get("hf_endpoint", ""),
+        ),
+    )
+
+
+def load_project_config(
+    project_dir: Path,
+    *,
+    config_path: Path | None = None,
+) -> ProjectConfig | None:
+    """Load project-level config (project.yaml), return ProjectConfig or None."""
+    project_yaml = project_dir.resolve() / "project.yaml"
+    if not project_yaml.is_file():
+        return None
+
+    _upgrade_config_file(project_yaml)
+
+    with project_yaml.open(encoding="utf-8") as f:
+        raw: dict[str, Any] = yaml.safe_load(f) or {}
+
+    base = project_dir.resolve()
+    if config_path is not None:
+        base = config_path.parent
+
+    paths_raw = raw.get("paths", {})
+    ai_raw = raw.get("ai", {})
+    context = _load_context(ai_raw, base, project_dir=project_dir)
+
+    return ProjectConfig(
+        paths=ProjectPathsConfig(
+            input_dir=_path(paths_raw.get("input_dir", "."), base),
+            output_dir=_path(paths_raw.get("output_dir", "./output"), base),
+            recursive=paths_raw.get("recursive", False),
+        ),
+        ai=ProjectAIConfig(
+            tasks=_parse_tasks(ai_raw.get("tasks")),
+            context=context,
+        ),
+        compress=ProjectCompressConfig(
+            target_size_mb=raw.get("compress", {}).get("target_size_mb", 5),
+            max_width=raw.get("compress", {}).get("max_width", 640),
+            split_max_min=raw.get("compress", {}).get("split_max_min", 15),
+            splits_subdir=raw.get("compress", {}).get("splits_subdir", "splits"),
+            reencode_split=raw.get("compress", {}).get("reencode_split", False),
+        ),
+        analyze=AnalyzeConfig(**_filter_dc(raw.get("analyze", {}), AnalyzeConfig)),
         script=ScriptConfig(
             scripts_subdir=raw.get("script", {}).get("scripts_subdir", "scripts"),
             template_file=_path(
@@ -458,25 +498,34 @@ def load_config(
             target_words=raw.get("script", {}).get("target_words", 80),
         ),
         plan=PlanConfig(**_filter_dc(raw.get("plan", {}), PlanConfig)),
-        whisper=_parse_whisper(raw.get("whisper", {})),
+        whisper=ProjectWhisperConfig(
+            enabled=raw.get("whisper", {}).get("enabled", True),
+            model_size=raw.get("whisper", {}).get("model_size", "medium"),
+            language=raw.get("whisper", {}).get("language", "zh"),
+            device=raw.get("whisper", {}).get("device", "auto"),
+            max_segments_per_clip=raw.get("whisper", {}).get("max_segments_per_clip", 5),
+            transcripts_subdir=raw.get("whisper", {}).get("transcripts_subdir", "transcripts"),
+        ),
         export=ExportConfig(**_filter_dc(raw.get("export", {}), ExportConfig)),
     )
+
+
+def load_config(
+    config_path: str | Path = "config.yaml",
+    project_dir: Path | None = None,
+) -> AppConfig:
+    """Load config using the new V2 split structure.
+
+    Calls load_global_config + load_project_config internally,
+    composes into AppConfig wrapper.
+    """
+    config_file = Path(config_path).resolve()
+    global_cfg = load_global_config(config_file)
+    project_cfg = load_project_config(project_dir, config_path=config_file) if project_dir is not None else None
+
+    config = AppConfig(global_cfg=global_cfg, project_cfg=project_cfg)
     _validate_config(config)
     return config
-
-
-def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
-    """Load only the global config (config.yaml), return GlobalConfig.
-    Implementation will be filled in sub-task 3."""
-    from clio.config.models import GlobalConfig
-
-    return GlobalConfig()
-
-
-def load_project_config(project_dir: Path) -> ProjectConfig | None:
-    """Load project-level config (project.yaml), return ProjectConfig or None.
-    Implementation will be filled in sub-task 3."""
-    return None
 
 
 def apply_run_paths(
