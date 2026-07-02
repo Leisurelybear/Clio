@@ -202,7 +202,7 @@ const TASK_DESCRIPTIONS = {
   refine_text: '对已有文案进行润色和修正（默认跟随视频分析）',
 };
 
-function _renderTaskBinding(tasks, providersObj, descs) {
+export function _renderTaskBinding(tasks, providersObj, descs) {
   const providerKeys = Object.keys(providersObj || {});
   let html = '<fieldset class="config-fieldset"><legend>AI 任务绑定</legend>';
 
@@ -288,7 +288,7 @@ function _renderTaskBinding(tasks, providersObj, descs) {
   return html;
 }
 
-function _renderProviderList(providers, descs) {
+export function _renderProviderList(providers, descs) {
   const providersObj = providers || {};
   const keys = Object.keys(providersObj);
   let html = '<fieldset class="config-fieldset"><legend>AI 模型列表</legend>';
