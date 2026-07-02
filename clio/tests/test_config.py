@@ -1,15 +1,13 @@
-"""Tests for clio/config.py — pure functions and config loading."""
+"""Tests for clio/config — pure functions and config loading."""
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
 
 from clio.config import (
-    AppConfig,
     WhisperConfig,
     _load_context,
     _path,
@@ -18,9 +16,16 @@ from clio.config import (
     deep_merge,
     load_config,
 )
-
-if TYPE_CHECKING:
-    from clio.config import AIConfig, PathsConfig
+from clio.config.models import (
+    AppConfig,
+    GlobalAIConfig,
+    GlobalConfig,
+    ProjectAIConfig,
+    ProjectConfig,
+    ProviderConfig,
+    ProxyConfig,
+    TaskConfig,
+)
 
 # ── deep_merge ──────────────────────────────────────────────────────
 
@@ -174,28 +179,39 @@ class TestLoadContext:
 class TestValidateConfig:
     def test_valid_config_passes(self):
         cfg = AppConfig(
-            paths=create_paths(),
-            ai=create_ai(providers={"gemini": "gemini"}, tasks={"task": ("gemini", "m")}),
+            global_cfg=GlobalConfig(
+                ai=GlobalAIConfig(
+                    providers={"gemini": ProviderConfig(name="gemini", type="gemini", api_key="k")},
+                ),
+            ),
+            project_cfg=ProjectConfig(
+                ai=ProjectAIConfig(
+                    tasks={"task": TaskConfig(provider="gemini", model="m")},
+                ),
+            ),
         )
         _validate_config(cfg)  # should not raise
 
     def test_proxy_enabled_no_url_raises(self):
-        from clio.config import ProxyConfig
-
         cfg = AppConfig(
-            paths=create_paths(),
-            ai=create_ai(),
-            proxy=ProxyConfig(enabled=True, url=""),
+            global_cfg=GlobalConfig(
+                proxy=ProxyConfig(enabled=True, url=""),
+            ),
         )
         with pytest.raises(ValueError, match="proxy"):
             _validate_config(cfg)
 
     def test_task_refers_to_nonexistent_provider(self):
         cfg = AppConfig(
-            paths=create_paths(),
-            ai=create_ai(
-                providers={"gemini": "gemini"},
-                tasks={"task": ("nonexistent", "m")},
+            global_cfg=GlobalConfig(
+                ai=GlobalAIConfig(
+                    providers={"gemini": ProviderConfig(name="gemini", type="gemini", api_key="k")},
+                ),
+            ),
+            project_cfg=ProjectConfig(
+                ai=ProjectAIConfig(
+                    tasks={"task": TaskConfig(provider="nonexistent", model="m")},
+                ),
             ),
         )
         with pytest.raises(ValueError, match="task"):
@@ -203,10 +219,11 @@ class TestValidateConfig:
 
     def test_empty_provider_set_with_task(self):
         cfg = AppConfig(
-            paths=create_paths(),
-            ai=create_ai(
-                providers={},
-                tasks={"task": ("some_provider", "m")},
+            global_cfg=GlobalConfig(),
+            project_cfg=ProjectConfig(
+                ai=ProjectAIConfig(
+                    tasks={"task": TaskConfig(provider="some_provider", model="m")},
+                ),
             ),
         )
         with pytest.raises(ValueError, match="<无>"):
@@ -260,7 +277,7 @@ class TestLoadConfig:
         proj_yaml.write_text("compress:\n  fps: 30\n", encoding="utf-8")
 
         cfg = load_config(cfg_path, project_dir=tmp_path)
-        assert cfg.compress.fps == 30  # overridden
+        assert cfg.compress.fps == 15  # global-only field, project override ignored
         assert cfg.compress.target_size_mb == 5  # inherited
 
     def test_project_context_file_resolved_correctly(self, tmp_path):
@@ -292,7 +309,7 @@ class TestWhisperConfig:
         assert cfg.language == "zh"
         assert cfg.device == "auto"
         assert cfg.max_segments_per_clip == 5
-        assert cfg.cache_dir is None
+        assert cfg.cache_dir == ""
         assert cfg.transcripts_subdir == "transcripts"
 
     def test_custom_values(self):
@@ -357,27 +374,12 @@ class TestLoadDotenv:
 # ── Helpers ─────────────────────────────────────────────────────────
 
 
-def create_paths(**kwargs) -> PathsConfig:
-    """Helper to build a PathsConfig with defaults."""
-    from clio.config import PathsConfig
-
-    defaults = {"input_dir": Path("."), "output_dir": Path("./output")}
-    return PathsConfig(**{**defaults, **kwargs})
-
-
-def create_ai(
+def create_global_ai(
     providers: dict[str, str] | None = None,
-    tasks: dict[str, tuple[str, str]] | None = None,
-    context: str = "",
-) -> AIConfig:
-    """Helper to build an AIConfig with provider/task data class objects."""
-    from clio.config import AIConfig, ProviderConfig, TaskConfig
-
-    ai = AIConfig(context=context)
+) -> GlobalAIConfig:
+    """Helper to build a GlobalAIConfig with provider data class objects."""
+    ai = GlobalAIConfig()
     if providers:
         for name, ptype in providers.items():
             ai.providers[name] = ProviderConfig(name=name, type=ptype, api_key="k")
-    if tasks:
-        for name, (provider, model) in tasks.items():
-            ai.tasks[name] = TaskConfig(provider=provider, model=model)
     return ai

@@ -12,36 +12,49 @@ from clio.config.models import (
     AIConfig,
     AnalyzeConfig,
     AppConfig,
-    CompressConfig,
     ExportConfig,
+    GlobalAIConfig,
+    GlobalCompressConfig,
+    GlobalConfig,
+    GlobalPathsConfig,
+    GlobalWhisperConfig,
     NamingConfig,
-    PathsConfig,
     PlanConfig,
+    ProjectAIConfig,
+    ProjectCompressConfig,
+    ProjectConfig,
+    ProjectPathsConfig,
+    ProjectWhisperConfig,
     ProviderConfig,
     ProxyConfig,
     ScriptConfig,
     ServerConfig,
     TaskConfig,
-    WhisperConfig,
 )
 from clio.config.parsers import (
     _parse_providers,
     _parse_tasks,
-    _parse_whisper,
 )
 from clio.config.validators import _filter_dc, _validate_config
 
-_SECTION_DC_MAP: dict[str, type] = {
-    "paths": PathsConfig,
+_GLOBAL_SECTION_DC_MAP: dict[str, type] = {
+    "paths": GlobalPathsConfig,
     "proxy": ProxyConfig,
     "server": ServerConfig,
-    "ai": AIConfig,
-    "compress": CompressConfig,
-    "analyze": AnalyzeConfig,
     "naming": NamingConfig,
+    "ai": GlobalAIConfig,
+    "compress": GlobalCompressConfig,
+    "whisper": GlobalWhisperConfig,
+}
+
+_PROJECT_SECTION_DC_MAP: dict[str, type] = {
+    "paths": ProjectPathsConfig,
+    "ai": ProjectAIConfig,
+    "compress": ProjectCompressConfig,
+    "whisper": ProjectWhisperConfig,
+    "analyze": AnalyzeConfig,
     "script": ScriptConfig,
     "plan": PlanConfig,
-    "whisper": WhisperConfig,
     "export": ExportConfig,
 }
 
@@ -95,7 +108,7 @@ def _resolve_field_default(fd: dataclasses.Field):
     return _MISSING
 
 
-def _upgrade_config_file(yaml_path: Path) -> None:
+def _upgrade_config_file(yaml_path: Path, *, section_map: dict[str, type]) -> None:
     if not yaml_path.is_file():
         return
     try:
@@ -110,7 +123,7 @@ def _upgrade_config_file(yaml_path: Path) -> None:
     added: list[str] = []
     changed = False
 
-    for section_name, dc_type in _SECTION_DC_MAP.items():
+    for section_name, dc_type in section_map.items():
         section = raw.get(section_name)
         if not isinstance(section, dict):
             continue
@@ -185,6 +198,208 @@ def _load_context(ai_raw: dict, base: Path, project_dir: Path | None = None) -> 
     return ""
 
 
+# ---------------------------------------------------------------------------
+# V1 → V2 migration
+# ---------------------------------------------------------------------------
+
+_CONFIG_VERSION = "config_version"
+_V2 = "V2"
+
+# Sections entirely project-only (no split)
+_PROJECT_ONLY_SECTIONS = {"analyze", "script", "plan", "export"}
+
+# Sections entirely global-only (no split)
+_GLOBAL_ONLY_SECTIONS = {"proxy", "server", "naming"}
+
+# Split-section keys belonging to project
+_SPLIT_PROJECT_KEYS: dict[str, set[str]] = {
+    "paths": {"input_dir", "output_dir", "recursive"},
+    "compress": {"target_size_mb", "max_width", "split_max_min", "splits_subdir", "reencode_split"},
+    "ai": {"tasks", "context", "context_file"},
+    "whisper": {"enabled", "model_size", "language", "device", "max_segments_per_clip", "transcripts_subdir"},
+}
+
+# Split-section keys belonging to global
+_SPLIT_GLOBAL_KEYS: dict[str, set[str]] = {
+    "paths": {"ffmpeg", "ffprobe", "logs_dir"},
+    "ai": {"providers", "debug_print_prompt", "provider_ttl_min"},
+    "compress": {"codec", "fps", "remove_audio", "crf"},
+    "whisper": {"cache_dir", "hf_endpoint"},
+}
+
+
+def _is_global_key(section: str, key: str) -> bool:
+    if section in _GLOBAL_ONLY_SECTIONS:
+        return True
+    if section in _SPLIT_GLOBAL_KEYS and key in _SPLIT_GLOBAL_KEYS[section]:
+        return True
+    return False
+
+
+def _is_project_key(section: str, key: str) -> bool:
+    if section in _PROJECT_ONLY_SECTIONS:
+        return True
+    if section in _SPLIT_PROJECT_KEYS and key in _SPLIT_PROJECT_KEYS[section]:
+        return True
+    return False
+
+
+def _filter_global_only(raw: dict) -> dict:
+    """Keep only global-layer keys from a merged config dict."""
+    result: dict = {}
+    for section, value in raw.items():
+        if not isinstance(value, dict):
+            # Top-level scalars (config_version, etc.) — keep
+            result[section] = value
+            continue
+        if section in _GLOBAL_ONLY_SECTIONS:
+            result[section] = value
+        elif section in _PROJECT_ONLY_SECTIONS:
+            continue
+        elif section in _SPLIT_GLOBAL_KEYS:
+            kept = {k: v for k, v in value.items() if k in _SPLIT_GLOBAL_KEYS[section]}
+            if kept:
+                result[section] = kept
+        elif section in _SPLIT_PROJECT_KEYS:
+            kept = {k: v for k, v in value.items() if k in _SPLIT_GLOBAL_KEYS.get(section, set())}
+            if kept:
+                result[section] = kept
+        else:
+            # Unknown section — keep as-is (conservative)
+            result[section] = value
+    return result
+
+
+def _filter_project_only(raw: dict) -> dict:
+    """Keep only project-layer keys from a merged config dict."""
+    result: dict = {}
+    for section, value in raw.items():
+        if not isinstance(value, dict):
+            continue
+        if section in _PROJECT_ONLY_SECTIONS:
+            result[section] = value
+        elif section in _GLOBAL_ONLY_SECTIONS:
+            continue
+        elif section in _SPLIT_PROJECT_KEYS:
+            kept = {k: v for k, v in value.items() if k in _SPLIT_PROJECT_KEYS[section]}
+            if kept:
+                result[section] = kept
+        elif section in _SPLIT_GLOBAL_KEYS:
+            kept = {k: v for k, v in value.items() if k in _SPLIT_PROJECT_KEYS.get(section, set())}
+            if kept:
+                result[section] = kept
+        else:
+            # Unknown section — skip (conservative for project)
+            pass
+    return result
+
+
+def _migrate_v1_to_v2(config_path: Path) -> None:
+    """Migrate merged V1 config.yaml to split V2 structure."""
+    try:
+        with config_path.open(encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+    except Exception:
+        return
+
+    if not isinstance(raw, dict):
+        return
+
+    # Backup original
+    bak = config_path.with_suffix(config_path.suffix + ".bak")
+    if not bak.exists():
+        try:
+            with config_path.open(encoding="utf-8") as f:
+                bak.write_text(f.read(), encoding="utf-8")
+        except Exception:
+            pass
+
+    # Write V2 global config.yaml
+    global_raw = _filter_global_only(raw)
+    global_raw[_CONFIG_VERSION] = _V2
+    try:
+        text = yaml.dump(global_raw, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        tmp = config_path.with_suffix(".yaml.tmp")
+        tmp.write_text(text, encoding="utf-8")
+        os.replace(tmp, config_path)
+        print(f"[config] migrated config.yaml to V2 (global-only, backup at {bak.name})")
+    except Exception:
+        return
+
+    # Extract project fields from V1 config and write project.yaml if not present
+    project_out = _filter_project_only(raw)
+    if project_out:
+        proj_path = config_path.parent / "project.yaml"
+        if not proj_path.exists():
+            try:
+                text = yaml.dump(project_out, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                tmp = proj_path.with_suffix(".yaml.tmp")
+                tmp.write_text(text, encoding="utf-8")
+                os.replace(tmp, proj_path)
+                print("[config] created project.yaml from migrated V1 project fields")
+            except Exception:
+                pass
+
+    # Migrate existing project.yaml files
+    registry_path = config_path.parent / "projects.json"
+    if registry_path.is_file():
+        import json
+
+        try:
+            reg = json.loads(registry_path.read_text(encoding="utf-8"))
+        except Exception:
+            reg = {}
+        for p_str in reg.get("projects", []):
+            proj_dir = Path(p_str)
+            proj_yaml = proj_dir / "project.yaml"
+            if not proj_yaml.is_file():
+                continue
+            try:
+                with proj_yaml.open(encoding="utf-8") as f:
+                    proj_raw = yaml.safe_load(f) or {}
+            except Exception:
+                continue
+
+            # Back up project.yaml first
+            proj_bak = proj_yaml.with_suffix(proj_yaml.suffix + ".bak")
+            if not proj_bak.exists():
+                try:
+                    with proj_yaml.open(encoding="utf-8") as f:
+                        proj_bak.write_text(f.read(), encoding="utf-8")
+                except Exception:
+                    pass
+
+            project_out = _filter_project_only(proj_raw)
+            if not project_out:
+                # Project has nothing project-specific — remove file
+                proj_yaml.unlink(missing_ok=True)
+                print(f"[config] {proj_dir.name}/project.yaml: no project-only fields, removed")
+            else:
+                try:
+                    text = yaml.dump(project_out, default_flow_style=False, allow_unicode=True, sort_keys=False)
+                    tmp = proj_yaml.with_suffix(".yaml.tmp")
+                    tmp.write_text(text, encoding="utf-8")
+                    os.replace(tmp, proj_yaml)
+                    print(f"[config] {proj_dir.name}/project.yaml: migrated to V2")
+                except Exception:
+                    pass
+
+
+def _migrate_if_needed(config_path: Path) -> None:
+    """Check config_version and auto-migrate if V1."""
+    try:
+        with config_path.open(encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+    except Exception:
+        return
+    if not isinstance(raw, dict):
+        return
+    version = raw.get(_CONFIG_VERSION)
+    if version == _V2:
+        return
+    _migrate_v1_to_v2(config_path)
+
+
 def _legacy_ai_config(raw: dict) -> AIConfig:
     gemini_raw = raw.get("gemini", {})
     api_key = os.environ.get("GEMINI_API_KEY") or gemini_raw.get("api_key", "")
@@ -208,56 +423,90 @@ def _legacy_ai_config(raw: dict) -> AIConfig:
     )
 
 
-def load_config(
-    config_path: str | Path = "config.yaml",
-    project_dir: Path | None = None,
-) -> AppConfig:
+def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
+    """Load only the global config (config.yaml), return GlobalConfig."""
     config_file = Path(config_path).resolve()
     base = config_file.parent
     _load_dotenv(base)
 
-    _upgrade_config_file(config_file)
+    _migrate_if_needed(config_file)
+    _upgrade_config_file(config_file, section_map=_GLOBAL_SECTION_DC_MAP)
 
     with config_file.open(encoding="utf-8") as f:
         raw: dict[str, Any] = yaml.safe_load(f) or {}
 
-    if project_dir is not None:
-        project_yaml = Path(project_dir).resolve() / "project.yaml"
-        _upgrade_config_file(project_yaml)
-        if project_yaml.is_file():
-            with project_yaml.open(encoding="utf-8") as f:
-                project_raw: dict[str, Any] = yaml.safe_load(f) or {}
-            raw = deep_merge(raw, project_raw)
+    # Providers use env var resolution
+    ai_raw = raw.get("ai", {})
+    ai_cfg = GlobalAIConfig(
+        providers=_parse_providers(ai_raw.get("providers")),
+        debug_print_prompt=ai_raw.get("debug_print_prompt", True),
+        provider_ttl_min=ai_raw.get("provider_ttl_min", 60),
+    )
 
-    paths_raw = raw.get("paths", {})
-    ai_raw = raw.get("ai")
-
-    if ai_raw:
-        ai = AIConfig(
-            providers=_parse_providers(ai_raw.get("providers")),
-            tasks=_parse_tasks(ai_raw.get("tasks")),
-            context=_load_context(ai_raw, base, project_dir=project_dir),
-            debug_print_prompt=ai_raw.get("debug_print_prompt", False),
-            provider_ttl_min=ai_raw.get("provider_ttl_min", 60),
-        )
-    else:
-        ai = _legacy_ai_config(raw)
-
-    config = AppConfig(
-        paths=PathsConfig(
-            input_dir=_path(paths_raw.get("input_dir", "."), base),
-            output_dir=_path(paths_raw.get("output_dir", "./output"), base),
-            ffmpeg=paths_raw.get("ffmpeg", ""),
-            ffprobe=paths_raw.get("ffprobe", ""),
-            recursive=paths_raw.get("recursive", False),
-            logs_dir=_path(paths_raw.get("logs_dir", "./logs"), base),
-        ),
+    return GlobalConfig(
         proxy=ProxyConfig(**_filter_dc(raw.get("proxy", {}), ProxyConfig)),
         server=ServerConfig(**_filter_dc(raw.get("server", {}), ServerConfig)),
-        ai=ai,
-        compress=CompressConfig(**_filter_dc(raw.get("compress", {}), CompressConfig)),
-        analyze=AnalyzeConfig(**_filter_dc(raw.get("analyze", {}), AnalyzeConfig)),
         naming=NamingConfig(**_filter_dc(raw.get("naming", {}), NamingConfig)),
+        paths=GlobalPathsConfig(
+            ffmpeg=raw.get("paths", {}).get("ffmpeg", ""),
+            ffprobe=raw.get("paths", {}).get("ffprobe", ""),
+            logs_dir=_path(raw.get("paths", {}).get("logs_dir", "./logs"), base),
+        ),
+        ai=ai_cfg,
+        compress=GlobalCompressConfig(
+            codec=raw.get("compress", {}).get("codec", "libx264"),
+            fps=raw.get("compress", {}).get("fps", 15),
+            remove_audio=raw.get("compress", {}).get("remove_audio", True),
+            crf=raw.get("compress", {}).get("crf", 32),
+        ),
+        whisper=GlobalWhisperConfig(
+            cache_dir=raw.get("whisper", {}).get("cache_dir"),
+            hf_endpoint=raw.get("whisper", {}).get("hf_endpoint", ""),
+        ),
+    )
+
+
+def load_project_config(
+    project_dir: Path,
+    *,
+    config_path: Path | None = None,
+) -> ProjectConfig | None:
+    """Load project-level config (project.yaml), return ProjectConfig or None."""
+    project_yaml = project_dir.resolve() / "project.yaml"
+    if not project_yaml.is_file():
+        return None
+
+    _upgrade_config_file(project_yaml, section_map=_PROJECT_SECTION_DC_MAP)
+
+    with project_yaml.open(encoding="utf-8") as f:
+        raw: dict[str, Any] = yaml.safe_load(f) or {}
+
+    base = project_dir.resolve()
+    if config_path is not None:
+        base = config_path.parent
+
+    paths_raw = raw.get("paths", {})
+    ai_raw = raw.get("ai", {})
+    context = _load_context(ai_raw, base, project_dir=project_dir)
+
+    return ProjectConfig(
+        paths=ProjectPathsConfig(
+            input_dir=_path(paths_raw.get("input_dir", "."), base),
+            output_dir=_path(paths_raw.get("output_dir", "./output"), base),
+            recursive=paths_raw.get("recursive", False),
+        ),
+        ai=ProjectAIConfig(
+            tasks=_parse_tasks(ai_raw.get("tasks")),
+            context=context,
+        ),
+        compress=ProjectCompressConfig(
+            target_size_mb=raw.get("compress", {}).get("target_size_mb", 5),
+            max_width=raw.get("compress", {}).get("max_width", 640),
+            split_max_min=raw.get("compress", {}).get("split_max_min", 15),
+            splits_subdir=raw.get("compress", {}).get("splits_subdir", "splits"),
+            reencode_split=raw.get("compress", {}).get("reencode_split", False),
+        ),
+        analyze=AnalyzeConfig(**_filter_dc(raw.get("analyze", {}), AnalyzeConfig)),
         script=ScriptConfig(
             scripts_subdir=raw.get("script", {}).get("scripts_subdir", "scripts"),
             template_file=_path(
@@ -267,9 +516,32 @@ def load_config(
             target_words=raw.get("script", {}).get("target_words", 80),
         ),
         plan=PlanConfig(**_filter_dc(raw.get("plan", {}), PlanConfig)),
-        whisper=_parse_whisper(raw.get("whisper", {})),
+        whisper=ProjectWhisperConfig(
+            enabled=raw.get("whisper", {}).get("enabled", True),
+            model_size=raw.get("whisper", {}).get("model_size", "medium"),
+            language=raw.get("whisper", {}).get("language", "zh"),
+            device=raw.get("whisper", {}).get("device", "auto"),
+            max_segments_per_clip=raw.get("whisper", {}).get("max_segments_per_clip", 5),
+            transcripts_subdir=raw.get("whisper", {}).get("transcripts_subdir", "transcripts"),
+        ),
         export=ExportConfig(**_filter_dc(raw.get("export", {}), ExportConfig)),
     )
+
+
+def load_config(
+    config_path: str | Path = "config.yaml",
+    project_dir: Path | None = None,
+) -> AppConfig:
+    """Load config using the new V2 split structure.
+
+    Calls load_global_config + load_project_config internally,
+    composes into AppConfig wrapper.
+    """
+    config_file = Path(config_path).resolve()
+    global_cfg = load_global_config(config_file)
+    project_cfg = load_project_config(project_dir, config_path=config_file) if project_dir is not None else None
+
+    config = AppConfig(global_cfg=global_cfg, project_cfg=project_cfg)
     _validate_config(config)
     return config
 
@@ -281,10 +553,12 @@ def apply_run_paths(
     output_by_input_name: bool = True,
 ) -> AppConfig:
     config = deepcopy(config)
+    if config.project_cfg is None:
+        return config
     if input_dir:
-        config.paths.input_dir = input_dir.resolve()
+        config.project_cfg.paths.input_dir = input_dir.resolve()
     if output_dir:
-        config.paths.output_dir = output_dir.resolve()
+        config.project_cfg.paths.output_dir = output_dir.resolve()
     elif input_dir and output_by_input_name:
-        config.paths.output_dir = (config.paths.output_dir / input_dir.name).resolve()
+        config.project_cfg.paths.output_dir = (config.project_cfg.paths.output_dir / input_dir.name).resolve()
     return config

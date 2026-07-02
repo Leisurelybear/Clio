@@ -6,6 +6,13 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from clio.config import AppConfig, WhisperConfig
+from clio.config.models import (
+    AnalyzeConfig,
+    GlobalConfig,
+    ProjectConfig,
+    ProjectPathsConfig,
+    ProjectWhisperConfig,
+)
 from clio.tasks.transcribe import run_transcribe_all
 from clio.transcribe import (
     _get_model,
@@ -19,15 +26,17 @@ from clio.transcribe import (
 @pytest.fixture
 def cfg() -> AppConfig:
     return AppConfig(
-        paths=MagicMock(),
-        whisper=WhisperConfig(enabled=True, model_size="small", language="zh", device="cpu"),
+        global_cfg=GlobalConfig(),
+        project_cfg=ProjectConfig(
+            whisper=ProjectWhisperConfig(enabled=True, model_size="small", language="zh", device="cpu"),
+        ),
     )
 
 
 class TestResolveCacheDir:
     def test_default(self, tmp_path, monkeypatch):
         monkeypatch.setattr("clio.transcribe.PROJECT_ROOT", tmp_path)
-        result = _resolve_cache_dir(MagicMock(whisper=WhisperConfig(cache_dir=None)))
+        result = _resolve_cache_dir(MagicMock(whisper=WhisperConfig(cache_dir="")))
         assert result == tmp_path / "models"
 
     def test_custom(self, tmp_path):
@@ -254,8 +263,10 @@ class TestRunTranscribeAll:
     def test_transcribe_enabled_check_no_deps(self):
         """当 faster-whisper 不可导入时，run_transcribe_all 打印警告并返回 0"""
         config = AppConfig(
-            paths=MagicMock(),
-            whisper=WhisperConfig(enabled=True),
+            global_cfg=GlobalConfig(),
+            project_cfg=ProjectConfig(
+                whisper=ProjectWhisperConfig(enabled=True),
+            ),
         )
 
         with (
@@ -268,8 +279,10 @@ class TestRunTranscribeAll:
     def test_transcribe_skipped_when_disabled(self):
         """whisper.enabled=False 时跳过转录"""
         config = AppConfig(
-            paths=MagicMock(),
-            whisper=WhisperConfig(enabled=False),
+            global_cfg=GlobalConfig(),
+            project_cfg=ProjectConfig(
+                whisper=ProjectWhisperConfig(enabled=False),
+            ),
         )
 
         with patch("builtins.print"):
@@ -282,12 +295,16 @@ class TestRunTranscribeAll:
 
         cancel_event = Event()
         config = AppConfig(
-            paths=MagicMock(),
-            whisper=WhisperConfig(enabled=True, model_size="small", language="zh", device="cpu"),
+            global_cfg=GlobalConfig(),
+            project_cfg=ProjectConfig(
+                paths=ProjectPathsConfig(
+                    input_dir=MagicMock(),
+                    output_dir=MagicMock(),
+                ),
+                whisper=ProjectWhisperConfig(enabled=True, model_size="small", language="zh", device="cpu"),
+                analyze=AnalyzeConfig(skip_existing=False),
+            ),
         )
-        config.analyze.skip_existing = False
-        config.paths.output_dir = MagicMock()
-        config.paths.input_dir = MagicMock()
 
         mock_state = MagicMock()
 

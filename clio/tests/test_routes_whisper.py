@@ -34,7 +34,7 @@ def _make_handler(proj_input: Path, proj_output: Path) -> MagicMock:
     cfg = MagicMock()
     cfg.whisper.model_size = "small"
     cfg.whisper.hf_endpoint = ""
-    cfg.whisper.cache_dir = None
+    cfg.whisper.cache_dir = ""
     cfg.proxy.enabled = False
     cfg.proxy.url = ""
     handler._get_config.return_value = cfg

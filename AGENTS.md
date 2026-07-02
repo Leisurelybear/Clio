@@ -13,7 +13,7 @@ An **AI preprocessing pipeline**: raw travel vlog footage → ffmpeg compression
 - **ffmpeg / ffprobe** (video processing; GoPro 4K → 640p 5MB compressed)
 - **google-genai** (Gemini 2.5 Flash video File API)
 - **httpx** (DeepSeek / OpenAI compatible calls)
-- **PyYAML** (config parsing)
+- **PyYAML** (config parsing; split into `config.yaml` global + `project.yaml` per-project)
 - **pytest** (unit tests, auto-run in CI; **914 test cases**)
 
 Dependencies in `requirements.txt`; `setup.ps1`/`setup.sh` creates venv + installs ffmpeg + copies `.env` in one click.
@@ -125,7 +125,7 @@ Upon taking over, the AI should:
 
 1. `git log --oneline -10` — recent changes
 2. `git status` — uncommitted changes
-3. Read `config.example.yaml` — config structure
+3. Read `config.example.yaml` + `docs/project.example.yaml` — config structure
 4. Read `templates/trip_context.md` — current trip background
 5. Read `docs/superpowers/agents/gotchas.md` — known pitfalls (only if modifying affected modules)
 6. Read `CHANGELOG.md` — project history (only if needed)

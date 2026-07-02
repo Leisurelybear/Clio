@@ -44,24 +44,31 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] 3. Replace normal-mode debug prints with structured logging — no leftover debug prints found; all remaining print() calls are intentional CLI output
 - [x] 4. Add golden tests for export formats — 26 export tests pass
 
-### Phase 6: Global vs Project Config Separation
+### Phase 6: Global vs Project Config Separation ✅
 
-**Background**: Currently global `config.yaml` and per-project `project.yaml` share the same schema and merge at load time. This makes it impossible to distinguish "app-wide defaults" (providers, whisper model management) from "project-specific overrides" (which provider to use, AI context). Users have no UI-level understanding of which settings are global vs local.
+**Background**: Previously global `config.yaml` and per-project `project.yaml` shared the same schema and merged at load time, making it impossible to distinguish app-wide defaults from project-specific overrides.
 
 **Design goals**:
-- Global config (`config.yaml`): defines providers (API keys, model names, base URLs), Whisper model download paths, UI listen address/port, default paths
-- Project config (`project.yaml`): selects which provider/task binding to use, sets AI context, configures pipeline steps, overrides analysis parameters
-- No schema overlap: a setting lives in exactly one layer, never both
-- UI explicitly shows which layer each setting comes from, with tab switcher
+- Global config (`config.yaml`): defines providers, Whisper model paths, UI listen address, default paths
+- Project config (`project.yaml`): selects provider/task binding, sets AI context, configures pipeline steps
+- No schema overlap: each setting lives in exactly one layer
+- UI explicitly shows which layer each setting comes from (Global / Project / Merged sub-tabs)
+- Provider configuration is exclusively global — API keys never in project.yaml
 
 **Sub-tasks**:
-- [ ] 1. Design spec: define exact schema boundary between global and project config
-- [ ] 2. Backend: split `load_config` into `load_global_config` + `load_project_config` with separate caches
-- [ ] 3. Backend: `/api/config/global` and `/api/config/project` REST endpoints (no more "raw" catch-all)
-- [ ] 4. UI: Settings tab split into "Global" and "Project" sub-tabs
-- [ ] 5. UI: Global tab shows providers/formats; Project tab shows task binding/context/steps
-- [ ] 6. Migration: existing merged config.yaml auto-migrates to the new structure on first run
-- [ ] 7. Provider configuration is exclusively global — API keys never stored in project.yaml
+- [x] Design spec (`docs/superpowers/specs/2026-07-01-global-project-config-separation-design.md`)
+- [x] Backend: `load_global_config` + `load_project_config` + `GlobalConfig`/`ProjectConfig` dataclasses
+- [x] Backend: `/api/config/global` and `/api/config/project` REST endpoints with field ownership validation
+- [x] UI: Settings tab split into Global / Project / Merged sub-tabs (editor-config.js)
+- [x] Migration: V1→V2 auto-migration on first load, creates `project.yaml` from V1 project fields
+- [x] Provider config is exclusively global (API keys validated against leak to project.yaml)
+- [x] 36 new tests + 918 existing tests migrated (954 total, all pass)
+
+**Key design decisions**:
+- `CombinedX` classes are read-only properties on `AppConfig`; mutation goes through `global_cfg`/`project_cfg` accessors
+- V1→V2 migration backs up original config as `config.yaml.bak`
+- `handle_put_config_raw` validates field ownership to prevent API key cross-layer leaks
+- `_SECTION_DC_MAP` in `_upgrade_config_file` still uses old merged types (pending clean-up in future phase)
 
 ---
 

@@ -124,9 +124,15 @@ DEEPSEEK_API_KEY=你的_DeepSeek_API_Key
 
 ### ⚙️ 修改配置
 
+配置已拆分为两层：
+
+- **`config.yaml`**（全局）：AI 厂商、API 密钥、代理、编解码参数等跨项目通用设置
+- **`project.yaml`**（项目）：任务定义、AI 上下文、压缩尺寸、whisper 语言等项目级个性化
+
 ```bash
 cp config.example.yaml config.yaml
-# 编辑 paths.input_dir（素材目录）、proxy.url（代理）等
+# 全局配置：编辑 proxy、ai.providers 等
+# 项目配置：在项目目录放置 project.yaml（参考 docs/project.example.yaml）
 ```
 
 ### ▶️ 跑起来
@@ -153,7 +159,7 @@ python main.py serve
 | 📋 剪辑规划 | **DeepSeek** / OpenAI | 纯文本 | 编排片段顺序 |
 | 🔧 AI 审阅 | 同上（可独立配置） | 纯文本 | 用 trip 上下文修正输出 |
 
-每个任务可独立指定厂家和模型（`config.yaml` 的 `ai.tasks`），支持 **OpenAI 兼容接口**（通义千问 / Kimi 等）。
+每个任务可独立指定厂家和模型（`project.yaml` 的 `ai.tasks`），支持 **OpenAI 兼容接口**（通义千问 / Kimi 等）。
 
 📌 **trip 上下文自动注入**：行程背景、避免误判提示（如 "不要把戴高乐机场 RER 误认为曼谷"）统一写在 `templates/trip_context.md`，每次 AI 调用前自动插入。—
 

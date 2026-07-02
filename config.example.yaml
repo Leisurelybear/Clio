@@ -1,19 +1,28 @@
-# Vlog 剪辑辅助工具配置（示例，请复制为 config.yaml 后按需修改）
-
-paths:
-  input_dir: "./videos"
-  output_dir: "./output"
-  recursive: false          # true = 扫描子文件夹内所有视频
-  ffmpeg: ""
-  ffprobe: ""
-  logs_dir: "./logs"        # 按小时切文件：logs/YYYY-MM-DD-HH.log
-                            # 整个 CLI 跑下来所有 print() / 错误 / 日志都会同时落这里
+# Vlog 剪辑辅助工具全局配置示例（config.yaml）
+#
+# 从 config_v2 开始，配置拆分为两层：
+#   config.yaml  — 全局配置（本文件），仅包含跨项目的通用设置
+#   project.yaml — 项目级配置，放在每个项目的目录下
+#
+# 全局配置项：
+#   proxy, server, naming
+#   paths: ffmpeg, ffprobe, logs_dir
+#   ai: providers, debug_print_prompt, provider_ttl_min
+#   compress: fps, codec, crf, remove_audio
+#   whisper: cache_dir, hf_endpoint
+#
+# 项目级配置项（见 project.example.yaml）：
+#   paths: input_dir, output_dir, recursive
+#   ai: tasks, context, context_file
+#   compress: target_size_mb, max_width, split_max_min, splits_subdir, reencode_split
+#   analyze, script, plan, export
+#   whisper: enabled, model_size, language, device, max_segments_per_clip, transcripts_subdir
 
 proxy:
   enabled: false
   url: "socks5://127.0.0.1:1080"
 
-# AI 厂家与任务配置（每个步骤可独立指定厂家和模型）
+# AI 厂家配置（全局，密钥管理见下方说明）
 #
 # API 密钥管理：
 #   - 密钥放在项目根目录的 .env 文件中（参考 .env.example），不要写在 config.yaml 里
@@ -29,27 +38,19 @@ proxy:
 #     - 通义千问：https://dashscope.aliyuncs.com/compatible-mode/v1
 #     - Kimi：https://api.moonshot.cn/v1
 ai:
-  # 可选：trip 背景 + 规范说明。每次 AI 调用前会自动注入到提示词前面。
-  # 用 inline 短文本（context）或者一个文件（context_file）都行，二选一。
-  # 适合写：拍摄时间地点、命名约定、避免误判的提示、输出语言等。
-  # context: "所有素材均拍摄于 2024 年 7 月法国巴黎，不要误判为其他城市。"
-  # context_file: ./templates/trip_context.md
-
   # 已缓存的 AI 提供商过期间隔（分钟），超时后自动关闭重建。
   # 长时间运行的 UI 服务建议设 60-120，避免旧 HTTP session 泄漏。
   # 设为 0 表示永不过期。
   # provider_ttl_min: 60
 
-  # debug_print_prompt: true  # 调试用：在每次 AI 调用前打印完整 prompt（含上下文注入）到控制台
+  # debug_print_prompt: true  # 调试用：每次 AI 调用前打印完整 prompt 到控制台（默认开启，可改为 false 关闭）
   providers:
     gemini:
       type: gemini
       api_key_env: GEMINI_API_KEY
-      # base_url: 留空即可，SDK 自动使用 Google 官方 API 地址（https://generativelanguage.googleapis.com）
+      # base_url: 留空即可，SDK 自动使用 Google 官方 API 地址
       poll_interval_sec: 5
-      # 免费额度下建议 5-8，付费可降到 3（重试间隔 ~2s 指数退避）
       retry_attempts: 5
-      # 每分钟最多调用次数，0 = 不限流
       requests_per_minute: 0
 
     openai:
@@ -61,92 +62,23 @@ ai:
       type: openai              # OpenAI 兼容接口
       api_key_env: DEEPSEEK_API_KEY
       base_url: https://api.deepseek.com/v1
-      # max_tokens: 4096  # 可选：AI 输出最大 token 数（默认 4096，覆盖大部分输出）
-  # 
+      # max_tokens: 4096
+  #
   # ⚠️ 注意：不要在 config.yaml 里写 api_key 字段，密钥请放在 .env 文件中
   #    例如 .env 内容：GEMINI_API_KEY=AIza...  /  DEEPSEEK_API_KEY=sk-...
   #    api_key 字段仅作为 .env 未设置时的后备方案（不推荐）
 
-  # 注意：model 请填写厂商实际支持的模型名。
-  # DeepSeek 官网可用：deepseek-chat（V3）、deepseek-reasoner（R1）。
-  # 部分三方 API 或自定义网关支持 deepseek-v4-flash 等变体名，请按实际可用名填写。
-  tasks:
-    video_analyze:              # 视频理解（需支持视频的厂家，如 gemini）
-      provider: gemini
-      model: gemini-2.5-flash
-
-    voiceover:                  # 口播文案（纯文本）
-      provider: deepseek
-      model: deepseek-chat
-
-    vlog_plan:                  # 日 vlog 剪辑规划（纯文本）
-      provider: deepseek
-      model: deepseek-chat
-
-    # 可选：refine 阶段（`python main.py refine`）专用 provider。
-    # 默认回退到 video_analyze 的 provider。
-    # texts 和 scripts 审阅共用这一个任务（都是纯文本）。
-    # 显式声明后可换成更便宜的纯文本模型（典型场景：全切 deepseek 省钱）。
-    # refine_text:
-    #   provider: deepseek
-    #   model: deepseek-chat
+paths:
+  ffmpeg: ""
+  ffprobe: ""
+  logs_dir: "./logs"        # 按小时切文件：logs/YYYY-MM-DD-HH.log
 
 compress:
-  target_size_mb: 5
-  max_width: 640
   fps: 15
   codec: libx264
   crf: 32
   remove_audio: true
-  # 自动分段：超过此时长（分钟）的原视频在压缩前先切成等长段
-  # 每段独立压缩和分析，避免长视频超出 AI 上下文限制
-  # 设为 0 关闭分段；免费额度推荐 15，付费可按需调大
-  split_max_min: 15
-  splits_subdir: splits
-  # reencode_split: true  # 分段时重新编码（-c:v libx264）以精确到帧，
-                            # 避免段首黑屏。默认 false 使用 -c copy（快速但
-                            # 切分边界在关键帧，段首可能有多余画面或黑帧）。
 
-analyze:
-  compressed_subdir: compressed
-  texts_subdir: texts
-  skip_existing: true
-  # 压缩视频超过此时长（分钟）则跳过分析，避免浪费 Gemini 配额
-  # 设为 0 表示不限制；免费额度建议 30-45，付费可按需调整
-  max_analyze_duration_min: 45
-  # AI 分析并发数（ThreadPoolExecutor）。1=串行（默认），>1 并发分析多个视频
-  # 注意：并发需要 Gemini 账号有足够的配额（requests_per_minute 也要相应调整）
-  max_workers: 1
-
-naming:
-  index_width: 3
-
-script:
-  scripts_subdir: scripts
-  template_file: ./templates/vlog_template.md
-  target_words: 80
-
-plan:
-  plans_subdir: plans
-  max_clips_per_day: 12
-  target_duration_sec: 180
-#   use_transcripts: true
-
-export:
-  canvas_ratio: 16:9      # 16:9 | 9:16 | 1:1 — 剪映导出画布比例
-  output_subdir: export
-  # jianying_draft_dir: "~/Movies/JianyingPro/User Data/Projects/"     # macOS
-  # jianying_draft_dir: "~/AppData/Local/JianyingPro/User Data/Projects/"  # Windows
-  # auto_copy_draft: true   # 导出后自动复制草稿到剪映目录
-
-# Whisper ASR 语音转录（需要额外安装 faster-whisper: python main.py whisper install）
-# 运行时检测安装，未安装则自动跳过，不会报错
 whisper:
-  enabled: true        # 默认已启用（运行时检测 faster-whisper 是否安装）
-  model_size: medium   # small | medium | large-v3
-  language: zh         # zh | en | auto（auto=自动检测语言；per-project 可覆盖）
-  device: auto         # auto | cpu | cuda
-  max_segments_per_clip: 5   # plan 注入时每段视频最多取 N 条
-  cache_dir: null      # null=默认 <程序根目录>/models/；可指定共享目录
-  transcripts_subdir: transcripts
+  cache_dir: ""               # 模型缓存目录，为空时使用默认路径 <程序根目录>/models/
   hf_endpoint: https://hf-mirror.com   # 国内推荐 hf-mirror.com，留空=HuggingFace 官方

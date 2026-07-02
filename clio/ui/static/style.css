@@ -686,6 +686,27 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
   50% { box-shadow: 0 0 0 6px rgba(245, 158, 11, 0); }
 }
 
+/* ── Config Tab Bar ────────────────────────────────────────── */
+.config-tab-bar {
+  display: flex; gap: 0; margin-bottom: 16px;
+  border-bottom: 2px solid var(--border);
+}
+.config-tab-btn {
+  padding: 8px 18px; font-size: var(--text-sm); font-weight: 500;
+  background: transparent; color: var(--text-secondary);
+  border: none; border-bottom: 2px solid transparent;
+  margin-bottom: -2px; cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.config-tab-btn:hover { color: var(--text-primary); background: var(--bg-surface-2); }
+.config-tab-btn.active {
+  color: var(--accent); border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.config-merged .config-fieldset { opacity: 0.9; }
+.config-merged .config-fieldset input,
+.config-merged .config-fieldset textarea { pointer-events: none; background: var(--bg-surface-2); }
+
 /* ── Config Form ───────────────────────────────────────────── */
 .config-form { font-size: var(--text-sm); }
 .config-form .config-fieldset {

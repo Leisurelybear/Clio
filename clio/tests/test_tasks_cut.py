@@ -3,36 +3,45 @@ from __future__ import annotations
 import json
 import threading
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from clio.config import AppConfig
+from clio.config.models import (
+    AnalyzeConfig,
+    GlobalConfig,
+    GlobalPathsConfig,
+    NamingConfig,
+    PlanConfig,
+    ProjectConfig,
+    ProjectPathsConfig,
+    ScriptConfig,
+)
 from clio.vmeta import VideoMeta
 
 
 @pytest.fixture
 def cfg(tmp_path) -> AppConfig:
-    plans = tmp_path / "plans"
-    texts = tmp_path / "texts"
-    compressed = tmp_path / "compressed"
-    videos = tmp_path / "videos"
-    for d in [plans, texts, compressed, videos]:
-        d.mkdir()
-    analyze = MagicMock(skip_existing=True, texts_subdir="texts", compressed_subdir="compressed")
-    script = MagicMock(scripts_subdir="scripts")
-    plan = MagicMock(plans_subdir="plans")
+    (tmp_path / "plans").mkdir()
+    (tmp_path / "texts").mkdir()
+    (tmp_path / "compressed").mkdir()
+    (tmp_path / "videos").mkdir()
     return AppConfig(
-        paths=MagicMock(
-            input_dir=videos,
-            output_dir=tmp_path,
-            ffmpeg="ffmpeg",
-            ffprobe="ffprobe",
+        global_cfg=GlobalConfig(
+            paths=GlobalPathsConfig(ffmpeg="ffmpeg", ffprobe="ffprobe"),
+            naming=NamingConfig(index_width=3),
         ),
-        analyze=analyze,
-        naming=MagicMock(index_width=3),
-        script=script,
-        plan=plan,
+        project_cfg=ProjectConfig(
+            paths=ProjectPathsConfig(input_dir=tmp_path / "videos", output_dir=tmp_path),
+            analyze=AnalyzeConfig(
+                skip_existing=True,
+                texts_subdir="texts",
+                compressed_subdir="compressed",
+            ),
+            script=ScriptConfig(scripts_subdir="scripts"),
+            plan=PlanConfig(plans_subdir="plans"),
+        ),
     )
 
 

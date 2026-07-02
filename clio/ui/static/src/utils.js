@@ -76,6 +76,8 @@ function updateProjectSidebar() {
 }
 
 function updateEntityUI() {
+  const saveBtn = $('btn-save');
+  if (saveBtn) saveBtn.style.display = '';
   const cls = state.currentEntity === 'plan' ? 'entity-plan'
     : state.currentEntity === 'run' ? 'entity-run'
     : state.currentEntity === 'config' ? 'entity-config'

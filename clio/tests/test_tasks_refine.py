@@ -2,11 +2,20 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
 from clio.config import AppConfig
+from clio.config.models import (
+    AnalyzeConfig,
+    GlobalConfig,
+    GlobalPathsConfig,
+    PlanConfig,
+    ProjectConfig,
+    ProjectPathsConfig,
+    ScriptConfig,
+)
 
 
 @pytest.fixture
@@ -15,19 +24,20 @@ def cfg(tmp_path) -> AppConfig:
     scripts = tmp_path / "scripts"
     texts.mkdir()
     scripts.mkdir()
-    analyze = MagicMock(skip_existing=True, texts_subdir="texts", compressed_subdir="compressed")
-    script = MagicMock(scripts_subdir="scripts")
-    plan = MagicMock(plans_subdir="plans")
     return AppConfig(
-        paths=MagicMock(
-            input_dir=tmp_path / "videos",
-            output_dir=tmp_path,
-            ffmpeg="",
-            ffprobe="",
+        global_cfg=GlobalConfig(
+            paths=GlobalPathsConfig(ffmpeg="", ffprobe=""),
         ),
-        analyze=analyze,
-        script=script,
-        plan=plan,
+        project_cfg=ProjectConfig(
+            paths=ProjectPathsConfig(input_dir=tmp_path / "videos", output_dir=tmp_path),
+            analyze=AnalyzeConfig(
+                skip_existing=True,
+                texts_subdir="texts",
+                compressed_subdir="compressed",
+            ),
+            script=ScriptConfig(scripts_subdir="scripts"),
+            plan=PlanConfig(plans_subdir="plans"),
+        ),
     )
 
 

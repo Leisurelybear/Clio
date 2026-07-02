@@ -7,7 +7,14 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from clio.config import AnalyzeConfig, AppConfig, PathsConfig
+from clio.config import AppConfig
+from clio.config.models import (
+    AnalyzeConfig,
+    GlobalConfig,
+    GlobalPathsConfig,
+    ProjectConfig,
+    ProjectPathsConfig,
+)
 from clio.tasks.reindex import (
     _find_original_for_stem,
     auto_reindex_if_needed,
@@ -32,12 +39,16 @@ def input_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def config(compressed_dir: Path, input_dir: Path) -> AppConfig:
     return AppConfig(
-        paths=PathsConfig(
-            input_dir=input_dir,
-            output_dir=compressed_dir.parent,
-            ffprobe="ffprobe",
+        global_cfg=GlobalConfig(
+            paths=GlobalPathsConfig(ffprobe="ffprobe"),
         ),
-        analyze=AnalyzeConfig(compressed_subdir=compressed_dir.name),
+        project_cfg=ProjectConfig(
+            paths=ProjectPathsConfig(
+                input_dir=input_dir,
+                output_dir=compressed_dir.parent,
+            ),
+            analyze=AnalyzeConfig(compressed_subdir=compressed_dir.name),
+        ),
     )
 
 
@@ -61,10 +72,13 @@ class TestFindOriginalForStem:
 class TestAutoReindexIfNeeded:
     def test_missing_compressed_dir(self, tmp_path: Path) -> None:
         cfg = AppConfig(
-            paths=PathsConfig(
-                input_dir=tmp_path,
-                output_dir=tmp_path / "nonexistent",
-            )
+            global_cfg=GlobalConfig(),
+            project_cfg=ProjectConfig(
+                paths=ProjectPathsConfig(
+                    input_dir=tmp_path,
+                    output_dir=tmp_path / "nonexistent",
+                ),
+            ),
         )
         assert auto_reindex_if_needed(cfg) is False
 
@@ -81,7 +95,7 @@ class TestAutoReindexIfNeeded:
 
 class TestRunReindex:
     def test_missing_dir(self, config: AppConfig, capsys: pytest.CaptureFixture[str]) -> None:
-        config.paths.output_dir = Path("/nonexistent_path_xyz")
+        config.project_cfg.paths.output_dir = Path("/nonexistent_path_xyz")
         with patch("clio.tasks.reindex.resolve_binary", return_value="ffprobe"):
             result = run_reindex(config)
         assert result == 0
