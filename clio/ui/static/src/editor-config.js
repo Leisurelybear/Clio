@@ -175,6 +175,119 @@ function _renderConfigGlobal(globalData, descs) {
   return html;
 }
 
+function _renderConfigProject(projectData, globalData, descs) {
+  let html = '';
+  for (const [key, val] of Object.entries(projectData)) {
+    if (key === 'ai') continue;
+    html += _renderConfigForm({ [key]: val }, '', descs);
+  }
+  html += _renderTaskBinding(
+    projectData.ai?.tasks || {},
+    globalData?.ai?.providers || {},
+    descs || {},
+  );
+  return html;
+}
+
+const TASK_LABELS = {
+  video_analyze: '视频分析',
+  voiceover: '口播文案',
+  vlog_plan: 'vlog 剪辑规划',
+  refine_text: '文本精修',
+};
+const TASK_DESCRIPTIONS = {
+  video_analyze: '分析视频内容（场景、物体、人物、动作、地点），需多模态模型',
+  voiceover: '根据分析结果生成口播文案',
+  vlog_plan: '根据所有素材生成剪辑顺序和时间轴',
+  refine_text: '对已有文案进行润色和修正（默认跟随视频分析）',
+};
+
+function _renderTaskBinding(tasks, providersObj, descs) {
+  const providerKeys = Object.keys(providersObj || {});
+  let html = '<fieldset class="config-fieldset"><legend>AI 任务绑定</legend>';
+
+  if (providerKeys.length === 0) {
+    html += '<div class="config-empty-state"><p class="muted">还没有注册任何 AI 模型</p><p class="hint">请先在"全局"标签页中添加 Provider。</p><p><a href="#" id="goto-global-providers">去添加 →</a></p></div>';
+    html += '</fieldset>';
+    return html;
+  }
+
+  for (const taskKey of ['video_analyze', 'voiceover', 'vlog_plan', 'refine_text']) {
+    const label = TASK_LABELS[taskKey];
+    const desc = TASK_DESCRIPTIONS[taskKey];
+    const taskCfg = tasks[taskKey];
+    const isRefine = taskKey === 'refine_text';
+    const isFollowing = isRefine && !taskCfg;
+
+    html += '<div class="task-binding-card">';
+    html += '<div class="task-binding-header">';
+    html += `<span class="task-binding-name">${escapeHtml(label)}${_renderTooltip('ai.tasks.' + taskKey, desc)}</span>`;
+    html += '</div>';
+
+    if (isRefine) {
+      html += '<div class="task-binding-row">';
+      html += '<label class="task-binding-label refine-follow-cb">';
+      html += `<input type="checkbox" class="refine-follow-check" data-task="${taskKey}" ${isFollowing ? 'checked' : ''}> 跟随视频分析`;
+      html += '</label>';
+      html += '</div>';
+    }
+
+    if (isFollowing) {
+      const vaCfg = tasks.video_analyze || {};
+      html += '<div class="task-binding-row">';
+      html += `<span class="muted">继承自 video_analyze: ${escapeHtml(vaCfg.provider || '(未配置)')} / ${escapeHtml(vaCfg.model || '(未配置)')}</span>`;
+      html += '</div>';
+    } else {
+      const currentProvider = taskCfg?.provider || '';
+      const currentModel = taskCfg?.model || '';
+
+      let eligibleProviders = providerKeys;
+      if (taskKey === 'video_analyze') {
+        eligibleProviders = providerKeys.filter(k => providersObj[k]?.type === 'gemini');
+      }
+
+      html += '<div class="task-binding-row">';
+      html += '<label class="task-binding-label">Provider</label>';
+      html += `<select class="task-provider-select" data-task="${taskKey}">`;
+      html += '<option value="">-- 选择 Provider --</option>';
+      for (const pk of eligibleProviders) {
+        const p = providersObj[pk];
+        const typeLabel = p?.type === 'gemini' ? 'Gemini' : 'OpenAI';
+        const selected = pk === currentProvider ? ' selected' : '';
+        html += `<option value="${escapeHtml(pk)}"${selected}>${escapeHtml(pk)} (${typeLabel})</option>`;
+      }
+      html += '</select>';
+      html += '</div>';
+
+      const hasProvider = currentProvider && providersObj[currentProvider];
+      html += '<div class="task-binding-row">';
+      html += '<label class="task-binding-label">模型</label>';
+      if (hasProvider) {
+        const models = providersObj[currentProvider].models || [];
+        if (models.length > 0) {
+          html += `<select class="task-model-select" data-task="${taskKey}">`;
+          html += '<option value="">-- 选择模型 --</option>';
+          for (const m of models) {
+            const selected = m === currentModel ? ' selected' : '';
+            html += `<option value="${escapeHtml(m)}"${selected}>${escapeHtml(m)}</option>`;
+          }
+          html += '</select>';
+        } else {
+          html += '<span class="warn">⚠️ 该 Provider 没有注册可用模型</span>';
+        }
+      } else {
+        html += '<span class="muted">请先选择 Provider</span>';
+      }
+      html += '</div>';
+    }
+
+    html += '</div>';
+  }
+
+  html += '</fieldset>';
+  return html;
+}
+
 function _renderProviderList(providers, descs) {
   const providersObj = providers || {};
   const keys = Object.keys(providersObj);
@@ -409,6 +522,55 @@ function _attachProviderListHandlers(pane, providersObj) {
   });
 }
 
+function _attachTaskBindingHandlers(pane, projectCfg) {
+  const reRender = () => renderConfig();
+
+  pane.querySelectorAll('.task-provider-select').forEach(sel => {
+    sel.onchange = () => {
+      const taskKey = sel.dataset.task;
+      setDeep(projectCfg, `ai.tasks.${taskKey}.provider`, sel.value);
+      setDeep(projectCfg, `ai.tasks.${taskKey}.model`, '');
+      markDirty();
+      reRender();
+    };
+  });
+
+  pane.querySelectorAll('.task-model-select').forEach(sel => {
+    sel.onchange = () => {
+      const taskKey = sel.dataset.task;
+      setDeep(projectCfg, `ai.tasks.${taskKey}.model`, sel.value);
+      markDirty();
+    };
+  });
+
+  pane.querySelectorAll('.refine-follow-check').forEach(cb => {
+    cb.onchange = () => {
+      if (cb.checked) {
+        if (projectCfg.ai?.tasks?.refine_text) {
+          delete projectCfg.ai.tasks.refine_text;
+        }
+      } else {
+        if (!projectCfg.ai) projectCfg.ai = {};
+        if (!projectCfg.ai.tasks) projectCfg.ai.tasks = {};
+        projectCfg.ai.tasks.refine_text = { provider: '', model: '' };
+      }
+      markDirty();
+      reRender();
+    };
+  });
+
+  const gotoBtn = pane.querySelector('#goto-global-providers');
+  if (gotoBtn) {
+    gotoBtn.onclick = (e) => {
+      e.preventDefault();
+      state.configTab = 'global';
+      state.dirty = false;
+      updateSaveBtn();
+      renderConfig();
+    };
+  }
+}
+
 function _tabBtn(label, tabKey, active) {
   return `<button class="config-tab-btn${active ? ' active' : ''}" data-config-tab="${tabKey}">${label}</button>`;
 }
@@ -548,7 +710,7 @@ export function renderConfig() {
   let contentHtml = '';
   if (active === 'project') {
     const projectData = state.configProject || {};
-    contentHtml = `<div class="config-form">${_renderConfigForm(projectData, '', descs)}</div>`;
+    contentHtml = `<div class="config-form">${_renderConfigProject(projectData, state.configGlobal, descs)}</div>`;
   } else if (active === 'global') {
     const globalData = state.configGlobal || {};
     contentHtml = _renderEnvEditor()
@@ -593,6 +755,7 @@ export function renderConfig() {
   } else if (active === 'project') {
     _attachConfigForm(pane, state.configProject || {}, descs);
     _attachContextTemplate(pane);
+    _attachTaskBindingHandlers(pane, state.configProject);
   }
 
   // Model management stays in global tab (system-level)
