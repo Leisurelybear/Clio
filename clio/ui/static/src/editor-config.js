@@ -42,7 +42,7 @@ export function _renderTagInput(container, values, onChange) {
     for (const v of values) {
       const chip = document.createElement('span');
       chip.className = 'tag-chip';
-      chip.innerHTML = `${escapeHtml(v)} <span class="tag-chip-remove" data-value="${escapeHtml(v)}">×</span>`;
+      chip.innerHTML = `${escapeHtml(v)} <span class="tag-chip-remove">×</span>`;
       chip.querySelector('.tag-chip-remove').onclick = () => {
         const idx = values.indexOf(v);
         if (idx >= 0) values.splice(idx, 1);
