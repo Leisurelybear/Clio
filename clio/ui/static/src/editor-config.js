@@ -171,7 +171,12 @@ function _renderConfigGlobal(globalData, descs) {
     if (key === 'ai') continue;
     html += _renderConfigForm({ [key]: val }, '', descs);
   }
-  html += _renderProviderList(globalData.ai?.providers || {}, descs);
+  const aiCfg = globalData.ai || {};
+  const { providers, ...otherAiFields } = aiCfg;
+  if (Object.keys(otherAiFields).length > 0) {
+    html += _renderConfigForm(otherAiFields, 'ai', descs);
+  }
+  html += _renderProviderList(providers || {}, descs);
   return html;
 }
 
@@ -181,8 +186,13 @@ function _renderConfigProject(projectData, globalData, descs) {
     if (key === 'ai') continue;
     html += _renderConfigForm({ [key]: val }, '', descs);
   }
+  const aiCfg = projectData.ai || {};
+  const { tasks, context, ...otherAiFields } = aiCfg;
+  if (Object.keys(otherAiFields).length > 0 || context !== undefined) {
+    html += _renderConfigForm({ context, ...otherAiFields }, 'ai', descs);
+  }
   html += _renderTaskBinding(
-    projectData.ai?.tasks || {},
+    tasks || {},
     globalData?.ai?.providers || {},
     descs || {},
   );
@@ -252,11 +262,14 @@ export function _renderTaskBinding(tasks, providersObj, descs) {
       html += '<option value="">-- 选择 Provider --</option>';
       for (const pk of eligibleProviders) {
         const p = providersObj[pk];
-        const typeLabel = p?.type === 'gemini' ? 'Gemini' : 'OpenAI';
+        const typeLabel = p?.type === 'gemini' ? 'Gemini' : 'OpenAI 兼容';
         const selected = pk === currentProvider ? ' selected' : '';
         html += `<option value="${escapeHtml(pk)}"${selected}>${escapeHtml(pk)} (${typeLabel})</option>`;
       }
       html += '</select>';
+      if (taskKey === 'video_analyze' && eligibleProviders.length === 0 && providerKeys.length > 0) {
+        html += '<span class="warn" style="font-size:var(--text-xs)">需要 type=gemini 的 Provider，当前仅注册了非 Gemini 类型</span>';
+      }
       html += '</div>';
 
       const hasProvider = currentProvider && providersObj[currentProvider];
@@ -273,7 +286,7 @@ export function _renderTaskBinding(tasks, providersObj, descs) {
           }
           html += '</select>';
         } else {
-          html += '<span class="warn">⚠️ 该 Provider 没有注册可用模型</span>';
+          html += `<span class="warn">⚠️ 该 Provider 没有注册可用模型 <a href="#" class="edit-provider-link" data-provider="${escapeHtml(currentProvider)}" style="color:var(--accent);font-size:var(--text-xs)">编辑</a></span>`;
         }
       } else {
         html += '<span class="muted">请先选择 Provider</span>';
@@ -569,6 +582,21 @@ function _attachTaskBindingHandlers(pane, projectCfg) {
       renderConfig();
     };
   }
+
+  pane.querySelectorAll('.edit-provider-link').forEach(link => {
+    link.onclick = (e) => {
+      e.preventDefault();
+      const pName = link.dataset.provider;
+      state.configTab = 'global';
+      state.dirty = false;
+      updateSaveBtn();
+      renderConfig();
+      setTimeout(() => {
+        const editBtn = document.querySelector(`.btn-provider-edit[data-provider="${escapeHtml(pName)}"]`);
+        if (editBtn) editBtn.click();
+      }, 100);
+    };
+  });
 }
 
 function _tabBtn(label, tabKey, active) {
