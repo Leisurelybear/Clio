@@ -215,6 +215,7 @@ const TASK_DESCRIPTIONS = {
 export function _renderTaskBinding(tasks, providersObj, descs) {
   const providerKeys = Object.keys(providersObj || {});
   let html = '<fieldset class="config-fieldset"><legend>AI 任务绑定</legend>';
+  html += '<p class="hint" style="margin:0 0 8px;line-height:1.6">为流水线的每个步骤指定使用的 AI Provider 和模型。<br>视频分析（video_analyze）<strong>必须</strong>使用 type=Gemini 的 Provider（支持多模态）；其他任务可以使用任意 Provider。<br>勾选"跟随视频分析"表示该任务复用 video_analyze 的配置；取消勾选后可独立选择。</p>';
 
   if (providerKeys.length === 0) {
     html += '<div class="config-empty-state"><p class="muted">还没有注册任何 AI 模型</p><p class="hint">请先在"全局"标签页中添加 Provider。</p><p><a href="#" id="goto-global-providers">去添加 →</a></p></div>';
@@ -239,6 +240,7 @@ export function _renderTaskBinding(tasks, providersObj, descs) {
       html += '<label class="task-binding-label refine-follow-cb">';
       html += `<input type="checkbox" class="refine-follow-check" data-task="${taskKey}" ${isFollowing ? 'checked' : ''}> 跟随视频分析`;
       html += '</label>';
+      html += '<span class="hint" style="font-size:var(--text-xs)">勾选 = 使用 video_analyze 相同的 Provider/模型；取消 = 可独立指定其他 Provider</span>';
       html += '</div>';
     }
 
@@ -308,6 +310,8 @@ export function _renderProviderList(providers, descs) {
 
   if (keys.length === 0) {
     html += '<div class="config-empty-state"><p class="muted">还没有注册任何 AI 模型</p><p class="hint">点击下方按钮添加一个 AI 厂商（如 Gemini、DeepSeek、通义千问等），然后在 Project 标签页中为任务绑定模型。</p></div>';
+  } else {
+    html += '<p class="hint" style="margin:0 0 8px;line-height:1.6">在此管理 AI 厂商（Provider）。每个 Provider 需要：类型（决定能否做视频分析）、API 密钥（保存在 .env）、和模型列表（供任务绑定选择）。<br>添加完成后，切换到"项目"标签页为每个 AI 任务绑定具体的 Provider 和模型。</p>';
   }
 
   for (const name of keys) {
@@ -362,6 +366,7 @@ function _showProviderModal(providersObj, name, onSave) {
       <div class="form-group">
         <label class="form-label">类型</label>
         <select id="modal-provider-type" class="form-input">${typeOptions}</select>
+        <span class="hint">Gemini 支持视频分析和纯文本任务；OpenAI 兼容（如 DeepSeek、通义千问）仅支持文本任务</span>
       </div>
       <div class="form-group">
         <label class="form-label">API 密钥</label>
@@ -369,7 +374,7 @@ function _showProviderModal(providersObj, name, onSave) {
           <input id="modal-provider-key" class="form-input" type="password" placeholder="输入 API 密钥" style="flex:1">
           <button id="modal-key-toggle" class="btn-secondary">显示</button>
         </div>
-        <span class="hint">密钥将通过 .env 文件存储，不会写入 config.yaml</span>
+        <span class="hint">密钥将通过 .env 文件存储，不会写入 config.yaml${isEdit ? '。留空则保持现有密钥不变' : ''}</span>
       </div>
       <div class="form-group" id="modal-base-url-group" style="${existing?.type === 'gemini' && !isEdit ? 'display:none' : ''}">
         <label class="form-label">接口地址</label>
@@ -379,6 +384,7 @@ function _showProviderModal(providersObj, name, onSave) {
       <div class="form-group">
         <label class="form-label">模型列表 <span class="muted">（按回车添加）</span></label>
         <div id="modal-provider-models"></div>
+        <span class="hint">输入该厂商可用的模型名称，如 <code>gemini-2.5-flash</code>、<code>deepseek-chat</code>。这些模型将出现在项目标签页的任务绑定下拉菜单中。</span>
       </div>
       <div style="display:flex;gap:8px;justify-content:end;margin-top:16px">
         <button id="modal-cancel" class="btn-secondary">取消</button>
