@@ -165,6 +165,250 @@ export async function initProjectConfig() {
 }
 
 
+function _renderConfigGlobal(globalData, descs) {
+  let html = '';
+  for (const [key, val] of Object.entries(globalData)) {
+    if (key === 'ai') continue;
+    html += _renderConfigForm({ [key]: val }, '', descs);
+  }
+  html += _renderProviderList(globalData.ai?.providers || {}, descs);
+  return html;
+}
+
+function _renderProviderList(providers, descs) {
+  const providersObj = providers || {};
+  const keys = Object.keys(providersObj);
+  let html = '<fieldset class="config-fieldset"><legend>AI 模型列表</legend>';
+
+  if (keys.length === 0) {
+    html += '<div class="config-empty-state"><p class="muted">还没有注册任何 AI 模型</p><p class="hint">点击下方按钮添加一个 AI 厂商（如 Gemini、DeepSeek、通义千问等），然后在 Project 标签页中为任务绑定模型。</p></div>';
+  }
+
+  for (const name of keys) {
+    const p = providersObj[name];
+    const typeLabel = p.type === 'gemini' ? 'Gemini' : 'OpenAI 兼容';
+    const hasModels = p.models && p.models.length > 0;
+    const modelTags = hasModels
+      ? p.models.map(m => `<span class="tag-chip">${escapeHtml(m)}</span>`).join(' ')
+      : '<span class="warn">⚠️ 未注册模型</span>';
+
+    html += `<div class="provider-card" data-provider="${escapeHtml(name)}">
+      <div class="provider-card-header">
+        <span class="provider-card-name">${escapeHtml(name)}</span>
+        <span class="provider-card-type">${typeLabel}</span>
+        <span class="provider-card-actions">
+          <button class="btn-provider-edit" data-provider="${escapeHtml(name)}">编辑</button>
+          <button class="btn-provider-delete" data-provider="${escapeHtml(name)}">删除</button>
+        </span>
+      </div>
+      <div class="provider-card-body">
+        <div class="provider-card-field"><span class="provider-card-label">类型</span><span>${typeLabel}</span></div>
+        <div class="provider-card-field"><span class="provider-card-label">API 密钥</span><span>•••••••••• <button class="btn-provider-show-key" data-provider="${escapeHtml(name)}">显示</button></span></div>
+        ${p.type !== 'gemini' ? `<div class="provider-card-field"><span class="provider-card-label">接口地址</span><span>${escapeHtml(p.base_url || '(默认)')}</span></div>` : ''}
+        <div class="provider-card-field"><span class="provider-card-label">模型</span><span class="provider-card-models">${modelTags}</span></div>
+      </div>
+    </div>`;
+  }
+
+  html += `<div style="margin-top:12px"><button id="btn-add-provider" class="btn-primary">${icon('plus', 14)} 添加 Provider</button></div>`;
+  html += '</fieldset>';
+  return html;
+}
+
+function _showProviderModal(providersObj, name, onSave) {
+  const existing = name ? providersObj[name] : null;
+  const isEdit = !!existing;
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center';
+
+  const typeOptions = ['gemini', 'openai'].map(t =>
+    `<option value="${t}"${existing?.type === t ? ' selected' : ''}>${t === 'gemini' ? 'Gemini（支持视频分析）' : 'OpenAI 兼容（纯文本，如 DeepSeek）'}</option>`
+  ).join('');
+
+  backdrop.innerHTML = `
+    <div class="modal" style="background:var(--bg-surface,#1e1e1e);border:1px solid var(--border,#333);border-radius:8px;padding:24px;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
+      <h3 style="margin:0 0 16px">${isEdit ? '编辑 Provider' : '添加 Provider'}</h3>
+      <div class="form-group">
+        <label class="form-label">名称 <span class="muted">（唯一标识符）</span></label>
+        <input id="modal-provider-name" class="form-input" value="${escapeHtml(name || '')}" ${isEdit ? 'readonly' : ''} placeholder="如 my-gemini">
+      </div>
+      <div class="form-group">
+        <label class="form-label">类型</label>
+        <select id="modal-provider-type" class="form-input">${typeOptions}</select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">API 密钥</label>
+        <div style="display:flex;gap:8px">
+          <input id="modal-provider-key" class="form-input" type="password" placeholder="输入 API 密钥" style="flex:1">
+          <button id="modal-key-toggle" class="btn-secondary">显示</button>
+        </div>
+        <span class="hint">密钥将通过 .env 文件存储，不会写入 config.yaml</span>
+      </div>
+      <div class="form-group" id="modal-base-url-group" style="${existing?.type === 'gemini' && !isEdit ? 'display:none' : ''}">
+        <label class="form-label">接口地址</label>
+        <input id="modal-provider-base-url" class="form-input" value="${escapeHtml(existing?.base_url || '')}" placeholder="https://api.openai.com/v1">
+        <span class="hint">仅 OpenAI 兼容类型需要填写</span>
+      </div>
+      <div class="form-group">
+        <label class="form-label">模型列表 <span class="muted">（按回车添加）</span></label>
+        <div id="modal-provider-models"></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:end;margin-top:16px">
+        <button id="modal-cancel" class="btn-secondary">取消</button>
+        <button id="modal-save" class="btn-primary">${isEdit ? '保存修改' : '添加'}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+
+  // Tag input for models
+  const modelsContainer = backdrop.querySelector('#modal-provider-models');
+  const modelsList = existing?.models ? [...existing.models] : [];
+  _renderTagInput(modelsContainer, modelsList, () => {});
+
+  // Type toggle → show/hide base URL
+  backdrop.querySelector('#modal-provider-type').onchange = (e) => {
+    const grp = backdrop.querySelector('#modal-base-url-group');
+    grp.style.display = e.target.value === 'gemini' ? 'none' : '';
+  };
+
+  // Key visibility toggle
+  const keyInput = backdrop.querySelector('#modal-provider-key');
+  backdrop.querySelector('#modal-key-toggle').onclick = () => {
+    const isPwd = keyInput.type === 'password';
+    keyInput.type = isPwd ? 'text' : 'password';
+    backdrop.querySelector('#modal-key-toggle').textContent = isPwd ? '隐藏' : '显示';
+  };
+
+  // Save
+  backdrop.querySelector('#modal-save').onclick = async () => {
+    const newName = backdrop.querySelector('#modal-provider-name').value.trim();
+    const newType = backdrop.querySelector('#modal-provider-type').value;
+    const newKey = backdrop.querySelector('#modal-provider-key').value.trim();
+    const newBaseUrl = backdrop.querySelector('#modal-provider-base-url').value.trim();
+
+    if (!newName) { setStatus('请填写 Provider 名称', 'warn'); return; }
+    if (isEdit && newName !== name) { setStatus('名称不可修改（如需重命名请删除后重建）', 'warn'); return; }
+    if (!isEdit && providersObj[newName]) { setStatus(`Provider "${newName}" 已存在`, 'warn'); return; }
+
+    // Save API key to .env if provided
+    if (newKey) {
+      const envNameEnv = newName.toUpperCase() + '_API_KEY';
+      try {
+        const existing = await api('GET', '/api/env');
+        let envContent = existing.content || '';
+        const lines = envContent.split('\n');
+        let found = false;
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].startsWith(envNameEnv + '=')) {
+            lines[i] = `${envNameEnv}=${newKey}`;
+            found = true;
+            break;
+          }
+        }
+        if (!found) lines.push(`${envNameEnv}=${newKey}`);
+        const envResult = await api('PUT', '/api/env', { content: lines.join('\n') });
+        if (!envResult.ok) { setStatus('API 密钥保存失败: ' + (envResult.error || ''), 'err'); return; }
+      } catch (e) { setStatus('API 密钥保存失败: ' + e.message, 'err'); return; }
+    }
+
+    const envName = newName.toUpperCase() + '_API_KEY';
+    const providerData = {
+      type: newType,
+      api_key_env: envName,
+      api_key: '',
+      base_url: newBaseUrl || '',
+      models: modelsList,
+    };
+
+    if (isEdit) {
+      if (!newKey) {
+        delete providerData.api_key_env;
+        delete providerData.api_key;
+      }
+      Object.assign(providersObj[name], providerData);
+    } else {
+      providersObj[newName] = {
+        name: newName,
+        type: newType,
+        api_key_env: envName,
+        api_key: '',
+        base_url: newBaseUrl || '',
+        models: [...modelsList],
+      };
+    }
+
+    markDirty();
+    backdrop.remove();
+    onSave();
+  };
+
+  backdrop.querySelector('#modal-cancel').onclick = () => backdrop.remove();
+  backdrop.onclick = (e) => { if (e.target === backdrop) backdrop.remove(); };
+}
+
+function _attachProviderListHandlers(pane, providersObj) {
+  const reRender = () => renderConfig();
+
+  // Edit buttons
+  pane.querySelectorAll('.btn-provider-edit').forEach(btn => {
+    btn.onclick = () => {
+      const name = btn.dataset.provider;
+      _showProviderModal(providersObj, name, reRender);
+    };
+  });
+
+  // Delete buttons
+  pane.querySelectorAll('.btn-provider-delete').forEach(btn => {
+    btn.onclick = async () => {
+      const name = btn.dataset.provider;
+      const tasks = state.configProject?.ai?.tasks || {};
+      const refs = Object.entries(tasks)
+        .filter(([_, t]) => t.provider === name)
+        .map(([k]) => k);
+      if (refs.length > 0) {
+        if (!confirm(`以下任务正在使用 "${name}"：${refs.join('、')}。确定删除？删除后这些任务将无法运行。`)) return;
+      } else {
+        if (!confirm(`确定删除 Provider "${name}"？`)) return;
+      }
+      delete providersObj[name];
+      markDirty();
+      reRender();
+    };
+  });
+
+  // Add button
+  const addBtn = pane.querySelector('#btn-add-provider');
+  if (addBtn) {
+    addBtn.onclick = () => _showProviderModal(providersObj, null, reRender);
+  }
+
+  // Show key buttons
+  pane.querySelectorAll('.btn-provider-show-key').forEach(btn => {
+    btn.onclick = async () => {
+      const providerName = btn.dataset.provider;
+      const envName = providerName.toUpperCase() + '_API_KEY';
+      try {
+        const existing = await api('GET', '/api/env');
+        let envContent = existing.content || '';
+        const lines = envContent.split('\n');
+        for (const line of lines) {
+          if (line.startsWith(envName + '=')) {
+            const val = line.slice(envName.length + 1);
+            const span = btn.parentNode;
+            span.innerHTML = escapeHtml(val);
+            return;
+          }
+        }
+        setStatus(`未找到 ${envName}`, 'warn');
+      } catch {
+        setStatus('无法读取 .env 文件', 'err');
+      }
+    };
+  });
+}
+
 function _tabBtn(label, tabKey, active) {
   return `<button class="config-tab-btn${active ? ' active' : ''}" data-config-tab="${tabKey}">${label}</button>`;
 }
@@ -306,10 +550,9 @@ export function renderConfig() {
     const projectData = state.configProject || {};
     contentHtml = `<div class="config-form">${_renderConfigForm(projectData, '', descs)}</div>`;
   } else if (active === 'global') {
-    const { _config_source, _needsConfigInit, _descriptions, ...configData } = state.configRaw;
     const globalData = state.configGlobal || {};
     contentHtml = _renderEnvEditor()
-      + `<div class="config-form">${_renderConfigForm(globalData, '', descs)}</div>`;
+      + `<div class="config-form">${_renderConfigGlobal(globalData, descs)}</div>`;
   } else {
     // Merged tab: read-only merged view
     const { _config_source, _needsConfigInit, _descriptions, ...configData } = state.configRaw;
@@ -346,6 +589,7 @@ export function renderConfig() {
   if (active === 'global') {
     _attachConfigForm(pane, state.configGlobal || {}, descs);
     _attachEnvEditor();
+    _attachProviderListHandlers(pane, state.configGlobal?.ai?.providers || {});
   } else if (active === 'project') {
     _attachConfigForm(pane, state.configProject || {}, descs);
     _attachContextTemplate(pane);
