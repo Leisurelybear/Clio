@@ -38,10 +38,12 @@ async function selectVideo(file) {
   player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${projParam}${extraParam}`;
   $('player-name').textContent = file;
 
-  if (state.source === 'original' && (v.offset_sec || 0) > 0) {
+  if (state.source === 'original') {
     player.onloadedmetadata = () => {
       $('player-time').textContent = `${fmtTime(0)} / ${fmtTime(player.duration)}`;
-      player.currentTime = v.offset_sec;
+      if ((v.offset_sec || 0) > 0) {
+        player.currentTime = v.offset_sec;
+      }
     };
   }
 
