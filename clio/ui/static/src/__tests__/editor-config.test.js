@@ -223,7 +223,7 @@ describe('_renderProviderList', () => {
 
   it('renders multiple provider cards', () => {
     const html = _renderProviderList({ gemini: GEMINI_PROVIDER, deepseek: OPENAI_PROVIDER });
-    const matches = html.match(/provider-card/g);
+    const matches = html.match(/class="provider-card"/g);
     expect(matches.length).toBe(2);
   });
 
@@ -277,13 +277,19 @@ describe('_renderTaskBinding', () => {
   it('shows provider dropdown with all providers for non-video tasks', () => {
     const html = _renderTaskBinding(ALL_TASKS, { gemini: GEMINI_PROVIDER, deepseek: OPENAI_PROVIDER, extra: OPENAI_PROVIDER });
     expect(html).toContain('gemini (Gemini)');
-    expect(html).toContain('deepseek (OpenAI)');
+    expect(html).toContain('deepseek (OpenAI 兼容)');
   });
 
   it('filters video_analyze provider dropdown to gemini only', () => {
     const html = _renderTaskBinding(TASKS_WITH_VA, { gemini: GEMINI_PROVIDER, deepseek: OPENAI_PROVIDER });
     expect(html).toContain('gemini (Gemini)');
-    expect(html).not.toContain('deepseek');
+    expect(html).toContain('deepseek (OpenAI 兼容)');
+    const div = document.createElement('div');
+    div.innerHTML = html;
+    const vaCard = div.querySelector('.task-binding-card');
+    const vaSelect = vaCard.querySelector('.task-provider-select');
+    expect(vaSelect.textContent).not.toContain('deepseek');
+    expect(vaSelect.textContent).toContain('gemini');
   });
 
   it('shows model dropdown when provider has models', () => {
