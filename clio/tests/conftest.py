@@ -47,6 +47,7 @@ def tmp_config(tmp_path: Path) -> Path:
         "    gemini:\n"
         "      type: gemini\n"
         "      api_key: test-gemini-key\n"
+        "      models: [gemini-2.5-flash, gemini-2.0-flash]\n"
         "    deepseek:\n"
         "      type: openai\n"
         "      api_key: test-deepseek-key\n"

@@ -262,6 +262,23 @@ class TestLoadConfig:
         cfg = load_config(tmp_config / "config.yaml")
         assert cfg.ai.provider_ttl_min == 60
 
+    def test_provider_models_list(self, tmp_config):
+        cfg = load_config(tmp_config / "config.yaml")
+        g = cfg.ai.providers.get("gemini")
+        assert g is not None
+        assert g.models == ["gemini-2.5-flash", "gemini-2.0-flash"]
+
+    def test_provider_models_defaults_to_empty(self, tmp_path):
+        cfg_path = tmp_path / "config.yaml"
+        cfg_path.write_text(
+            "proxy:\n  enabled: false\n"
+            "ai:\n  providers:\n    g:\n      type: gemini\n      api_key: k\n"
+            "  tasks:\n    t:\n      provider: g\n      model: m\n",
+            encoding="utf-8",
+        )
+        cfg = load_config(cfg_path)
+        assert cfg.ai.providers["g"].models == []
+
     def test_with_project_dir_no_project_yaml(self, tmp_config):
         """project_dir without project.yaml returns base config."""
         cfg = load_config(tmp_config / "config.yaml", project_dir=tmp_config)
