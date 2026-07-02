@@ -1215,3 +1215,148 @@ button .icon { width: 12px; height: 12px; }
   flex: 1;
   min-width: 120px;
 }
+
+/* ── Provider Cards ─────────────────────────────────────────── */
+.config-empty-state {
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+}
+.config-empty-state p { margin: var(--space-1) 0; }
+.config-empty-state .hint { margin-top: var(--space-2); }
+.config-empty-state a {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  font-weight: 500;
+}
+.config-empty-state a:hover { color: var(--accent-hover); }
+
+.provider-card {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  margin: var(--space-2) 0;
+  padding: var(--space-3);
+  background: var(--bg-surface-2);
+}
+.provider-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.provider-card-name {
+  font-weight: 600;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+  flex: 1;
+}
+.provider-card-type {
+  font-size: var(--text-xs);
+  color: var(--accent);
+  background: var(--accent-bg);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.provider-card-actions {
+  display: flex;
+  gap: var(--space-1);
+}
+.provider-card-actions button {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.provider-card-actions button:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+.provider-card-body { font-size: var(--text-sm); }
+.provider-card-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px 0;
+}
+.provider-card-label {
+  color: var(--text-tertiary);
+  min-width: 80px;
+  flex-shrink: 0;
+  font-size: var(--text-xs);
+}
+.provider-card-models {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ── Task Binding Cards ─────────────────────────────────────── */
+.task-binding-card {
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-md);
+  margin: var(--space-2) 0;
+  padding: var(--space-3);
+  background: var(--bg-surface-2);
+}
+.task-binding-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.task-binding-name {
+  font-weight: 600;
+  font-size: var(--text-base);
+  color: var(--text-primary);
+}
+.task-binding-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-1) 0;
+}
+.task-binding-label {
+  color: var(--text-tertiary);
+  min-width: 70px;
+  flex-shrink: 0;
+  font-size: var(--text-sm);
+}
+.task-binding-row select {
+  flex: 1;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.task-binding-row select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+.refine-follow-cb {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+.refine-follow-check {
+  margin: 0;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
