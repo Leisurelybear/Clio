@@ -269,21 +269,19 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 **Background**: The current UI can only view existing artifacts. To re-run a step (compress / analyze / voiceover / plan), users must open a terminal. Users expect to select a folder → select videos → click a button → see results, without switching to the command line.
 
 **Acceptance Criteria**:
-- Enable sidebar "▶ Run" as the R-008 entry point
-- Right panel shows run panel: step selection (compress / analyze / voiceover / plan / all)
-- Input directory can be independently selected (not limited to config's `input_dir`, can manually enter path or browse)
-- Files within the selected directory can be checked individually (not "run all")
-- After clicking execute, panel shows real-time progress + ETA (reuses R-005's `.progress.json` or uses SSE)
-- Auto-switch to corresponding view after completion (e.g., after voiceover completes, switch to voiceover tab and refresh)
+- ✅ Enable sidebar "▶ Run" as the R-008 entry point
+- ✅ Right panel shows run panel: step selection (compress / analyze / voiceover / plan / all)
+- ❌ Input directory can be independently selected (not limited to config's `input_dir`, can manually enter path or browse)
+- ✅ Files within the selected directory can be checked individually (not "run all") — multi-select via "选择视频" button
+- ✅ After clicking execute, panel shows real-time progress + ETA (SSE via `/api/run/stream`)
+- ⚠️ Auto-switch to corresponding view after completion — video/plan/steps reloaded, but no per-step smart view switch
 
 **Sub-tasks**:
-- [ ] R-008a: Backend `/api/run/step` endpoint, accepts `{ step: string, input_dir?: string, files?: string[] }`
-- [ ] R-008b: Run panel UI (step selection, progress, result viewing)
-- [ ] R-008c: Input directory selection + file checkbox interaction
-- [ ] R-008d: Auto-refresh corresponding view after completion
-- [ ] R-008e: Documentation + enable sidebar "Run" entry
-
-> **F-001 Suggestion**: External analysis suggests merging R-007 (multi-project switching) and R-008 (single-step execution) into a unified "Project Management + Pipeline" panel, using `projects.json` to persist the project list. Can be implemented together.
+- [ ] R-008a: Backend `/api/run/step` endpoint (dedicated endpoint with `input_dir`) — **not started**. Existing `/api/run/start` + `/api/rerun` cover most use cases; missing standalone `input_dir` override.
+- [x] R-008b: Run panel UI (step checkboxes → SSE progress → result/done state) — **done**. `runner.js` has 6 steps, ETA, stalled detection, processing state table.
+- [~] R-008c: File checkbox interaction: **done** (`sidebar.js` toggle + `sidebar-data.js` checkboxes + `runner.js` badge). Input directory selection/browse in run panel: **not done** (browse modal exists but not wired to run panel).
+- [~] R-008d: Auto-refresh after completion: **done** (videos/plans/steps reload). Per-step smart view switch: **not done** (e.g., compress completed → switch to compressed view).
+- [~] R-008e: Sidebar "▶ Run" entry: **done** (active, not grayed). README docs: **not done**. ROADMAP status: **now updated**.
 
 ## Feature R-009: Engineering Robustness
 

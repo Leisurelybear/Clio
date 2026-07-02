@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import {
-  $, $$, setStatus,
+  $, $$, setStatus, fmtTime,
   updateSidebarDay, updateEntityUI,
 } from './utils.js';
 import { api } from './api.js';
@@ -37,6 +37,13 @@ async function selectVideo(file) {
   const extraParam = tokenParam ? `&token=${encodeURIComponent(tokenParam)}` : '';
   player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${projParam}${extraParam}`;
   $('player-name').textContent = file;
+
+  if (state.source === 'original' && (v.offset_sec || 0) > 0) {
+    player.onloadedmetadata = () => {
+      $('player-time').textContent = `${fmtTime(0)} / ${fmtTime(player.duration)}`;
+      player.currentTime = v.offset_sec;
+    };
+  }
 
   if (v.text_json) {
     try {
