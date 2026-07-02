@@ -30,6 +30,57 @@ export function _renderTooltip(path, desc) {
 }
 
 
+export function _renderTagInput(container, values, onChange) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'tag-input-wrapper';
+
+  const chips = document.createElement('div');
+  chips.className = 'tag-chips';
+
+  function renderChips() {
+    chips.innerHTML = '';
+    for (const v of values) {
+      const chip = document.createElement('span');
+      chip.className = 'tag-chip';
+      chip.innerHTML = `${escapeHtml(v)} <span class="tag-chip-remove" data-value="${escapeHtml(v)}">×</span>`;
+      chip.querySelector('.tag-chip-remove').onclick = () => {
+        const idx = values.indexOf(v);
+        if (idx >= 0) values.splice(idx, 1);
+        renderChips();
+        onChange(values);
+      };
+      chips.appendChild(chip);
+    }
+  }
+  renderChips();
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'tag-input';
+  input.placeholder = '输入模型名，按回车添加';
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const val = input.value.trim();
+      if (val && !values.includes(val)) {
+        values.push(val);
+        renderChips();
+        onChange(values);
+      }
+      input.value = '';
+    } else if (e.key === 'Backspace' && !input.value && values.length) {
+      values.pop();
+      renderChips();
+      onChange(values);
+    }
+  };
+
+  wrapper.appendChild(chips);
+  wrapper.appendChild(input);
+  container.appendChild(wrapper);
+}
+
+
 export function _renderConfigForm(obj, path, descriptions = null) {
   if (obj === null || obj === undefined) {
     return `<span class="config-null">(空)</span>`;
