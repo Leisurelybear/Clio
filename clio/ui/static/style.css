@@ -113,6 +113,18 @@ body.light-theme {
   }
 }
 
+/* ── Focus Ring ────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
+button:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
+}
+
 /* ── Reset ─────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; }
 
@@ -268,11 +280,12 @@ aside, section { overflow-y: auto; overflow-x: hidden; }
   cursor: col-resize;
   position: relative;
   z-index: 10;
-  transition: background var(--transition-fast), width var(--transition-fast);
+  transition: background var(--transition-fast);
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  width: var(--handle-w);
 }
 .resize-handle::before {
   content: '';
@@ -282,14 +295,14 @@ aside, section { overflow-y: auto; overflow-x: hidden; }
   width: 1px;
   height: 100%;
   background: var(--border);
-  transition: background var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 .resize-handle:hover::before,
 .resize-handle:active::before {
   background: var(--accent);
   width: 2px;
   left: 1.5px;
-  box-shadow: var(--accent-glow);
+  box-shadow: 0 0 6px rgba(99, 102, 241, 0.3);
 }
 .resize-handle:hover {
   background: var(--accent-bg);
@@ -548,7 +561,7 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
   border-radius: var(--radius-sm);
 }
 .selection-action:hover {
-  background: rgba(79, 195, 247, 0.1);
+  background: var(--accent-bg);
 }
 .video-list-actions {
   display: flex;
@@ -1031,9 +1044,9 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
 #cut-result p { margin: var(--space-1) 0; word-break: break-all; }
 
 /* ── Scrollbar ─────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
 
 /* ── Project Selector ──────────────────────────────────────── */
@@ -1059,7 +1072,7 @@ button .icon { width: 12px; height: 12px; }
 
 /* ── Modal ─────────────────────────────────────────────────── */
 .modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
-.modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); }
+.modal-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(6px); }
 .modal-dialog {
   position: relative; background: var(--bg-surface); border: 1px solid var(--border-light);
   border-radius: var(--radius-xl); padding: var(--space-5) var(--space-6);
@@ -1068,11 +1081,11 @@ button .icon { width: 12px; height: 12px; }
   animation: modalIn 250ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 @keyframes modalIn {
-  from { opacity: 0; transform: translateY(-12px) scale(0.96); }
+  from { opacity: 0; transform: translateY(-8px) scale(0.97); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.modal-dialog h3 { margin: 0 0 var(--space-4); color: var(--text-primary); font-size: var(--text-lg); }
+.modal-dialog h3 { margin: 0 0 var(--space-4); color: var(--text-primary); font-size: var(--text-lg); font-weight: 600; }
 .modal-dialog label { display: block; margin-bottom: var(--space-3); }
 .modal-dialog label span { display: block; margin-bottom: var(--space-1); font-size: var(--text-sm); color: var(--text-secondary); }
 .modal-dialog input[type="text"] {
@@ -1084,17 +1097,38 @@ button .icon { width: 12px; height: 12px; }
 .modal-dialog input[type="text"]:focus { outline: none; border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-bg); }
 
 .modal-actions { display: flex; justify-content: flex-end; gap: var(--space-2); margin-top: var(--space-4); }
-.modal-actions button { padding: 8px 18px; border-radius: var(--radius-sm); font: inherit; font-size: var(--text-sm); cursor: pointer; transition: all var(--transition-fast); }
+.modal-actions button { padding: 8px 18px; border-radius: var(--radius-md); font: inherit; font-size: var(--text-sm); cursor: pointer; transition: all var(--transition-fast); }
 .btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); padding: 8px 16px; border-radius: var(--radius-md); font: inherit; font-size: var(--text-sm); cursor: pointer; transition: all var(--transition-fast); display: inline-flex; align-items: center; gap: 6px; }
 .btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-light); }
 .btn-secondary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
+/* ── Loading Skeleton ──────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.skeleton {
+  background: linear-gradient(90deg, var(--bg-surface-2) 25%, var(--bg-hover) 50%, var(--bg-surface-2) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+.skeleton-line { height: 12px; margin-bottom: var(--space-2); width: 100%; }
+.skeleton-line:last-child { width: 60%; }
+.skeleton-block { height: 60px; margin-bottom: var(--space-2); border-radius: var(--radius-md); }
+.skeleton-circle { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; background: var(--bg-surface-2); }
+}
+
 /* ── Empty State ───────────────────────────────────────────── */
-.empty-state { padding: 48px 24px; text-align: center; color: var(--text-muted); }
-.empty-state > .icon { display: block; margin-bottom: var(--space-3); }
-.empty-state > .icon svg { width: 36px; height: 36px; stroke-width: 1.5; }
-.empty-state h4 { margin: 0 0 var(--space-2); color: var(--text-secondary); font-size: var(--text-lg); }
-.empty-state p { margin: var(--space-1) 0; font-size: var(--text-sm); }
+.empty-state { padding: var(--space-8) var(--space-4); text-align: center; color: var(--text-muted); }
+.empty-state-icon { display: block; margin: 0 auto var(--space-3); width: 48px; height: 48px; color: var(--text-muted); opacity: 0.5; }
+.empty-state-icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.empty-state h4 { margin: 0 0 var(--space-1); color: var(--text-secondary); font-size: var(--text-lg); font-weight: 600; }
+.empty-state p { margin: var(--space-1) 0; font-size: var(--text-sm); line-height: 1.5; max-width: 280px; margin-left: auto; margin-right: auto; }
+.empty-state .btn-primary { display: inline-flex; width: auto; margin-top: var(--space-3); padding: 8px 18px; }
 
 /* ── Project Cards ─────────────────────────────────────────── */
 #project-list-modal { max-height: 50vh; overflow-y: auto; margin: var(--space-3) 0; }
