@@ -3,6 +3,13 @@ import { $, $$, escapeHtml, markDirty, updateSaveBtn, setStatus, setDeep } from 
 import { api, icon } from './api.js';
 import { renderActiveTab } from './editor.js';
 
+const DEFAULT_PROVIDERS = ['gemini', 'openai', 'deepseek'];
+const DEFAULT_MODELS = {
+  gemini: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash'],
+  openai: ['gpt-4o', 'gpt-4o-mini'],
+  deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
+};
+
 
 export function labelFromPath(path) {
   return path ? path.split('.').pop() : 'config';
@@ -328,7 +335,7 @@ export function _renderProviderList(providers, descs) {
         <span class="provider-card-type">${typeLabel}</span>
         <span class="provider-card-actions">
           <button class="btn-provider-edit" data-provider="${escapeHtml(name)}">编辑</button>
-          <button class="btn-provider-delete" data-provider="${escapeHtml(name)}">删除</button>
+          ${DEFAULT_PROVIDERS.includes(name) ? '' : `<button class="btn-provider-delete" data-provider="${escapeHtml(name)}">删除</button>`}
         </span>
       </div>
       <div class="provider-card-body">
@@ -357,7 +364,7 @@ function _showProviderModal(providersObj, name, onSave) {
   ).join('');
 
   backdrop.innerHTML = `
-    <div class="modal" style="background:var(--bg-surface,#1e1e1e);border:1px solid var(--border,#333);border-radius:8px;padding:24px;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
+    <div style="background:var(--bg-surface,#1e1e1e);border:1px solid var(--border,#333);border-radius:8px;padding:24px;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
       <h3 style="margin:0 0 16px">${isEdit ? '编辑 Provider' : '添加 Provider'}</h3>
       <div class="form-group">
         <label class="form-label">名称 <span class="muted">（唯一标识符）</span></label>
@@ -384,7 +391,7 @@ function _showProviderModal(providersObj, name, onSave) {
       <div class="form-group">
         <label class="form-label">模型列表 <span class="muted">（按回车添加）</span></label>
         <div id="modal-provider-models"></div>
-        <span class="hint">输入该厂商可用的模型名称，如 <code>gemini-2.5-flash</code>、<code>deepseek-chat</code>。这些模型将出现在项目标签页的任务绑定下拉菜单中。</span>
+        <span class="hint">输入该厂商可用的模型名称。默认厂商已预填常用模型。这些模型将出现在项目标签页的任务绑定下拉菜单中。</span>
       </div>
       <div style="display:flex;gap:8px;justify-content:end;margin-top:16px">
         <button id="modal-cancel" class="btn-secondary">取消</button>
@@ -394,9 +401,14 @@ function _showProviderModal(providersObj, name, onSave) {
   `;
   document.body.appendChild(backdrop);
 
-  // Tag input for models
+  // Tag input for models — pre-populate defaults for known providers
   const modelsContainer = backdrop.querySelector('#modal-provider-models');
-  const modelsList = existing?.models ? [...existing.models] : [];
+  let modelsList;
+  if (existing) {
+    modelsList = existing.models?.length ? [...existing.models] : [...(DEFAULT_MODELS[name] || [])];
+  } else {
+    modelsList = [];
+  }
   _renderTagInput(modelsContainer, modelsList, () => {});
 
   // Type toggle → show/hide base URL
@@ -719,6 +731,24 @@ function _attachContextTemplate(pane) {
 }
 
 
+function _ensureDefaultProviderModels() {
+  const providers = state.configGlobal?.ai?.providers;
+  if (!providers) return;
+  let changed = false;
+  for (const name of DEFAULT_PROVIDERS) {
+    const p = providers[name];
+    if (p && (!p.models || p.models.length === 0)) {
+      const defaults = DEFAULT_MODELS[name];
+      if (defaults) {
+        p.models = [...defaults];
+        changed = true;
+      }
+    }
+  }
+  if (changed) markDirty();
+}
+
+
 export function renderConfig() {
   const pane = $('tab-config');
   if (state._needsConfigInit) {
@@ -736,6 +766,8 @@ export function renderConfig() {
     pane.innerHTML = '<p class="muted">配置数据不可用</p>';
     return;
   }
+
+  _ensureDefaultProviderModels();
 
   const isFallback = state.configRaw._config_source === 'global_fallback';
   const active = state.configTab || 'project';
