@@ -670,18 +670,36 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
   overflow: hidden;
 }
 .tabs {
-  display: flex; background: var(--bg-surface-3);
-  border-bottom: 1px solid var(--border); flex-shrink: 0;
+  display: flex;
+  background: var(--bg-surface-2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  padding: 3px var(--space-2);
+  gap: 2px;
 }
 .tab {
-  flex: 1; padding: 10px var(--space-3); background: none; border: none;
-  color: var(--text-secondary); cursor: pointer; font: inherit; font-size: var(--text-sm);
-  border-bottom: 2px solid transparent;
+  flex: 1;
+  padding: 7px var(--space-2);
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  border-radius: var(--radius-sm);
   transition: all var(--transition-fast);
-  display: flex; align-items: center; justify-content: center; gap: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 500;
 }
-.tab:hover { background: var(--bg-hover); color: var(--text-primary); }
-.tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(96,165,250,0.04); }
+.tab:hover { background: var(--bg-hover); color: var(--text-secondary); }
+.tab.active {
+  color: var(--accent);
+  background: var(--bg-surface);
+  font-weight: 600;
+}
 
 /* Entity-specific editor modes */
 #editor.entity-plan .tabs { display: none; }
