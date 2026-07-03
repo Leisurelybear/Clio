@@ -435,31 +435,66 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
   padding: var(--space-2) var(--space-3); cursor: pointer;
   border-bottom: 1px solid var(--border);
   transition: background var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 .video-item:hover { background: var(--bg-hover); }
 .video-item.active { background: var(--bg-active); }
-.video-item.active .video-name { color: #fff; }
+.video-item.active .video-name { color: var(--accent); }
 .video-item.no-match { opacity: 0.5; }
 
-.video-name { font-weight: 500; word-break: break-all; font-size: var(--text-base); display: flex; align-items: center; gap: 6px; }
-.video-title { font-size: var(--text-xs); color: var(--text-secondary); margin: 0 0 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.video-thumb {
+  width: 32px; height: 20px;
+  background: var(--bg-surface-2);
+  border-radius: 3px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 7px; color: var(--text-muted);
+  flex-shrink: 0;
+  border: 1px solid var(--border);
+}
+
+.video-info { flex: 1; min-width: 0; }
+
+.video-name {
+  font-weight: 500; word-break: break-all; font-size: var(--text-base);
+  display: flex; align-items: center; gap: 6px;
+  color: var(--text-primary);
+}
+.video-title {
+  font-size: var(--text-xs); color: var(--text-secondary);
+  margin: 0 0 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
 .video-match { margin: 2px 0 0; font-size: var(--text-xs); line-height: 1.4; }
+.video-duration {
+  font-size: 10px; color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
 .match-badge {
   display: inline-flex; align-items: center; gap: 3px;
-  font-size: var(--text-xs); background: var(--bg-surface-2);
-  color: var(--text-secondary); padding: 1px 6px;
+  font-size: 10px; background: var(--success-bg);
+  color: var(--success); padding: 1px 6px;
   border-radius: 10px; font-family: var(--font-mono);
+  white-space: nowrap; font-weight: 500;
+}
+.match-badge.miss { background: var(--error-bg); color: var(--error); }
+.video-item.active .match-badge { background: var(--accent-bg); color: var(--accent); }
+
+.video-step-badges {
+  display: flex;
+  gap: 4px;
+  margin-top: 2px;
+}
+.video-step-badge {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-weight: 500;
   white-space: nowrap;
 }
-.match-badge.miss { background: var(--red-bg); color: var(--red); }
-.video-item.active .match-badge { background: rgba(96,165,250,0.15); color: var(--accent); }
-
-.video-meta {
-  font-size: var(--text-xs); color: var(--text-tertiary);
-  margin-top: 3px; display: flex; align-items: center; gap: var(--space-2);
-}
-.video-meta .has { color: var(--success); display: inline-flex; align-items: center; gap: 3px; }
-.video-meta .miss { opacity: 0.35; display: inline-flex; align-items: center; gap: 3px; }
+.video-step-badge.done { background: var(--success-bg); color: var(--success); }
+.video-step-badge.pending { background: var(--bg-surface-3); color: var(--text-muted); }
+.video-step-badge.running { background: var(--warning-bg); color: var(--warning); }
 
 /* ── Video Group Tree ───────────────────────────────────────── */
 .video-group-header {

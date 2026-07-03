@@ -152,16 +152,21 @@ function renderVideoItem(v) {
   } else {
     matchBadge = `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
   }
-  li.innerHTML = `<div class="video-name-row">${checkboxHtml}
-    <div class="video-name">${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)}</div></div>
-    ${v.title ? `<div class="video-title">${escapeHtml(v.title)}</div>` : ''}
-    <div class="video-match">${matchBadge}</div>
-    <div class="video-meta">
-      <span class="${tCls}">${tLabel}</span>
-      &nbsp;
-      <span class="${sCls}">${sLabel}</span>
-      &nbsp;
-      <span class="${tTransCls}">${tTransLabel}</span>
+  const stepBadges = [
+    {label:'压缩', done: state.source === 'compressed'},
+    {label:'分析', done: !!v.text_json},
+    {label:'口播', done: !!v.script_json},
+    {label:'转录', done: !!v.transcript_file},
+  ].map(s => `<span class="video-step-badge ${s.done ? 'done' : 'pending'}">${s.label}</span>`).join('');
+
+  const durHtml = v.duration_sec ? `<span class="video-duration">${Math.round(v.duration_sec)}s</span>` : '';
+
+  li.innerHTML = `<div class="video-thumb">VID</div>
+    <div class="video-info">
+      <div class="video-name">${checkboxHtml}${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)}${durHtml}</div>
+      <div class="video-step-badges">${stepBadges}</div>
+      ${v.title ? `<div class="video-title">${escapeHtml(v.title)}</div>` : ''}
+      <div class="video-match">${matchBadge}</div>
     </div>
     <div class="video-actions">
       <button class="menu-btn" title="操作">⋮</button>
