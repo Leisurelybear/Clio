@@ -734,18 +734,15 @@ function _attachContextTemplate(pane) {
 function _ensureDefaultProviderModels() {
   const providers = state.configGlobal?.ai?.providers;
   if (!providers) return;
-  let changed = false;
   for (const name of DEFAULT_PROVIDERS) {
     const p = providers[name];
     if (p && (!p.models || p.models.length === 0)) {
       const defaults = DEFAULT_MODELS[name];
       if (defaults) {
         p.models = [...defaults];
-        changed = true;
       }
     }
   }
-  if (changed) markDirty();
 }
 
 
