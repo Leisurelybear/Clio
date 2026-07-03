@@ -191,10 +191,16 @@ describe('_renderProviderList', () => {
     expect(html).toContain('显示');
   });
 
-  it('renders edit and delete buttons', () => {
-    const html = _renderProviderList({ gemini: GEMINI_PROVIDER });
+  it('renders edit and delete buttons for non-default providers', () => {
+    const html = _renderProviderList({ 'my-custom-provider': GEMINI_PROVIDER });
     expect(html).toContain('btn-provider-edit');
     expect(html).toContain('btn-provider-delete');
+  });
+
+  it('hides delete button for default providers', () => {
+    const html = _renderProviderList({ gemini: GEMINI_PROVIDER });
+    expect(html).toContain('btn-provider-edit');
+    expect(html).not.toContain('btn-provider-delete');
   });
 
   it('renders model chips for providers with models', () => {
