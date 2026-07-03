@@ -150,8 +150,29 @@ header {
 }
 header > * { -webkit-app-region: no-drag; }
 
-.proj { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
-.proj .label { color: var(--text-tertiary); font-size: var(--text-sm); white-space: nowrap; }
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.brand-mark {
+  width: 22px;
+  height: 22px;
+  background: var(--accent);
+  color: #fff;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
+.proj { display: flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.proj .label { color: var(--text-muted); font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; }
 .proj .value {
   font-family: var(--font-mono);
   color: var(--text-primary);
@@ -159,26 +180,47 @@ header > * { -webkit-app-region: no-drag; }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px;
 }
 
-.source-toggle { display: flex; background: var(--bg-surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; }
-.source-toggle button {
-  background: transparent; color: var(--text-secondary); border: none;
-  padding: 6px 16px; cursor: pointer; font: inherit; font-size: var(--text-sm);
-  border-right: 1px solid var(--border); transition: background var(--transition-fast), color var(--transition-fast);
-  display: flex; align-items: center; gap: 6px;
+.source-toggle {
+  display: flex;
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
 }
-.source-toggle button:last-child { border-right: none; }
+.source-toggle button {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  padding: 5px 14px;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
 .source-toggle button:hover { background: var(--bg-hover); color: var(--text-primary); }
-.source-toggle button.active { background: var(--accent); color: #fff; box-shadow: var(--accent-glow); }
+.source-toggle button.active { background: var(--accent); color: #fff; }
 .source-toggle button:focus-visible { outline: 2px solid var(--border-focus); outline-offset: -2px; }
 
-.actions { display: flex; align-items: center; gap: var(--space-2); }
+.actions { display: flex; align-items: center; gap: var(--space-1); }
 .btn-icon {
-  background: var(--bg-surface-2); color: var(--text-secondary); border: 1px solid var(--border);
-  padding: 6px 10px; cursor: pointer; border-radius: var(--radius-sm); font: inherit;
-  display: flex; align-items: center; gap: 6px; font-size: var(--text-sm);
+  background: transparent;
+  color: var(--text-tertiary);
+  border: 1px solid transparent;
+  padding: 5px;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
   transition: all var(--transition-fast);
+  width: 30px;
+  height: 30px;
+  justify-content: center;
 }
-.btn-icon:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-light); }
+.btn-icon:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border); }
 .btn-icon:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
 .status { font-size: var(--text-sm); min-width: 120px; display: flex; align-items: center; gap: 6px; }
