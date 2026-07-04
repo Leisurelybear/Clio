@@ -22,6 +22,8 @@ from clio.schema import add_schema_version
 from clio.tasks._helpers import (
     ClipRecord,
     _build_stem,
+    _matches_selected_stem,
+    _selected_stems,
     _write_csv,
     _write_text_file,
 )
@@ -271,8 +273,8 @@ def run_analyze_all(
             items.append((p, orig_path, idx_str))
 
     if files is not None:
-        allowed = {Path(f).stem.lower() for f in files}
-        items = [it for it in items if it[0].stem.lower() in allowed]
+        selected = _selected_stems(files)
+        items = [it for it in items if _matches_selected_stem(it[0], selected) or _matches_selected_stem(it[1], selected)]
 
     if not items:
         print(f"[错误] 压缩目录为空或无法匹配: {config.compressed_dir}，请先运行压缩步骤")

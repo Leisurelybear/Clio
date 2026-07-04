@@ -14,7 +14,7 @@ from clio.log import timed
 from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
 from clio.split import split_video
-from clio.tasks._helpers import ClipRecord, _eta_line, _next_index
+from clio.tasks._helpers import ClipRecord, _eta_line, _matches_selected_stem, _next_index, _selected_stems
 from clio.utils import find_videos, format_index, get_duration_sec, resolve_binary
 from clio.vmeta import SegmentEntry, SplitInfo, VideoIndex, VideoMeta
 
@@ -108,8 +108,8 @@ def run_compress_all(
     else:
         videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
     if files is not None:
-        allowed = {Path(f).stem.lower() for f in files}
-        videos = [v for v in videos if v.stem.lower() in allowed]
+        selected = _selected_stems(files)
+        videos = [v for v in videos if _matches_selected_stem(v, selected)]
     config.compressed_dir.mkdir(parents=True, exist_ok=True)
 
     # Phase 1: resolve items to compress — split long videos if needed

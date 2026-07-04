@@ -16,7 +16,7 @@ The goals are:
 - [x] Propagate cancellation into Gemini video analysis.
 - [x] Propagate cancellation into label ffmpeg runs.
 - [x] Propagate cancellation into split ffmpeg runs.
-- [ ] Harden selected-video filtering across artifact-producing steps.
+- [x] Harden selected-video filtering across artifact-producing steps.
 - [ ] Make `.env` writes atomic.
 - [ ] Expand token-mode auth coverage for read APIs.
 

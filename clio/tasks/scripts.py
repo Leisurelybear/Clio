@@ -16,6 +16,7 @@ from clio.log import timed
 from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
 from clio.schema import add_schema_version
+from clio.tasks._helpers import _matches_selected_stem, _selected_stems
 from clio.utils import write_json_atomic, write_text_atomic
 
 
@@ -87,8 +88,8 @@ def run_generate_scripts(
     else:
         input_files = sorted(config.texts_dir.glob("*.json"))
     if files is not None:
-        allowed = {Path(f).stem.lower() for f in files}
-        input_files = [f for f in input_files if f.stem.lower() in allowed]
+        selected = _selected_stems(files)
+        input_files = [f for f in input_files if _matches_selected_stem(f, selected)]
     if not input_files:
         return
     if tracker:
