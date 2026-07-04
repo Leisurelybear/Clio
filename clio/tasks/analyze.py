@@ -41,7 +41,11 @@ def _build_stem_to_path(input_dir: Path) -> dict[str, Path]:
     return mapping
 
 
-def _resolve_original(input_dir: Path, compressed_stem: str, stem_cache: dict[str, Path] | None = None) -> Path | None:
+def _resolve_original(
+    input_dir: Path,
+    compressed_stem: str,
+    stem_cache: dict[str, Path] | None = None,
+) -> Path | None:
     """Resolve original video path from a compressed file stem.
 
     Handles:
@@ -61,11 +65,31 @@ def _resolve_original(input_dir: Path, compressed_stem: str, stem_cache: dict[st
         key = stem.lower()
         if stem_cache is not None:
             return stem_cache.get(key)
-        for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
+        for ext in (
+            ".mp4",
+            ".mov",
+            ".mkv",
+            ".avi",
+            ".mts",
+            ".m2ts",
+            ".m4v",
+            ".webm",
+            ".lrv",
+        ):
             candidate = input_dir / f"{stem}{ext}"
             if candidate.is_file():
                 return candidate
-        for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
+        for ext in (
+            ".mp4",
+            ".mov",
+            ".mkv",
+            ".avi",
+            ".mts",
+            ".m2ts",
+            ".m4v",
+            ".webm",
+            ".lrv",
+        ):
             for candidate in input_dir.rglob(f"{stem}{ext}"):
                 if candidate.is_file():
                     return candidate
@@ -130,7 +154,10 @@ def _process_video_item(
         identity = (
             resolve_identity(compressed, config.paths.input_dir, idx_str)
             if analysis is None
-            else load_identity(analysis) or resolve_identity(compressed, config.paths.input_dir, idx_str)
+            else (
+                load_identity(analysis)
+                or resolve_identity(compressed, config.paths.input_dir, idx_str)
+            )
         )
         return ClipRecord(
             index=idx_val,
@@ -145,7 +172,10 @@ def _process_video_item(
 
     max_min = config.analyze.max_analyze_duration_min
     if max_min > 0 and duration_sec > max_min * 60:
-        print(f"  [跳过] {compressed.name} 时长 {format_duration(duration_sec)} 超过限制 {max_min} 分钟")
+        print(
+            f"  [跳过] {compressed.name} 时长 {format_duration(duration_sec)} "
+            f"超过限制 {max_min} 分钟"
+        )
         if tracker:
             tracker.next(message=f"跳过 {compressed.name}（超长）")
             tracker.log(f"跳过 {compressed.name}（超长 {format_duration(duration_sec)}）")
@@ -172,7 +202,10 @@ def _process_video_item(
         )
     except Exception as e:
         elapsed_total = time.monotonic() - t0
-        print(f"  [错误] 分析 {compressed.name} 失败: {e}（耗时 {format_duration(elapsed_total)}）")
+        print(
+            f"  [错误] 分析 {compressed.name} 失败: {e}"
+            f"（耗时 {format_duration(elapsed_total)}）"
+        )
         state.mark(original.stem, "analyze", "error")
         error_count[0] += 1
         if tracker:
@@ -233,7 +266,9 @@ def run_analyze_all(
     stem_cache = _build_stem_to_path(config.paths.input_dir)
 
     def _list_compressed(d: Path) -> list[Path]:
-        return sorted(p for p in d.iterdir() if p.suffix.lower() in VIDEO_EXTS and p.is_file())
+        return sorted(
+            p for p in d.iterdir() if p.suffix.lower() in VIDEO_EXTS and p.is_file()
+        )
 
     if single_file:
         items: list[tuple[Path, Path, str]] = []
@@ -251,7 +286,9 @@ def run_analyze_all(
         else:
             # 降级：原有 stem 匹配，修复只取 candidates[0] 的 bug
             candidates = [
-                p for p in _list_compressed(config.compressed_dir) if single_file.stem.lower() in p.stem.lower()
+                p
+                for p in _list_compressed(config.compressed_dir)
+                if single_file.stem.lower() in p.stem.lower()
             ]
             if not candidates:
                 print(f"[错误] 未找到 {single_file.name} 对应的压缩文件，请先运行压缩步骤")
@@ -274,7 +311,12 @@ def run_analyze_all(
 
     if files is not None:
         selected = _selected_stems(files)
-        items = [it for it in items if _matches_selected_stem(it[0], selected) or _matches_selected_stem(it[1], selected)]
+        items = [
+            it
+            for it in items
+            if _matches_selected_stem(it[0], selected)
+            or _matches_selected_stem(it[1], selected)
+        ]
 
     if not items:
         print(f"[错误] 压缩目录为空或无法匹配: {config.compressed_dir}，请先运行压缩步骤")
