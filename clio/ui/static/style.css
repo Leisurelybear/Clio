@@ -145,8 +145,6 @@ body {
 /* ── Icons (inline SVG) ────────────────────────────────────── */
 .icon { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex-shrink: 0; }
 .icon svg { display: block; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-.icon-sm { width: 12px; height: 12px; }
-
 /* ── Header ────────────────────────────────────────────────── */
 header {
   display: flex;
@@ -558,9 +556,6 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
   flex-shrink: 0;
   accent-color: var(--accent);
   width: 16px; height: 16px; cursor: pointer;
-}
-.video-name-row {
-  display: flex; align-items: center; gap: 6px;
 }
 .selection-header {
   display: flex;
@@ -981,10 +976,6 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
 .run-step input[type="checkbox"] { width: auto !important; margin-top: 3px !important; accent-color: var(--accent); }
 .run-step-label { font-weight: 500; color: var(--text-primary); min-width: 110px; font-size: var(--text-sm); }
 .run-step-hint { font-size: var(--text-xs); color: var(--text-tertiary); }
-.run-step-disabled { opacity: 0.45; cursor: not-allowed; }
-.run-step-disabled:hover { background: transparent; border-color: var(--border); }
-.run-step-disabled .run-step-label { color: var(--text-muted); }
-
 /* ── Run Step Sub-Options (plan children) ──────────────────── */
 .run-step-sub {
   padding: var(--space-2) var(--space-3) var(--space-2) 36px;
@@ -1069,13 +1060,6 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
 
-/* ── Project Selector ──────────────────────────────────────── */
-#project-selector { display: flex; gap: var(--space-2); padding: 0 var(--space-1); }
-.sidebar-select {
-  flex: 1; background: var(--bg-surface-2); color: var(--text-primary);
-  border: 1px solid var(--border); padding: 6px 8px;
-  border-radius: var(--radius-sm); font: inherit; font-size: var(--text-sm);
-}
 /* Buttons use small icons by default */
 button .icon { width: 12px; height: 12px; }
 
@@ -1123,33 +1107,10 @@ button .icon { width: 12px; height: 12px; }
 .btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-light); }
 .btn-secondary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
 
-/* ── Loading Skeleton ──────────────────────────────────────── */
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-.skeleton {
-  background: linear-gradient(90deg, var(--bg-surface-2) 25%, var(--bg-hover) 50%, var(--bg-surface-2) 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-  border-radius: var(--radius-sm);
-}
-.skeleton-line { height: 12px; margin-bottom: var(--space-2); width: 100%; }
-.skeleton-line:last-child { width: 60%; }
-.skeleton-block { height: 60px; margin-bottom: var(--space-2); border-radius: var(--radius-md); }
-.skeleton-circle { width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0; }
-
-@media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; background: var(--bg-surface-2); }
-}
-
 /* ── Empty State ───────────────────────────────────────────── */
 .empty-state { padding: var(--space-8) var(--space-4); text-align: center; color: var(--text-muted); }
-.empty-state-icon { display: block; margin: 0 auto var(--space-3); width: 48px; height: 48px; color: var(--text-muted); opacity: 0.5; }
-.empty-state-icon svg { width: 100%; height: 100%; stroke: currentColor; fill: none; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
 .empty-state h4 { margin: 0 0 var(--space-1); color: var(--text-secondary); font-size: var(--text-lg); font-weight: 600; }
 .empty-state p { margin: var(--space-1) 0; font-size: var(--text-sm); line-height: 1.5; max-width: 280px; margin-left: auto; margin-right: auto; }
-.empty-state .btn-primary { display: inline-flex; width: auto; margin-top: var(--space-3); padding: 8px 18px; }
 
 /* ── Project Cards ─────────────────────────────────────────── */
 #project-list-modal { max-height: 50vh; overflow-y: auto; margin: var(--space-3) 0; }
@@ -1212,9 +1173,6 @@ button .icon { width: 12px; height: 12px; }
 /* ── Browse Modal ──────────────────────────────────────────── */
 .modal-dialog-wide { min-width: 480px; max-width: 70vw; }
 
-/* ── Loading Spinner ──────────────────────────────────────── */
-.spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
-@keyframes spin { to { transform: rotate(360deg); } }
 .browse-path {
   font-family: var(--font-mono); font-size: var(--text-sm);
   color: var(--accent); padding: var(--space-2) var(--space-2);
