@@ -19,6 +19,7 @@ The goals are:
 - [x] Harden selected-video filtering across artifact-producing steps.
 - [x] Make `.env` writes atomic.
 - [x] Expand token-mode auth coverage for read APIs.
+- [x] Keep pipeline running when progress file writes fail.
 
 ## Verification
 

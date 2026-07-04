@@ -44,6 +44,7 @@ class ProgressTracker:
         self._path = output_dir / ".progress.json"
         self._lock = threading.Lock()
         self._start = time.monotonic()
+        self._write_failed = False
         self._data: ProgressData = {
             "_schema_version": ARTIFACT_SCHEMA_VERSION,
             "phase": "",
@@ -60,14 +61,19 @@ class ProgressTracker:
         self._flush()
 
     def _flush(self) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        suffix = os.urandom(4).hex()
-        tmp = self._path.parent / f"{self._path.name}.{suffix}.tmp"
-        tmp.write_text(json.dumps(self._data, ensure_ascii=False), encoding="utf-8")
+        tmp: Path | None = None
         try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            suffix = os.urandom(4).hex()
+            tmp = self._path.parent / f"{self._path.name}.{suffix}.tmp"
+            tmp.write_text(json.dumps(self._data, ensure_ascii=False), encoding="utf-8")
             tmp.replace(self._path)
-        except OSError:
-            tmp.unlink(missing_ok=True)
+        except OSError as e:
+            if tmp is not None:
+                tmp.unlink(missing_ok=True)
+            if not self._write_failed:
+                print(f"[进度] 无法写入 {self._path}: {e}")
+                self._write_failed = True
 
     def update(
         self,
