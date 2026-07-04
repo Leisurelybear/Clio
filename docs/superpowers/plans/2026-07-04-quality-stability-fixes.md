@@ -17,7 +17,7 @@ The goals are:
 - [x] Propagate cancellation into label ffmpeg runs.
 - [x] Propagate cancellation into split ffmpeg runs.
 - [x] Harden selected-video filtering across artifact-producing steps.
-- [ ] Make `.env` writes atomic.
+- [x] Make `.env` writes atomic.
 - [ ] Expand token-mode auth coverage for read APIs.
 
 ## Verification
