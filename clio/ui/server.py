@@ -98,6 +98,36 @@ from clio.utils import write_json_atomic
 
 STATIC_DIR = Path(__file__).parent / "static"
 
+_SENSITIVE_GET_PATHS = {
+    "/api/env",
+    "/api/config/raw",
+    "/api/config/global",
+    "/api/config/project",
+    "/api/project",
+    "/api/projects",
+    "/api/videos",
+    "/api/video",
+    "/api/texts",
+    "/api/voiceover",
+    "/api/plans",
+    "/api/plan",
+    "/api/processing-state",
+    "/api/run/status",
+    "/api/run/stream",
+    "/api/fs/dirs",
+    "/api/transcripts",
+    "/api/whisper/check",
+    "/api/whisper/install/status",
+    "/api/whisper/models",
+    "/api/token-usage",
+    "/api/logs",
+}
+_SENSITIVE_GET_PREFIXES = ("/api/vmeta/",)
+
+
+def _get_requires_auth(path: str) -> bool:
+    return path in _SENSITIVE_GET_PATHS or any(path.startswith(prefix) for prefix in _SENSITIVE_GET_PREFIXES)
+
 
 @dataclass
 class _ServerState:
@@ -251,16 +281,7 @@ def make_handler(
                 rel = path[len("/static/") :]
                 return handle_static(self, rel)
 
-            # Routes that require auth
-            _sensitive = {
-                "/api/env",
-                "/api/config/raw",
-                "/api/config/global",
-                "/api/config/project",
-                "/api/video",
-                "/api/fs/dirs",
-            }
-            if path in _sensitive and not self._require_auth():
+            if _get_requires_auth(path) and not self._require_auth():
                 return
 
             if path == "/api/config":

@@ -227,6 +227,11 @@ function _startRunSSE() {
   }
   if (state.currentProjectInputDir) {
     url += sep + 'input_dir=' + encodeURIComponent(state.currentProjectInputDir);
+    sep = '&';
+  }
+  const token = sessionStorage.getItem('api_token');
+  if (token) {
+    url += sep + 'token=' + encodeURIComponent(token);
   }
   _runEventSource = new EventSource(url);
   _runEventSource.onmessage = (event) => {
