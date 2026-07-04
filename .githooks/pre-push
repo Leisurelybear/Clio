@@ -6,6 +6,20 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+
+def _reconfigure_stdio() -> None:
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_reconfigure_stdio()
+
 ruff_candidates = [
     REPO_ROOT / ".venv" / "Scripts" / "ruff.exe",
     REPO_ROOT / ".venv" / "bin" / "ruff",
