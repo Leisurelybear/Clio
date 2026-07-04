@@ -539,7 +539,14 @@ def load_config(
     """
     config_file = Path(config_path).resolve()
     global_cfg = load_global_config(config_file)
-    project_cfg = load_project_config(project_dir, config_path=config_file) if project_dir is not None else None
+    effective_project_dir = project_dir
+    if effective_project_dir is None and (config_file.parent / "project.yaml").is_file():
+        effective_project_dir = config_file.parent
+    project_cfg = (
+        load_project_config(effective_project_dir, config_path=config_file)
+        if effective_project_dir is not None
+        else None
+    )
 
     config = AppConfig(global_cfg=global_cfg, project_cfg=project_cfg)
     _validate_config(config)

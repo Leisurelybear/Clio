@@ -20,6 +20,7 @@ The goals are:
 - [x] Make `.env` writes atomic.
 - [x] Expand token-mode auth coverage for read APIs.
 - [x] Keep pipeline running when progress file writes fail.
+- [x] Load sibling `project.yaml` by default for CLI config paths.
 
 ## Verification
 
