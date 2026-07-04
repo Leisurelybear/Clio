@@ -292,7 +292,7 @@ async function _handleRunStatus(s) {
           <p><strong>进度:</strong> ${s.current}/${s.total} (${pct}%)${eta}</p>
           <p><strong>状态:</strong> ${escapeHtml(s.message || '')}</p>
           <div style="background:#333;border-radius:3px;height:8px;margin:8px 0">
-            <div style="background:#4a9eff;border-radius:3px;height:100%;width:${pct}%"></div>
+            <div style="background:var(--accent);border-radius:3px;height:100%;width:${pct}%"></div>
           </div>
           <div id="stale-warn" style="display:none;margin-top:8px;padding:8px;background:var(--warning-bg,#2a2520);border:1px solid var(--warning-border,#b8860b);border-radius:6px;font-size:var(--text-sm)">
             ⏳ 进度长时间未更新，可能正在后台下载模型（约 1-2 GB）或网络连接异常<br>

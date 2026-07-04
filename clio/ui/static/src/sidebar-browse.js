@@ -11,6 +11,7 @@ export function openBrowseDir(targetInputId) {
     if (inp) inp.value = path;
   };
   modal.style.display = 'flex';
+  loadBrowseDir('');
 }
 
 export async function loadBrowseDir(path) {

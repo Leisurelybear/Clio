@@ -2,6 +2,8 @@ import { state } from './state.js';
 import { $, $$, escapeHtml, setStatus, updateSidebarDay } from './utils.js';
 import { api, submitToken } from './api.js';
 import { initLayout } from './layout.js';
+import { initTheme, toggleTheme } from './theme.js';
+import { addToast } from './toast.js';
 import { setupPlayer } from './viewer.js';
 import { save, initProjectConfig, renderActiveTab, refineCurrentFile } from './editor.js';
 import {
@@ -32,9 +34,11 @@ window.switchToOriginalThenCompress = switchToOriginalThenCompress;
 window.goToRunTab = goToRunTab;
 window.initProjectConfig = initProjectConfig;
 window.refineCurrentFile = refineCurrentFile;
+window.addToast = addToast;
 
 async function init() {
   initLayout();
+  initTheme();
 
   // 从 URL 读取 project + input_dir 参数
   const urlParams = new URLSearchParams(window.location.search);
@@ -211,15 +215,22 @@ async function init() {
       setStatus('已重新加载', 'ok');
     } catch (e) { setStatus('重载失败: ' + e.message, 'err'); }
   };
+  document.getElementById('btn-theme').onclick = toggleTheme;
   $('btn-save').onclick = save;
   document.getElementById('btn-select-videos').addEventListener('click', toggleSelection);
   $$('.tab').forEach(t => t.onclick = () => { state.currentTab = t.dataset.tab; renderActiveTab(); });
   setupPlayer();
   document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && (e.key === 's' || e.key === 'S')) { e.preventDefault(); save(); }
-    // Close visible modals on Escape
+    const mod = e.ctrlKey || e.metaKey;
+    if (e.key === 's' && mod) { e.preventDefault(); save(); }
     if (e.key === 'Escape') {
       $$('.modal').forEach(m => { if (m.style.display !== 'none') m.style.display = 'none'; });
+    }
+    if (mod && e.key >= '1' && e.key <= '5') {
+      e.preventDefault();
+      const items = $$('.project-item:not(.disabled)');
+      const idx = parseInt(e.key) - 1;
+      if (idx < items.length) items[idx].click();
     }
   });
   window.addEventListener('beforeunload', (e) => {

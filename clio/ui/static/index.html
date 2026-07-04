@@ -7,18 +7,23 @@
 </head>
 <body>
 <header>
-  <div class="proj">
-    <span class="label">项目:</span>
-    <span id="proj-name" class="value">加载中...</span>
+  <div class="header-left">
+    <div class="brand-mark">V</div>
+    <div class="proj">
+      <span class="label">PROJECT</span>
+      <span id="proj-name" class="value">加载中...</span>
+    </div>
   </div>
   <div class="source-toggle">
     <button data-source="compressed" class="active" title="浏览 output/compressed/ 下的 640p 压缩视频">压缩</button>
     <button data-source="original" title="浏览 input_dir 下的原始 4K 视频">原视频</button>
   </div>
   <div class="actions">
-    <button id="btn-reload" class="btn-icon" title="重新扫描磁盘上的文件"><span class="icon"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></span> 重新加载</button>
-
     <span id="status" class="status"></span>
+    <button id="btn-theme" class="btn-icon" title="切换浅色/暗色主题">
+      <span class="icon"><svg viewBox="0 0 24 24" width="16" height="16"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg></span>
+    </button>
+    <button id="btn-reload" class="btn-icon" title="重新扫描磁盘上的文件"><span class="icon"><svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg></span></button>
   </div>
 </header>
 
@@ -39,22 +44,27 @@
         <li class="project-item" data-entity="plan" title="打开编排 (plan) 面板">
           <span class="icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg></span>
           <span class="name">编排</span>
+          <span class="shortcut">1</span>
         </li>
         <li class="project-item" data-entity="config" title="编辑 config.yaml 配置">
           <span class="icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/></svg></span>
           <span class="name">设置</span>
+          <span class="shortcut">2</span>
         </li>
         <li class="project-item" data-entity="run" title="运行流水线: 压缩→分析→口播→vlog 剪辑规划→标号">
           <span class="icon"><svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg></span>
           <span class="name">运行</span>
+          <span class="shortcut">3</span>
         </li>
         <li class="project-item" data-entity="logs" title="查看服务运行日志">
           <span class="icon"><svg viewBox="0 0 24 24"><polyline points="1 12 1 19 23 19 23 12"/><polyline points="22 8 12 3 2 8 2 8"/><rect x="12" y="15" width="2" height="2"/><rect x="8" y="15" width="2" height="2"/><rect x="4" y="15" width="2" height="2"/></svg></span>
           <span class="name">日志</span>
+          <span class="shortcut">4</span>
         </li>
         <li class="project-item" data-entity="tokens" title="AI token 使用统计">
           <span class="icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span>
           <span class="name">统计</span>
+          <span class="shortcut">5</span>
         </li>
       </ul>
       <h3>视频 <span id="video-count" class="muted"></span></h3>
@@ -148,7 +158,7 @@
     <p class="hint">指定存放压缩、分析结果等中间文件的目录路径</p>
     <div class="modal-actions">
       <button id="np-cancel" class="btn-secondary">取消</button>
-      <button id="np-create" class="btn-primary" style="width:auto;padding:8px 18px">创建并切换</button>
+      <button id="np-create" class="btn-primary">创建并切换</button>
     </div>
   </div>
 </div>
@@ -168,7 +178,7 @@
     <p class="hint" style="margin-bottom:8px;">或者输入素材目录路径（需包含 project.json）</p>
     <div style="display:flex;gap:8px;">
       <input id="op-custom-path" type="text" placeholder="如：D:\Projects\MyVlog" style="flex:1;">
-      <button id="op-open-path" class="btn-primary" style="width:auto;padding:8px 18px">打开</button>
+      <button id="op-open-path" class="btn-primary">打开</button>
       <button class="browse-btn" data-target="op-custom-path" type="button">浏览</button>
     </div>
   </div>
@@ -185,7 +195,7 @@
     </div>
     <div class="modal-actions" style="margin-top:12px;">
       <button id="browse-up" class="btn-secondary">上级目录</button>
-      <button id="browse-select" class="btn-primary" style="width:auto;padding:8px 18px" disabled>选择当前目录</button>
+      <button id="browse-select" class="btn-primary" disabled>选择当前目录</button>
       <button id="browse-cancel" class="btn-secondary">取消</button>
     </div>
   </div>
@@ -215,7 +225,7 @@
     </p>
     <label>
       <span>API Token</span>
-      <input id="auth-token-input" type="text" placeholder="粘贴 API Token" style="width:100%;box-sizing:border-box;font-family:monospace;">
+      <input id="auth-token-input" type="text" placeholder="粘贴 API Token" style="width:100%;box-sizing:border-box;font-family:var(--font-mono);">
     </label>
     <div class="modal-actions">
       <button id="auth-submit" class="btn-primary">验证</button>
@@ -223,6 +233,7 @@
   </div>
 </div>
 
+<div id="toast-container" class="toast-container"></div>
 <script type="module" src="/static/src/main.js"></script>
 </body>
 </html>
