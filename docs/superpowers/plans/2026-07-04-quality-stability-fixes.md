@@ -14,7 +14,7 @@ The goals are:
 ## Fix Log
 
 - [x] Propagate cancellation into Gemini video analysis.
-- [ ] Propagate cancellation into label ffmpeg runs.
+- [x] Propagate cancellation into label ffmpeg runs.
 - [ ] Propagate cancellation into split ffmpeg runs.
 - [ ] Harden selected-video filtering across artifact-producing steps.
 - [ ] Make `.env` writes atomic.

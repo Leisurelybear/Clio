@@ -78,7 +78,7 @@ def run_label_videos(
             label = idx.replace("'", "")
             vf = f"drawtext=text='{label}':fontsize=36:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=8:x=20:y=20"
             try:
-                run_ffmpeg(["-i", str(compressed), "-vf", vf, "-an", "-y", str(out)], ffmpeg)
+                run_ffmpeg(["-i", str(compressed), "-vf", vf, "-an", "-y", str(out)], ffmpeg, cancel_event=cancel_event)
                 state.mark(orig_stem, "label", "done")
             except Exception:
                 state.mark(orig_stem, "label", "error")
