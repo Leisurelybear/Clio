@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import cast
 
@@ -14,6 +15,7 @@ def split_video(
     ffprobe: str,
     reencode: bool = False,
     manifest_dir: Path | None = None,
+    cancel_event: threading.Event | None = None,
 ) -> list[Path]:
     """Split a video into equal-length segments if it exceeds max_duration_min.
 
@@ -87,7 +89,10 @@ def split_video(
                     "-y",
                     str(seg_path),
                 ]
-            run_ffmpeg(args, ffmpeg)
+            if cancel_event is None:
+                run_ffmpeg(args, ffmpeg)
+            else:
+                run_ffmpeg(args, ffmpeg, cancel_event=cancel_event)
             segments.append(seg_path)
             manifest.append(
                 {

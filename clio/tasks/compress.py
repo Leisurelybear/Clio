@@ -125,6 +125,7 @@ def run_compress_all(
                 ffprobe,
                 reencode=config.compress.reencode_split,
                 manifest_dir=config.compressed_dir,
+                cancel_event=cancel_event,
             )
             for seg in segments:
                 items.append((video, seg))
