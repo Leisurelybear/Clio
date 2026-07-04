@@ -161,7 +161,7 @@ function renderVideoItem(v) {
 
   const durHtml = v.duration_sec ? `<span class="video-duration">${Math.round(v.duration_sec)}s</span>` : '';
 
-  li.innerHTML = `<div class="video-thumb">VID</div>
+  li.innerHTML = `<div class="video-thumb">${icon('video')}</div>
     <div class="video-info">
       <div class="video-name">${checkboxHtml}${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)}${durHtml}</div>
       <div class="video-step-badges">${stepBadges}</div>
