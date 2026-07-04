@@ -62,7 +62,8 @@
   --transition-fast: 150ms ease;
   --transition-base: 200ms ease;
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
-
+}
+:root {
   --sidebar-w: 240px;
   --editor-w: 400px;
   --handle-w: 5px;
@@ -846,7 +847,6 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
   border-top: 1px solid var(--border); flex-shrink: 0;
 }
 .btn-primary {
-  width: 100%;
   padding: 9px 16px;
   background: var(--accent);
   color: #fff;

@@ -221,10 +221,16 @@ async function init() {
   $$('.tab').forEach(t => t.onclick = () => { state.currentTab = t.dataset.tab; renderActiveTab(); });
   setupPlayer();
   document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && (e.key === 's' || e.key === 'S')) { e.preventDefault(); save(); }
-    // Close visible modals on Escape
+    const mod = e.ctrlKey || e.metaKey;
+    if (e.key === 's' && mod) { e.preventDefault(); save(); }
     if (e.key === 'Escape') {
       $$('.modal').forEach(m => { if (m.style.display !== 'none') m.style.display = 'none'; });
+    }
+    if (mod && e.key >= '1' && e.key <= '5') {
+      e.preventDefault();
+      const items = $$('.project-item:not(.disabled)');
+      const idx = parseInt(e.key) - 1;
+      if (idx < items.length) items[idx].click();
     }
   });
   window.addEventListener('beforeunload', (e) => {
