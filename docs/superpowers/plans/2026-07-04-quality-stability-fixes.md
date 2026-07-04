@@ -13,7 +13,7 @@ The goals are:
 
 ## Fix Log
 
-- [ ] Propagate cancellation into Gemini video analysis.
+- [x] Propagate cancellation into Gemini video analysis.
 - [ ] Propagate cancellation into label ffmpeg runs.
 - [ ] Propagate cancellation into split ffmpeg runs.
 - [ ] Harden selected-video filtering across artifact-producing steps.
@@ -23,4 +23,3 @@ The goals are:
 ## Verification
 
 Each fix should run the narrowest relevant pytest module first. Run the full suite after a batch of related fixes.
-
