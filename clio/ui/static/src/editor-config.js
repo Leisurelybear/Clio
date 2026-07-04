@@ -848,7 +848,7 @@ export function renderLogs() {
       </label>
       <button class="btn-secondary" id="btn-logs-clear">清空</button>
     </div>
-    <div id="logs-view" style="flex:1;overflow-y:auto;padding:8px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,12px);line-height:1.6;background:#1a1a1a;white-space:pre-wrap;word-break:break-all"></div>
+    <div id="logs-view" style="flex:1;overflow-y:auto;padding:8px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,12px);line-height:1.6;background:var(--bg-surface);white-space:pre-wrap;word-break:break-all"></div>
   `;
   const view = $('logs-view');
   const cb = $('logs-autoscroll');
@@ -1005,7 +1005,7 @@ async function _loadModelMgmt() {
     html += '<div style="display:flex;justify-content:space-between;font-size:var(--text-xs);margin-bottom:4px">';
     html += '<span id="model-dl-msg"></span><span id="model-dl-speed"></span></div>';
     html += '<div style="background:#333;border-radius:3px;height:6px;overflow:hidden">';
-    html += '<div id="model-dl-bar" style="background:#4a9eff;border-radius:3px;height:100%;width:0%"></div></div>';
+    html += '<div id="model-dl-bar" style="background:var(--accent);border-radius:3px;height:100%;width:0%"></div></div>';
     html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:2px">';
     html += '<p id="model-dl-eta" class="muted" style="font-size:var(--text-xs);margin:0"></p>';
     html += '<button id="btn-cancel-dl" style="background:none;border:1px solid var(--err,#c44);color:var(--err,#c44);padding:2px 10px;border-radius:3px;cursor:pointer;font-size:var(--text-xs);display:none">取消下载</button>';

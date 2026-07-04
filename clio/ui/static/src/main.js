@@ -3,6 +3,7 @@ import { $, $$, escapeHtml, setStatus, updateSidebarDay } from './utils.js';
 import { api, submitToken } from './api.js';
 import { initLayout } from './layout.js';
 import { initTheme, toggleTheme } from './theme.js';
+import { addToast } from './toast.js';
 import { setupPlayer } from './viewer.js';
 import { save, initProjectConfig, renderActiveTab, refineCurrentFile } from './editor.js';
 import {
@@ -33,6 +34,7 @@ window.switchToOriginalThenCompress = switchToOriginalThenCompress;
 window.goToRunTab = goToRunTab;
 window.initProjectConfig = initProjectConfig;
 window.refineCurrentFile = refineCurrentFile;
+window.addToast = addToast;
 
 async function init() {
   initLayout();
