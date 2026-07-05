@@ -309,7 +309,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 **Acceptance Criteria**:
 - ✅ `requirements.txt` pins all dependency versions (`requirements-locked.txt`)
 - ✅ Core pure functions + route handlers + orchestration logic have unit tests (**381 test cases**, GitHub Actions CI)
-- [ ] Add Linux/macOS `setup.sh` (equivalent to existing `setup.ps1`) — project primarily targets Windows
+- [x] Add Linux/macOS `setup.sh` (equivalent to existing `setup.ps1`) — syntax repaired and UTF-8 prompts restored
 - [ ] `main.py check` venv detection compatible with both Linux `bin/` and Windows `Scripts/`
 
 **Sub-tasks**:

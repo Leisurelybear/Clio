@@ -1,185 +1,149 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
 cd "$(dirname "$0")"
 
 echo "=== Clio - 环境配置 ==="
 
-# ---- Python 版本检查（项目要求 3.11+）----
-pyVer=$(python3 --version 2>&1) || {
-    echo "错误：未检测到 Python3，请安装 Python 3.11 或更高版本" >&2
-    echo "      下载: https://python.org/downloads/" >&2
-    echo -n "      是否在浏览器中打开下载页面? (Y/n) " >&2
-    read -r choice
-    if [ "$choice" != "n" ] && [ "$choice" != "N" ]; then
-        case "$(uname -s)" in
-            Darwin) open "https://python.org/downloads/" 2>/dev/null || true ;;
-            Linux)  xdg-open "https://python.org/downloads/" 2>/dev/null || true ;;
-        esac
-    fi
-    exit 1
-}
-if [[ $pyVer =~ Python\ ([0-9]+)\.([0-9]+) ]]; then
-    major=${BASH_REMATCH[1]}
-    minor=${BASH_REMATCH[2]}
-    if [[ $major -lt 3 || ($major -eq 3 && $minor -lt 11) ]]; then
-        echo "错误：需要 Python 3.11+，当前版本: $pyVer" >&2
-        echo "      下载: https://python.org/downloads/" >&2
-        case "$(uname -s)" in
-            Darwin) echo "      推荐: brew install python@3.12" >&2 ;;
-            Linux)  echo "      推荐: sudo apt install python3 python3-pip（或使用系统包管理器）" >&2 ;;
-        esac
-        echo -n "      是否在浏览器中打开下载页面? (Y/n) " >&2
-        read -r choice
-        if [ "$choice" != "n" ] && [ "$choice" != "N" ]; then
-            case "$(uname -s)" in
-                Darwin) open "https://python.org/downloads/" 2>/dev/null || true ;;
-                Linux)  xdg-open "https://python.org/downloads/" 2>/dev/null || true ;;
-            esac
-        fi
-        exit 1
-    fi
-    echo "     Python $major.$minor - 版本检查通过"
-else
-    echo "错误：无法解析 Python 版本: $pyVer" >&2
-    echo "      请从 https://python.org/downloads/ 安装 Python 3.11+" >&2
+python_bin="${PYTHON:-python3}"
+
+echo "[0/5] 检查 Python 版本..."
+if ! py_ver="$($python_bin --version 2>&1)"; then
+    echo "错误：未检测到 Python3，请安装 Python 3.11 或更高版本。" >&2
+    echo "下载地址：https://python.org/downloads/" >&2
     exit 1
 fi
 
-# 1. Python 虚拟环境
-if [ -f ".venv/bin/python" ]; then
-    venvVer=$(.venv/bin/python --version 2>&1)
-    if [[ $venvVer =~ Python\ ([0-9]+)\.([0-9]+) ]]; then
-        vmajor=${BASH_REMATCH[1]}
-        vminor=${BASH_REMATCH[2]}
-        if [[ $vmajor -lt 3 || ($vmajor -eq 3 && $vminor -lt 11) ]]; then
-            echo "     虚拟环境 Python 版本过旧 ($vmajor.$vminor)，正在重建..."
+if [[ $py_ver =~ Python\ ([0-9]+)\.([0-9]+) ]]; then
+    major="${BASH_REMATCH[1]}"
+    minor="${BASH_REMATCH[2]}"
+    if [[ $major -lt 3 || ( $major -eq 3 && $minor -lt 11 ) ]]; then
+        echo "错误：需要 Python 3.11+，当前版本：$py_ver" >&2
+        case "$(uname -s)" in
+            Darwin) echo "建议：brew install python@3.12" >&2 ;;
+            Linux) echo "建议：使用系统包管理器安装 Python 3.11+ 和 python3-venv。" >&2 ;;
+        esac
+        exit 1
+    fi
+    echo "Python $major.$minor 检查通过"
+else
+    echo "错误：无法解析 Python 版本：$py_ver" >&2
+    exit 1
+fi
+
+echo "[1/5] 准备 Python 虚拟环境..."
+if [[ -x ".venv/bin/python" ]]; then
+    venv_ver="$(".venv/bin/python" --version 2>&1 || true)"
+    if [[ $venv_ver =~ Python\ ([0-9]+)\.([0-9]+) ]]; then
+        vmajor="${BASH_REMATCH[1]}"
+        vminor="${BASH_REMATCH[2]}"
+        if [[ $vmajor -lt 3 || ( $vmajor -eq 3 && $vminor -lt 11 ) ]]; then
+            echo "虚拟环境 Python 版本过旧（$vmajor.$vminor），正在重建..."
             rm -rf ".venv"
         fi
     fi
 fi
-if [ ! -f ".venv/bin/python" ]; then
-    echo "[1/4] 创建 Python 虚拟环境..."
-    if ! python3 -m venv .venv 2>/dev/null; then
-        echo "     创建虚拟环境失败，请安装 python3-venv:" >&2
-        echo "       Debian/Ubuntu: sudo apt install python3-venv" >&2
-        echo "       Fedora: sudo dnf install python3-virtualenv" >&2
-        echo "       Arch: sudo pacman -S python-virtualenv" >&2
+
+if [[ ! -x ".venv/bin/python" ]]; then
+    if ! "$python_bin" -m venv .venv; then
+        echo "创建虚拟环境失败。Debian/Ubuntu 可尝试：sudo apt install python3-venv" >&2
         exit 1
     fi
 else
-    echo "[1/4] 虚拟环境已存在，跳过"
+    echo "虚拟环境已存在，跳过创建"
 fi
 
-# 确保虚拟环境中有 pip（某些系统 Python 不会自带）
 if ! .venv/bin/python -m pip --version >/dev/null 2>&1; then
-    echo "     正在通过 ensurepip 安装 pip..."
-    if ! .venv/bin/python -m ensurepip --upgrade --default-pip; then
-        echo "     ensurepip 不可用，下载 get-pip.py..."
-        curl -fsSL --connect-timeout 30 -o /tmp/get-pip.py https://bootstrap.pypa.io/get-pip.py || {
-            echo "     无法下载 get-pip.py，请检查网络或手动安装: python3 -m ensurepip --upgrade" >&2
-            exit 1
-        }
-        .venv/bin/python /tmp/get-pip.py
-        rm -f /tmp/get-pip.py
-    fi
+    echo "正在通过 ensurepip 安装 pip..."
+    .venv/bin/python -m ensurepip --upgrade --default-pip
 fi
 
-echo "[2/4] 安装 Python 依赖..."
-.venv/bin/python -m pip install --upgrade pip || echo "     警告: pip 升级失败，继续安装依赖..."
-.venv/bin/python -m pip install -r requirements.txt || { echo "     [错误] 依赖安装失败，请检查网络或代理设置" >&2; exit 1; }
+echo "[2/5] 安装 Python 依赖..."
+.venv/bin/python -m pip install --upgrade pip
+.venv/bin/python -m pip install -r requirements.txt
 
-# Whisper 语音转录（可选加速）
-read -rp "是否安装 Whisper 语音转录? (y/N, 默认 N) " whisperAnswer
-if [ "$whisperAnswer" = "y" ] || [ "$whisperAnswer" = "Y" ]; then
-    echo "[2b] 安装 faster-whisper 及推理依赖..."
+read -r -p "是否安装 Whisper 语音转录依赖？(y/N) " whisper_answer
+if [[ "$whisper_answer" == "y" || "$whisper_answer" == "Y" ]]; then
+    echo "安装 faster-whisper 及推理依赖..."
     if ! .venv/bin/python -m pip install -r requirements-whisper.txt; then
-        echo "     Whisper 依赖安装失败，跳过后续步骤" >&2
-        echo "     可后续运行 'python -m clio whisper install' 单独安装" >&2
-    else
-        if command -v nvidia-smi &>/dev/null; then
-            echo "     检测到 NVIDIA GPU，安装 CUDA 运行时加速..."
-            free_kb=$(df -k . | awk 'NR==2{print $4}' 2>/dev/null || echo 0)
-            cuda_args=""
-            if [ "$free_kb" -gt 0 ] && [ "$free_kb" -lt $((5*1024*1024)) ]; then
-                echo "     磁盘仅剩 $((free_kb/1024/1024))GB，使用无缓存模式安装..."
-                cuda_args="--no-cache-dir"
-            fi
-            if ! .venv/bin/python -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 $cuda_args; then
-                echo "     CUDA 运行时安装失败，将使用 CPU 运行（速度较慢）"
-            fi
-        else
-            echo "     未检测到 NVIDIA GPU，将使用 CPU 运行（速度较慢）"
+        echo "Whisper 依赖安装失败，后续可运行 python main.py whisper install 单独安装。" >&2
+    elif command -v nvidia-smi >/dev/null 2>&1; then
+        echo "检测到 NVIDIA GPU，尝试安装 CUDA 运行时依赖..."
+        cuda_args=()
+        free_kb="$(df -k . | awk 'NR==2{print $4}' 2>/dev/null || echo 0)"
+        if [[ "$free_kb" =~ ^[0-9]+$ && "$free_kb" -gt 0 && "$free_kb" -lt $((5 * 1024 * 1024)) ]]; then
+            echo "磁盘剩余空间较少，使用无缓存模式安装 CUDA 依赖..."
+            cuda_args=(--no-cache-dir)
+        fi
+        if ! .venv/bin/python -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12 "${cuda_args[@]}"; then
+            echo "CUDA 运行时依赖安装失败，将继续使用 CPU 或现有环境。" >&2
         fi
     fi
 else
-    echo "     跳过 Whisper 安装，后续可运行 'python -m clio whisper install' 单独安装"
+    echo "跳过 Whisper 依赖安装，后续可运行 python main.py whisper install。"
 fi
 
-# 2. ffmpeg
-if ! command -v ffmpeg &>/dev/null; then
-    echo "[3/4] 未检测到 ffmpeg，尝试安装..."
+echo "[3/5] 检查 ffmpeg..."
+if command -v ffmpeg >/dev/null 2>&1 && command -v ffprobe >/dev/null 2>&1; then
+    echo "ffmpeg 已就绪：$(command -v ffmpeg)"
+else
+    echo "未检测到完整 ffmpeg/ffprobe，尝试使用系统包管理器安装..."
     case "$(uname -s)" in
         Linux)
-            if command -v apt-get &>/dev/null; then
-                sudo apt-get update -qq && sudo apt-get install -y ffmpeg || echo "     apt 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
-            elif command -v dnf &>/dev/null; then
-                sudo dnf install -y ffmpeg || echo "     dnf 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
-            elif command -v pacman &>/dev/null; then
-                sudo pacman -S --noconfirm ffmpeg || echo "     pacman 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
-            elif command -v zypper &>/dev/null; then
-                sudo zypper install -y ffmpeg || echo "     zypper 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
-            elif command -v brew &>/dev/null; then
-                brew install ffmpeg || echo "     brew 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
+            if command -v apt-get >/dev/null 2>&1; then
+                sudo apt-get update -qq && sudo apt-get install -y ffmpeg
+            elif command -v dnf >/dev/null 2>&1; then
+                sudo dnf install -y ffmpeg
+            elif command -v pacman >/dev/null 2>&1; then
+                sudo pacman -S --noconfirm ffmpeg
+            elif command -v zypper >/dev/null 2>&1; then
+                sudo zypper install -y ffmpeg
             else
-                echo "     请手动安装 ffmpeg:" >&2
-                echo "       Debian/Ubuntu: sudo apt install ffmpeg" >&2
-                echo "       Fedora: sudo dnf install ffmpeg" >&2
-                echo "       Arch: sudo pacman -S ffmpeg" >&2
-                echo "       macOS: brew install ffmpeg" >&2
-                echo "       https://ffmpeg.org/download.html" >&2
+                echo "无法自动安装 ffmpeg，请手动安装：https://ffmpeg.org/download.html" >&2
             fi
             ;;
         Darwin)
-            if command -v brew &>/dev/null; then
-                brew install ffmpeg || echo "     brew 安装失败，请手动安装: https://ffmpeg.org/download.html" >&2
+            if command -v brew >/dev/null 2>&1; then
+                brew install ffmpeg
             else
-                echo "     请先安装 Homebrew (https://brew.sh)，然后运行: brew install ffmpeg" >&2
+                echo "请先安装 Homebrew，然后运行：brew install ffmpeg" >&2
             fi
             ;;
+        *)
+            echo "当前系统未适配自动安装 ffmpeg，请手动安装：https://ffmpeg.org/download.html" >&2
+            ;;
     esac
-else
-    echo "[3/4] ffmpeg 已就绪: $(command -v ffmpeg)"
 fi
 
-# 3. .env
-if [ ! -f ".env" ]; then
+echo "[4/5] 准备本地配置文件..."
+if [[ ! -f ".env" && -f ".env.example" ]]; then
     cp ".env.example" ".env"
-    echo "[4/4] 已创建 .env，请编辑并填入 GEMINI_API_KEY"
+    echo "已创建 .env，请填写 GEMINI_API_KEY / DEEPSEEK_API_KEY 等密钥。"
 else
-    echo "[4/4] .env 已存在"
+    echo ".env 已存在或缺少 .env.example，跳过"
 fi
 
-# 4. config.yaml
-if [ ! -f "config.yaml" ] && [ -f "config.example.yaml" ]; then
+if [[ ! -f "config.yaml" && -f "config.example.yaml" ]]; then
     cp "config.example.yaml" "config.yaml"
-    echo "[*] 已创建 config.yaml，请按需修改 paths / proxy"
-fi
-
-# 5. Git hooks
-hooksPath=$(git config core.hooksPath || true)
-if [ "$hooksPath" != ".githooks" ]; then
-    echo "[5/5] 设置 git hooks 路径为 .githooks..."
-    git config core.hooksPath .githooks
+    echo "已创建 config.yaml，请按需修改 paths / proxy / ai.providers。"
 else
-    echo "[5/5] git hooks 路径已配置为 .githooks"
+    echo "config.yaml 已存在或缺少 config.example.yaml，跳过"
+fi
+
+echo "[5/5] 配置 git hooks..."
+hooks_path="$(git config core.hooksPath || true)"
+if [[ "$hooks_path" != ".githooks" ]]; then
+    git config core.hooksPath .githooks
+    echo "git hooks 路径已设置为 .githooks"
+else
+    echo "git hooks 路径已是 .githooks"
 fi
 
 echo ""
-echo "=== 环境检查 ==="
-echo "  注意: 请先编辑 .env 填入 API Key，再运行环境检查"
-echo "  .venv/bin/python -m clio check"
-
-echo ""
-echo "配置完成后运行:"
+echo "=== 环境配置完成 ==="
+echo "请先编辑 .env 填入 API Key，然后运行："
 echo "  source .venv/bin/activate"
-echo "  python -m clio run --day day1"
+echo "  python main.py check"
+echo ""
+echo "启动 Web UI："
+echo "  python main.py serve --no-browser"
