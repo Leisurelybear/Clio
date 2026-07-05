@@ -271,6 +271,32 @@ header > * { -webkit-app-region: no-drag; }
 .state-cell { display: table-cell; padding: 2px 8px; text-align: center; border-bottom: 1px solid var(--border); }
 .status button { background: none; border: 1px solid currentColor; border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer; color: inherit; font: inherit; font-size: var(--text-sm); }
 
+.runtime-warnings {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+.runtime-warnings[hidden] { display: none; }
+.runtime-warning {
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+}
+.runtime-warning.warning {
+  background: var(--warning-bg);
+  border: 1px solid rgba(234, 179, 8, 0.35);
+  color: var(--warning);
+}
+.runtime-warning.danger {
+  background: var(--error-bg);
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  color: var(--error);
+}
+
 /* ── Main Layout ───────────────────────────────────────────── */
 main {
   flex: 1;

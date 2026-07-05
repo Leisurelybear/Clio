@@ -121,7 +121,7 @@ High-value open items that are not already covered by completed fixes:
 - [ ] CR-008: UX/observability follow-ups.
   - Add pre-run summary showing selected videos, resolved artifact count per step, expected skips, and warnings.
   - Add provider/model test connection button.
-  - Add visible warnings when `debug_print_prompt=true` or LAN host mode is active.
+  - [x] Add visible warnings when `debug_print_prompt=true` or LAN host mode is active.
   - Add "why skipped" panel based on `.processing.json`.
 
 ---
