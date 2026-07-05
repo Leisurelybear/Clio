@@ -30,7 +30,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] 1. Backend auth — `ServerConfig`, `--token` CLI, `_require_auth()`, auto-generate on non-localhost — commit `767bc92`
 - [x] 2. Frontend auth — `api.js` Bearer header + 401 modal, video `?token=` URL, auto-capture from URL — commit `767bc92`
 - [x] 3. Auth tests (12 test cases) — commit `ae56e6d`
-- [ ] 4. Update README/UI docs with safe hosting guidance
+- [x] 4. Update README/UI docs with safe hosting guidance — this docs update
 
 ### Phase 4: Type and schema hardening ✅
 - [x] 1. Fix type contracts in config, utils, progress, vmeta, export
@@ -109,6 +109,8 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Background**: `server.py` has 6% coverage, `fs.py` has 12% coverage. These are security-sensitive and critical files with minimal testing.
 
+**Status**: ✅ **Done** (`c0e88fc`)
+
 **Sub-tasks**:
 - [x] U-010a: Add tests for `server.py` dispatch logic (do_GET/do_PUT/do_POST routing) — 90% coverage
 - [x] U-010b: Add tests for `fs.py` directory browsing (boundary cases, permission errors) — 96% coverage
@@ -120,11 +122,13 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Background**: `/api/fs/dirs` has no path restriction, exposing full filesystem when `--host 0.0.0.0` is used. All write endpoints lack auth. Requires lightweight token-based protection.
 
+**Status**: ✅ **Done** (`b071758`, `767bc92`)
+
 **Sub-tasks**:
-- [ ] U-008a: Restrict `handle_get_fs_dirs` to user home directory or a configurable root
-- [ ] U-008b: Add `UI_TOKEN` env var check — when `--host` is not localhost, require `?token=` on all sensitive endpoints
-- [ ] U-008c: Update README.md with explicit security warning for `--host 0.0.0.0`
-- [ ] U-008d: Add tests for `fs.py` (currently 12% coverage)
+- [x] U-008a: Restrict `handle_get_fs_dirs` to user home directory and Windows drive roots — `b071758`
+- [x] U-008b: Add token auth — when `--host` is not localhost, require `?token=` or Bearer token on sensitive endpoints — `767bc92`
+- [x] U-008c: Update UI README with explicit security warning for `--host 0.0.0.0` — this docs update
+- [x] U-008d: Add tests for `fs.py` — `c0e88fc`
 
 ## Staging / WIP
 

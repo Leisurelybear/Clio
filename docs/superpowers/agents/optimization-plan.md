@@ -19,8 +19,8 @@ Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cros
 | Pipeline cancel not covering analyze/scripts/plan/label | Add cancel_event to all loop steps | **U-005** | ✅ done |
 | `RateLimiter` lock blocks parallel AI calls | Split acquire from sleep | **U-006** | ✅ done |
 | Whisper download ctypes thread kill unsafe | Replace with chunked download | **U-007** | ✅ done |
-| `/api/fs/dirs` no auth/restriction for LAN mode | Add root restriction + token | **U-008** |
-| Whisper low-confidence segments silently dropped | Mark `low_confidence` flag | **U-009** |
+| `/api/fs/dirs` no auth/restriction for LAN mode | Add root restriction + token | ✅ **U-008** (`b071758`, `767bc92`) |
+| Whisper low-confidence segments silently dropped | Mark `low_confidence` flag | ✅ **U-009** (`fcbf9f3`) |
 
 ### What reviews got wrong (already fixed)
 
@@ -40,10 +40,10 @@ Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cros
 | `serve.ps1`/`serve.sh` has hardcoded project paths | Not distributable | Needs de-localization |
 | ROADMAP.md 656 lines — completed features not archived | Maintenance burden | Periodic cleanup |
 | AGENTS.md §7 commit history overly long (100+ entries) | Should trim to ~30 | Periodic cleanup |
-| `transcribe.py` low-confidence segs silently dropped | Information loss for downstream | **U-009** |
-| `server.py` 6% coverage + `fs.py` 12% coverage | Security-sensitive untested surface | **U-010** |
+| `transcribe.py` low-confidence segs silently dropped | Information loss for downstream | ✅ **U-009** (`fcbf9f3`) |
+| `server.py` 6% coverage + `fs.py` 12% coverage | Security-sensitive untested surface | ✅ **U-010** (`c0e88fc`) |
 | ~~`videos.py:101` sidecar mapping — all split segments to first sidecar~~ | ~~All split segments share same text/script in UI~~ | ~~B-097~~ ✅ `05edab2` |
 
 ### Tracking
 
-See `ROADMAP.md` section "In Progress" — entries **U-002**, **U-007**, **U-008**, **U-010**.
+See `ROADMAP.md` section "In Progress" — entries **U-002**, **U-007** plus future Phase 3 items.

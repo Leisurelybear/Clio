@@ -135,6 +135,9 @@ header 右侧的 **`压缩` / `原视频`** 切换按钮决定侧栏列的是哪
 ## 安全
 
 - 默认仅监听 `127.0.0.1`，不暴露到局域网
+- 使用 `--host 0.0.0.0` 暴露到局域网时，服务会自动生成访问 token；终端会打印带 `?token=` 的 Token URL，前端也会把 token 写入 `Authorization: Bearer ...`
+- 也可以通过 `--token <value>` 显式指定 token；远程访问时不要把 token URL 发给不可信设备
+- 目录浏览接口 `/api/fs/dirs` 只允许访问用户主目录内的路径；Windows 下仅额外允许列出驱动器根目录
 - 所有文件 IO 沙盒在 `output_dir` 内：basename 不允许 `/` `\` `..`
 - 写入采用 atomic rename (写 `.tmp` 然后 `os.replace`)，不会留下半截文件
 - 首次覆盖某个文件时自动创建 `*.bak` 备份（已存在则不覆盖）
