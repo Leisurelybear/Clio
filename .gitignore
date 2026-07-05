@@ -9,11 +9,11 @@ __pycache__/
 *.bak
 projects.json
 projects.json.bak
-.opencode/*
-!.opencode/skills/
-!.opencode/skills/**
+.opencode/
 opencode_session_import.json
 .claude/
+.codex/
+.tmp-empty-git-excludes
 
 # Whisper model cache
 /models/
