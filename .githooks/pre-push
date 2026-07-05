@@ -4,8 +4,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
-
 
 def _reconfigure_stdio() -> None:
     for name in ("stdout", "stderr"):
@@ -19,6 +17,8 @@ def _reconfigure_stdio() -> None:
 
 
 _reconfigure_stdio()
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 ruff_candidates = [
     REPO_ROOT / ".venv" / "Scripts" / "ruff.exe",
@@ -35,10 +35,10 @@ if RUFF is None:
         if result.returncode == 0:
             RUFF = [str(python), "-m", "ruff"]
         else:
-            print("⚠️  pre-push: ruff not found, skipping lint check")
+            print("[pre-push] ruff not found, skipping lint check")
             sys.exit(0)
     else:
-        print("⚠️  pre-push: no Python venv found, skipping lint check")
+        print("[pre-push] no Python venv found, skipping lint check")
         sys.exit(0)
 
 if not isinstance(RUFF, list):
@@ -55,5 +55,5 @@ py_files = result.stdout.splitlines()
 print(f"ruff check: {len(py_files)} files")
 check = subprocess.run([*RUFF, "check", *py_files], cwd=REPO_ROOT)
 if check.returncode != 0:
-    print("⚠️  pre-push: lint errors found, push blocked. Run `ruff check` locally to fix.")
+    print("[pre-push] lint errors found, push blocked. Run `ruff check` locally to fix.")
     sys.exit(1)
