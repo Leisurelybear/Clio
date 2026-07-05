@@ -93,7 +93,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 High-value open items that are not already covered by completed fixes:
 
-- [ ] CR-001: Selected-video runs should filter later artifacts by canonical identity, not only filename stems.
+- [x] CR-001: Selected-video runs now filter later artifacts by canonical identity, not only filename stems.
   - Current risk: selected `002_GL010684.mp4` can miss `texts/002_<AI title>.json`, so `voiceover`, `label`, or `refine` may process zero files.
   - Proposed fix: add a shared artifact-selection helper that reads `media_identity.compressed_stem`, `media_identity.original_stem`, `compressed_file`, and index fallbacks.
   - Required verification: realistic selected filename plus AI-generated analysis JSON title.

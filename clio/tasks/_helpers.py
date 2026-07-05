@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -67,6 +68,29 @@ def _selected_stems(files: list[str]) -> set[str]:
 
 def _matches_selected_stem(path: Path, selected: set[str]) -> bool:
     return bool(_stem_variants(path.stem, include_segment_base=True) & selected)
+
+
+def _matches_selected_artifact(path: Path, selected: set[str]) -> bool:
+    if _matches_selected_stem(path, selected):
+        return True
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    candidates: list[str] = []
+    identity = data.get("media_identity")
+    if isinstance(identity, dict):
+        candidates.extend(
+            str(value) for value in (identity.get("compressed_stem"), identity.get("original_stem")) if value
+        )
+    for key in ("compressed_file", "source_file", "index"):
+        value = data.get(key)
+        if value:
+            candidates.append(str(value))
+    for candidate in candidates:
+        if _stem_variants(candidate, include_segment_base=True) & selected:
+            return True
+    return False
 
 
 def _build_stem(index: int, title: str, config: AppConfig) -> str:

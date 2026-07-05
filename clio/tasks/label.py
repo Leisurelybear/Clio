@@ -11,7 +11,7 @@ from clio.config import AppConfig
 from clio.log import timed
 from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
-from clio.tasks._helpers import _eta_line, _matches_selected_stem, _selected_stems
+from clio.tasks._helpers import _eta_line, _matches_selected_artifact, _selected_stems
 from clio.utils import format_index, resolve_binary, run_ffmpeg
 
 
@@ -32,7 +32,7 @@ def run_label_videos(
     json_files = sorted(config.texts_dir.glob("*.json"))
     if files is not None:
         selected = _selected_stems(files)
-        json_files = [f for f in json_files if _matches_selected_stem(f, selected)]
+        json_files = [f for f in json_files if _matches_selected_artifact(f, selected)]
     if tracker:
         tracker.update(phase="label", total=len(json_files), message=f"烧录序号（{len(json_files)} 个）...")
     with timed(f"run_label_videos（{len(json_files)} 个）"):

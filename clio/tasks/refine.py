@@ -12,7 +12,7 @@ from clio.config import AppConfig
 from clio.log import timed
 from clio.tasks._helpers import (
     _eta_line,
-    _matches_selected_stem,
+    _matches_selected_artifact,
     _rewrite_script_md,
     _rewrite_text_file,
     _selected_stems,
@@ -62,7 +62,7 @@ def run_refine_texts(
     target_files = _collect_target_files(path, config.texts_dir)
     if files is not None:
         selected = _selected_stems(files)
-        target_files = [f for f in target_files if _matches_selected_stem(f, selected)]
+        target_files = [f for f in target_files if _matches_selected_artifact(f, selected)]
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
     if not target_files:
         print(f"未找到 json 文件: {path or config.texts_dir}")
@@ -116,7 +116,7 @@ def run_refine_scripts(
     target_files = _collect_target_files(path, config.scripts_dir, pattern="*_voiceover.json")
     if files is not None:
         selected = _selected_stems(files)
-        target_files = [f for f in target_files if _matches_selected_stem(f, selected)]
+        target_files = [f for f in target_files if _matches_selected_artifact(f, selected)]
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
     if not target_files:
         print(f"未找到 voiceover json 文件: {path or config.scripts_dir}")
