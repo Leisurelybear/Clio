@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-03
+
+### Added
+- R-017: Model Registry & Task Binding UI (14 commits, be636f2–2a712f7)
+- ProviderConfig.models field for model name storage (be636f2)
+- Tag input component for model name editing (c1c3ba9)
+- Provider list UI with add/edit/delete in Settings Global tab (5d4c8fc)
+- Task binding panel with dropdowns in Settings Project tab (87cd821)
+- CSS styles for provider cards, task binding cards, modals, tag input (61d50b8)
+- 39 unit tests for _renderProviderList and _renderTaskBinding (dd44169)
+
+### Fixed
+- Provider edit modal layout, default provider delete button hidden (9b9a7ab)
+- Dirty state not triggered by default model population (86c88e7)
+- Restore ai.debug_print_prompt/provider_ttl_min/ai.context fields lost during custom AI renderer refactor (fe63fe6)
+- Various test assertions for provider card rendering and task binding (21307f5, 2a712f7)
+- Video player onloadedmetadata for original source segments (a1e5b32)
+- Edit modal hint about empty API key remaining unchanged (d550715)
+
 ## 2026-07-02
 
 ### Added

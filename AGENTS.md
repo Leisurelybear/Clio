@@ -14,7 +14,7 @@ An **AI preprocessing pipeline**: raw travel vlog footage → ffmpeg compression
 - **google-genai** (Gemini 2.5 Flash video File API)
 - **httpx** (DeepSeek / OpenAI compatible calls)
 - **PyYAML** (config parsing; split into `config.yaml` global + `project.yaml` per-project)
-- **pytest** (unit tests, auto-run in CI; **914 test cases**)
+- **pytest** (unit tests, auto-run in CI; **972 test cases**)
 
 Dependencies in `requirements.txt`; `setup.ps1`/`setup.sh` creates venv + installs ffmpeg + copies `.env` in one click.
 
@@ -44,7 +44,8 @@ vlog-video-analysis/
 │   │   ├── routes/            Route handlers (split into focused modules)
 │   │   └── static/            Frontend (no build step, ES modules)
 │   │       └── src/           ES modules: sidebar.js, sidebar-data.js,
-│   │                           sidebar-rerun.js, sidebar-browse.js, ...
+│   │                           sidebar-rerun.js, sidebar-browse.js,
+│   │                           editor-config.js (provider list + task binding), ...
 │   └── ai/                    AI providers
 │       ├── base.py            TaskName enum, Provider Protocol
 │       ├── factory.py         Provider lookup by name
@@ -54,7 +55,7 @@ vlog-video-analysis/
 ├── config.example.yaml / .env.example
 ├── requirements.txt / requirements-locked.txt
 ├── .github/workflows/test.yml
-└── clio/tests/            pytest unit tests (864 cases)
+└── clio/tests/            pytest unit tests (972 cases)
 ```
 
 > See `docs/superpowers/agents/directory-tree.md` for full tree with file-level annotations and test coverage details.
@@ -79,6 +80,19 @@ vlog-video-analysis/
 - Chinese for user-facing copy (CLI prompts, error messages)
 - Default `skip_existing=True` shared by all steps (controlled by `analyze` toggle)
 - AI-returned JSON uses `extract_json()`: first `json.loads`, then regex `{}`
+
+### 4.7 Model Registry (R-017)
+
+Provider management is a **frontend-only** experience — no new backend APIs needed:
+
+- `ProviderConfig.models: list[str]` field stores model names per provider
+- API keys stored in `.env` via `PUT /api/env`, never in `config.yaml`
+- Frontend `editor-config.js` renders:
+  - **Provider list** (Global tab): cards with add/edit/delete, tag input for model names
+  - **Task binding** (Project tab): dropdowns filtered by capability (gemini → video tasks)
+- Task binding mutations write to `project.yaml` via existing `PUT /api/config/project`
+- Default providers (gemini, openai, deepseek) cannot be deleted
+- Video tasks (`video_analyze`) only show gemini-type providers in dropdown
 
 ### 4.4 Configuration
 
@@ -178,6 +192,8 @@ python main.py serve --no-browser              # Verify UI starts
 | Know known pitfalls and traps | `docs/superpowers/agents/gotchas.md` |
 | Check active refactoring items | `docs/superpowers/agents/optimization-plan.md` |
 | See full directory tree with annotations | `docs/superpowers/agents/directory-tree.md` |
+| Understand the model registry (provider list + task binding) | `AGENTS.md §4.7` |
+| Understand R-017 implementation details | `docs/superpowers/plans/2026-07-02-model-registry.md` |
 | Add a new AI provider | Skill: `adding-ai-provider` |
 | Add a new AI task | Skill: `adding-new-task` |
 | Add a new CLI subcommand | Skill: `adding-cli-subcommand` |

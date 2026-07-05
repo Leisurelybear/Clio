@@ -128,7 +128,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ## Staging / WIP
 
-### R-017: Model Registry & Task Binding UI
+### R-017: Model Registry & Task Binding UI ✅
 
 **Background**: Currently users must manually edit `config.yaml` to change models — typing provider names, model strings, and API keys by hand. This is error-prone and unfriendly. Goal: a visual model registry where users can:
 
@@ -138,21 +138,21 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Register new models: name, API key, adapter type (OpenAI-compatible / Anthropic / Gemini), base URL, etc.
 - New registrations auto-populate the provider list in `config.yaml`
 
-**Acceptance Criteria**:
-- UI "Models" tab listing all registered models with adapter type + supported tasks
-- Task binding panel: each task (video_analyze, voiceover, refine_text, etc.) shows a dropdown of compatible models
-- "Add Model" form: name, api_key, base_url, adapter_type (openai / anthropic / gemini), optional tags
-- Auto-validate: video tasks filter out text-only models
-- Backend: CRUD API for models, stored in `ai.providers` section of config
-- Existing `config.yaml` providers migrate seamlessly
+**Acceptance Criteria** (all ✅):
+- ✅ Provider list in Settings Global tab with add/edit/delete
+- ✅ Task binding panel in Settings Project tab with dropdowns and capability filtering
+- ✅ Add/edit Provider modal: name, type, API key (stored in .env), base_url, model tag list
+- ✅ Auto-validate: video_analyze filters to gemini-type providers only
+- ✅ Backend: `ProviderConfig.models` field, frontend-only CRUD via existing PUT endpoints
+- ✅ Existing `config.yaml` providers migrate seamlessly (models field optional, defaults to empty)
 
 **Sub-tasks**:
-- [ ] R-017a: Design model registry data model (adapter type, capability tags, credential storage)
-- [ ] R-017b: Backend CRUD API for provider registration
-- [ ] R-017c: Backend task-model binding with capability validation
-- [ ] R-017d: UI model list + add/edit/remove
-- [ ] R-017e: UI task binding dropdowns with filtering
-- [ ] R-017f: Migration path for existing config.yaml providers
+- [x] R-017a: Design model registry data model (adapter type, capability tags, credential storage)
+- [x] R-017b: Backend CRUD API for provider registration (reuses PUT /api/config/global, no new endpoints)
+- [x] R-017c: Backend task-model binding with capability validation (frontend filters, backend runtime check)
+- [x] R-017d: UI model list + add/edit/remove
+- [x] R-017e: UI task binding dropdowns with filtering
+- [x] R-017f: Migration path for existing config.yaml providers
 
 ### R-018: AI Prompt Debug Print
 
@@ -514,11 +514,13 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-018d: Selected video highlight style + count display + selection mode badge
 - [x] R-018e: Disable run button + hint text when nothing selected
 
-### R-018 Follow-up: Compact JSON in Debug Prompt Output
+### R-018 Follow-up: Compact JSON in Debug Prompt Output ✅
 
 **Background**: `debug_print_prompt` prints the full prompt to console, but injected JSON (clips list, transcripts, analysis data) uses `json.dumps(..., indent=2)`, rendering across dozens of lines. This makes the log hard to scroll through and defeats the purpose of a quick debug glance.
 
 **Request**: Before `print(prompt)` in `_call_ai()`, compact all embedded JSON to single-line format. Suggestion: change all `json.dumps(...)` in prompt-formatting paths (`analyze.py:248/278/333/338/374/375`) to `indent=None` — the AI does not need pretty-printed JSON, and it reduces token count slightly.
+
+✅ Done — all `json.dumps(...)` in prompt-formatting paths use `indent=None`.
 
 ## Feature R-019: Run Panel Prompt Injection
 
@@ -708,7 +710,10 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 | Commit | Description | Date |
 | --- | --- | --- |
+| `be636f2`~`2a712f7` (14 commits) | R-017: Model Registry & Task Binding UI (ProviderConfig.models, tag input, provider cards, task binding, tests, fixes) | 2026-07-02~07-03 |
 | `43a922b` | feat(ui): run panel prompt injection (R-019) | 2026-07-01 |
 | `05edab2` | fix(ui): segment-specific text/script matching in video list (B-097) | 2026-07-01 |
 
 Older completed sections (commit log, test coverage verification, code review audit) archived to [`docs/archive/2026-07-01-roadmap-archive.md`](docs/archive/2026-07-01-roadmap-archive.md).
+
+### Test count: 954 → 972 (R-017 added UI unit tests + backend model parsing tests)
