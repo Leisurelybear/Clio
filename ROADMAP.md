@@ -97,10 +97,10 @@ High-value open items that are not already covered by completed fixes:
   - Current risk: selected `002_GL010684.mp4` can miss `texts/002_<AI title>.json`, so `voiceover`, `label`, or `refine` may process zero files.
   - Proposed fix: add a shared artifact-selection helper that reads `media_identity.compressed_stem`, `media_identity.original_stem`, `compressed_file`, and index fallbacks.
   - Required verification: realistic selected filename plus AI-generated analysis JSON title.
-- [ ] CR-002: Complete config semantic validation beyond numeric ranges.
+- [x] CR-002: Config semantic validation now covers provider/task compatibility.
   - Validate provider `type` against supported adapters.
   - Validate `video_analyze` provider compatibility (`gemini`-type only).
-  - Warn or reject when a task model is not listed in its provider `models`.
+  - Reject when a task model is not listed in its provider `models` if the provider declares a model list.
 - [ ] CR-003: Make artifact identity a reusable project-level index service.
   - Build a single lookup layer for original -> compressed segments -> texts -> scripts -> transcripts -> plan usage.
   - Use it in `/api/videos`, selected-run filtering, rerun, label, cut, and export.
