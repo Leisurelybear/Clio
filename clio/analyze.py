@@ -10,6 +10,7 @@ from clio.ai.base import AIResponse, TaskName
 from clio.ai.factory import get_task_provider, get_video_provider
 from clio.config import AppConfig
 from clio.log import format_size, timed
+from clio.prompt_overrides import format_prompt_template, resolve_prompt_template
 from clio.prompts import (
     ANALYZE_PROMPT,
     PLAN_PROMPT,
@@ -176,9 +177,11 @@ def analyze_video(
     token_store=None,
     cancel_event: threading.Event | None = None,
     context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
 ) -> dict:
     provider, model = get_video_provider(config, TaskName.VIDEO_ANALYZE)
-    prompt = _wrap_with_context(ANALYZE_PROMPT, config, context_override=context_override)
+    base = resolve_prompt_template("video_analyze", ANALYZE_PROMPT, config, task_prompts=task_prompts)
+    prompt = _wrap_with_context(base, config, context_override=context_override)
     text = _call_ai(
         "AI 视频分析",
         provider.provider_id,
@@ -210,6 +213,7 @@ def generate_voiceover(
     token_store=None,
     cancel_event: threading.Event | None = None,
     context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
 ) -> dict:
     if cancel_event and cancel_event.is_set():
         raise RuntimeError("voiceover 被用户取消")
@@ -220,7 +224,10 @@ def generate_voiceover(
         f"- {t.get('start', '?')}-{t.get('end', '?')}: {t.get('description', '')}"
         for t in clip_data.get("timeline", [])
     )
-    base = SCRIPT_PROMPT.format(
+    template_text = resolve_prompt_template("voiceover", SCRIPT_PROMPT, config, task_prompts=task_prompts)
+    base = format_prompt_template(
+        "voiceover",
+        template_text,
         index=clip_data.get("index", ""),
         title=clip_data.get("title", ""),
         summary=clip_data.get("summary", ""),
@@ -251,13 +258,17 @@ def plan_daily_vlog(
     use_transcripts: bool = True,
     token_store=None,
     context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
 ) -> dict:
     provider, model = get_task_provider(config, TaskName.VLOG_PLAN)
 
     # 取第一个 clip 的 index 作为 prompt 示例，确保格式一致
     first_idx = clips[0].get("index", "001") if clips else "001"
 
-    base = PLAN_PROMPT.format(
+    plan_template = resolve_prompt_template("vlog_plan", PLAN_PROMPT, config, task_prompts=task_prompts)
+    base = format_prompt_template(
+        "vlog_plan",
+        plan_template,
         clips_json=json.dumps(clips, ensure_ascii=False, indent=None),
         max_clips=config.plan.max_clips_per_day,
         target_duration_sec=config.plan.target_duration_sec,
@@ -289,7 +300,10 @@ def plan_daily_vlog(
                 )
         if transcript_info:
             transcript_json = json.dumps(transcript_info, ensure_ascii=False, indent=None)
-            base += TRANSCRIPT_CONTEXT.format(transcripts_json=transcript_json)
+            transcript_template = resolve_prompt_template(
+                "transcript_context", TRANSCRIPT_CONTEXT, config, task_prompts=task_prompts
+            )
+            base += format_prompt_template("transcript_context", transcript_template, transcripts_json=transcript_json)
     prompt = _wrap_with_context(f"日 vlog 标签: {day_label}\n\n{base}", config, context_override=context_override)
     text = _call_ai(
         "AI vlog 剪辑规划",
@@ -332,7 +346,12 @@ def plan_daily_vlog(
 
 
 def refine_text(
-    analysis: dict, config: AppConfig, fix: str | None = None, context_override: str | None = None, token_store=None
+    analysis: dict,
+    config: AppConfig,
+    fix: str | None = None,
+    context_override: str | None = None,
+    token_store=None,
+    task_prompts: dict[str, str] | None = None,
 ) -> dict:
     """审阅并修正现有的素材分析。
 
@@ -341,13 +360,21 @@ def refine_text(
     """
     provider, model = get_task_provider(config, TaskName.REFINE_TEXT)
     if fix:
-        base = REFINE_TEXT_FIX_PROMPT.format(
+        refine_template = resolve_prompt_template(
+            "refine_text_fix", REFINE_TEXT_FIX_PROMPT, config, task_prompts=task_prompts
+        )
+        base = format_prompt_template(
+            "refine_text_fix",
+            refine_template,
             fix_instruction=fix.strip(),
             existing_json=json.dumps(analysis, ensure_ascii=False, indent=None),
         )
         label = "AI refine (定向)"
     else:
-        base = REFINE_TEXT_PROMPT.format(
+        refine_template = resolve_prompt_template("refine_text", REFINE_TEXT_PROMPT, config, task_prompts=task_prompts)
+        base = format_prompt_template(
+            "refine_text",
+            refine_template,
             existing_json=json.dumps(analysis, ensure_ascii=False, indent=None),
         )
         label = "AI refine 素材"
@@ -376,6 +403,7 @@ def refine_script(
     fix: str | None = None,
     context_override: str | None = None,
     token_store=None,
+    task_prompts: dict[str, str] | None = None,
 ) -> dict:
     """审阅并修正现有的口播文案。
 
@@ -387,14 +415,24 @@ def refine_script(
     analysis_json = json.dumps(analysis, ensure_ascii=False, indent=None) if analysis else "（无）"
     existing_json = json.dumps(script, ensure_ascii=False, indent=None)
     if fix:
-        base = REFINE_SCRIPT_FIX_PROMPT.format(
+        refine_template = resolve_prompt_template(
+            "refine_script_fix", REFINE_SCRIPT_FIX_PROMPT, config, task_prompts=task_prompts
+        )
+        base = format_prompt_template(
+            "refine_script_fix",
+            refine_template,
             fix_instruction=fix.strip(),
             analysis_json=analysis_json,
             existing_json=existing_json,
         )
         label = "AI refine 脚本 (定向)"
     else:
-        base = REFINE_SCRIPT_PROMPT.format(
+        refine_template = resolve_prompt_template(
+            "refine_script", REFINE_SCRIPT_PROMPT, config, task_prompts=task_prompts
+        )
+        base = format_prompt_template(
+            "refine_script",
+            refine_template,
             analysis_json=analysis_json,
             existing_json=existing_json,
         )

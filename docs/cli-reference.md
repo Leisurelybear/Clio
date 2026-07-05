@@ -354,6 +354,31 @@ Auto deep-merged on top of the global configuration at load time:
 
 Edit `templates/vlog_template.md` to adjust voiceover style (first person, word count, structure, etc.).
 
+### Prompt Overrides
+
+Create Markdown files in `templates/prompts/` to override built-in AI prompts without editing Python code. The priority order is:
+
+1. Runtime `task_prompts` from the Run panel / API
+2. `templates/prompts/{name}.md`
+3. Built-in constants in `clio/prompts.py`
+
+Supported files and required placeholders:
+
+| File | Required placeholders |
+|---|---|
+| `video_analyze.md` | none |
+| `voiceover.md` | `{index}`, `{title}`, `{summary}`, `{location}`, `{timeline_text}`, `{template}`, `{target_words}` |
+| `vlog_plan.md` | `{clips_json}`, `{max_clips}`, `{target_duration_sec}`, `{example_index}` |
+| `refine_text.md` | `{existing_json}` |
+| `refine_text_fix.md` | `{fix_instruction}`, `{existing_json}` |
+| `refine_script.md` | `{analysis_json}`, `{existing_json}` |
+| `refine_script_fix.md` | `{fix_instruction}`, `{analysis_json}`, `{existing_json}` |
+| `transcript_context.md` | `{transcripts_json}` |
+
+Missing or unknown placeholders fail before the AI request. Use `{{` and `}}` for literal JSON braces inside custom prompt files.
+
+For prompt experiments, prefer creating an override file instead of editing `clio/prompts.py`; deleting the override restores the built-in prompt.
+
 ### AI Provider Configuration
 
 Each step can independently configure provider and model (`config.yaml` → `ai`):

@@ -117,6 +117,7 @@ def _process_video_item(
     error_count: list[int],
     cancel_event: threading.Event | None = None,
     context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
 ) -> ClipRecord | None:
     idx_val = int(idx_str)
 
@@ -193,6 +194,7 @@ def _process_video_item(
             token_store=token_store,
             cancel_event=cancel_event,
             context_override=context_override,
+            task_prompts=task_prompts,
         )
     except Exception as e:
         elapsed_total = time.monotonic() - t0
@@ -242,6 +244,7 @@ def run_analyze_all(
     files: list[str] | None = None,
     overwrite: bool = False,
     context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
     **kwargs: Any,
 ) -> list[ClipRecord]:
     """Analyze already-compressed videos using AI (compress step must precede this).
@@ -352,6 +355,7 @@ def run_analyze_all(
                         error_count,
                         cancel_event,
                         context_override,
+                        task_prompts,
                     )
                     batch_futures.append(f)
 

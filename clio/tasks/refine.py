@@ -52,6 +52,7 @@ def run_refine_texts(
     context_override: str | None = None,
     files: list[str] | None = None,
     overwrite: bool = False,
+    task_prompts: dict[str, str] | None = None,
 ) -> int:
     """审阅并修正 texts/*.json；同步重写同名 .txt。返回处理条数。
 
@@ -80,7 +81,12 @@ def run_refine_texts(
             try:
                 analysis = json.loads(json_file.read_text(encoding="utf-8"))
                 refined = refine_text(
-                    analysis, config, fix=fix, context_override=context_override, token_store=token_store
+                    analysis,
+                    config,
+                    fix=fix,
+                    context_override=context_override,
+                    token_store=token_store,
+                    task_prompts=task_prompts,
                 )
             except Exception as e:
                 print(f"  失败: {e}")
@@ -106,6 +112,7 @@ def run_refine_scripts(
     context_override: str | None = None,
     files: list[str] | None = None,
     overwrite: bool = False,
+    task_prompts: dict[str, str] | None = None,
 ) -> int:
     """审阅并修正 scripts/*_voiceover.json；同步重写同名 .md。
 
@@ -135,7 +142,13 @@ def run_refine_scripts(
                 script = json.loads(json_file.read_text(encoding="utf-8"))
                 analysis = _load_analysis_for_script(json_file, config.texts_dir)
                 refined = refine_script(
-                    script, analysis, config, fix=fix, context_override=context_override, token_store=token_store
+                    script,
+                    analysis,
+                    config,
+                    fix=fix,
+                    context_override=context_override,
+                    token_store=token_store,
+                    task_prompts=task_prompts,
                 )
             except Exception as e:
                 print(f"  失败: {e}")

@@ -370,11 +370,16 @@ High-value open items that are not already covered by completed fixes:
 - CLI supports analyzing the same video with multiple models and comparing results
 
 **Sub-tasks**:
-- [ ] R-010a: External prompt file override mechanism (`templates/prompts/` same-named file takes priority)
+- [x] R-010a: External prompt file override mechanism (`templates/prompts/` same-named file takes priority; runtime `task_prompts` take priority; placeholder validation fails before AI calls)
 - [ ] R-010b: Confidence scoring (modify prompts to make AI output `_confidence`)
 - [ ] R-010c: Multi-model comparison CLI
 - [ ] R-010d: Backend `GET /api/prompts` returns all available prompts; `PUT /api/prompts/{name}` saves override
 - [ ] R-010e: UI Settings tab embeds Prompt Management panel (list + editor + restore default)
+
+**Prompt optimization note**:
+- Keep built-in prompts in `clio/prompts.py` unchanged until real output regressions are compared.
+- Trial prompt improvements through `templates/prompts/*.md` first; deleting the override file restores the built-in prompt.
+- Current optimization candidates: add `_confidence` to `video_analyze`; make travel-specific language easier to adapt for food/daily/sport vlogs; keep JSON output constraints strict.
 
 ## Feature R-002: One-Clip Cut (Extract All Segments from Plan)
 

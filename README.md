@@ -340,3 +340,11 @@ python -m pytest -v         # 测试
   <br>
   <sub>用 AI 加速你的 vlog 创作 · 从素材到成片，快人一步</sub>
 </p>
+
+## Prompt Overrides
+
+Create Markdown files in `templates/prompts/` to override built-in AI prompts without editing Python code. Runtime prompts from the Run panel take priority over these files, and both still receive trip/context injection before the AI call.
+
+Supported files: `video_analyze.md`, `voiceover.md`, `vlog_plan.md`, `refine_text.md`, `refine_text_fix.md`, `refine_script.md`, `refine_script_fix.md`, and `transcript_context.md`.
+
+Prompt files are validated before AI requests. Missing or unknown `{placeholder}` values fail early; use `{{` and `}}` for literal JSON braces.
