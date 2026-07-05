@@ -127,6 +127,8 @@ Recommendation:
 
 The CLI video discovery supports recursive input scanning, but UI original browsing does not.
 
+Status: Fixed on 2026-07-05. `/api/videos?source=original` now uses the configured recursive scan and represents nested originals as safe POSIX relative paths. `/api/video?source=original` resolves those relative paths inside the project input directory and rejects traversal/absolute paths.
+
 Relevant code:
 
 - `clio/utils.py:178` supports `find_videos(..., recursive=True)`.

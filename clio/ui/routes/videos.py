@@ -16,7 +16,7 @@ from clio.ui.services.file_service import (
     _find_texts_dirs,
     _is_safe_basename,
 )
-from clio.utils import get_duration_sec, resolve_binary
+from clio.utils import find_videos, get_duration_sec, resolve_binary
 from clio.vmeta import VideoMeta
 
 if TYPE_CHECKING:
@@ -36,6 +36,25 @@ def _parse_segment_info(stem: str) -> tuple[str | None, int | None]:
     if not m:
         return None, None
     return m.group(1), int(m.group(2))
+
+
+def _original_rel_name(path: Path, root: Path) -> str:
+    return path.relative_to(root).as_posix()
+
+
+def _resolve_original_video_path(root: Path, requested: str) -> Path | None:
+    parts = requested.split("_", 1)
+    actual = parts[1] if len(parts) == 2 and parts[0].isdigit() else requested
+    rel = Path(actual)
+    if rel.is_absolute() or ".." in rel.parts:
+        return None
+    try:
+        candidate = (root / rel).resolve()
+        root_resolved = root.resolve()
+        candidate.relative_to(root_resolved)
+    except (OSError, ValueError):
+        return None
+    return candidate
 
 
 def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
@@ -221,14 +240,13 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                 _ffprobe = resolve_binary(cfg.paths.ffprobe, "ffprobe")
             except Exception:
                 _ffprobe = None
-            for p in sorted(proj_input.iterdir()):
-                if p.suffix.lower() not in VIDEO_EXTS:
-                    continue
+            for p in find_videos(proj_input, recursive=cfg.paths.recursive):
+                rel_name = _original_rel_name(p, proj_input)
                 comp = _find_compressed_for_original(p.stem, comp_dir)
                 if not comp:
                     videos.append(
                         {
-                            "file": p.name,
+                            "file": rel_name,
                             "source": "original",
                             "index": None,
                             "match": None,
@@ -249,7 +267,7 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                 segment_matches = [{"source": "compressed", "file": cf, "index": ci} for cf, ci in comp]
                 for c_file, c_idx in comp:
                     seg_v: dict[str, Any] = {
-                        "file": f"{c_idx}_{p.name}",
+                        "file": f"{c_idx}_{rel_name}",
                         "source": "original",
                         "index": c_idx,
                         "title": text_titles.get(c_idx, ""),
@@ -273,13 +291,13 @@ def handle_get_video(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     proj_out = handler._get_project_output(proj_input)
     fname = qs.get("file", [""])[0]
     source = qs.get("source", ["compressed"])[0]
-    if not _is_safe_basename(fname):
-        return handler.send_error(HTTPStatus.FORBIDDEN)
     if source == "original":
-        parts = fname.split("_", 1)
-        actual_fname = parts[1] if len(parts) == 2 and parts[0].isdigit() else fname
-        vp = proj_input / actual_fname
+        vp = _resolve_original_video_path(proj_input, fname)
+        if vp is None:
+            return handler.send_error(HTTPStatus.FORBIDDEN)
     else:
+        if not _is_safe_basename(fname):
+            return handler.send_error(HTTPStatus.FORBIDDEN)
         vp = proj_out / "compressed" / fname
     if not vp.is_file() or vp.suffix.lower() not in VIDEO_EXTS:
         return handler.send_error(HTTPStatus.NOT_FOUND)
