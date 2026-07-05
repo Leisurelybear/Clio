@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from clio.config import apply_run_paths, load_config
+from clio.doctor import run_doctor
 from clio.log import setup_logging
 from clio.shutdown import before_stop, install_hooks
 from clio.ui import run as run_ui
@@ -150,6 +151,9 @@ def main(argv: list[str] | None = None) -> int:
     p_check = sub.add_parser("check", help="检查环境配置是否就绪")
     p_check.add_argument("-i", "--input", type=Path, help="检查指定素材文件夹")
 
+    p_doctor = sub.add_parser("doctor", help="诊断本机环境、依赖、配置和常见运行风险")
+    p_doctor.add_argument("-i", "--input", type=Path, help="诊断指定素材文件夹")
+
     p_plan = sub.add_parser("plan", help="生成单日 vlog 剪辑规划")
     _add_io_args(p_plan)
     p_plan.add_argument("--day", default="day1", help="日 vlog 标签")
@@ -258,6 +262,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "check":
         return run_check(config_path, getattr(args, "input", None))
+
+    if args.command == "doctor":
+        return run_doctor(config_path, getattr(args, "input", None))
 
     elif args.command == "transcribe":
         from clio.tasks.transcribe import run_transcribe_all

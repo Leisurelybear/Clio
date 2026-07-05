@@ -93,6 +93,14 @@ def test_whisper_check_subcommand(cli_runner, config_path):
     assert result == 0
 
 
+@patch("clio.main.run_doctor")
+def test_doctor_subcommand(mock_run_doctor, cli_runner, config_path):
+    mock_run_doctor.return_value = 0
+    result = cli_runner(["--config", str(config_path), "doctor"])
+    assert result == 0
+    mock_run_doctor.assert_called_once_with(config_path, None)
+
+
 @patch("clio.tasks.transcribe.run_transcribe_all")
 def test_transcribe_force_flag(mock_run, cli_runner, config_path):
     """--force 应设置 skip_existing=False"""

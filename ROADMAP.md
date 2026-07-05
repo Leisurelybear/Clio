@@ -117,7 +117,7 @@ High-value open items that are not already covered by completed fixes:
 - [~] CR-007: Developer experience follow-ups.
   - Documented Node.js 18+ requirement for local UI tests; CI uses Node 22.
   - Documented recommended lint command as `ruff check clio main.py` and updated CI quality commands to match.
-  - Consider `python main.py doctor` for env, ffmpeg, API keys, config, model cache, and write-permission checks.
+  - Added `python main.py doctor` for config, ffmpeg, API keys, Node version, and write-permission checks.
 - [ ] CR-008: UX/observability follow-ups.
   - Add pre-run summary showing selected videos, resolved artifact count per step, expected skips, and warnings.
   - Add provider/model test connection button.

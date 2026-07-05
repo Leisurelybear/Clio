@@ -144,6 +144,9 @@ python main.py run -i "E:/Videos/🇫🇷巴黎之旅" --day day1
 # 🔍 只看环境
 python main.py check
 
+# 🩺 完整诊断（配置 / ffmpeg / API key / Node 等）
+python main.py doctor
+
 # 🌐 启动 UI
 python main.py serve
 ```

@@ -138,6 +138,9 @@ python main.py run -i "E:/Videos/🇫🇷ParisTrip" --day day1
 # 🔍 Environment check
 python main.py check
 
+# 🩺 Full diagnostics (config / ffmpeg / API keys / Node, etc.)
+python main.py doctor
+
 # 🌐 Launch UI
 python main.py serve
 ```
