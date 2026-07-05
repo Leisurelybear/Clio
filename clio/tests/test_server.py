@@ -813,12 +813,21 @@ class TestAuth:
         handler.do_GET()
         mock_fn.assert_called_once()
 
-    def test_non_sensitive_get_works_without_token(self, auth_cls):
-        """GET /api/config (non-sensitive) works without token."""
+    def test_api_config_returns_401_without_token(self, auth_cls):
+        """GET /api/config returns 401 in token mode."""
         handler = _build_handler(auth_cls, path="/api/config")
         with patch("clio.ui.server.handle_get_config") as mock_fn:
             handler.do_GET()
-            mock_fn.assert_called_once()
+            handler.send_response.assert_called_once_with(401)
+            mock_fn.assert_not_called()
+
+    @patch("clio.ui.server.handle_get_config")
+    def test_api_config_works_with_bearer_token(self, mock_fn, auth_cls):
+        """GET /api/config with valid Bearer token works."""
+        handler = _build_handler(auth_cls, path="/api/config")
+        handler.headers.get.side_effect = lambda k, d=None: "Bearer test-token-789" if k == "Authorization" else "0"
+        handler.do_GET()
+        mock_fn.assert_called_once()
 
     # --- PUT route auth ---
 

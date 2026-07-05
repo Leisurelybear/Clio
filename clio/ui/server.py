@@ -126,6 +126,8 @@ _SENSITIVE_GET_PREFIXES = ("/api/vmeta/",)
 
 
 def _get_requires_auth(path: str) -> bool:
+    if path.startswith("/api/"):
+        return True
     return path in _SENSITIVE_GET_PATHS or any(path.startswith(prefix) for prefix in _SENSITIVE_GET_PREFIXES)
 
 

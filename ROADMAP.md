@@ -80,6 +80,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] Split staging no longer writes raw intermediate segments into `compressed/`; `run_compress_all()` now stages split inputs under `output/<splits_subdir>/` while keeping the manifest in `compressed/` for existing metadata lookup — this update
 - [x] Example config and README drift reduced: DeepSeek defaults now include official model names used by `project.example.yaml`, Web UI `server.api_token` is documented in `config.example.yaml`, and README test-count badges now say 970+ — this update
 - [x] Prompt debug logging now defaults off in config models, loader fallback, and examples to avoid writing full prompts/context/transcripts to logs unless explicitly enabled — this update
+- [x] Token mode now requires auth for every `/api/*` GET route, including `/api/config`, while keeping the UI shell and static assets public — this update
 
 ---
 
