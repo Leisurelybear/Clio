@@ -481,18 +481,17 @@ def load_project_config(
     with project_yaml.open(encoding="utf-8") as f:
         raw: dict[str, Any] = yaml.safe_load(f) or {}
 
-    base = project_dir.resolve()
-    if config_path is not None:
-        base = config_path.parent
+    project_base = project_dir.resolve()
+    config_base = config_path.parent if config_path is not None else project_base
 
     paths_raw = raw.get("paths", {})
     ai_raw = raw.get("ai", {})
-    context = _load_context(ai_raw, base, project_dir=project_dir)
+    context = _load_context(ai_raw, config_base, project_dir=project_dir)
 
     return ProjectConfig(
         paths=ProjectPathsConfig(
-            input_dir=_path(paths_raw.get("input_dir", "."), base),
-            output_dir=_path(paths_raw.get("output_dir", "./output"), base),
+            input_dir=_path(paths_raw.get("input_dir", "."), project_base),
+            output_dir=_path(paths_raw.get("output_dir", "./output"), project_base),
             recursive=paths_raw.get("recursive", False),
         ),
         ai=ProjectAIConfig(
@@ -511,7 +510,7 @@ def load_project_config(
             scripts_subdir=raw.get("script", {}).get("scripts_subdir", "scripts"),
             template_file=_path(
                 raw.get("script", {}).get("template_file", "./templates/vlog_template.md"),
-                base,
+                project_base,
             ),
             target_words=raw.get("script", {}).get("target_words", 80),
         ),

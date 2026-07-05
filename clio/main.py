@@ -256,15 +256,15 @@ def main(argv: list[str] | None = None) -> int:
         print(f"配置文件不存在: {config_path}", file=sys.stderr)
         return 1
 
+    if args.command == "doctor":
+        return run_doctor(config_path, getattr(args, "input", None))
+
     base_config = load_config(config_path)
     setup_logging(base_config.paths.logs_dir)
     install_hooks()
 
     if args.command == "check":
         return run_check(config_path, getattr(args, "input", None))
-
-    if args.command == "doctor":
-        return run_doctor(config_path, getattr(args, "input", None))
 
     elif args.command == "transcribe":
         from clio.tasks.transcribe import run_transcribe_all
