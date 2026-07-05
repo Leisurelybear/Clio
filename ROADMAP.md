@@ -87,6 +87,45 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ---
 
+### Remaining Review Items
+
+**Source**: `docs/analysis/2026-07-04-current-project-review.md`
+
+High-value open items that are not already covered by completed fixes:
+
+- [ ] CR-001: Selected-video runs should filter later artifacts by canonical identity, not only filename stems.
+  - Current risk: selected `002_GL010684.mp4` can miss `texts/002_<AI title>.json`, so `voiceover`, `label`, or `refine` may process zero files.
+  - Proposed fix: add a shared artifact-selection helper that reads `media_identity.compressed_stem`, `media_identity.original_stem`, `compressed_file`, and index fallbacks.
+  - Required verification: realistic selected filename plus AI-generated analysis JSON title.
+- [ ] CR-002: Complete config semantic validation beyond numeric ranges.
+  - Validate provider `type` against supported adapters.
+  - Validate `video_analyze` provider compatibility (`gemini`-type only).
+  - Warn or reject when a task model is not listed in its provider `models`.
+- [ ] CR-003: Make artifact identity a reusable project-level index service.
+  - Build a single lookup layer for original -> compressed segments -> texts -> scripts -> transcripts -> plan usage.
+  - Use it in `/api/videos`, selected-run filtering, rerun, label, cut, and export.
+- [ ] CR-004: Move UI route authorization toward policy metadata.
+  - Define route metadata for method/path/handler/auth policy.
+  - Default `/api/*` to auth-required in token mode.
+  - Add route-matrix tests so new endpoints cannot bypass token checks accidentally.
+- [ ] CR-005: Revisit config auto-upgrade write behavior.
+  - Current risk: PyYAML default injection can strip user comments and formatting.
+  - Proposed direction: keep auto-upgrade for critical migrations; move optional default injection to explicit `migrate-config` or UI prompt.
+- [ ] CR-006: Reduce frontend `innerHTML` interpolation risk.
+  - Prefer DOM creation plus `textContent` for filenames, provider names, model names, project names, logs, and AI titles.
+  - Add focused XSS regression tests around those values when frontend test runtime is upgraded.
+- [ ] CR-007: Developer experience follow-ups.
+  - Add local Node version check in setup scripts or docs; local Node 16 cannot run current Vitest/Vite, CI uses Node 22.
+  - Document recommended lint command as `ruff check clio main.py` or exclude local assistant/generated directories from repo-wide lint.
+  - Consider `python main.py doctor` for env, ffmpeg, API keys, config, model cache, and write-permission checks.
+- [ ] CR-008: UX/observability follow-ups.
+  - Add pre-run summary showing selected videos, resolved artifact count per step, expected skips, and warnings.
+  - Add provider/model test connection button.
+  - Add visible warnings when `debug_print_prompt=true` or LAN host mode is active.
+  - Add "why skipped" panel based on `.processing.json`.
+
+---
+
 ## In Progress
 
 ### U-002: ProviderManager (Phase 2 — Short-term)
