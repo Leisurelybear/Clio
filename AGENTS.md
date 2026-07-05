@@ -163,8 +163,8 @@ GitHub Actions runs tests on Python 3.11/3.12 (Ubuntu + Windows).
 ### Code Formatting
 
 ```bash
-ruff format .
-ruff check .
+ruff format clio main.py
+ruff check clio main.py
 ```
 
 Pre-commit hook auto-runs ruff on staged `.py` files (`.githooks/pre-commit`).

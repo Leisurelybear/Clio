@@ -33,7 +33,7 @@
 
 ## 🖥️ Web UI 编辑器
 
-**纯 Python 标准库**（`http.server`），无需 Node.js、无需 npm、无需构建。
+**运行时为纯 Python 标准库**（`http.server`），无需前端构建；仅运行 UI 单元测试时需要 Node.js 18+（CI 使用 Node 22）。
 
 <div align="center">
   <img src="docs/screenshots/pipeline.png" alt="流水线执行界面" width="85%">
@@ -307,8 +307,8 @@ python -m pip install -r requirements.txt
 # 本地开发
 .\.venv\Scripts\activate   # Windows
 source .venv/bin/activate   # Linux/Mac
-ruff format .               # 格式化
-ruff check .                # 检查
+ruff format clio main.py    # 格式化
+ruff check clio main.py     # 检查
 python -m pytest -v         # 测试
 ```
 

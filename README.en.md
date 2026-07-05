@@ -33,7 +33,7 @@
 
 ## 🖥️ Web UI Editor
 
-**Pure Python stdlib** (`http.server`). No Node.js, no npm, no build step.
+**Pure Python stdlib at runtime** (`http.server`). No frontend build is required; UI unit tests require Node.js 18+ (CI uses Node 22).
 
 <div align="center">
   <img src="docs/screenshots/pipeline.png" alt="Pipeline runner" width="85%">
@@ -300,8 +300,8 @@ Personal vlogger tool — [Issues](https://github.com/Leisurelybear/vlog-editing
 ```bash
 .venv\Scripts\activate         # Windows
 source .venv/bin/activate      # Linux/Mac
-ruff format .                  # Format
-ruff check .                   # Lint
+ruff format clio main.py       # Format
+ruff check clio main.py        # Lint
 python -m pytest -v            # Test
 ```
 

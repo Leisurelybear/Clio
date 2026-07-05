@@ -114,9 +114,9 @@ High-value open items that are not already covered by completed fixes:
 - [ ] CR-006: Reduce frontend `innerHTML` interpolation risk.
   - Prefer DOM creation plus `textContent` for filenames, provider names, model names, project names, logs, and AI titles.
   - Add focused XSS regression tests around those values when frontend test runtime is upgraded.
-- [ ] CR-007: Developer experience follow-ups.
-  - Add local Node version check in setup scripts or docs; local Node 16 cannot run current Vitest/Vite, CI uses Node 22.
-  - Document recommended lint command as `ruff check clio main.py` or exclude local assistant/generated directories from repo-wide lint.
+- [~] CR-007: Developer experience follow-ups.
+  - Documented Node.js 18+ requirement for local UI tests; CI uses Node 22.
+  - Documented recommended lint command as `ruff check clio main.py` and updated CI quality commands to match.
   - Consider `python main.py doctor` for env, ffmpeg, API keys, config, model cache, and write-permission checks.
 - [ ] CR-008: UX/observability follow-ups.
   - Add pre-run summary showing selected videos, resolved artifact count per step, expected skips, and warnings.
