@@ -108,9 +108,10 @@ High-value open items that are not already covered by completed fixes:
   - Route metadata now records method/path/auth policy for current API routes.
   - Unknown `/api/*` remains auth-required in token mode.
   - Route-matrix tests cover public static routes, known API routes, and unknown-route defaults.
-- [ ] CR-005: Revisit config auto-upgrade write behavior.
-  - Current risk: PyYAML default injection can strip user comments and formatting.
-  - Proposed direction: keep auto-upgrade for critical migrations; move optional default injection to explicit `migrate-config` or UI prompt.
+- [x] CR-005: Revisit config auto-upgrade write behavior.
+  - Decision (2026-07-06): keep current auto-upgrade behavior.
+  - Rationale: long-term configuration is UI-managed, so preserving YAML comments/manual formatting is not a product goal.
+  - Known trade-off accepted: ordinary config loads may rewrite YAML via PyYAML when defaults are injected, which can change comments/formatting and mark local config files dirty.
 - [ ] CR-006: Reduce frontend `innerHTML` interpolation risk.
   - Prefer DOM creation plus `textContent` for filenames, provider names, model names, project names, logs, and AI titles.
   - Add focused XSS regression tests around those values when frontend test runtime is upgraded.
