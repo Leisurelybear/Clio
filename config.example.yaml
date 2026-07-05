@@ -49,7 +49,7 @@ ai:
   # 设为 0 表示永不过期。
   # provider_ttl_min: 60
 
-  # debug_print_prompt: true  # 调试用：每次 AI 调用前打印完整 prompt 到控制台（默认开启，可改为 false 关闭）
+  # debug_print_prompt: true  # 调试用：设为 true 时打印完整 prompt；默认关闭，避免日志记录上下文/转录等隐私内容
   providers:
     gemini:
       type: gemini

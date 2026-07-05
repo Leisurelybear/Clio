@@ -154,6 +154,7 @@ class TestV1ToV2Migration:
         cfg = load_config(cfg_path, project_dir=tmp_path)
         assert cfg.compress.target_size_mb == 5
         assert cfg.analyze.skip_existing is True
+        assert cfg.ai.debug_print_prompt is False
 
 
 class TestCombinedWrappers:

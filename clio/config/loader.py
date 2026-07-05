@@ -439,7 +439,7 @@ def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
     ai_raw = raw.get("ai", {})
     ai_cfg = GlobalAIConfig(
         providers=_parse_providers(ai_raw.get("providers")),
-        debug_print_prompt=ai_raw.get("debug_print_prompt", True),
+        debug_print_prompt=ai_raw.get("debug_print_prompt", False),
         provider_ttl_min=ai_raw.get("provider_ttl_min", 60),
     )
 

@@ -100,7 +100,7 @@ class GlobalPathsConfig:
 @dataclass
 class GlobalAIConfig:
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
-    debug_print_prompt: bool = True
+    debug_print_prompt: bool = False
     provider_ttl_min: int = 60
 
 
@@ -348,7 +348,7 @@ class AIConfig:
     providers: dict[str, ProviderConfig] = field(default_factory=dict)
     tasks: dict[str, TaskConfig] = field(default_factory=dict)
     context: str = ""
-    debug_print_prompt: bool = True
+    debug_print_prompt: bool = False
     provider_ttl_min: int = 60
 
 
