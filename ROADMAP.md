@@ -579,7 +579,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | A-002 | app.js → 1509-line global functions | Split into src/ ES modules (Phase 1d complete, 8 modules) | ✅ |
 | A-003 | pipeline.py → 789-line pile | Split into tasks/ package (Phase 1b complete, 96 lines) | ✅ |
 | A-004 | `_write_text_file` / `_rewrite_text_file` 80% duplicate | Extract common function (Phase 1b moved to _helpers.py) | ✅ |
-| A-005 | `project.json` vs `project.yaml` out of sync | Two config sources inconsistent, should unify or make mutually aware | 🔴 |
+| A-005 | `project.json` vs `project.yaml` out of sync | `project.yaml.paths.output_dir` is now authoritative; `project.json.output_dir` remains a legacy fallback | ✅ |
 | A-006 | Frontend ES module dynamic import circular reference | viewer/editor/runner three-way dynamic import, can be refactored long-term | 🟡 |
 
 ## Known Issues (Bug Tracker)
