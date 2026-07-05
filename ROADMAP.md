@@ -78,6 +78,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ### Completed Iterations
 - [x] Split staging no longer writes raw intermediate segments into `compressed/`; `run_compress_all()` now stages split inputs under `output/<splits_subdir>/` while keeping the manifest in `compressed/` for existing metadata lookup — this update
+- [x] Example config and README drift reduced: DeepSeek defaults now include official model names used by `project.example.yaml`, Web UI `server.api_token` is documented in `config.example.yaml`, and README test-count badges now say 970+ — this update
 
 ---
 
