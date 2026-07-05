@@ -77,6 +77,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 **Source**: `docs/analysis/2026-07-04-current-project-review.md`
 
 ### Completed Iterations
+- [x] Config validation now rejects invalid numeric ranges for runtime-sensitive settings such as `analyze.max_workers`, compression dimensions, provider TTL/rate/retry values, and `max_tokens` - this update
 - [x] UI original video browsing now honors `paths.recursive`, returns nested originals as safe relative paths, and serves them through bounded `/api/video` resolution - this update
 - [x] Split staging no longer writes raw intermediate segments into `compressed/`; `run_compress_all()` now stages split inputs under `output/<splits_subdir>/` while keeping the manifest in `compressed/` for existing metadata lookup — this update
 - [x] Example config and README drift reduced: DeepSeek defaults now include official model names used by `project.example.yaml`, Web UI `server.api_token` is documented in `config.example.yaml`, and README test-count badges now say 970+ — this update

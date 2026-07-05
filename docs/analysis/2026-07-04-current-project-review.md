@@ -151,6 +151,8 @@ Recommendation:
 
 `_validate_config()` currently checks proxy URL and task provider existence, but many user-editable numeric and enum-like fields are not validated.
 
+Status: Partially fixed on 2026-07-05. `_validate_config()` now rejects invalid numeric ranges for core runtime fields including `analyze.max_workers`, compression size/width/split thresholds, `naming.index_width`, provider TTL, provider rate limit, retry attempts, and `max_tokens`. Enum/capability validation remains open.
+
 Relevant code:
 
 - `clio/config/validators.py:8` only validates proxy and task provider names.

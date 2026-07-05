@@ -229,8 +229,48 @@ class TestValidateConfig:
         with pytest.raises(ValueError, match="<无>"):
             _validate_config(cfg)
 
+    # ── load_config ─────────────────────────────────────────────────────
 
-# ── load_config ─────────────────────────────────────────────────────
+    @pytest.mark.parametrize(
+        ("field_name", "mutate"),
+        [
+            ("analyze.max_workers", lambda cfg: setattr(cfg.project_cfg.analyze, "max_workers", 0)),
+            ("compress.target_size_mb", lambda cfg: setattr(cfg.project_cfg.compress, "target_size_mb", 0)),
+            ("compress.max_width", lambda cfg: setattr(cfg.project_cfg.compress, "max_width", 0)),
+            ("compress.split_max_min", lambda cfg: setattr(cfg.project_cfg.compress, "split_max_min", -1)),
+            ("naming.index_width", lambda cfg: setattr(cfg.global_cfg.naming, "index_width", 0)),
+            ("ai.provider_ttl_min", lambda cfg: setattr(cfg.global_cfg.ai, "provider_ttl_min", -1)),
+            (
+                "ai.providers.gemini.requests_per_minute",
+                lambda cfg: setattr(cfg.global_cfg.ai.providers["gemini"], "requests_per_minute", -1),
+            ),
+            (
+                "ai.providers.gemini.retry_attempts",
+                lambda cfg: setattr(cfg.global_cfg.ai.providers["gemini"], "retry_attempts", -1),
+            ),
+            (
+                "ai.providers.gemini.max_tokens",
+                lambda cfg: setattr(cfg.global_cfg.ai.providers["gemini"], "max_tokens", 0),
+            ),
+        ],
+    )
+    def test_numeric_ranges_are_validated(self, field_name, mutate):
+        cfg = AppConfig(
+            global_cfg=GlobalConfig(
+                ai=GlobalAIConfig(
+                    providers={"gemini": ProviderConfig(name="gemini", type="gemini", api_key="k")},
+                ),
+            ),
+            project_cfg=ProjectConfig(
+                ai=ProjectAIConfig(
+                    tasks={"task": TaskConfig(provider="gemini", model="m")},
+                ),
+            ),
+        )
+        mutate(cfg)
+
+        with pytest.raises(ValueError, match=field_name.replace(".", r"\.")):
+            _validate_config(cfg)
 
 
 class TestLoadConfig:
