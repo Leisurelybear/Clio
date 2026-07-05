@@ -72,6 +72,15 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ---
 
+## Current Review Iteration (2026-07-04)
+
+**Source**: `docs/analysis/2026-07-04-current-project-review.md`
+
+### Completed Iterations
+- [x] Split staging no longer writes raw intermediate segments into `compressed/`; `run_compress_all()` now stages split inputs under `output/<splits_subdir>/` while keeping the manifest in `compressed/` for existing metadata lookup — this update
+
+---
+
 ## In Progress
 
 ### U-002: ProviderManager (Phase 2 — Short-term)

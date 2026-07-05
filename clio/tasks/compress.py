@@ -114,12 +114,13 @@ def run_compress_all(
 
     # Phase 1: resolve items to compress — split long videos if needed
     items: list[tuple[Path, Path]] = []  # (original_path, path_to_compress)
+    split_staging_dir = config.paths.output_dir / config.compress.splits_subdir
     for video in videos:
         max_min = config.compress.split_max_min
         if max_min > 0:
             segments = split_video(
                 video,
-                config.compressed_dir,
+                split_staging_dir,
                 max_min,
                 ffmpeg,
                 ffprobe,
