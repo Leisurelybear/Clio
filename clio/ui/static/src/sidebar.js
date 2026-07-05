@@ -185,6 +185,17 @@ function toggleSelection() {
   }
 }
 
+function sameVideoIndex(a, b) {
+  if (a === undefined || a === null || b === undefined || b === null) return false;
+  const left = String(a).trim();
+  const right = String(b).trim();
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const leftNum = Number.parseInt(left, 10);
+  const rightNum = Number.parseInt(right, 10);
+  return Number.isFinite(leftNum) && Number.isFinite(rightNum) && leftNum === rightNum;
+}
+
 async function setSource(source) {
   if (source === state.source) return;
   if (state.dirty) {
@@ -204,14 +215,22 @@ async function setSource(source) {
   saveProject();
   try {
     await loadVideos();
-    const target = oldVideo ? state.videos.find(v => v.file === oldMatchFile || v.match?.file === oldVideo.file) : null;
+    const target = oldVideo
+      ? state.videos.find(v =>
+          v.file === oldMatchFile
+          || v.match?.file === oldVideo.file
+          || sameVideoIndex(v.index, oldVideo.index)
+        )
+      : null;
     if (state.videos.length) {
       if (state.currentEntity === 'plan') {
         import('./editor.js').then(mod => mod.renderActiveTab());
         if (target) {
           state.currentVideo = target.file;
           const projParam = state.currentProjectName ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
-          $('player').src = `/api/video?file=${encodeURIComponent(target.file)}&source=${source}${projParam}`;
+          const tokenParam = sessionStorage.getItem('api_token');
+          const extraParam = tokenParam ? `&token=${encodeURIComponent(tokenParam)}` : '';
+          $('player').src = `/api/video?file=${encodeURIComponent(target.file)}&source=${source}${projParam}${extraParam}`;
           $('player-name').textContent = target.file;
           setStatus(`已切到 ${source} 视图`, 'ok');
         } else {
