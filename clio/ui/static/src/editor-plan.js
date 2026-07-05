@@ -4,6 +4,20 @@ import { api, icon } from './api.js';
 import { renderPreviewBar, startPreview, _playPreviewSegment } from './viewer.js';
 
 
+export function configSaveStatusForTab(tab) {
+  if (tab === 'project') {
+    return { message: '项目配置已保存，立即生效', level: 'ok' };
+  }
+  if (tab === 'global') {
+    return {
+      message: '全局配置已保存并热加载；正在运行中的任务仍使用启动时配置',
+      level: 'ok',
+    };
+  }
+  return { message: '合并视图为只读，无法保存', level: 'warn' };
+}
+
+
 export function renderPlan() {
   const p = state.plan;
   const pane = $('tab-plan');
@@ -204,10 +218,8 @@ export async function save() {
       if (r.error) throw new Error(r.error);
       state.dirty = false;
       updateSaveBtn();
-      setStatus(
-        tab === 'project' ? '项目配置已保存，立即生效' : '全局配置已保存（需重启服务生效）',
-        'ok'
-      );
+      const status = configSaveStatusForTab(tab);
+      setStatus(status.message, status.level);
       return;
     }
     if (entity === 'plan') {
