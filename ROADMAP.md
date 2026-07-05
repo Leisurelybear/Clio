@@ -81,6 +81,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] Example config and README drift reduced: DeepSeek defaults now include official model names used by `project.example.yaml`, Web UI `server.api_token` is documented in `config.example.yaml`, and README test-count badges now say 970+ — this update
 - [x] Prompt debug logging now defaults off in config models, loader fallback, and examples to avoid writing full prompts/context/transcripts to logs unless explicitly enabled — this update
 - [x] Token mode now requires auth for every `/api/*` GET route, including `/api/config`, while keeping the UI shell and static assets public — this update
+- [x] `input_dir` query switching now only accepts the default project directory or directories registered in `projects.json`, preventing arbitrary existing directories from being treated as projects — this update
 
 ---
 

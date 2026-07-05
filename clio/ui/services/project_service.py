@@ -252,8 +252,16 @@ def resolve_project_input(qs: dict, input_dir: Path, config_path: Path | None) -
     """
     input_dir_raw = qs.get("input_dir", [None])[0]
     if input_dir_raw:
-        candidate = Path(input_dir_raw)
-        if candidate.is_dir():
+        candidate = Path(input_dir_raw).resolve()
+        allowed_paths = {str(input_dir.resolve())}
+        registry_file = _registry_path(config_path)
+        if registry_file.is_file():
+            try:
+                reg = json.loads(registry_file.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                reg = {}
+            allowed_paths.update(str(Path(p).resolve()) for p in reg.get("projects", []))
+        if candidate.is_dir() and str(candidate) in allowed_paths:
             return candidate
 
     project_name = qs.get("project", [None])[0]
