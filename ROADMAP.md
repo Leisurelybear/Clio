@@ -104,10 +104,10 @@ High-value open items that are not already covered by completed fixes:
 - [ ] CR-003: Make artifact identity a reusable project-level index service.
   - Build a single lookup layer for original -> compressed segments -> texts -> scripts -> transcripts -> plan usage.
   - Use it in `/api/videos`, selected-run filtering, rerun, label, cut, and export.
-- [~] CR-004: UI route authorization now has centralized policy metadata.
+- [x] CR-004: UI route authorization now has centralized policy metadata and route-matrix coverage.
   - Route metadata now records method/path/auth policy for current API routes.
   - Unknown `/api/*` remains auth-required in token mode.
-  - Route-matrix tests remain deferred because this project currently avoids new test code unless explicitly requested.
+  - Route-matrix tests cover public static routes, known API routes, and unknown-route defaults.
 - [ ] CR-005: Revisit config auto-upgrade write behavior.
   - Current risk: PyYAML default injection can strip user comments and formatting.
   - Proposed direction: keep auto-upgrade for critical migrations; move optional default injection to explicit `migrate-config` or UI prompt.
