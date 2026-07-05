@@ -130,7 +130,7 @@ ai:
 - Commit granularity: one feature per commit, **do not batch**
 - History rewriting: force-push accepted
 - **No** API keys / local paths in config files
-- **No** test code (unless explicitly requested)
+- Add reasonable tests for new feature modules and behavior changes. Pure docs/config-only changes may skip tests with explicit verification notes.
 - **Push must be explicitly confirmed**. Local commits fine, `git push` requires user approval.
 
 ## 6. AI Transfer Protocol
