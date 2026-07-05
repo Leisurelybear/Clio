@@ -26,6 +26,7 @@ node_modules/
 
 # Superpowers temp artifacts (brainstorm mockups, etc.)
 .superpowers/
+.worktrees/
 
 # Ruff cache
 .ruff_cache/
