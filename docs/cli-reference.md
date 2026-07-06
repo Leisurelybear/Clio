@@ -280,6 +280,19 @@ python main.py serve --no-browser       # Don't auto-open browser (for remote ma
 Page after startup: left side video list (auto-scans `output/compressed/`), center is video player (supports seek / Range requests), right side three tabs: Analysis (texts), Voiceover (scripts), Vlog Editing Plan (plan). Clicking timeline / plan segments automatically seeks to the corresponding time; `Ctrl+S` to save.
 See `vlog_tool/ui/README.md` for details.
 
+### External Trigger
+
+Automation tools such as NAS download tasks or Syncthing hooks can trigger the same pipeline start behavior through the authenticated webhook endpoint:
+
+```bash
+curl -X POST "http://127.0.0.1:8765/api/webhook/trigger" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <api-token-if-configured>" \
+  -d '{"steps":["compress","analyze"],"day_label":"day1"}'
+```
+
+The JSON body is the same as `POST /api/run/start`, including `steps`, `files`, `overwrite`, `day_label`, `use_transcripts`, `context_override`, and `task_prompts`.
+
 ---
 
 ## Output Directory Structure

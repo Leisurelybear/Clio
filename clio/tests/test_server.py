@@ -645,6 +645,12 @@ class TestDoPOST:
         handler.do_POST()
         mock_fn.assert_called_once()
 
+    @patch("clio.ui.server.handle_post_run_start")
+    def test_post_webhook_trigger(self, mock_fn, handler_cls):
+        handler = self._post_handler(handler_cls, {}, "/api/webhook/trigger")
+        handler.do_POST()
+        mock_fn.assert_called_once()
+
     @patch("clio.ui.server.handle_post_run_cancel")
     def test_post_run_cancel(self, mock_fn, handler_cls):
         handler = self._post_handler(handler_cls, {}, "/api/run/cancel")

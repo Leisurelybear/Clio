@@ -615,7 +615,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | R-022 | 2026-06-24 N-05 | Smart cover frame extraction | Add `cover_timestamp` in analysis output, extract JPEG with ffmpeg, show candidates in UI | [x] |
 | R-023 | 2026-06-24 N-06 | Align transcript segments with visual timeline | Attach transcript snippets to timeline entries by time overlap; expose to plan prompt/UI | [x] |
 | R-024 | 2026-06-21 F-4 | GoPro GPMF telemetry as highlight signal | Parse telemetry timestamps (speed/elevation/location), feed highlight windows into analysis prompt | [ ] |
-| R-025 | 2026-06-24 N-04 | Webhook / external trigger | Add authenticated `POST /api/webhook/trigger` for NAS/Syncthing automation | [ ] |
+| R-025 | 2026-06-24 N-04 | Webhook / external trigger | Add authenticated `POST /api/webhook/trigger` for NAS/Syncthing automation | [x] |
 
 ## Known Issues (Bug Tracker)
 

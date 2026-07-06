@@ -369,7 +369,7 @@ def make_handler(
             except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
                 return self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, 400)
 
-            if path == "/api/run/start":
+            if path in {"/api/run/start", "/api/webhook/trigger"}:
                 return handle_post_run_start(self, qs, obj)
             if path == "/api/run/cancel":
                 return handle_post_run_cancel(self, qs, obj)
