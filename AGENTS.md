@@ -192,6 +192,7 @@ python main.py serve --no-browser              # Verify UI starts
 | Know known pitfalls and traps | `docs/superpowers/agents/gotchas.md` |
 | Check active refactoring items | `docs/superpowers/agents/optimization-plan.md` |
 | Evaluate repeatable workflows for skill extraction | `docs/superpowers/agents/skill-candidates.md` |
+| Review maintenance rules for future AI agents | `docs/superpowers/agents/maintenance-instructions.md` |
 | See full directory tree with annotations | `docs/superpowers/agents/directory-tree.md` |
 | Understand the model registry (provider list + task binding) | `AGENTS.md §4.7` |
 | Understand R-017 implementation details | `docs/superpowers/plans/2026-07-02-model-registry.md` |
