@@ -1,0 +1,335 @@
+from __future__ import annotations
+
+import json
+import re
+from collections.abc import Iterable
+from pathlib import Path
+from typing import Any
+
+from clio._constants import VIDEO_EXTENSIONS
+from clio.config.models import AppConfig
+from clio.tasks._helpers import _matches_selected_artifact, _matches_selected_stem, _selected_stems
+
+STEP_LABELS = {
+    "compress": "压缩视频",
+    "analyze": "AI 分析",
+    "voiceover": "生成口播文案",
+    "transcribe": "字幕转录",
+    "plan": "vlog 剪辑规划",
+    "label": "标记镜头",
+}
+
+
+def build_run_preview(
+    config: AppConfig,
+    steps: Iterable[str],
+    *,
+    force: bool,
+    use_transcripts: bool,
+    files: list[str] | None = None,
+    day_label: str = "day1",
+) -> dict[str, Any]:
+    selected_steps = list(steps)
+    selected = _selected_stems(files) if files is not None else None
+
+    source_input_info, all_source_videos = _source_input_info(config)
+    all_recursive_source_videos = _video_files(config.paths.input_dir, recursive=True)
+    compressed_input_info, all_compressed_videos = _compressed_input_info(config)
+    all_analysis_jsons = _analysis_jsons(config)
+
+    source_videos = _filter_stem_paths(all_source_videos, selected)
+    compressed_videos = _filter_stem_paths(all_compressed_videos, selected)
+    analysis_jsons = _filter_artifact_paths(all_analysis_jsons, selected)
+
+    input_info = compressed_input_info if _starts_from_compressed(selected_steps) else source_input_info
+    input_info = {
+        **input_info,
+        "count": len(compressed_videos) if input_info["mode"] == "compressed" else len(source_videos),
+    }
+
+    preview_steps = [
+        _step_preview(
+            config,
+            step,
+            source_videos=source_videos,
+            all_recursive_source_videos=all_recursive_source_videos,
+            compressed_videos=compressed_videos,
+            analysis_jsons=analysis_jsons,
+            all_analysis_jsons=all_analysis_jsons,
+            force=force,
+            use_transcripts=use_transcripts,
+            day_label=day_label,
+        )
+        for step in selected_steps
+    ]
+    return {
+        "input": input_info,
+        "steps": preview_steps,
+        "totals": {
+            "selected_steps": len(selected_steps),
+            "will_run": sum(step["will_run"] for step in preview_steps),
+            "will_skip": sum(step["will_skip"] for step in preview_steps),
+            "warnings": sum(len(step["warnings"]) for step in preview_steps),
+        },
+    }
+
+
+def _starts_from_compressed(steps: list[str]) -> bool:
+    return bool(steps) and steps[0] in {"analyze", "transcribe"}
+
+
+def _source_input_info(config: AppConfig) -> tuple[dict[str, Any], list[Path]]:
+    project_input = Path(config.input) if getattr(config, "input", None) else None
+    if project_input and project_input.is_file():
+        videos = [project_input] if _is_video(project_input) else []
+        return {"mode": "file", "path": str(project_input), "count": len(videos)}, videos
+
+    input_dir = config.paths.input_dir
+    videos = _video_files(input_dir, recursive=config.paths.recursive)
+    return {"mode": "directory", "path": str(input_dir), "count": len(videos)}, videos
+
+
+def _compressed_input_info(config: AppConfig) -> tuple[dict[str, Any], list[Path]]:
+    compressed_dir = config.compressed_dir
+    videos = _video_files(compressed_dir, recursive=False)
+    return {"mode": "compressed", "path": str(compressed_dir), "count": len(videos)}, videos
+
+
+def _step_preview(
+    config: AppConfig,
+    step: str,
+    *,
+    source_videos: list[Path],
+    all_recursive_source_videos: list[Path],
+    compressed_videos: list[Path],
+    analysis_jsons: list[Path],
+    all_analysis_jsons: list[Path],
+    force: bool,
+    use_transcripts: bool,
+    day_label: str,
+) -> dict[str, Any]:
+    if step == "compress":
+        return _compress_step(config, source_videos, force=force)
+    if step == "analyze":
+        return _analyze_step(config, compressed_videos, all_recursive_source_videos, force=force)
+    if step == "transcribe":
+        if not use_transcripts:
+            return _warning_step(step, "字幕开关未启用，转录步骤不会在本次运行中执行。")
+        return _transcribe_step(config, compressed_videos, all_recursive_source_videos, force=force)
+    if step == "voiceover":
+        return _voiceover_step(config, analysis_jsons, force=force)
+    if step == "plan":
+        return _plan_step(config, all_analysis_jsons, day_label=day_label, force=force)
+    if step == "label":
+        return _label_step(config, analysis_jsons, force=force)
+    return _unknown_step(step)
+
+
+def _compress_step(config: AppConfig, source_videos: list[Path], *, force: bool) -> dict[str, Any]:
+    total = len(source_videos)
+    if force:
+        return _step("compress", total=total, will_run=total, will_skip=0)
+
+    compressed_original_stems = _compressed_original_stems(config.compressed_dir)
+    skipped = sum(1 for source in source_videos if source.stem.lower() in compressed_original_stems)
+    return _step("compress", total=total, will_run=total - skipped, will_skip=skipped)
+
+
+def _analyze_step(
+    config: AppConfig,
+    compressed_videos: list[Path],
+    source_videos: list[Path],
+    *,
+    force: bool,
+) -> dict[str, Any]:
+    source_names = {source.stem.lower(): source.name for source in source_videos}
+    inputs = _resolvable_analysis_inputs(compressed_videos, source_names)
+    total = len(inputs)
+    if force:
+        return _step("analyze", total=total, will_run=total, will_skip=0)
+
+    skipped = sum(1 for compressed in inputs if _analysis_exists(config, compressed, source_names))
+    return _step("analyze", total=total, will_run=total - skipped, will_skip=skipped)
+
+
+def _transcribe_step(
+    config: AppConfig,
+    compressed_videos: list[Path],
+    source_videos: list[Path],
+    *,
+    force: bool,
+) -> dict[str, Any]:
+    source_names = {source.stem.lower(): source.name for source in source_videos}
+    inputs = _resolvable_analysis_inputs(compressed_videos, source_names)
+    total = len(inputs)
+    if force:
+        return _step("transcribe", total=total, will_run=total, will_skip=0)
+
+    skipped = sum(
+        1
+        for compressed in inputs
+        if _valid_json_file(config.transcripts_dir / f"{compressed.stem}_transcript.json")
+    )
+    return _step("transcribe", total=total, will_run=total - skipped, will_skip=skipped)
+
+
+def _voiceover_step(config: AppConfig, analysis_jsons: list[Path], *, force: bool) -> dict[str, Any]:
+    total = len(analysis_jsons)
+    if total == 0:
+        return _warning_step("voiceover", "未找到分析 JSON，口播步骤可能没有输入。")
+    skipped = 0 if force else sum(
+        1 for analysis_json in analysis_jsons if (config.scripts_dir / f"{analysis_json.stem}_voiceover.json").exists()
+    )
+    return _step("voiceover", total=total, will_run=total - skipped, will_skip=skipped)
+
+
+def _plan_step(config: AppConfig, analysis_jsons: list[Path], *, day_label: str, force: bool) -> dict[str, Any]:
+    if not analysis_jsons:
+        return _warning_step("plan", "未找到分析 JSON，规划步骤可能没有输入。")
+    total = 1
+    plan_json = config.plans_dir / f"{day_label}_plan.json"
+    plan_md = config.plans_dir / f"{day_label}_plan.md"
+    skipped = 0 if force else int(plan_md.is_file() and _valid_json_file(plan_json))
+    return _step("plan", total=total, will_run=total - skipped, will_skip=skipped)
+
+
+def _label_step(config: AppConfig, analysis_jsons: list[Path], *, force: bool) -> dict[str, Any]:
+    total = len(analysis_jsons)
+    if total == 0:
+        return _warning_step("label", "未找到分析 JSON，标记步骤可能没有输入。")
+    labeled_dir = config.paths.output_dir / "labeled"
+    skipped = 0 if force else sum(
+        1 for analysis_json in analysis_jsons if (labeled_dir / f"{analysis_json.stem}_labeled.mp4").exists()
+    )
+    return _step("label", total=total, will_run=total - skipped, will_skip=skipped)
+
+
+def _warning_step(step: str, warning: str) -> dict[str, Any]:
+    return _step(step, total=0, will_run=0, will_skip=0, warnings=[warning])
+
+
+def _unknown_step(step: str) -> dict[str, Any]:
+    return _step(step, total=0, will_run=0, will_skip=0, warnings=[f"未知步骤：{step}"])
+
+
+def _step(
+    name: str,
+    *,
+    total: int,
+    will_run: int,
+    will_skip: int,
+    warnings: list[str] | None = None,
+) -> dict[str, Any]:
+    return {
+        "name": name,
+        "label": STEP_LABELS.get(name, name),
+        "total": total,
+        "will_run": will_run,
+        "will_skip": will_skip,
+        "warnings": warnings or [],
+    }
+
+
+def _analysis_jsons(config: AppConfig) -> list[Path]:
+    texts_dirs = _find_texts_dirs(config.texts_dir)
+    return sorted(path for texts_dir in texts_dirs for path in texts_dir.iterdir() if path.suffix.lower() == ".json")
+
+
+def _find_texts_dirs(texts_dir: Path) -> list[Path]:
+    if texts_dir.is_dir():
+        return [texts_dir]
+    output_dir = texts_dir.parent
+    if not output_dir.is_dir():
+        return []
+    return sorted(path for path in output_dir.rglob(texts_dir.name) if path.is_dir())
+
+
+def _filter_stem_paths(paths: list[Path], selected: set[str] | None) -> list[Path]:
+    if selected is None:
+        return paths
+    return [path for path in paths if _matches_selected_stem(path, selected)]
+
+
+def _filter_artifact_paths(paths: list[Path], selected: set[str] | None) -> list[Path]:
+    if selected is None:
+        return paths
+    return [path for path in paths if _matches_selected_artifact(path, selected)]
+
+
+def _video_files(path: Path, *, recursive: bool) -> list[Path]:
+    if not path.is_dir():
+        return []
+    candidates = path.rglob("*") if recursive else path.iterdir()
+    return sorted(item for item in candidates if item.is_file() and _is_video(item))
+
+
+def _compressed_original_stems(compressed_dir: Path) -> set[str]:
+    if not compressed_dir.is_dir():
+        return set()
+    stems = set()
+    for path in sorted(compressed_dir.iterdir()):
+        if not path.is_file() or path.suffix.lower() != ".mp4":
+            continue
+        prefix, stem_part = _indexed_stem_parts(path.stem)
+        if prefix:
+            stems.add(_original_stem_for_compressed_part(stem_part).lower())
+    return stems
+
+
+def _analysis_exists(config: AppConfig, compressed: Path, source_names: dict[str, str]) -> bool:
+    prefix, stem_part = _indexed_stem_parts(compressed.stem)
+    if not prefix:
+        return False
+
+    original_stem = _original_stem_for_compressed_part(stem_part)
+    original_name = source_names.get(original_stem.lower())
+    if not original_name:
+        return False
+    for candidate in sorted(config.texts_dir.glob(f"{prefix}_*.json")):
+        try:
+            data = json.loads(candidate.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        if isinstance(data, dict) and data.get("source_file") == original_name:
+            return True
+    return False
+
+
+def _resolvable_analysis_inputs(compressed_videos: list[Path], source_names: dict[str, str]) -> list[Path]:
+    inputs = []
+    for compressed in compressed_videos:
+        prefix, stem_part = _indexed_stem_parts(compressed.stem)
+        if not prefix:
+            continue
+        original_stem = _original_stem_for_compressed_part(stem_part)
+        if original_stem.lower() in source_names:
+            inputs.append(compressed)
+    return inputs
+
+
+def _valid_json_file(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    try:
+        json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return False
+    return True
+
+
+def _indexed_stem_parts(stem: str) -> tuple[str, str]:
+    if "_" not in stem:
+        return "", stem
+    prefix, stem_part = stem.split("_", 1)
+    if not prefix.isdigit():
+        return "", stem
+    return prefix, stem_part
+
+
+def _original_stem_for_compressed_part(stem_part: str) -> str:
+    match = re.match(r"^(.+?)_seg\d+$", stem_part)
+    return match.group(1) if match else stem_part
+
+
+def _is_video(path: Path) -> bool:
+    return path.suffix.lower() in VIDEO_EXTENSIONS
