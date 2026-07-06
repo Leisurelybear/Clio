@@ -568,7 +568,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | Sub-task | Status |
 |----------|--------|
 | Remove `clio/ui/static/app.js` — legacy shim with no entry point | [x] |
-| Update `clio/ui/README.md` — add transcript tab, tokens panel, auth modal, `Ctrl+1~5`/`Escape` shortcuts, preview playback; update ASCII layout | [ ] |
+| Update `clio/ui/README.md` — add transcript tab, tokens panel, auth modal, `Ctrl+1~5`/`Escape` shortcuts, preview playback; update ASCII layout | [x] |
 | Wire toast system (`addToast`) into actual call sites — currently exposed globally but never called | [ ] |
 | Unify open-project modal `#op-custom-path` to use `.input-with-browse` class | [ ] |
 

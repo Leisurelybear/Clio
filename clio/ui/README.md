@@ -25,20 +25,22 @@ python main.py serve --host 0.0.0.0     # 暴露到局域网（注意安全）
 点 sidebar 的项目条目会切换右栏内容；点视频条目会切换右栏 + 播放器。
 ⚙ 设置也是项目级入口：点开后右侧渲染完整 config 编辑表单。
 ▶ 运行：支持多步骤流水线（压缩→分析→口播→vlog 剪辑规划→标号），实时进度 + ETA。
+日志和统计也是项目级入口：日志面板实时读取服务日志，统计面板汇总 AI token 用量。
 
 ```
 ┌────────────────────────────────────────────┐
 │ 项目: E:\Videos\Franch2 [压缩|原视频] [重新加载] │
 ├──────────┬──────────────────┬──────────────┤
 │ 项目      │  视频播放器       │  视频模式    │
-│ 📋 规划   │  ▶ 00:00 / 00:42 │ ┌──分析─┐    │
-│    day1   │                  │ │ 摘要  │    │
-│ ⚙ 设置   │                  │ │ 时间轴│    │
-│ ▶ 运行   │                  │ └────────┘    │
-│ ────────  │                  │ ┌──口播─┐    │
-│ 视频      │                  │ │ 文案  │    │
-│ [001]xxx  │                  │ └────────┘    │
-│ [002]yyy  │                  │   [保存]     │
+│ 编排  1   │  ▶ 00:00 / 00:42 │ ┌ 分析 ┐     │
+│ 设置  2   │                  │ │ 摘要 │     │
+│ 运行  3   │                  │ │ 时间轴│     │
+│ 日志  4   │                  │ └──────┘     │
+│ 统计  5   │                  │ ┌ 口播 ┐     │
+│ ────────  │                  │ ┌ 转录 ┐     │
+│ 视频      │                  │   [保存]     │
+│ [001]xxx  │                  │              │
+│ [002]yyy  │                  │              │
 └──────────┴──────────────────┴──────────────┘
 ```
 
@@ -72,10 +74,13 @@ UI 只读 / 写 `config.yaml` 里 `paths.output_dir` 下的文件：
 | --- | --- | --- | --- |
 | 分析 (texts) | sidebar → 视频 → tab「分析」 | `output/texts*/*.json` | `title`, `location`, `mood`, `summary`, `timeline[]` |
 | 口播 (scripts) | sidebar → 视频 → tab「口播」 | `output/scripts/*_voiceover.json` | `title`, `voiceover`, `edit_tip`, `duration_hint_sec` |
+| 转录 (transcript) | sidebar → 视频 → tab「转录」 | `output/transcripts/*.json` | `segments[]`，支持手动添加、编辑、删除 |
 | 规划 (plan) | sidebar → 📋 规划 | `output/plans/day<N>_plan.json` | `theme`, `opening_tip`, `ending_tip`, `sequence[]` |
 | 设置 (config) | sidebar → ⚙ 设置 → 项目 tab | `project.yaml` | 项目级字段，嵌套表单渲染 |
 | 设置 (config) | sidebar → ⚙ 设置 → 全局 tab | `config.yaml`（global-only 字段） | 保存后需重启服务 |
 | 设置 (config) | sidebar → ⚙ 设置 → 合并视图 tab | 合并后配置 | 只读查看全局+项目字段来源 |
+| 日志 (logs) | sidebar → 日志 | `logs/YYYY-MM-DD-HH.log` | 服务运行日志，支持自动刷新 |
+| 统计 (tokens) | sidebar → 统计 | `output/token_usage.json` | 总 token、按模型、按任务、最近 100 条历史 |
 | 多项目 | sidebar 顶部选择器 / URL `?project=name` | 自动发现 `project.json` | 支持新建、打开、切换 |
 
 `texts*` 通配同时匹配 `texts/` 和 `texts - 巴黎/` 之类的目录。
@@ -112,12 +117,12 @@ header 右侧的 **`压缩` / `原视频`** 切换按钮决定侧栏列的是哪
 
 ## 规划预览播放
 
-在「vlog 剪辑规划」面板顶部有「预览播放」按钮，点击后自动遍历编排的 `sequence[]`：
+在播放器下方有规划预览条；进入「编排」后，可用播放/上一段/下一段按钮按 `sequence[]` 连续预览：
 
 - 每个 segment 按 `use_timeline` 的开始时间跳转，播到结束时间后自动推进到下一个
-- 当前播放的 segment 在列表中高亮（蓝色边框）
-- 面板右上角显示进度（3/11）
-- 点击「停止预览」随时终止；播完所有 segment 后自动停止
+- 当前播放的 segment 会在规划列表和预览条里高亮
+- 预览条显示已播 / 当前 / 待播段，点击某段可跳转
+- 再次点击播放按钮可停止；播完所有 segment 后自动停止
 - 切换到视频 / 运行 / 设置 tab 或切换源时自动停止预览
 
 ## 播放速度
@@ -130,11 +135,17 @@ header 右侧的 **`压缩` / `原视频`** 切换按钮决定侧栏列的是哪
 ## 快捷键
 
 - `Ctrl+S` — 保存当前 tab 的修改
+- `Ctrl+1` ~ `Ctrl+5` — 切换项目区入口：编排 / 设置 / 运行 / 日志 / 统计
+- `Ctrl+B` — 折叠 / 展开左侧栏
+- `Ctrl+\` — 折叠 / 展开右侧编辑栏
+- `Escape` — 关闭打开中的 modal；编辑转录文本时结束编辑
 - 点 timeline / plan 的 segment — 视频跳到对应时间
 
 ## 安全
 
 - 默认仅监听 `127.0.0.1`，不暴露到局域网
+- 使用 `--host 0.0.0.0` 暴露到局域网时，服务会要求 API Token；浏览器收到 401 会弹出 token 输入框
+- token 可通过启动参数 `--token` 指定；未指定且监听非本机地址时，服务会在启动时生成并打印
 - 所有文件 IO 沙盒在 `output_dir` 内：basename 不允许 `/` `\` `..`
 - 写入采用 atomic rename (写 `.tmp` 然后 `os.replace`)，不会留下半截文件
 - 首次覆盖某个文件时自动创建 `*.bak` 备份（已存在则不覆盖）
