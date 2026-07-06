@@ -121,10 +121,10 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 **Background**: `/api/fs/dirs` has no path restriction, exposing full filesystem when `--host 0.0.0.0` is used. All write endpoints lack auth. Requires lightweight token-based protection.
 
 **Sub-tasks**:
-- [ ] U-008a: Restrict `handle_get_fs_dirs` to user home directory or a configurable root
-- [ ] U-008b: Add `UI_TOKEN` env var check — when `--host` is not localhost, require `?token=` on all sensitive endpoints
+- [x] U-008a: Restrict `handle_get_fs_dirs` to user home directory or a configurable root _(already implemented via `_is_allowed_path` in `fs.py:18-28`)_
+- [x] U-008b: Add `UI_TOKEN` env var check — when `--host` is not localhost, require `?token=` on all sensitive endpoints _(already implemented in `server.py:164-181` + `server.py:429-434`)_
 - [ ] U-008c: Update README.md with explicit security warning for `--host 0.0.0.0`
-- [ ] U-008d: Add tests for `fs.py` (currently 12% coverage)
+- [x] U-008d: Add tests for `fs.py` _(92% coverage now, U-010b)_
 
 ## Staging / WIP
 
@@ -560,6 +560,27 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | A-004 | `_write_text_file` / `_rewrite_text_file` 80% duplicate | Extract common function (Phase 1b moved to _helpers.py) | ✅ |
 | A-005 | `project.json` vs `project.yaml` out of sync | Two config sources inconsistent, should unify or make mutually aware | 🔴 |
 | A-006 | Frontend ES module dynamic import circular reference | viewer/editor/runner three-way dynamic import, can be refactored long-term | 🟡 |
+
+## N-02: UI Documentation & Dead Code Cleanup
+
+**Source**: 2026-07-06 full project audit
+
+| Sub-task | Status |
+|----------|--------|
+| Remove `clio/ui/static/app.js` — legacy shim with no entry point | [ ] |
+| Update `clio/ui/README.md` — add transcript tab, tokens panel, auth modal, `Ctrl+1~5`/`Escape` shortcuts, preview playback; update ASCII layout | [ ] |
+| Wire toast system (`addToast`) into actual call sites — currently exposed globally but never called | [ ] |
+| Unify open-project modal `#op-custom-path` to use `.input-with-browse` class | [ ] |
+
+## U-011: Configuration Safety & Housekeeping
+
+**Source**: 2026-07-06 full project audit
+
+| Sub-task | Status |
+|----------|--------|
+| Add `project.yaml`, `**/.vmeta/`, `**/.vindex` to `.gitignore` | [ ] |
+| Change `debug_print_prompt` default from `True` to `False` in `clio/config/models.py` | [ ] |
+| Update `config.example.yaml` to reflect `debug_print_prompt: false` by default | [ ] |
 
 ## Known Issues (Bug Tracker)
 
