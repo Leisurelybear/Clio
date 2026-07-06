@@ -126,6 +126,19 @@ The UI automatically reindexes when opening a project for the first time.
 
 ---
 
+## `verify` — Check .vmeta / .vindex Integrity
+
+Verify existing `.vindex` and `.vmeta` sidecars against source videos and compressed segments.
+This reports missing sources, stale source metadata, missing segments, missing `.vmeta` files, and compressed-file hash mismatches.
+
+```bash
+python main.py verify
+```
+
+Exit code is `0` when every indexed source is OK, otherwise `1`. If verification reports stale or missing sidecars, run `python main.py reindex`; if compressed-file hashes mismatch, rerun compression for the affected source.
+
+---
+
 ## `cut` — Cut Video Segments per Plan
 
 Read `plans/<day>_plan.json`, and use ffmpeg to cut independent segments from the corresponding compressed video (or original) based on the time ranges specified in `sequence[].use_timeline`.
