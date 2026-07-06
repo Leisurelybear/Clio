@@ -578,9 +578,9 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 | Sub-task | Status |
 |----------|--------|
-| Add `project.yaml`, `**/.vmeta/`, `**/.vindex` to `.gitignore` | [ ] |
-| Change `debug_print_prompt` default from `True` to `False` in `clio/config/models.py` | [ ] |
-| Update `config.example.yaml` to reflect `debug_print_prompt: false` by default | [ ] |
+| Add `project.yaml`, `**/.vmeta/`, `**/.vindex` to `.gitignore` | [x] |
+| Change `debug_print_prompt` default from `True` to `False` in `clio/config/models.py` | [x] |
+| Update `config.example.yaml` to reflect `debug_print_prompt: false` by default | [x] |
 
 ## Known Issues (Bug Tracker)
 
