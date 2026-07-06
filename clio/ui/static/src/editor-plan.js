@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { $, escapeHtml, markDirty, updateSidebarDay, setStatus, updateSaveBtn } from './utils.js';
 import { api, icon } from './api.js';
 import { renderPreviewBar, startPreview, _playPreviewSegment } from './viewer.js';
+import { addToast } from './toast.js';
 
 
 export function renderPlan() {
@@ -122,11 +123,14 @@ export function renderPlan() {
       const r = await api('POST', '/api/export', { day: state.currentDay || 'day1', format: 'jianying' });
       if (r.ok) {
         resultDiv.innerHTML = `<span style="color:var(--ok,#484)">✓ 已导出到 ${escapeHtml(r.path)}</span>`;
+        addToast('已导出到剪映', 'success');
       } else {
         resultDiv.innerHTML = `<span style="color:var(--err,#c44)">✗ ${escapeHtml(r.error || '导出失败')}</span>`;
+        addToast(r.error || '导出失败', 'error', 6000);
       }
     } catch (e) {
       resultDiv.innerHTML = `<span style="color:var(--err,#c44)">✗ 导出失败: ${escapeHtml(e.message || e)}</span>`;
+      addToast('导出失败: ' + (e.message || e), 'error', 6000);
     }
   });
   $('btn-cut-exec').onclick = executeCut;
@@ -159,6 +163,7 @@ export async function executeCut() {
     if (r.ok) {
       result.innerHTML = `<p class="ok">裁剪完成</p><p>输出目录: ${escapeHtml(r.output_dir)}</p>`;
       setStatus('裁剪完成', 'ok');
+      addToast('裁剪完成', 'success');
       state.steps.cut = true;
       import('./sidebar.js').then(mod => mod.renderSteps());
       import('./sidebar.js').then(mod => mod.saveProject());
@@ -167,7 +172,9 @@ export async function executeCut() {
     }
   } catch (e) {
     result.innerHTML = `<p class="err">错误: ${escapeHtml(e.message)}</p>`;
-    setStatus('裁剪失败: ' + e.message, 'err');
+    const msg = '裁剪失败: ' + e.message;
+    setStatus(msg, 'err');
+    addToast(msg, 'error', 6000);
   } finally {
     btn.disabled = false;
     btn.textContent = '执行裁剪';
@@ -204,10 +211,9 @@ export async function save() {
       if (r.error) throw new Error(r.error);
       state.dirty = false;
       updateSaveBtn();
-      setStatus(
-        tab === 'project' ? '项目配置已保存，立即生效' : '全局配置已保存（需重启服务生效）',
-        'ok'
-      );
+      const msg = tab === 'project' ? '项目配置已保存，立即生效' : '全局配置已保存（需重启服务生效）';
+      setStatus(msg, 'ok');
+      addToast(msg, 'success');
       return;
     }
     if (entity === 'plan') {
@@ -228,7 +234,10 @@ export async function save() {
     state.dirty = false;
     updateSaveBtn();
     setStatus('已保存', 'ok');
+    addToast('已保存', 'success');
   } catch (e) {
-    setStatus('保存失败: ' + e.message, 'err');
+    const msg = '保存失败: ' + e.message;
+    setStatus(msg, 'err');
+    addToast(msg, 'error', 6000);
   }
 }

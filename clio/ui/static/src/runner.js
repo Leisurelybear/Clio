@@ -6,6 +6,7 @@ import {
   updateSidebarDay,
 } from './utils.js';
 import { api, icon } from './api.js';
+import { addToast } from './toast.js';
 
 let _runEventSource = null;
 let _lastRunDay = 'day1';
@@ -191,7 +192,9 @@ async function startRun() {
     const r = await api('POST', '/api/run/start', body);
     if (r.ok) {
       _runActive = true;
-      setStatus(r.message || '流水线已启动', 'ok');
+      const msg = r.message || '流水线已启动';
+      setStatus(msg, 'ok');
+      addToast(msg, 'success');
       $('run-progress').innerHTML = '<p class="muted">流水线已启动，等待进度...</p>';
       _startRunSSE();
     } else {
@@ -199,7 +202,9 @@ async function startRun() {
     }
   } catch (e) {
     $('run-progress').innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
-    setStatus('启动失败: ' + e.message, 'err');
+    const msg = '启动失败: ' + e.message;
+    setStatus(msg, 'err');
+    addToast(msg, 'error', 6000);
     btn.disabled = false;
     btn.innerHTML = `${icon('play', 16)} 运行选中步骤`;
   }
@@ -210,9 +215,13 @@ async function cancelRun() {
   if (btn) { btn.disabled = true; btn.innerHTML = '⏹ 正在取消...'; }
   try {
     const r = await api('POST', '/api/run/cancel', {});
-    setStatus(r.message || '取消请求已发送', 'warn');
+    const msg = r.message || '取消请求已发送';
+    setStatus(msg, 'warn');
+    addToast(msg, 'warning');
   } catch (e) {
-    setStatus('取消失败: ' + e.message, 'err');
+    const msg = '取消失败: ' + e.message;
+    setStatus(msg, 'err');
+    addToast(msg, 'error', 6000);
     if (btn) { btn.disabled = false; btn.innerHTML = '取消'; }
   }
 }
@@ -320,6 +329,7 @@ async function _handleRunStatus(s) {
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="ok">✓ 流水线完成</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线完成', 'ok');
+      addToast(s.message || '流水线完成', 'success');
       renderProcessingState($('run-state-container'));
       // 检查是否有转录失败（如缺少模型），弹出下载引导
       (async () => {
@@ -361,6 +371,7 @@ async function _handleRunStatus(s) {
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="warn">⏹ 流水线已取消</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线已取消', 'warn');
+      addToast(s.message || '流水线已取消', 'warning');
       renderProcessingState($('run-state-container'));
     } else if (s.status === 'error') {
       _lastProgressSnapshot = null;
@@ -372,6 +383,7 @@ async function _handleRunStatus(s) {
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="err">✗ 流水线出错</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线出错', 'err');
+      addToast(s.message || '流水线出错', 'error', 6000);
       renderProcessingState($('run-state-container'));
     }
 }

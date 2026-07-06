@@ -569,7 +569,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 |----------|--------|
 | Remove `clio/ui/static/app.js` — legacy shim with no entry point | [x] |
 | Update `clio/ui/README.md` — add transcript tab, tokens panel, auth modal, `Ctrl+1~5`/`Escape` shortcuts, preview playback; update ASCII layout | [x] |
-| Wire toast system (`addToast`) into actual call sites — currently exposed globally but never called | [ ] |
+| Wire toast system (`addToast`) into actual call sites — currently exposed globally but never called | [x] |
 | Unify open-project modal `#op-custom-path` to use `.input-with-browse` class | [x] |
 
 ## U-011: Configuration Safety & Housekeeping
