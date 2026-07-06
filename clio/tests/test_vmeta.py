@@ -85,6 +85,25 @@ class TestVideoMeta:
         missing = tmp_path / "nope.mp4"
         assert meta.is_stale(missing)
 
+    def test_vmeta_is_stale_target_hash_change(self, tmp_path: Path):
+        src = tmp_path / "source.mp4"
+        src.write_bytes(b"\x00" * 1000)
+        tgt = tmp_path / "001_source.mp4"
+        tgt.write_bytes(b"\x00" * 500)
+        meta = VideoMeta.build(source=src, target=tgt, source_duration=10, target_duration=10)
+        assert not meta.is_stale(src, tgt)
+        tgt.write_bytes(b"\x01" * 500)
+        assert meta.is_stale(src, tgt)
+
+    def test_vmeta_is_stale_target_size_change(self, tmp_path: Path):
+        src = tmp_path / "source.mp4"
+        src.write_bytes(b"\x00" * 1000)
+        tgt = tmp_path / "001_source.mp4"
+        tgt.write_bytes(b"\x00" * 500)
+        meta = VideoMeta.build(source=src, target=tgt, source_duration=10, target_duration=10)
+        tgt.write_bytes(b"\x00" * 600)
+        assert meta.is_stale(src, tgt)
+
     def test_vmeta_split_info_roundtrip(self, tmp_path: Path):
         src = tmp_path / "src.mp4"
         src.write_bytes(b"\x00" * 1000)

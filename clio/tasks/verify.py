@@ -58,13 +58,15 @@ def run_verify(config: AppConfig) -> int:
                 stale_count += 1
                 break
 
-            if meta.verify:
-                current_hash = _quick_hash(seg_path)
-                if current_hash != meta.verify:
+            if meta.is_stale(source, seg_path):
+                if meta.verify and _quick_hash(seg_path) != meta.verify:
                     print(f"✗ HASH_MISMATCH ({seg_path.name})")
-                    all_segments_ok = False
                     hash_fail_count += 1
-                    break
+                else:
+                    print(f"⚠ VMETA_STALE ({seg_path.name})")
+                    stale_count += 1
+                all_segments_ok = False
+                break
 
         if all_segments_ok:
             print("✓ OK")
