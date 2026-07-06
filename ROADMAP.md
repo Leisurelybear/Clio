@@ -30,7 +30,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] 1. Backend auth — `ServerConfig`, `--token` CLI, `_require_auth()`, auto-generate on non-localhost — commit `767bc92`
 - [x] 2. Frontend auth — `api.js` Bearer header + 401 modal, video `?token=` URL, auto-capture from URL — commit `767bc92`
 - [x] 3. Auth tests (12 test cases) — commit `ae56e6d`
-- [ ] 4. Update README/UI docs with safe hosting guidance
+- [x] 4. Update README/UI docs with safe hosting guidance
 
 ### Phase 4: Type and schema hardening ✅
 - [x] 1. Fix type contracts in config, utils, progress, vmeta, export
@@ -123,7 +123,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 **Sub-tasks**:
 - [x] U-008a: Restrict `handle_get_fs_dirs` to user home directory or a configurable root _(already implemented via `_is_allowed_path` in `fs.py:18-28`)_
 - [x] U-008b: Add `UI_TOKEN` env var check — when `--host` is not localhost, require `?token=` on all sensitive endpoints _(already implemented in `server.py:164-181` + `server.py:429-434`)_
-- [ ] U-008c: Update README.md with explicit security warning for `--host 0.0.0.0`
+- [x] U-008c: Update README.md with explicit security warning for `--host 0.0.0.0`
 - [x] U-008d: Add tests for `fs.py` _(92% coverage now, U-010b)_
 
 ## Staging / WIP

@@ -61,6 +61,13 @@
 
 Launch: `python main.py serve` → open `http://127.0.0.1:8765`
 
+Security notes:
+
+- By default the UI listens on `127.0.0.1`, so only the local machine can access it.
+- `python main.py serve --host 0.0.0.0` exposes the UI to your LAN; other devices may access project directories, video previews, and config APIs. Use it only on trusted networks.
+- When exposing the UI to a LAN, prefer `--token <random-long-string>`. If omitted, the server auto-generates an API token and prints a `Token URL` in the terminal.
+- Do not expose the UI directly to the public internet. Use a VPN or SSH tunnel for remote access.
+
 ---
 
 ## 🧩 Pipeline Steps
