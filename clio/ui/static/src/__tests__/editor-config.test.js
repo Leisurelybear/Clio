@@ -1,5 +1,20 @@
-import { describe, it, expect, vi } from 'vitest';
-import { _renderTagInput, _renderProviderList, _renderTaskBinding } from '../editor-config.js';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { api } from '../api.js';
+import { _attachProviderListHandlers, _renderTagInput, _renderProviderList, _renderTaskBinding } from '../editor-config.js';
+
+vi.mock('../api.js', async () => {
+  const actual = await vi.importActual('../api.js');
+  return {
+    ...actual,
+    api: vi.fn(),
+  };
+});
+
+beforeEach(() => {
+  vi.restoreAllMocks();
+  vi.clearAllMocks();
+  api.mockReset();
+});
 
 function renderTagInput(values = [], onChange = () => {}) {
   const container = document.createElement('div');
@@ -179,6 +194,19 @@ describe('_renderProviderList', () => {
     expect(html).not.toContain('config-empty-state');
   });
 
+  it('renders provider test button and status area', () => {
+    const div = document.createElement('div');
+    div.innerHTML = _renderProviderList({ gemini: GEMINI_PROVIDER });
+
+    const btn = div.querySelector('.btn-provider-test');
+    const status = div.querySelector('.provider-test-status');
+
+    expect(btn).not.toBeNull();
+    expect(btn.textContent).toBe('测试');
+    expect(status).not.toBeNull();
+    expect(status.textContent).toBe('');
+  });
+
   it('shows OpenAI type label for openai providers', () => {
     const html = _renderProviderList({ deepseek: OPENAI_PROVIDER });
     expect(html).toContain('OpenAI 兼容');
@@ -243,6 +271,121 @@ describe('_renderProviderList', () => {
     const html = _renderProviderList({ '<script>xss</script>': GEMINI_PROVIDER });
     expect(html).toContain('&lt;script&gt;xss&lt;/script&gt;');
     expect(html).not.toContain('<script>xss</script>');
+  });
+
+  it('posts first model when testing a single-model provider', async () => {
+    api.mockResolvedValue({ ok: true, elapsed_ms: 123 });
+    const div = document.createElement('div');
+    div.innerHTML = _renderProviderList({ deepseek: OPENAI_PROVIDER });
+    _attachProviderListHandlers(div, { deepseek: OPENAI_PROVIDER });
+
+    div.querySelector('.btn-provider-test').click();
+    await vi.waitFor(() => {
+      expect(api).toHaveBeenCalledWith('POST', '/api/ai/test', {
+        provider: 'deepseek',
+        model: 'deepseek-chat',
+      });
+    });
+  });
+
+  it('prompts for a multi-model provider and posts the selected model', async () => {
+    const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('gemini-2.0-flash');
+    api.mockResolvedValue({ ok: true, elapsed_ms: 41 });
+    const div = document.createElement('div');
+    div.innerHTML = _renderProviderList({ gemini: GEMINI_PROVIDER });
+    _attachProviderListHandlers(div, { gemini: GEMINI_PROVIDER });
+
+    div.querySelector('.btn-provider-test').click();
+    await vi.waitFor(() => {
+      expect(promptSpy).toHaveBeenCalledWith(
+        expect.stringContaining('gemini-2.0-flash'),
+        'gemini-2.5-flash',
+      );
+      expect(api).toHaveBeenCalledWith('POST', '/api/ai/test', {
+        provider: 'gemini',
+        model: 'gemini-2.0-flash',
+      });
+    });
+  });
+
+  it('does not call api and restores the button when model prompt is canceled', async () => {
+    vi.spyOn(window, 'prompt').mockReturnValue(null);
+    const div = document.createElement('div');
+    div.innerHTML = _renderProviderList({ gemini: GEMINI_PROVIDER });
+    _attachProviderListHandlers(div, { gemini: GEMINI_PROVIDER });
+
+    const btn = div.querySelector('.btn-provider-test');
+    btn.click();
+
+    expect(btn.disabled).toBe(true);
+    await vi.waitFor(() => {
+      expect(btn.disabled).toBe(false);
+      expect(api).not.toHaveBeenCalled();
+      expect(div.querySelector('.provider-test-status').textContent).toBe('已取消测试');
+    });
+  });
+
+  it('blocks providers without models before calling api', async () => {
+    const div = document.createElement('div');
+    div.innerHTML = _renderProviderList({ nope: PROVIDER_NO_MODELS });
+    _attachProviderListHandlers(div, { nope: PROVIDER_NO_MODELS });
+
+    const btn = div.querySelector('.btn-provider-test');
+    btn.click();
+
+    await vi.waitFor(() => {
+      expect(btn.disabled).toBe(false);
+      expect(api).not.toHaveBeenCalled();
+      expect(div.querySelector('.provider-test-status').textContent).toBe('测试失败：请先添加模型');
+    });
+  });
+
+  it('disables the test button while the request is pending and restores it after resolve', async () => {
+    let resolveApi;
+    api.mockReturnValue(new Promise(resolve => { resolveApi = resolve; }));
+    const div = document.createElement('div');
+    div.innerHTML = _renderProviderList({ deepseek: OPENAI_PROVIDER });
+    _attachProviderListHandlers(div, { deepseek: OPENAI_PROVIDER });
+
+    const btn = div.querySelector('.btn-provider-test');
+    btn.click();
+
+    expect(btn.disabled).toBe(true);
+    expect(div.querySelector('.provider-test-status').textContent).toBe('测试中...');
+
+    resolveApi({ ok: true, elapsed_ms: 12 });
+    await vi.waitFor(() => {
+      expect(btn.disabled).toBe(false);
+      expect(div.querySelector('.provider-test-status').textContent).toBe('测试成功：12 ms');
+    });
+  });
+
+  it('shows successful test result using textContent', async () => {
+    api.mockResolvedValue({ ok: true, elapsed_ms: 88 });
+    const div = document.createElement('div');
+    div.innerHTML = _renderProviderList({ deepseek: OPENAI_PROVIDER });
+    _attachProviderListHandlers(div, { deepseek: OPENAI_PROVIDER });
+
+    div.querySelector('.btn-provider-test').click();
+    await vi.waitFor(() => {
+      const status = div.querySelector('.provider-test-status');
+      expect(status.textContent).toBe('测试成功：88 ms');
+      expect(status.innerHTML).toBe('测试成功：88 ms');
+    });
+  });
+
+  it('shows failed test result using textContent', async () => {
+    api.mockResolvedValue({ ok: false, error: '<img src=x onerror=alert(1)>' });
+    const div = document.createElement('div');
+    div.innerHTML = _renderProviderList({ deepseek: OPENAI_PROVIDER });
+    _attachProviderListHandlers(div, { deepseek: OPENAI_PROVIDER });
+
+    div.querySelector('.btn-provider-test').click();
+    await vi.waitFor(() => {
+      const status = div.querySelector('.provider-test-status');
+      expect(status.textContent).toBe('测试失败：<img src=x onerror=alert(1)>');
+      expect(status.innerHTML).toBe('测试失败：&lt;img src=x onerror=alert(1)&gt;');
+    });
   });
 });
 
