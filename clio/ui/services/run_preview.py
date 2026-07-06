@@ -166,9 +166,7 @@ def _transcribe_step(
         return _step("transcribe", total=total, will_run=total, will_skip=0)
 
     skipped = sum(
-        1
-        for compressed in inputs
-        if _valid_json_file(config.transcripts_dir / f"{compressed.stem}_transcript.json")
+        1 for compressed in inputs if _valid_json_file(config.transcripts_dir / f"{compressed.stem}_transcript.json")
     )
     return _step("transcribe", total=total, will_run=total - skipped, will_skip=skipped)
 
@@ -177,8 +175,14 @@ def _voiceover_step(config: AppConfig, analysis_jsons: list[Path], *, force: boo
     total = len(analysis_jsons)
     if total == 0:
         return _warning_step("voiceover", "未找到分析 JSON，口播步骤可能没有输入。")
-    skipped = 0 if force else sum(
-        1 for analysis_json in analysis_jsons if (config.scripts_dir / f"{analysis_json.stem}_voiceover.json").exists()
+    skipped = (
+        0
+        if force
+        else sum(
+            1
+            for analysis_json in analysis_jsons
+            if (config.scripts_dir / f"{analysis_json.stem}_voiceover.json").exists()
+        )
     )
     return _step("voiceover", total=total, will_run=total - skipped, will_skip=skipped)
 
@@ -198,8 +202,10 @@ def _label_step(config: AppConfig, analysis_jsons: list[Path], *, force: bool) -
     if total == 0:
         return _warning_step("label", "未找到分析 JSON，标记步骤可能没有输入。")
     labeled_dir = config.paths.output_dir / "labeled"
-    skipped = 0 if force else sum(
-        1 for analysis_json in analysis_jsons if (labeled_dir / f"{analysis_json.stem}_labeled.mp4").exists()
+    skipped = (
+        0
+        if force
+        else sum(1 for analysis_json in analysis_jsons if (labeled_dir / f"{analysis_json.stem}_labeled.mp4").exists())
     )
     return _step("label", total=total, will_run=total - skipped, will_skip=skipped)
 
