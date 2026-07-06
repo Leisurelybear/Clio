@@ -582,6 +582,41 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | Change `debug_print_prompt` default from `True` to `False` in `clio/config/models.py` | [x] |
 | Update `config.example.yaml` to reflect `debug_print_prompt: false` by default | [x] |
 
+## Analysis Document Triage (2026-07-07)
+
+**Source**: `docs/analysis/*.md` review pass. Valuable items from analysis docs have been merged below; already-implemented items are marked done to avoid repeated audits.
+
+### Already Absorbed / Completed
+
+| Source item | Status |
+| --- | --- |
+| 2026-06-28 BUG-001/BUG-002: rerun analyze/voiceover cancel propagation | [x] `clio/ui/routes/run.py`, `clio/tasks/scripts.py`, `clio/analyze.py` pass `cancel_event` |
+| 2026-06-28 BUG-005: `jianying.py` debug prints | [x] Replaced with `logger.debug()` |
+| 2026-06-28 FD-001/ARCH-002: JianYing canvas ratio / export config | [x] `ExportConfig.canvas_ratio`, presets, `jianying_draft_dir`, `auto_copy_draft` |
+| 2026-06-28 FD-002: `AppConfig.transcripts_dir` missing | [x] Added `config.transcripts_dir` property |
+| 2026-06-28 FD-004 / N-01: UI JianYing export entry | [x] Plan view has export button and result path display |
+| 2026-06-28 FD-006: unfriendly missing `faster-whisper` failure | [x] `run_transcribe_all` checks `check_whisper()` and logs actionable message |
+| 2026-06-28 OPT-002: unbounded `ProgressTracker.logs` | [x] Logs capped to last 100 entries |
+| 2026-06-28 NEW-001: auto-copy JianYing draft | [x] `auto_copy_draft` copies `draft_content.json` when configured |
+| 2026-06-28 NEW-005 / 2026-06-17 P1-3: SSE run progress | [x] `/api/run/stream` + frontend `EventSource` |
+| 2026-06-24 A-05: label/cut missing `ProcessingState.mark()` | [x] `tasks/label.py` and `tasks/cut.py` mark skipped/done/error |
+
+### New / Still Useful Backlog
+
+| ID | Source | Item | Suggested approach | Status |
+| --- | --- | --- | --- | --- |
+| A-007 | 2026-06-28 ARCH-001 | Replace `server.py` hand-written route `if` chain with a route registry | Keep stdlib `http.server`; add `clio/ui/router.py` with method/path registration and path params | [ ] |
+| A-008 | 2026-06-28 ARCH-004 | Debounce `ProcessingState.mark()` disk flushes | Batch writes by time or pending count, flush on shutdown | [ ] |
+| B-099 | 2026-06-24 O-06 | OpenAI-compatible provider timeout is hardcoded to 120s | Add `ProviderConfig.timeout_sec`, parse YAML, pass to `httpx.Client(timeout=...)` | [ ] |
+| B-100 | 2026-06-24 O-07 | `extract_json()` has no response length guard | Add maximum response length / warning before regex scan to avoid pathological AI responses | [ ] |
+| B-101 | 2026-06-28 OPT-003 | `.vmeta verify` hash is written but not checked | Either validate `verify` in `is_stale()` or explicitly document it as reserved metadata | [ ] |
+| R-020 | 2026-06-28 NEW-002 | `vmeta` / `.vindex` integrity verification CLI | Add `python main.py verify` to report OK / STALE / MISSING and recommend reindex/recompress | [ ] |
+| R-021 | 2026-06-28 NEW-004 / 2026-06-17 UX-6 | Multi-day planning | Add `plan --all-days`, scan day labels, generate per-day plans and optional `trip_plan.json` | [ ] |
+| R-022 | 2026-06-24 N-05 | Smart cover frame extraction | Add `cover_timestamp` in analysis output, extract JPEG with ffmpeg, show candidates in UI | [ ] |
+| R-023 | 2026-06-24 N-06 | Align transcript segments with visual timeline | Attach transcript snippets to timeline entries by time overlap; expose to plan prompt/UI | [ ] |
+| R-024 | 2026-06-21 F-4 | GoPro GPMF telemetry as highlight signal | Parse telemetry timestamps (speed/elevation/location), feed highlight windows into analysis prompt | [ ] |
+| R-025 | 2026-06-24 N-04 | Webhook / external trigger | Add authenticated `POST /api/webhook/trigger` for NAS/Syncthing automation | [ ] |
+
 ## Known Issues (Bug Tracker)
 
 Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (long-term).
@@ -719,7 +754,7 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 | ID | Bottleneck | Optimization Plan | Priority |
 | --- | --- | --- | --- |
-| P-001 | AI analysis (analyze step) is pure serial, each video waits for previous upload+process+generate | `ThreadPoolExecutor(max_workers=3~5)` after RateLimiter refactoring (U-006). See part2 review §P-1 for details | P2 |
+| P-001 | AI analysis (analyze step) is pure serial, each video waits for previous upload+process+generate | ✅ Done: `ThreadPoolExecutor(max_workers)` added after RateLimiter refactor | ✅ |
 | P-002 | Repeated ffprobe calls to read same video's `duration_sec` / `size_mb` | Cache already-read info, reuse results | P3 |
 | P-003 | `GET /api/videos` iterates directory every time, high I/O cost | Add directory mtime cache, reuse unchanged scan results | P3 |
 
