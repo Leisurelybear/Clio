@@ -63,6 +63,7 @@ ai:
       type: openai
       api_key_env: OPENAI_API_KEY
       base_url: https://api.openai.com/v1
+      # timeout_sec: 120
       models:
         - gpt-4o
         - gpt-4o-mini
@@ -74,6 +75,7 @@ ai:
       models:
         - deepseek-v4-flash
         - deepseek-v4-pro
+      # timeout_sec: 120
       # max_tokens: 4096
   #
   # ⚠️ 注意：不要在 config.yaml 里写 api_key 字段，密钥请放在 .env 文件中

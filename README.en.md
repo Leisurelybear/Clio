@@ -160,7 +160,7 @@ python main.py serve
 | 📋 Edit Plan | **DeepSeek** / OpenAI | Text | Arranges segment sequence |
 | 🔧 Refine | Same (configurable) | Text | Fixes output with trip context |
 
-Each task can use a different provider/model via `config.yaml` → `ai.tasks`. Supports **OpenAI-compatible APIs** (Tongyi Qianwen, Kimi, etc.).
+Each task can use a different provider/model via `config.yaml` → `ai.tasks`. Supports **OpenAI-compatible APIs** (Tongyi Qianwen, Kimi, etc.). OpenAI-compatible providers can set `timeout_sec` for slow gateways or local models.
 
 📌 **Automatic trip context injection**: write your trip background and known pitfalls once in `templates/trip_context.md`, injected into every AI call.
 

@@ -26,6 +26,7 @@ class ProviderConfig:
     poll_interval_sec: int = 5
     retry_attempts: int = 2
     requests_per_minute: int = 0
+    timeout_sec: float = 120.0
     max_tokens: int = 4096
     models: list[str] = field(default_factory=list)
 

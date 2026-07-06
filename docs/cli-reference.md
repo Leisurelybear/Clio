@@ -368,10 +368,12 @@ ai:
       type: openai
       api_key_env: OPENAI_API_KEY
       base_url: https://api.openai.com/v1
+      timeout_sec: 120
     deepseek:
       type: openai              # OpenAI compatible API
       api_key_env: DEEPSEEK_API_KEY
       base_url: https://api.deepseek.com/v1
+      timeout_sec: 120
 
   tasks:
     video_analyze:              # Video understanding (must support video, e.g. gemini)
@@ -394,6 +396,8 @@ ai:
 
 > `refine_text` falls back to `video_analyze`'s provider by default. Both texts and scripts
 > review share this single task (both are text-only); declaring it explicitly in `ai.tasks` allows switching to a cheaper model.
+
+For OpenAI-compatible providers, `timeout_sec` controls the HTTP client timeout. Increase it for slow third-party gateways or local model servers; decrease it when you want failures to surface faster.
 
 ### AI Trip Context
 
