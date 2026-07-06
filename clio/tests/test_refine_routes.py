@@ -65,6 +65,7 @@ class TestFileBusy:
 
     def test_discard_not_raise(self):
         _mark_busy("/not/marked.json", False)
+        assert _is_file_busy("/not/marked.json") is False
 
 
 # ===========================================================================

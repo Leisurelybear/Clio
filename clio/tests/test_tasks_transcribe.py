@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -19,11 +18,11 @@ def _mock_whisper_deps():
 
 
 @pytest.fixture
-def cfg():
+def cfg(tmp_path):
     c = MagicMock()
     c.whisper = WhisperConfig(enabled=True, language="zh", model_size="small", device="cpu")
-    c.paths.output_dir = Path("/tmp/output")
-    c.paths.input_dir = Path("/tmp/input")
+    c.paths.output_dir = tmp_path / "default_output"
+    c.paths.input_dir = tmp_path / "default_input"
     c.analyze.skip_existing = True
     c.analyze.compressed_subdir = "compressed"
     c.analyze.max_analyze_duration_min = 30
@@ -159,6 +158,7 @@ class TestRunTranscribeAll:
         inp.mkdir()
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
+        cfg.transcripts_dir = output / "transcripts"
 
         transcripts = output / "transcripts"
         transcripts.mkdir(parents=True)
@@ -238,6 +238,7 @@ class TestRunTranscribeAll:
         cfg.paths.input_dir = inp
         cfg.paths.output_dir = output
         cfg.analyze.skip_existing = False
+        cfg.transcripts_dir = output / "transcripts"
 
         fake_wav = tmp_path / "fake.wav"
         fake_wav.touch()

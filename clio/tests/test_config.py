@@ -190,7 +190,7 @@ class TestValidateConfig:
                 ),
             ),
         )
-        _validate_config(cfg)  # should not raise
+        assert _validate_config(cfg) is None
 
     def test_proxy_enabled_no_url_raises(self):
         cfg = AppConfig(

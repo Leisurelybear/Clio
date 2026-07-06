@@ -89,12 +89,21 @@ class TestHandlePostRunStart:
         """Duplicate run request must NOT overwrite existing progress file."""
         handler = _handler
         handler._resolve_project_input.return_value = Path("/input")
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        progress = out_dir / ".progress.json"
+        original = {"status": "running", "phase": "analyze", "message": "still running"}
+        progress.write_text(json.dumps(original, ensure_ascii=False), encoding="utf-8")
+        cfg = MagicMock()
+        cfg.paths.output_dir = out_dir
+        handler._get_config.return_value = cfg
         handler.__class__._fake_state.run_thread = MagicMock()
         handler.__class__._fake_state.run_thread.is_alive.return_value = True
 
         handle_post_run_start(handler, {}, {})
 
         handler._send_json.assert_called_once_with({"ok": False, "error": "pipeline is already running"}, 409)
+        assert json.loads(progress.read_text(encoding="utf-8")) == original
 
     def test_starts_thread(self, tmp_path: Path, _no_thread, _handler):
         handler = _handler

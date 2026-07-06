@@ -211,6 +211,7 @@ class TestInvalidation:
         mock_load.return_value = MagicMock()
         cache = ConfigCache(None)
         cache.invalidate_key("nope")  # should not raise
+        assert cache.keys() == []
 
 
 # ===========================================================================
