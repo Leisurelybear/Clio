@@ -12,6 +12,7 @@ from clio.ui.routes.run import (
     handle_get_run_status,
     handle_post_rerun,
     handle_post_run_cancel,
+    handle_post_run_preview,
     handle_post_run_start,
 )
 
@@ -104,6 +105,49 @@ class TestHandlePostRunStart:
 
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args[0][0]["ok"] is True
+
+
+class TestHandlePostRunPreview:
+    def test_builds_preview_from_request(self, tmp_path: Path, _handler, monkeypatch):
+        handler = _handler
+        proj_input = tmp_path / "input"
+        cfg = MagicMock()
+        handler._resolve_project_input.return_value = proj_input
+        handler._get_config.return_value = cfg
+        expected = {"input": {}, "steps": [], "totals": {}}
+        build = MagicMock(return_value=expected)
+        monkeypatch.setattr("clio.ui.routes.run.build_run_preview", build)
+
+        handle_post_run_preview(
+            handler,
+            {},
+            {
+                "day_label": "day3",
+                "steps": ["compress", "analyze"],
+                "use_transcripts": False,
+                "overwrite": True,
+                "files": ["A.mp4"],
+            },
+        )
+
+        build.assert_called_once_with(
+            cfg,
+            ["compress", "analyze"],
+            force=True,
+            use_transcripts=False,
+            files=["A.mp4"],
+            day_label="day3",
+        )
+        handler._send_json.assert_called_once_with({"ok": True, "preview": expected})
+
+    def test_rejects_non_list_files(self, tmp_path: Path, _handler):
+        handler = _handler
+        handler._resolve_project_input.return_value = tmp_path / "input"
+        handler._get_config.return_value = MagicMock()
+
+        handle_post_run_preview(handler, {}, {"files": "A.mp4"})
+
+        handler._send_json.assert_called_once_with({"ok": False, "error": "files must be a list of video names"}, 400)
 
 
 class TestHandlePostRerun:

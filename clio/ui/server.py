@@ -58,6 +58,7 @@ from clio.ui.routes.run import (
     handle_get_run_stream,
     handle_post_rerun,
     handle_post_run_cancel,
+    handle_post_run_preview,
     handle_post_run_start,
 )
 from clio.ui.routes.static_files import handle_favicon, handle_index, handle_static
@@ -147,6 +148,7 @@ _ROUTE_POLICIES = (
     RoutePolicy("PUT", "/api/whisper/model"),
     RoutePolicy("PUT", "/api/env"),
     RoutePolicy("POST", "/api/run/start"),
+    RoutePolicy("POST", "/api/run/preview"),
     RoutePolicy("POST", "/api/run/cancel"),
     RoutePolicy("POST", "/api/config/init"),
     RoutePolicy("POST", "/api/cut"),
@@ -446,6 +448,8 @@ def make_handler(
 
             if path == "/api/run/start":
                 return handle_post_run_start(self, qs, obj)
+            if path == "/api/run/preview":
+                return handle_post_run_preview(self, qs, obj)
             if path == "/api/run/cancel":
                 return handle_post_run_cancel(self, qs, obj)
             if path == "/api/config/init":

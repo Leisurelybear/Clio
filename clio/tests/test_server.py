@@ -645,6 +645,12 @@ class TestDoPOST:
         handler.do_POST()
         mock_fn.assert_called_once()
 
+    @patch("clio.ui.server.handle_post_run_preview")
+    def test_post_run_preview(self, mock_fn, handler_cls):
+        handler = self._post_handler(handler_cls, {}, "/api/run/preview")
+        handler.do_POST()
+        mock_fn.assert_called_once()
+
     @patch("clio.ui.server.handle_post_run_cancel")
     def test_post_run_cancel(self, mock_fn, handler_cls):
         handler = self._post_handler(handler_cls, {}, "/api/run/cancel")
@@ -915,6 +921,7 @@ class TestRouteAuthPolicy:
             ("PUT", "/api/whisper/model", True),
             ("PUT", "/api/env", True),
             ("POST", "/api/run/start", True),
+            ("POST", "/api/run/preview", True),
             ("POST", "/api/run/cancel", True),
             ("POST", "/api/config/init", True),
             ("POST", "/api/cut", True),
