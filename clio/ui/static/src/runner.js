@@ -88,6 +88,7 @@ function renderRun() {
         <span>覆盖现有输出</span>
       </label>
     </div>
+    <div id="run-preview" class="run-preview" style="margin-top:12px">${renderRunPreviewHtml(null)}</div>
     <div id="run-progress" style="margin-top:12px"></div>
     <div id="run-state-container"></div>
   `;
@@ -101,6 +102,7 @@ function renderRun() {
       });
       saveStepSelection(checks, $('run-use-transcripts')?.checked ?? true);
       togglePlanSubOptions();
+      refreshRunPreview();
     });
   });
   // wire use_transcripts change → persist
@@ -112,11 +114,15 @@ function renderRun() {
         checks[c.dataset.step] = c.checked;
       });
       saveStepSelection(checks, useTransCb.checked);
+      refreshRunPreview();
     });
   }
 
   togglePlanSubOptions();
   updateRunFilesBadge();
+  $('run-day')?.addEventListener('input', () => refreshRunPreview({ silent: true }));
+  $('run-overwrite')?.addEventListener('change', () => refreshRunPreview());
+  refreshRunPreview({ silent: true });
 
   const runBtn = $('btn-run-start');
   runBtn.onclick = startRun;
@@ -155,6 +161,83 @@ function updateRunFilesBadge() {
     badge.style.display = 'none';
     overwrap.style.display = 'none';
   }
+  if ($('run-preview')) refreshRunPreview({ silent: true });
+}
+
+function collectRunOptions() {
+  const steps = [...document.querySelectorAll('.run-step-cb:checked')].map(cb => cb.dataset.step);
+  const body = {
+    day_label: $('run-day')?.value.trim() || state.currentDay || 'day1',
+    steps,
+    use_transcripts: $('run-use-transcripts')?.checked ?? true,
+  };
+  if (state.selectionMode && state.selectedFiles.length > 0) {
+    body.files = state.selectedFiles;
+  }
+  const overwriteCb = $('run-overwrite');
+  if (overwriteCb && overwriteCb.checked) {
+    body.overwrite = true;
+  }
+  return body;
+}
+
+function renderRunPreviewHtml(preview) {
+  if (!preview) {
+    return '<p class="muted">选择步骤后显示预览</p>';
+  }
+  const input = preview.input || {};
+  const totals = preview.totals || {};
+  const steps = Array.isArray(preview.steps) ? preview.steps : [];
+  const stepRows = steps.map(step => {
+    const warnings = (step.warnings || []).map(w => `<div class="warn">${escapeHtml(w)}</div>`).join('');
+    return `
+      <div class="run-preview-step">
+        <span class="run-preview-name">${escapeHtml(step.label || step.name || '')}</span>
+        <span>总数 ${Number(step.total || 0)}</span>
+        <span>待执行 ${Number(step.will_run || 0)}</span>
+        <span>跳过 ${Number(step.will_skip || 0)}</span>
+        ${warnings}
+      </div>
+    `;
+  }).join('');
+  const warningLine = Number(totals.warnings || 0) > 0
+    ? `<p class="warn">警告 ${Number(totals.warnings || 0)} 项，请确认后再运行。</p>`
+    : '';
+  return `
+    <section class="run-preview-box">
+      <h4 style="margin:0 0 6px">运行预览</h4>
+      <p class="muted">输入：${escapeHtml(input.path || '')}（${Number(input.count || 0)} 个）</p>
+      <div class="run-preview-totals">
+        <span>步骤 ${Number(totals.selected_steps || 0)}</span>
+        <span>待执行 ${Number(totals.will_run || 0)}</span>
+        <span>跳过 ${Number(totals.will_skip || 0)}</span>
+      </div>
+      ${warningLine}
+      <div class="run-preview-steps">${stepRows}</div>
+    </section>
+  `;
+}
+
+async function refreshRunPreview({ silent = false } = {}) {
+  const container = $('run-preview');
+  if (!container) return null;
+  const options = collectRunOptions();
+  if (!options.steps.length) {
+    container.innerHTML = renderRunPreviewHtml(null);
+    return null;
+  }
+  if (!silent) {
+    container.innerHTML = '<p class="muted">正在生成运行预览...</p>';
+  }
+  try {
+    const response = await api('POST', '/api/run/preview', options);
+    if (!response.ok) throw new Error(response.error || '预览失败');
+    container.innerHTML = renderRunPreviewHtml(response.preview);
+    return response.preview;
+  } catch (e) {
+    container.innerHTML = `<p class="warn">运行预览暂不可用：${escapeHtml(e.message)}</p>`;
+    return null;
+  }
 }
 
 async function startRun() {
@@ -162,28 +245,17 @@ async function startRun() {
   if (btn.disabled) return;
   btn.disabled = true;
   btn.textContent = '启动中...';
-  const checked = [...document.querySelectorAll('.run-step-cb:checked')].map(cb => cb.dataset.step);
-  if (!checked.length) {
+  const body = collectRunOptions();
+  if (!body.steps.length) {
     btn.disabled = false;
     btn.textContent = '运行选中步骤';
     setStatus('请至少选择一个步骤', 'warn');
     return;
   }
-  _lastRunDay = ($('run-day')?.value.trim() || state.currentDay);
+  _lastRunDay = body.day_label;
   _stopRunSSE();
   try {
-    const body = {
-      day_label: _lastRunDay,
-      steps: checked,
-      use_transcripts: $('run-use-transcripts').checked,
-    };
-    if (state.selectionMode && state.selectedFiles.length > 0) {
-      body.files = state.selectedFiles;
-    }
-    const overwriteCb = $('run-overwrite');
-    if (overwriteCb && overwriteCb.checked) {
-      body.overwrite = true;
-    }
+    await refreshRunPreview({ silent: true });
     const contextOverride = $('run-context-override')?.value?.trim();
     if (contextOverride) {
       body.context_override = contextOverride;
@@ -416,4 +488,7 @@ export {
   startRun,
   _stopRunPoll,
   updateRunFilesBadge,
+  collectRunOptions,
+  renderRunPreviewHtml,
+  refreshRunPreview,
 };
