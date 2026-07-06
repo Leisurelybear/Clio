@@ -451,6 +451,15 @@ Keep the same `{placeholder}` names as the built-in prompt when overriding forma
 
 Generated analysis, voiceover, and plan JSON may include `_confidence` as a 0-1 self-assessed confidence score. Missing values are treated as `0.0` so older outputs remain valid.
 
+The web backend also exposes authenticated prompt management APIs:
+
+```text
+GET /api/prompts
+PUT /api/prompts/{PROMPT_NAME}
+```
+
+`PUT` accepts `{"content":"..."}` and writes a project-level override under `<input_dir>/templates/prompts/`.
+
 ### AI Trip Context
 
 Add `ai.context` or `ai.context_file` in `config.yaml`; the content is automatically injected as a **preamble** before all AI prompts:

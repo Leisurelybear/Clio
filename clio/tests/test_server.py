@@ -509,6 +509,12 @@ class TestDoGET:
         handler.do_GET()
         mock_fn.assert_called_once()
 
+    @patch("clio.ui.server.handle_get_prompts")
+    def test_api_prompts(self, mock_fn, handler_cls):
+        handler = _build_handler(handler_cls, path="/api/prompts")
+        handler.do_GET()
+        mock_fn.assert_called_once()
+
     @patch("clio.ui.server.read_session_log")
     def test_api_logs(self, mock_read, handler_cls):
         mock_read.return_value = {"logs": []}
@@ -601,6 +607,12 @@ class TestDoPUT:
         handler = self._put_handler(handler_cls, {}, "/api/env")
         handler.do_PUT()
         mock_fn.assert_called_once()
+
+    @patch("clio.ui.server.handle_put_prompt")
+    def test_put_prompt(self, mock_fn, handler_cls):
+        handler = self._put_handler(handler_cls, {"content": "prompt"}, "/api/prompts/ANALYZE_PROMPT")
+        handler.do_PUT()
+        mock_fn.assert_called_once_with(handler, {}, {"content": "prompt"}, "ANALYZE_PROMPT")
 
     def test_put_unknown(self, handler_cls):
         handler = self._put_handler(handler_cls, {}, "/api/nope")

@@ -52,6 +52,7 @@ from clio.ui.routes.projects import (
     handle_post_project_remove,
     handle_put_project,
 )
+from clio.ui.routes.prompts import handle_get_prompts, handle_put_prompt
 from clio.ui.routes.refine import handle_post_refine
 from clio.ui.routes.run import (
     handle_get_run_status,
@@ -259,6 +260,7 @@ def make_handler(
                 "/api/config/project",
                 "/api/video",
                 "/api/fs/dirs",
+                "/api/prompts",
             }
             if path in _sensitive and not self._require_auth():
                 return
@@ -310,6 +312,8 @@ def make_handler(
                 return handle_get_token_usage(self, qs)
             if path == "/api/env":
                 return handle_get_env(self, qs)
+            if path == "/api/prompts":
+                return handle_get_prompts(self, qs)
             if path == "/api/logs":
                 offset = int(qs.get("offset", ["0"])[0])
                 return self._send_json(read_session_log(offset))
@@ -351,6 +355,9 @@ def make_handler(
                 return handle_put_whisper_model(self, qs, obj)
             if path == "/api/env":
                 return handle_put_env(self, qs, obj)
+            if path.startswith("/api/prompts/"):
+                name = path[len("/api/prompts/") :]
+                return handle_put_prompt(self, qs, obj, name)
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
