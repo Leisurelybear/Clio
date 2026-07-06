@@ -1449,6 +1449,7 @@ button .icon { width: 12px; height: 12px; }
   font-size: var(--text-xs);
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 .provider-card-actions button:hover {
   background: var(--bg-hover);
@@ -1473,6 +1474,74 @@ button .icon { width: 12px; height: 12px; }
   flex-wrap: wrap;
   gap: 4px;
 }
+.provider-key-wrap { display: inline-flex; align-items: center; gap: 6px; }
+.btn-provider-show-key {
+  background: none;
+  border: none;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-xs);
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.btn-provider-show-key:hover { color: var(--accent-hover); }
+.provider-test-status { margin-top: 4px; font-size: var(--text-xs); }
+.provider-test-status.ok { color: var(--success); }
+.provider-test-status.err { color: var(--error); }
+
+/* ── Provider Modal ──────────────────────────────────────────── */
+.form-group { margin-bottom: var(--space-4); }
+.form-label {
+  display: block;
+  margin-bottom: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.form-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-sm);
+  transition: border-color var(--transition-fast);
+}
+.form-input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+select.form-input { cursor: pointer; }
+
+.btn-provider-test,
+.btn-provider-edit,
+.btn-provider-delete {
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+.btn-provider-test:hover,
+.btn-provider-edit:hover,
+.btn-provider-delete:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+.btn-provider-delete { color: var(--error); border-color: transparent; }
+.btn-provider-delete:hover { background: var(--error-bg); color: var(--error); border-color: var(--error); }
 
 /* ── Task Binding Cards ─────────────────────────────────────── */
 .task-binding-card {

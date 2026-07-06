@@ -340,7 +340,7 @@ export function _renderProviderList(providers, descs) {
       </div>
       <div class="provider-card-body">
         <div class="provider-card-field"><span class="provider-card-label">类型</span><span>${typeLabel}</span></div>
-        <div class="provider-card-field"><span class="provider-card-label">API 密钥</span><span>•••••••••• <button class="btn-provider-show-key" data-provider="${escapeHtml(name)}">显示</button></span></div>
+        <div class="provider-card-field"><span class="provider-card-label">API 密钥</span><span class="provider-key-wrap" data-provider="${escapeHtml(name)}"><span class="provider-key-masked">••••••••••</span><span class="provider-key-value" style="display:none"></span><button class="btn-provider-show-key">显示</button></span></div>
         ${p.type !== 'gemini' ? `<div class="provider-card-field"><span class="provider-card-label">接口地址</span><span>${escapeHtml(p.base_url || '(默认)')}</span></div>` : ''}
         <div class="provider-card-field"><span class="provider-card-label">模型</span><span class="provider-card-models">${modelTags}</span></div>
       </div>
@@ -356,16 +356,17 @@ function _showProviderModal(providersObj, name, onSave) {
   const existing = name ? providersObj[name] : null;
   const isEdit = !!existing;
   const backdrop = document.createElement('div');
-  backdrop.className = 'modal-backdrop';
-  backdrop.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:1000;display:flex;align-items:center;justify-content:center';
+  backdrop.className = 'modal';
+  backdrop.style.display = 'flex';
 
   const typeOptions = ['gemini', 'openai'].map(t =>
     `<option value="${t}"${existing?.type === t ? ' selected' : ''}>${t === 'gemini' ? 'Gemini（支持视频分析）' : 'OpenAI 兼容（纯文本，如 DeepSeek）'}</option>`
   ).join('');
 
   backdrop.innerHTML = `
-    <div style="background:var(--bg-surface,#1e1e1e);border:1px solid var(--border,#333);border-radius:8px;padding:24px;max-width:520px;width:90%;max-height:80vh;overflow-y:auto">
-      <h3 style="margin:0 0 16px">${isEdit ? '编辑 Provider' : '添加 Provider'}</h3>
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog" style="max-width:520px">
+      <h3 style="margin:0 0 var(--space-4)">${isEdit ? '编辑 Provider' : '添加 Provider'}</h3>
       <div class="form-group">
         <label class="form-label">名称 <span class="muted">（唯一标识符）</span></label>
         <input id="modal-provider-name" class="form-input" value="${escapeHtml(name || '')}" ${isEdit ? 'readonly' : ''} placeholder="如 my-gemini">
@@ -393,7 +394,7 @@ function _showProviderModal(providersObj, name, onSave) {
         <div id="modal-provider-models"></div>
         <span class="hint">输入该厂商可用的模型名称。默认厂商已预填常用模型。这些模型将出现在项目标签页的任务绑定下拉菜单中。</span>
       </div>
-      <div style="display:flex;gap:8px;justify-content:end;margin-top:16px">
+      <div class="modal-actions">
         <button id="modal-cancel" class="btn-secondary">取消</button>
         <button id="modal-save" class="btn-primary">${isEdit ? '保存修改' : '添加'}</button>
       </div>
@@ -489,7 +490,7 @@ function _showProviderModal(providersObj, name, onSave) {
   };
 
   backdrop.querySelector('#modal-cancel').onclick = () => backdrop.remove();
-  backdrop.onclick = (e) => { if (e.target === backdrop) backdrop.remove(); };
+  backdrop.querySelector('.modal-backdrop').onclick = () => backdrop.remove();
 }
 
 function _attachProviderListHandlers(pane, providersObj) {
@@ -528,26 +529,41 @@ function _attachProviderListHandlers(pane, providersObj) {
     addBtn.onclick = () => _showProviderModal(providersObj, null, reRender);
   }
 
-  // Show key buttons
+  // Show/hide key buttons
   pane.querySelectorAll('.btn-provider-show-key').forEach(btn => {
     btn.onclick = async () => {
-      const providerName = btn.dataset.provider;
-      const envName = providerName.toUpperCase() + '_API_KEY';
-      try {
-        const existing = await api('GET', '/api/env');
-        let envContent = existing.content || '';
-        const lines = envContent.split('\n');
-        for (const line of lines) {
-          if (line.startsWith(envName + '=')) {
-            const val = line.slice(envName.length + 1);
-            const span = btn.parentNode;
-            span.innerHTML = escapeHtml(val);
-            return;
+      const wrap = btn.closest('.provider-key-wrap');
+      if (!wrap) return;
+      const masked = wrap.querySelector('.provider-key-masked');
+      const value = wrap.querySelector('.provider-key-value');
+      const isVisible = value?.style.display !== 'none';
+      if (isVisible) {
+        value.style.display = 'none';
+        masked.style.display = '';
+        btn.textContent = '显示';
+      } else {
+        if (!value.textContent) {
+          const providerName = wrap.dataset.provider;
+          const envName = providerName.toUpperCase() + '_API_KEY';
+          try {
+            const existing = await api('GET', '/api/env');
+            const lines = (existing.content || '').split('\n');
+            let found = false;
+            for (const line of lines) {
+              if (line.startsWith(envName + '=')) {
+                value.textContent = line.slice(envName.length + 1);
+                found = true;
+                break;
+              }
+            }
+            if (!found) { setStatus(`未找到 ${envName}`, 'warn'); return; }
+          } catch {
+            setStatus('无法读取 .env 文件', 'err'); return;
           }
         }
-        setStatus(`未找到 ${envName}`, 'warn');
-      } catch {
-        setStatus('无法读取 .env 文件', 'err');
+        value.style.display = '';
+        masked.style.display = 'none';
+        btn.textContent = '隐藏';
       }
     };
   });
