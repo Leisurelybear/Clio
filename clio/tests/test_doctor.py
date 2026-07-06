@@ -17,6 +17,7 @@ from clio.doctor import (
     DoctorItem,
     collect_doctor_checks,
     doctor_exit_code,
+    is_virtualenv_python,
     parse_node_major,
 )
 
@@ -55,6 +56,33 @@ def test_parse_node_major() -> None:
     assert parse_node_major("v22.4.1") == 22
     assert parse_node_major("16.14.0") == 16
     assert parse_node_major("not node") is None
+
+
+def test_is_virtualenv_python_accepts_prefix_difference() -> None:
+    assert is_virtualenv_python("/usr/bin/python", prefix="/tmp/project/.venv", base_prefix="/usr")
+
+
+def test_is_virtualenv_python_accepts_linux_venv_bin() -> None:
+    assert is_virtualenv_python("/work/project/.venv/bin/python", prefix="/usr", base_prefix="/usr")
+
+
+def test_is_virtualenv_python_accepts_windows_venv_scripts() -> None:
+    assert is_virtualenv_python(
+        r"C:\work\project\.venv\Scripts\python.exe", prefix=r"C:\Python311", base_prefix=r"C:\Python311"
+    )
+
+
+def test_is_virtualenv_python_accepts_pyvenv_cfg(tmp_path: Path) -> None:
+    env_dir = tmp_path / "custom-env"
+    bin_dir = env_dir / "bin"
+    bin_dir.mkdir(parents=True)
+    (env_dir / "pyvenv.cfg").write_text("home = /usr/bin\n", encoding="utf-8")
+
+    assert is_virtualenv_python(bin_dir / "python", prefix="/usr", base_prefix="/usr")
+
+
+def test_is_virtualenv_python_rejects_system_python() -> None:
+    assert not is_virtualenv_python("/usr/bin/python", prefix="/usr", base_prefix="/usr")
 
 
 def test_collect_checks_reports_missing_task_provider_key(tmp_path: Path) -> None:

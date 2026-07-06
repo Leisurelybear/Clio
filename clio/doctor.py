@@ -6,7 +6,7 @@ import subprocess
 import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePath, PureWindowsPath
 from typing import Literal
 
 from clio.config import AppConfig, apply_run_paths, load_config
@@ -33,6 +33,33 @@ def parse_node_major(version_text: str) -> int | None:
         text = text[1:]
     first = text.split(".", 1)[0]
     return int(first) if first.isdigit() else None
+
+
+def is_virtualenv_python(
+    executable: str | Path | None = None,
+    *,
+    prefix: str | Path | None = None,
+    base_prefix: str | Path | None = None,
+) -> bool:
+    prefix = sys.prefix if prefix is None else str(prefix)
+    base_prefix = sys.base_prefix if base_prefix is None else str(base_prefix)
+    if prefix != base_prefix:
+        return True
+
+    raw_executable = str(executable or sys.executable)
+    fs_exe = Path(raw_executable)
+    if any((parent / "pyvenv.cfg").is_file() for parent in (fs_exe.parent, fs_exe.parent.parent)):
+        return True
+
+    exe: PurePath
+    if "\\" in raw_executable or (len(raw_executable) > 1 and raw_executable[1] == ":"):
+        exe = PureWindowsPath(raw_executable)
+    else:
+        exe = Path(raw_executable)
+
+    bin_dir = exe.parent.name.lower()
+    env_dir = exe.parent.parent.name.lower()
+    return bin_dir in {"bin", "scripts"} and env_dir in {".venv", "venv"}
 
 
 def _node_version() -> str | None:
@@ -89,7 +116,7 @@ def collect_doctor_checks(
         )
     )
 
-    venv_ok = sys.prefix != sys.base_prefix or ".venv" in sys.executable
+    venv_ok = is_virtualenv_python()
     items.append(
         DoctorItem(
             "虚拟环境",

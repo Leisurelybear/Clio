@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from clio.config import apply_run_paths, load_config
-from clio.doctor import run_doctor
+from clio.doctor import is_virtualenv_python, run_doctor
 from clio.log import setup_logging
 from clio.shutdown import before_stop, install_hooks
 from clio.ui import run as run_ui
@@ -61,7 +61,7 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
             ok = False
 
     print("环境检查:")
-    venv_ok = sys.prefix != sys.base_prefix or ".venv" in sys.executable
+    venv_ok = is_virtualenv_python()
     status(
         "虚拟环境",
         venv_ok,

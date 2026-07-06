@@ -350,13 +350,13 @@ High-value open items that are not already covered by completed fixes:
 - ✅ `requirements.txt` pins all dependency versions (`requirements-locked.txt`)
 - ✅ Core pure functions + route handlers + orchestration logic have unit tests (**381 test cases**, GitHub Actions CI)
 - [x] Add Linux/macOS `setup.sh` (equivalent to existing `setup.ps1`) — syntax repaired and UTF-8 prompts restored
-- [ ] `main.py check` venv detection compatible with both Linux `bin/` and Windows `Scripts/`
+- [x] `main.py check` venv detection compatible with both Linux `bin/` and Windows `Scripts/`
 
 **Sub-tasks**:
 - [x] R-009a: Pin dependency versions + migration guide
 - [x] R-009b: Linux `setup.sh` (low priority, project primarily targets Windows)
 - [x] R-009c: Core pure functions + routes + orchestration unit tests (pytest, 381 cases, CI Linux + Windows dual platform)
-- [ ] R-009d: Cross-platform venv detection fix (B-007, affects Linux CI)
+- [x] R-009d: Cross-platform venv detection fix (B-007, affects Linux CI) — shared `is_virtualenv_python()` covers `pyvenv.cfg`, `.venv/bin`, and `.venv/Scripts`.
 
 ## Feature R-010: AI Output Quality & Prompt Management
 
