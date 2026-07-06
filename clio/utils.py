@@ -16,6 +16,7 @@ from clio.shutdown import register_process, unregister_process
 
 T = TypeVar("T")
 JsonValue = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+MAX_EXTRACT_JSON_SCAN_CHARS = 2_000_000
 
 # ---- subprocess wrappers for cross-platform encoding safety ----
 # On Chinese Windows text=True defaults to GBK, which crashes on UTF-8
@@ -103,6 +104,11 @@ def extract_json(text: str) -> dict:
         return json.loads(text)
     except json.JSONDecodeError:
         pass
+
+    if len(text) > MAX_EXTRACT_JSON_SCAN_CHARS:
+        raise ValueError(
+            f"AI 返回内容过长，已跳过 JSON 正则提取：{len(text)} 字符 > {MAX_EXTRACT_JSON_SCAN_CHARS} 字符"
+        )
 
     match = re.search(r"\{[\s\S]*\}", text)
     if not match:

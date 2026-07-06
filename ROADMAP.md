@@ -608,7 +608,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | A-007 | 2026-06-28 ARCH-001 | Replace `server.py` hand-written route `if` chain with a route registry | Keep stdlib `http.server`; add `clio/ui/router.py` with method/path registration and path params | [ ] |
 | A-008 | 2026-06-28 ARCH-004 | Debounce `ProcessingState.mark()` disk flushes | Batch writes by time or pending count, flush on shutdown | [ ] |
 | B-099 | 2026-06-24 O-06 | OpenAI-compatible provider timeout is hardcoded to 120s | Add `ProviderConfig.timeout_sec`, parse YAML, pass to `httpx.Client(timeout=...)` | [x] |
-| B-100 | 2026-06-24 O-07 | `extract_json()` has no response length guard | Add maximum response length / warning before regex scan to avoid pathological AI responses | [ ] |
+| B-100 | 2026-06-24 O-07 | `extract_json()` has no response length guard | Add maximum response length / warning before regex scan to avoid pathological AI responses | [x] |
 | B-101 | 2026-06-28 OPT-003 | `.vmeta verify` hash is written but not checked | Either validate `verify` in `is_stale()` or explicitly document it as reserved metadata | [ ] |
 | R-020 | 2026-06-28 NEW-002 | `vmeta` / `.vindex` integrity verification CLI | Add `python main.py verify` to report OK / STALE / MISSING and recommend reindex/recompress | [ ] |
 | R-021 | 2026-06-28 NEW-004 / 2026-06-17 UX-6 | Multi-day planning | Add `plan --all-days`, scan day labels, generate per-day plans and optional `trip_plan.json` | [ ] |
