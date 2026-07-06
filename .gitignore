@@ -40,3 +40,6 @@ MagicMock/
 *.swp
 *.swo
 *~
+project.yaml
+**/.vmeta/
+**/.vindex
