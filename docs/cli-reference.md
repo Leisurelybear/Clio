@@ -66,6 +66,7 @@ Output trilogy:
 - `output/<media folder name>/texts/<index>_<title>.json` — Structured analysis (machine-readable)
 - `output/<media folder name>/texts/<index>_<title>.txt` — Human-readable version (with timeline)
 - `output/<media folder name>/summary.csv` — Full media overview table (one row per entry)
+- `output/<media folder name>/covers/<index>_<title>.jpg` — Optional cover frame when analysis returns `cover_timestamp`
 
 If a matching transcript already exists, timeline entries are enriched with `transcript` and `transcript_segments`. If transcription runs after analysis, the transcribe step updates the matching analysis JSON/TXT before planning.
 

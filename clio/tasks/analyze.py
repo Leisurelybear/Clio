@@ -25,6 +25,7 @@ from clio.tasks._helpers import (
     _write_csv,
     _write_text_file,
 )
+from clio.tasks.cover import extract_cover_frame
 from clio.tasks.transcript_align import attach_transcript_to_analysis
 from clio.utils import get_duration_sec, resolve_binary, write_json_atomic
 from clio.vmeta import VideoIndex
@@ -190,6 +191,9 @@ def _process_video_item(
     stem = _build_stem(idx_val, analysis.get("title", original.stem), config)
     final_text = config.texts_dir / f"{stem}.txt"
     json_path = config.texts_dir / f"{stem}.json"
+    cover_path = extract_cover_frame(config, compressed, analysis, stem)
+    if cover_path is not None:
+        analysis["cover_file"] = str(cover_path.relative_to(config.paths.output_dir))
     _write_text_file(final_text, analysis, original, compressed)
     write_json_atomic(json_path, analysis)
 

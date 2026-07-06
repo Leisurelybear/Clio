@@ -70,6 +70,7 @@ def _validate_analysis(data: dict, source: str) -> dict:
     data.setdefault("location", "未知")
     data.setdefault("mood", "")
     data.setdefault("suggested_use", "")
+    data.setdefault("cover_timestamp", "")
     return data
 
 
