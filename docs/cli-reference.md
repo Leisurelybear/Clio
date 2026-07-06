@@ -430,6 +430,25 @@ ai:
 
 For OpenAI-compatible providers, `timeout_sec` controls the HTTP client timeout. Increase it for slow third-party gateways or local model servers; decrease it when you want failures to surface faster.
 
+### Prompt Overrides
+
+Default prompt constants live in `clio/prompts.py`. To override them without editing code, create files under either project-level `<input_dir>/templates/prompts/` or repo-level `templates/prompts/`.
+Project-level files take priority.
+
+Supported names are the prompt constant names, with `.md`, `.txt`, or no suffix. Lowercase names also work:
+
+```text
+templates/prompts/ANALYZE_PROMPT.md
+templates/prompts/SCRIPT_PROMPT.md
+templates/prompts/PLAN_PROMPT.md
+templates/prompts/REFINE_TEXT_PROMPT.md
+templates/prompts/REFINE_TEXT_FIX_PROMPT.md
+templates/prompts/REFINE_SCRIPT_PROMPT.md
+templates/prompts/REFINE_SCRIPT_FIX_PROMPT.md
+```
+
+Keep the same `{placeholder}` names as the built-in prompt when overriding formatted prompts such as script, plan, or refine prompts.
+
 ### AI Trip Context
 
 Add `ai.context` or `ai.context_file` in `config.yaml`; the content is automatically injected as a **preamble** before all AI prompts:

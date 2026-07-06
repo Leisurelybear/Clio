@@ -1,3 +1,37 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+PROMPT_OVERRIDE_DIR = Path("templates") / "prompts"
+
+
+def _prompt_override_candidates(name: str, base_dir: Path) -> list[Path]:
+    aliases = [name, name.lower()]
+    suffixes = [".md", ".txt", ""]
+    return [base_dir / PROMPT_OVERRIDE_DIR / f"{alias}{suffix}" for alias in aliases for suffix in suffixes]
+
+
+def load_prompt(name: str, default: str, project_dir: str | Path | None = None) -> str:
+    """Load a prompt override from templates/prompts before falling back to code defaults."""
+    search_roots: list[Path] = []
+    if project_dir:
+        search_roots.append(Path(project_dir))
+    search_roots.append(Path(__file__).resolve().parent.parent)
+
+    seen: set[Path] = set()
+    for root in search_roots:
+        for candidate in _prompt_override_candidates(name, root):
+            resolved = candidate.resolve()
+            if resolved in seen:
+                continue
+            seen.add(resolved)
+            if candidate.is_file():
+                text = candidate.read_text(encoding="utf-8").strip()
+                if text:
+                    return text
+    return default
+
+
 ANALYZE_PROMPT = """请分析这段旅行 vlog 原始素材视频，用中文回复。
 
 请严格按以下 JSON 格式输出（不要 markdown 代码块，只输出 JSON）：

@@ -6,6 +6,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
+from clio.ai.base import AIResponse
 from clio.analyze import _wrap_with_context, plan_daily_vlog
 
 
@@ -98,6 +99,26 @@ class TestWrapWithContext:
         assert "Trip: Paris" in result
         assert "user context" in result
         assert "prompt" in result
+
+
+def test_analyze_video_uses_prompt_override(tmp_path, monkeypatch):
+    from clio.analyze import analyze_video
+
+    prompt_dir = tmp_path / "templates" / "prompts"
+    prompt_dir.mkdir(parents=True)
+    (prompt_dir / "ANALYZE_PROMPT.md").write_text("override analyze prompt", encoding="utf-8")
+
+    cfg = _fake_config()
+    cfg.paths.input_dir = tmp_path
+    provider = MagicMock(provider_id="mock")
+    provider.analyze_video.return_value = AIResponse('{"title":"x","summary":"y","timeline":[]}')
+
+    monkeypatch.setattr("clio.analyze.get_video_provider", lambda *a: (provider, "model"))
+    result = analyze_video("clip.mp4", cfg)
+
+    assert result["title"] == "x"
+    _, prompt, _ = provider.analyze_video.call_args.args[:3]
+    assert "override analyze prompt" in prompt
 
 
 class TestPlanDailyVlog:

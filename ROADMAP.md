@@ -312,7 +312,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - CLI supports analyzing the same video with multiple models and comparing results
 
 **Sub-tasks**:
-- [ ] R-010a: External prompt file override mechanism (`templates/prompts/` same-named file takes priority)
+- [x] R-010a: External prompt file override mechanism (`templates/prompts/` same-named file takes priority)
 - [ ] R-010b: Confidence scoring (modify prompts to make AI output `_confidence`)
 - [ ] R-010c: Multi-model comparison CLI
 - [ ] R-010d: Backend `GET /api/prompts` returns all available prompts; `PUT /api/prompts/{name}` saves override

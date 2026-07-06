@@ -19,6 +19,7 @@ from clio.prompts import (
     REFINE_TEXT_PROMPT,
     SCRIPT_PROMPT,
     TRANSCRIPT_CONTEXT,
+    load_prompt,
 )
 from clio.utils import extract_json
 
@@ -179,7 +180,8 @@ def analyze_video(
     context_override: str | None = None,
 ) -> dict:
     provider, model = get_video_provider(config, TaskName.VIDEO_ANALYZE)
-    prompt = _wrap_with_context(ANALYZE_PROMPT, config, context_override=context_override)
+    base = load_prompt("ANALYZE_PROMPT", ANALYZE_PROMPT, config.paths.input_dir)
+    prompt = _wrap_with_context(base, config, context_override=context_override)
     text = _call_ai(
         "AI 视频分析",
         provider.provider_id,
@@ -215,7 +217,7 @@ def generate_voiceover(
         f"- {t.get('start', '?')}-{t.get('end', '?')}: {t.get('description', '')}"
         for t in clip_data.get("timeline", [])
     )
-    base = SCRIPT_PROMPT.format(
+    base = load_prompt("SCRIPT_PROMPT", SCRIPT_PROMPT, config.paths.input_dir).format(
         index=clip_data.get("index", ""),
         title=clip_data.get("title", ""),
         summary=clip_data.get("summary", ""),
@@ -252,7 +254,7 @@ def plan_daily_vlog(
     # 取第一个 clip 的 index 作为 prompt 示例，确保格式一致
     first_idx = clips[0].get("index", "001") if clips else "001"
 
-    base = PLAN_PROMPT.format(
+    base = load_prompt("PLAN_PROMPT", PLAN_PROMPT, config.paths.input_dir).format(
         clips_json=json.dumps(clips, ensure_ascii=False, indent=None),
         max_clips=config.plan.max_clips_per_day,
         target_duration_sec=config.plan.target_duration_sec,
@@ -336,13 +338,13 @@ def refine_text(
     """
     provider, model = get_task_provider(config, TaskName.REFINE_TEXT)
     if fix:
-        base = REFINE_TEXT_FIX_PROMPT.format(
+        base = load_prompt("REFINE_TEXT_FIX_PROMPT", REFINE_TEXT_FIX_PROMPT, config.paths.input_dir).format(
             fix_instruction=fix.strip(),
             existing_json=json.dumps(analysis, ensure_ascii=False, indent=None),
         )
         label = "AI refine (定向)"
     else:
-        base = REFINE_TEXT_PROMPT.format(
+        base = load_prompt("REFINE_TEXT_PROMPT", REFINE_TEXT_PROMPT, config.paths.input_dir).format(
             existing_json=json.dumps(analysis, ensure_ascii=False, indent=None),
         )
         label = "AI refine 素材"
@@ -382,14 +384,14 @@ def refine_script(
     analysis_json = json.dumps(analysis, ensure_ascii=False, indent=None) if analysis else "（无）"
     existing_json = json.dumps(script, ensure_ascii=False, indent=None)
     if fix:
-        base = REFINE_SCRIPT_FIX_PROMPT.format(
+        base = load_prompt("REFINE_SCRIPT_FIX_PROMPT", REFINE_SCRIPT_FIX_PROMPT, config.paths.input_dir).format(
             fix_instruction=fix.strip(),
             analysis_json=analysis_json,
             existing_json=existing_json,
         )
         label = "AI refine 脚本 (定向)"
     else:
-        base = REFINE_SCRIPT_PROMPT.format(
+        base = load_prompt("REFINE_SCRIPT_PROMPT", REFINE_SCRIPT_PROMPT, config.paths.input_dir).format(
             analysis_json=analysis_json,
             existing_json=existing_json,
         )
