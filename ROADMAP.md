@@ -611,7 +611,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | B-100 | 2026-06-24 O-07 | `extract_json()` has no response length guard | Add maximum response length / warning before regex scan to avoid pathological AI responses | [x] |
 | B-101 | 2026-06-28 OPT-003 | `.vmeta verify` hash is written but not checked | Either validate `verify` in `is_stale()` or explicitly document it as reserved metadata | [x] |
 | R-020 | 2026-06-28 NEW-002 | `vmeta` / `.vindex` integrity verification CLI | Add `python main.py verify` to report OK / STALE / MISSING and recommend reindex/recompress | [x] |
-| R-021 | 2026-06-28 NEW-004 / 2026-06-17 UX-6 | Multi-day planning | Add `plan --all-days`, scan day labels, generate per-day plans and optional `trip_plan.json` | [ ] |
+| R-021 | 2026-06-28 NEW-004 / 2026-06-17 UX-6 | Multi-day planning | Add `plan --all-days`, scan day labels, generate per-day plans and optional `trip_plan.json` | [x] |
 | R-022 | 2026-06-24 N-05 | Smart cover frame extraction | Add `cover_timestamp` in analysis output, extract JPEG with ffmpeg, show candidates in UI | [ ] |
 | R-023 | 2026-06-24 N-06 | Align transcript segments with visual timeline | Attach transcript snippets to timeline entries by time overlap; expose to plan prompt/UI | [x] |
 | R-024 | 2026-06-21 F-4 | GoPro GPMF telemetry as highlight signal | Parse telemetry timestamps (speed/elevation/location), feed highlight windows into analysis prompt | [ ] |

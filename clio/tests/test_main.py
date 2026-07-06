@@ -126,3 +126,11 @@ def test_plan_no_transcripts_flag(mock_run_plan, cli_runner, config_path, tmp_pa
     assert result == 0
     cfg_arg = mock_run_plan.call_args[0][0]
     assert cfg_arg.plan.use_transcripts is False
+
+
+@patch("clio.pipeline.run_plan_all_days")
+def test_plan_all_days(mock_run_plan_all_days, cli_runner, config_path):
+    result = cli_runner(["--config", str(config_path), "plan", "--all-days", "--no-transcripts"])
+    assert result == 0
+    cfg_arg = mock_run_plan_all_days.call_args[0][0]
+    assert cfg_arg.plan.use_transcripts is False

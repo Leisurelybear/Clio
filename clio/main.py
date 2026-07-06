@@ -153,6 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     p_plan = sub.add_parser("plan", help="生成单日 vlog 剪辑规划")
     _add_io_args(p_plan)
     p_plan.add_argument("--day", default="day1", help="日 vlog 标签")
+    p_plan.add_argument("--all-days", action="store_true", help="按分析结果中的 day/day_label 批量生成多日规划")
     p_plan.add_argument("--no-transcripts", action="store_true", help="不注入语音转录信息到 prompt")
 
     p_run = sub.add_parser("run", help="一键执行完整流程")
@@ -325,12 +326,15 @@ def main(argv: list[str] | None = None) -> int:
             auto_reindex_if_needed(config)
             run_label_videos(config)
         elif args.command == "plan":
-            from clio.pipeline import run_plan_vlog
+            from clio.pipeline import run_plan_all_days, run_plan_vlog
             from clio.tasks.reindex import auto_reindex_if_needed
 
             auto_reindex_if_needed(config)
             config.plan.use_transcripts = not getattr(args, "no_transcripts", False)
-            run_plan_vlog(config, args.day)
+            if getattr(args, "all_days", False):
+                run_plan_all_days(config)
+            else:
+                run_plan_vlog(config, args.day)
         elif args.command == "run":
             from clio.pipeline import run_full_pipeline
 

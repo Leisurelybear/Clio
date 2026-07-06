@@ -97,9 +97,11 @@ Feed all `texts/` summaries for a day to the `ai.tasks.vlog_plan` provider, lett
 ```bash
 python main.py plan --day day1
 python main.py plan --day "Day2_卢瓦尔河谷"
+python main.py plan --all-days
 ```
 
 The `--day` label appears in the output filename and vlog title. Output to `output/<media folder name>/plans/<day>_plan.{json,md}`.
+`--all-days` scans `texts/*.json` for `day_label`, `day`, or `dayLabel`; files without a day field are grouped into `day1`. It generates one `<day>_plan.{json,md}` per day plus `plans/trip_plan.json`.
 
 ---
 
