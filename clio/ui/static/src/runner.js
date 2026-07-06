@@ -457,14 +457,66 @@ function _stopRunPoll() {
   _stopRunSSE();
 }
 
-const _STEP_LABELS_SHORT = { compress: '压缩', analyze: '分析', voiceover: '口播', transcribe: '转录' };
-const _STATUS_ICON = { done: '✅', skipped: '⏭️', error: '✗' };
+const _STEP_LABELS_SHORT = {
+  compress: '压缩',
+  analyze: '分析',
+  voiceover: '口播',
+  transcribe: '转录',
+  plan: '规划',
+  label: '标号',
+};
+const _STATUS_ICON = { done: '✅', skipped: '⏭️', error: '✗', cancelled: '⏹', running: '…' };
+const _SKIP_REASON_HINTS = {
+  compress: '已找到可复用的压缩文件或分段输出。勾选“覆盖现有输出”后会重新压缩。',
+  analyze: '通常是分析 JSON 已存在；也可能是视频超过 analyze.max_analyze_duration_min 时长限制。',
+  voiceover: '口播 JSON 已存在。需要重写文案时勾选“覆盖现有输出”。',
+  transcribe: '通常是转录 JSON 已存在；也可能是找不到原始视频或音频提取失败。',
+  plan: '剪辑规划文件已存在。需要重建规划时勾选“覆盖现有输出”。',
+  label: '可能是标号视频已存在，或找不到对应的压缩视频。',
+};
+
+function buildSkippedDiagnostics(processingState) {
+  const files = processingState?.files || {};
+  const stateSteps = Array.isArray(processingState?.steps) ? processingState.steps : Object.keys(_STEP_LABELS_SHORT);
+  const stepKeys = stateSteps.filter(step => step in _STEP_LABELS_SHORT);
+  const diagnostics = [];
+  for (const [file, steps] of Object.entries(files).sort((a, b) => a[0].localeCompare(b[0]))) {
+    if (!steps || typeof steps !== 'object') continue;
+    for (const step of stepKeys) {
+      if (steps[step] !== 'skipped') continue;
+      diagnostics.push({
+        file,
+        step,
+        label: _STEP_LABELS_SHORT[step] || step,
+        reason: _SKIP_REASON_HINTS[step] || '该步骤被记录为 skipped；请检查运行日志和对应输出文件。',
+      });
+    }
+  }
+  return diagnostics;
+}
+
+function renderSkippedDiagnosticsHtml(diagnostics) {
+  const rows = (diagnostics || []).map(item => `
+    <div class="skip-row">
+      <span class="skip-file">${escapeHtml(item.file)}</span>
+      <span class="skip-step">${escapeHtml(item.label || item.step)}</span>
+      <span class="skip-reason">${escapeHtml(item.reason)}</span>
+    </div>
+  `).join('');
+  return `
+    <details class="skip-panel" ${rows ? 'open' : ''}>
+      <summary>为什么被跳过</summary>
+      <p class="muted">基于 .processing.json 的 skipped 状态推断；精确原因以运行日志和实际输出文件为准。</p>
+      ${rows ? `<div class="skip-table">${rows}</div>` : '<p class="muted">当前没有 skipped 记录。</p>'}
+    </details>
+  `;
+}
 
 async function renderProcessingState(container) {
   try {
     const st = await api('GET', '/api/processing-state');
     const files = st.files;
-    const stepKeys = ['compress', 'analyze', 'voiceover', 'transcribe'];
+    const stepKeys = ['compress', 'analyze', 'voiceover', 'transcribe', 'plan', 'label'];
     const entries = Object.entries(files).sort((a, b) => a[0].localeCompare(b[0]));
     if (!entries.length) { if (container) container.innerHTML = ''; return; }
     let html = '<h4 style="margin:12px 0 4px">处理状态</h4><div class="state-table"><div class="state-row state-header"><span class="state-file">文件</span>';
@@ -479,6 +531,7 @@ async function renderProcessingState(container) {
       html += '</div>';
     }
     html += '</div>';
+    html += renderSkippedDiagnosticsHtml(buildSkippedDiagnostics(st));
     if (container) container.innerHTML = html;
   } catch { /* ignore */ }
 }
@@ -491,4 +544,6 @@ export {
   collectRunOptions,
   renderRunPreviewHtml,
   refreshRunPreview,
+  buildSkippedDiagnostics,
+  renderSkippedDiagnosticsHtml,
 };

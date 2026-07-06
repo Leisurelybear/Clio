@@ -269,6 +269,48 @@ header > * { -webkit-app-region: no-drag; }
 .state-header { font-weight: bold; }
 .state-file { display: table-cell; padding: 2px 8px; white-space: nowrap; border-bottom: 1px solid var(--border); }
 .state-cell { display: table-cell; padding: 2px 8px; text-align: center; border-bottom: 1px solid var(--border); }
+.skip-panel {
+  margin-top: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  padding: var(--space-2) var(--space-3);
+}
+.skip-panel summary {
+  cursor: pointer;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+.skip-table {
+  display: grid;
+  gap: 1px;
+  margin-top: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.skip-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 64px minmax(220px, 2fr);
+  gap: var(--space-2);
+  align-items: start;
+  padding: 6px 8px;
+  background: var(--bg-surface-2);
+  font-size: var(--text-sm);
+}
+.skip-file {
+  font-family: var(--font-mono);
+  word-break: break-all;
+  color: var(--text-secondary);
+}
+.skip-step {
+  color: var(--warning);
+  white-space: nowrap;
+}
+.skip-reason {
+  color: var(--text-secondary);
+}
 .status button { background: none; border: 1px solid currentColor; border-radius: var(--radius-sm); padding: 2px 8px; cursor: pointer; color: inherit; font: inherit; font-size: var(--text-sm); }
 
 .runtime-warnings {
@@ -1000,7 +1042,15 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
   transition: all var(--transition-fast);
 }
 .run-step:hover { background: var(--bg-hover); border-color: var(--border-light); }
-.run-step input[type="checkbox"] { width: auto !important; margin-top: 3px !important; accent-color: var(--accent); }
+.run-step input[type="checkbox"] {
+  flex: 0 0 16px;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px;
+  margin: 3px 0 0 !important;
+  padding: 0;
+  accent-color: var(--accent);
+}
 .run-step-label { font-weight: 500; color: var(--text-primary); min-width: 110px; font-size: var(--text-sm); }
 .run-step-hint { font-size: var(--text-xs); color: var(--text-tertiary); }
 /* ── Run Step Sub-Options (plan children) ──────────────────── */
@@ -1026,8 +1076,12 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
   cursor: pointer;
 }
 .run-option-check input[type="checkbox"] {
-  width: auto;
+  flex: 0 0 16px;
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px;
   margin: 0;
+  padding: 0;
   accent-color: var(--accent);
 }
 .run-option-label {

@@ -119,11 +119,11 @@ High-value open items that are not already covered by completed fixes:
   - Documented Node.js 18+ requirement for local UI tests; CI uses Node 22.
   - Documented recommended lint command as `ruff check clio main.py` and updated CI quality commands to match.
   - Added `python main.py doctor` for config, ffmpeg, API keys, Node version, and write-permission checks.
-- [~] CR-008: UX/observability follow-ups.
+- [x] CR-008: UX/observability follow-ups.
   - [x] Add pre-run summary showing selected videos, resolved artifact count per step, expected skips, and warnings.
   - [x] Add provider/model test connection button.
   - [x] Add visible warnings when `debug_print_prompt=true` or LAN host mode is active.
-  - Add "why skipped" panel based on `.processing.json`.
+  - [x] Add "why skipped" panel based on `.processing.json`.
 
 ---
 

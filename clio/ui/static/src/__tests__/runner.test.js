@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { renderRunPreviewHtml } from '../runner.js';
+import {
+  buildSkippedDiagnostics,
+  renderRunPreviewHtml,
+  renderSkippedDiagnosticsHtml,
+} from '../runner.js';
 
 describe('renderRunPreviewHtml', () => {
   it('renders totals and per-step counts', () => {
@@ -47,5 +51,54 @@ describe('renderRunPreviewHtml', () => {
 
   it('renders a neutral state without preview data', () => {
     expect(renderRunPreviewHtml(null)).toContain('选择步骤后显示预览');
+  });
+});
+
+describe('skipped diagnostics', () => {
+  it('builds inferred skipped reasons from processing state', () => {
+    const diagnostics = buildSkippedDiagnostics({
+      steps: ['compress', 'analyze', 'voiceover', 'transcribe', 'plan', 'label'],
+      files: {
+        GL010683: { compress: 'done', analyze: 'skipped', voiceover: null },
+        GL010684: { compress: 'skipped', analyze: 'done', transcribe: 'error' },
+      },
+    });
+
+    expect(diagnostics).toHaveLength(2);
+    expect(diagnostics[0]).toMatchObject({
+      file: 'GL010683',
+      step: 'analyze',
+      label: '分析',
+    });
+    expect(diagnostics[0].reason).toContain('分析 JSON');
+    expect(diagnostics[1]).toMatchObject({
+      file: 'GL010684',
+      step: 'compress',
+      label: '压缩',
+    });
+  });
+
+  it('renders skipped diagnostics and escapes dynamic strings', () => {
+    const html = renderSkippedDiagnosticsHtml([
+      {
+        file: '<video>',
+        step: 'label',
+        label: '<b>标号</b>',
+        reason: '找不到 <output>',
+      },
+    ]);
+
+    expect(html).toContain('为什么被跳过');
+    expect(html).toContain('&lt;video&gt;');
+    expect(html).toContain('&lt;b&gt;标号&lt;/b&gt;');
+    expect(html).toContain('找不到 &lt;output&gt;');
+    expect(html).not.toContain('<video>');
+    expect(html).not.toContain('<b>标号</b>');
+  });
+
+  it('renders an empty skipped diagnostics state', () => {
+    const html = renderSkippedDiagnosticsHtml([]);
+
+    expect(html).toContain('当前没有 skipped 记录');
   });
 });
