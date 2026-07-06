@@ -121,7 +121,7 @@ High-value open items that are not already covered by completed fixes:
   - Added `python main.py doctor` for config, ffmpeg, API keys, Node version, and write-permission checks.
 - [~] CR-008: UX/observability follow-ups.
   - [x] Add pre-run summary showing selected videos, resolved artifact count per step, expected skips, and warnings.
-  - Add provider/model test connection button.
+  - [x] Add provider/model test connection button.
   - [x] Add visible warnings when `debug_print_prompt=true` or LAN host mode is active.
   - Add "why skipped" panel based on `.processing.json`.
 
