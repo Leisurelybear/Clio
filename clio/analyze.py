@@ -72,6 +72,7 @@ def _validate_analysis(data: dict, source: str) -> dict:
     data.setdefault("mood", "")
     data.setdefault("suggested_use", "")
     data.setdefault("cover_timestamp", "")
+    data.setdefault("_confidence", 0.0)
     return data
 
 
@@ -86,6 +87,7 @@ def _validate_voiceover(data: dict, source: str) -> dict:
     data.setdefault("voiceover", "")
     data.setdefault("duration_hint_sec", 20)
     data.setdefault("edit_tip", "")
+    data.setdefault("_confidence", 0.0)
     return data
 
 
@@ -102,6 +104,7 @@ def _validate_plan(data: dict, source: str) -> dict:
     data.setdefault("sequence", [])
     data.setdefault("opening_tip", "")
     data.setdefault("ending_tip", "")
+    data.setdefault("_confidence", 0.0)
     return data
 
 

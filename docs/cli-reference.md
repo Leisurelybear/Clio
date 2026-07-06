@@ -449,6 +449,8 @@ templates/prompts/REFINE_SCRIPT_FIX_PROMPT.md
 
 Keep the same `{placeholder}` names as the built-in prompt when overriding formatted prompts such as script, plan, or refine prompts.
 
+Generated analysis, voiceover, and plan JSON may include `_confidence` as a 0-1 self-assessed confidence score. Missing values are treated as `0.0` so older outputs remain valid.
+
 ### AI Trip Context
 
 Add `ai.context` or `ai.context_file` in `config.yaml`; the content is automatically injected as a **preamble** before all AI prompts:
