@@ -67,6 +67,8 @@ Output trilogy:
 - `output/<media folder name>/texts/<index>_<title>.txt` — Human-readable version (with timeline)
 - `output/<media folder name>/summary.csv` — Full media overview table (one row per entry)
 
+If a matching transcript already exists, timeline entries are enriched with `transcript` and `transcript_segments`. If transcription runs after analysis, the transcribe step updates the matching analysis JSON/TXT before planning.
+
 > Re-running will **automatically skip** already generated `.json` / `.txt` (when `analyze.skip_existing: true`).
 > Add `--force` to rerun everything.
 
@@ -252,7 +254,7 @@ python main.py transcribe
 python main.py transcribe --force
 ```
 
-> Note: transcript data is injected into the `plan` prompt, so the AI can reference actual voiceover content to optimize editing arrangement.
+> Note: transcript data is attached to matching analysis timeline entries and injected into the `plan` prompt, so the AI can reference actual voiceover content to optimize editing arrangement.
 
 ---
 

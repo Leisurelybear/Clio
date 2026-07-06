@@ -72,7 +72,7 @@ UI 只读 / 写 `config.yaml` 里 `paths.output_dir` 下的文件：
 
 | 入口 | 路径 | 文件 | 字段 |
 | --- | --- | --- | --- |
-| 分析 (texts) | sidebar → 视频 → tab「分析」 | `output/texts*/*.json` | `title`, `location`, `mood`, `summary`, `timeline[]` |
+| 分析 (texts) | sidebar → 视频 → tab「分析」 | `output/texts*/*.json` | `title`, `location`, `mood`, `summary`, `timeline[]`，可含同期声 `transcript` |
 | 口播 (scripts) | sidebar → 视频 → tab「口播」 | `output/scripts/*_voiceover.json` | `title`, `voiceover`, `edit_tip`, `duration_hint_sec` |
 | 转录 (transcript) | sidebar → 视频 → tab「转录」 | `output/transcripts/*.json` | `segments[]`，支持手动添加、编辑、删除 |
 | 规划 (plan) | sidebar → 📋 规划 | `output/plans/day<N>_plan.json` | `theme`, `opening_tip`, `ending_tip`, `sequence[]` |

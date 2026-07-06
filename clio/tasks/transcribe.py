@@ -17,6 +17,7 @@ from clio.log import format_duration
 from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
 from clio.schema import add_schema_version
+from clio.tasks.transcript_align import enrich_matching_analysis_files
 from clio.transcribe import check_whisper, transcribe_audio
 from clio.utils import find_videos, popen_subprocess, resolve_binary, write_json_atomic
 
@@ -252,6 +253,9 @@ def run_transcribe_all(
             add_schema_version(transcript)
             transcript["media_identity"] = _identity_to_dict(transcript_identity)
             write_json_atomic(out_path, transcript)
+            enriched = enrich_matching_analysis_files(config, transcript)
+            if enriched:
+                print(f"  [对齐] 已更新 {enriched} 个分析 timeline 的语音片段")
             state.mark(orig_stem, "transcribe", "done")
             seg_info = f"{len(segments)} 段" if segments else "无有效内容"
             elapsed = time.time() - start_time
@@ -353,6 +357,7 @@ def run_transcribe_one(
         transcripts_dir.mkdir(parents=True, exist_ok=True)
         out_path = transcripts_dir / f"{video_path.stem}_transcript.json"
         write_json_atomic(out_path, transcript)
+        enrich_matching_analysis_files(config, transcript)
         print(f"  [transcribe_one] ✓ 已保存到 {out_path}")
         return transcript
     finally:

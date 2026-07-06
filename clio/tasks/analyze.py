@@ -25,6 +25,7 @@ from clio.tasks._helpers import (
     _write_csv,
     _write_text_file,
 )
+from clio.tasks.transcript_align import attach_transcript_to_analysis
 from clio.utils import get_duration_sec, resolve_binary, write_json_atomic
 from clio.vmeta import VideoIndex
 
@@ -184,6 +185,7 @@ def _process_video_item(
     identity = resolve_identity(compressed, config.paths.input_dir, idx_str)
     add_schema_version(analysis)
     analysis["media_identity"] = _identity_to_dict(identity)
+    attach_transcript_to_analysis(config, analysis)
 
     stem = _build_stem(idx_val, analysis.get("title", original.stem), config)
     final_text = config.texts_dir / f"{stem}.txt"
