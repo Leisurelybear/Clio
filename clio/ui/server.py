@@ -24,6 +24,7 @@ from clio.session_log import clear as clear_session_log
 from clio.session_log import read as read_session_log
 from clio.shutdown import before_stop, install_hooks
 from clio.tasks.reindex import auto_reindex_if_needed
+from clio.ui.routes.ai import handle_post_ai_test
 from clio.ui.routes.config_routes import (
     handle_get_config,
     handle_get_config_global,
@@ -150,6 +151,7 @@ _ROUTE_POLICIES = (
     RoutePolicy("POST", "/api/run/start"),
     RoutePolicy("POST", "/api/run/preview"),
     RoutePolicy("POST", "/api/run/cancel"),
+    RoutePolicy("POST", "/api/ai/test"),
     RoutePolicy("POST", "/api/config/init"),
     RoutePolicy("POST", "/api/cut"),
     RoutePolicy("POST", "/api/refine"),
@@ -452,6 +454,8 @@ def make_handler(
                 return handle_post_run_preview(self, qs, obj)
             if path == "/api/run/cancel":
                 return handle_post_run_cancel(self, qs, obj)
+            if path == "/api/ai/test":
+                return handle_post_ai_test(self, qs, obj)
             if path == "/api/config/init":
                 return handle_post_config_init(self, qs, obj)
             if path == "/api/cut":
