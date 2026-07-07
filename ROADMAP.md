@@ -455,7 +455,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 **Sub-tasks**:
 - [x] R-015a: `POST /api/config/raw` global save calls `_config_cache.clear()` ← `e21373e`
 - [x] R-015b: `_get_config()` adds mtime-based cache invalidation
-- [ ] R-015c: Frontend differentiates project-level vs global save prompts
+- [x] R-015c: Frontend differentiates project-level vs global save prompts
 - [x] R-015d: `_config_cache` adds maxsize limit (LRU cap 20) ← `e21373e`
 
 ## Staging / WIP
