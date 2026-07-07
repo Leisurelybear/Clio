@@ -271,10 +271,10 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 **Acceptance Criteria**:
 - ✅ Enable sidebar "▶ Run" as the R-008 entry point
 - ✅ Right panel shows run panel: step selection (compress / analyze / voiceover / plan / all)
-- ❌ Input directory can be independently selected (not limited to config's `input_dir`, can manually enter path or browse)
+- ✅ Input directory can be independently selected (not limited to config's `input_dir`, can manually enter path or browse)
 - ✅ Files within the selected directory can be checked individually (not "run all") — multi-select via "选择视频" button
 - ✅ After clicking execute, panel shows real-time progress + ETA (SSE via `/api/run/stream`)
-- ⚠️ Auto-switch to corresponding view after completion — video/plan/steps reloaded, but no per-step smart view switch
+- ✅ Auto-switch to corresponding view after completion — plan opens the plan view; media steps open compressed video results
 
 **Sub-tasks**:
 - [x] R-008a: Backend run endpoint supports per-run `input_dir` override via `/api/run/start` (no separate `/api/run/step` needed).
