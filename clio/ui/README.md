@@ -66,6 +66,15 @@ python main.py serve --host 0.0.0.0     # 暴露到局域网（注意安全）
 - 编辑**项目专属 project.yaml**（通过 `?project=X` 切换）：保存后立即生效，下次流水线运行自动加载新配置。
 校验失败（如 provider 拼写错误）时弹出错误红字，不写文件。
 
+Provider registry also has focused backend endpoints for integrations and future UI refactors:
+
+- `GET /api/providers` returns global `ai.providers`.
+- `POST /api/providers` creates a provider from a JSON body containing `name`, `type`, `api_key_env`, `base_url`, `models`, and `capabilities`.
+- `PUT /api/providers/{name}` creates or updates one provider.
+- `DELETE /api/providers/{name}` removes one provider from global `config.yaml`.
+
+These endpoints require the same API token as other sensitive config routes and invalidate the server config cache after writes.
+
 ## 数据来源
 
 UI 只读 / 写 `config.yaml` 里 `paths.output_dir` 下的文件：

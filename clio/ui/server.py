@@ -25,14 +25,18 @@ from clio.session_log import read as read_session_log
 from clio.shutdown import before_stop, install_hooks
 from clio.tasks.reindex import auto_reindex_if_needed
 from clio.ui.routes.config_routes import (
+    handle_delete_provider,
     handle_get_config,
     handle_get_config_global,
     handle_get_config_project,
     handle_get_config_raw,
+    handle_get_providers,
     handle_post_config_init,
+    handle_post_provider,
     handle_put_config_global,
     handle_put_config_project,
     handle_put_config_raw,
+    handle_put_provider,
 )
 from clio.ui.routes.env_routes import handle_get_env, handle_put_env
 from clio.ui.routes.export import handle_post_export
@@ -258,6 +262,7 @@ def make_handler(
                 "/api/config/raw",
                 "/api/config/global",
                 "/api/config/project",
+                "/api/providers",
                 "/api/video",
                 "/api/fs/dirs",
                 "/api/prompts",
@@ -273,6 +278,8 @@ def make_handler(
                 return handle_get_config_global(self, qs)
             if path == "/api/config/project":
                 return handle_get_config_project(self, qs)
+            if path == "/api/providers":
+                return handle_get_providers(self, qs)
             if path == "/api/project":
                 return handle_get_project(self, qs)
             if path == "/api/projects":
@@ -341,6 +348,9 @@ def make_handler(
                 return handle_put_config_global(self, qs, obj)
             if path == "/api/config/project":
                 return handle_put_config_project(self, qs, obj)
+            if path.startswith("/api/providers/"):
+                name = path[len("/api/providers/") :]
+                return handle_put_provider(self, qs, obj, name)
             if path == "/api/project":
                 return handle_put_project(self, qs, obj)
             if path == "/api/texts":
@@ -382,6 +392,8 @@ def make_handler(
                 return handle_post_run_cancel(self, qs, obj)
             if path == "/api/config/init":
                 return handle_post_config_init(self, qs, obj)
+            if path == "/api/providers":
+                return handle_post_provider(self, qs, obj)
             if path == "/api/cut":
                 return handle_post_cut(self, qs, obj)
             if path == "/api/refine":
@@ -420,6 +432,9 @@ def make_handler(
             if path.startswith("/api/prompts/"):
                 name = path[len("/api/prompts/") :]
                 return handle_delete_prompt(self, qs, name)
+            if path.startswith("/api/providers/"):
+                name = path[len("/api/providers/") :]
+                return handle_delete_provider(self, qs, name)
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 

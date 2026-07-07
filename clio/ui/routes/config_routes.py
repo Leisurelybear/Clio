@@ -6,10 +6,12 @@ from __future__ import annotations
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import unquote
 
 import yaml
 
 from clio.config import CONFIG_DESCRIPTIONS, deep_merge, load_config, load_global_config
+from clio.config.parsers import _infer_provider_capabilities
 from clio.ui.services.file_service import (
     _coerce_config_types,
     _create_project_yaml,
@@ -20,6 +22,14 @@ from clio.ui.services.project_service import _project_output_dir
 
 if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
+
+_PROVIDER_TYPES = {"gemini", "openai", "openai_compat"}
+
+
+def _provider_name_error(name: str) -> str | None:
+    if not name or not all(c.isalnum() or c in "_-" for c in name):
+        return "provider name must contain only letters, numbers, '_' or '-'"
+    return None
 
 
 def handle_get_config(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
@@ -338,3 +348,149 @@ def handle_put_config_project(handler: HandlerProtocol, qs: dict[str, Any], obj:
         return handler._send_json({"ok": False, "error": f"config validation failed: {e}"}, 400)
     handler.__class__._config_cache.invalidate_key(str(proj_input.resolve()))
     handler._send_json({"ok": True, "path": str(proj_yaml)})
+
+
+# ---------------------------------------------------------------------------
+# /api/providers — focused CRUD API for global AI provider registry
+# ---------------------------------------------------------------------------
+
+
+def _read_global_config_raw(config_path: Path | None) -> tuple[dict[str, Any] | None, str | None]:
+    if not config_path or not config_path.is_file():
+        return None, "config file not available"
+    try:
+        with open(config_path, encoding="utf-8") as f:
+            raw = yaml.safe_load(f) or {}
+    except Exception as e:
+        return None, f"cannot read current config: {e}"
+    if not isinstance(raw, dict):
+        return None, "config root must be a mapping"
+    return raw, None
+
+
+def _provider_error(name: str, provider: dict[str, Any]) -> str | None:
+    if error := _provider_name_error(name):
+        return error
+    provider_type = provider.get("type", "gemini")
+    if provider_type not in _PROVIDER_TYPES:
+        return f"unsupported provider type: {provider_type}"
+    models = provider.get("models", [])
+    if not isinstance(models, list) or any(not isinstance(m, str) for m in models):
+        return "models must be a list of strings"
+    capabilities = provider.get("capabilities")
+    if capabilities is not None and (
+        not isinstance(capabilities, list) or any(not isinstance(c, str) for c in capabilities)
+    ):
+        return "capabilities must be a list of strings"
+    return None
+
+
+def _normalize_provider(name: str, obj: dict[str, Any]) -> dict[str, Any]:
+    provider_type = obj.get("type", "gemini")
+    data = {
+        "type": provider_type,
+        "api_key_env": obj.get("api_key_env", ""),
+        "api_key": obj.get("api_key", ""),
+        "base_url": obj.get("base_url", ""),
+        "poll_interval_sec": obj.get("poll_interval_sec", 5),
+        "retry_attempts": obj.get("retry_attempts", 2),
+        "requests_per_minute": obj.get("requests_per_minute", 0),
+        "timeout_sec": obj.get("timeout_sec", 120.0),
+        "max_tokens": obj.get("max_tokens", 4096),
+        "models": obj.get("models", []),
+        "capabilities": obj.get("capabilities") or _infer_provider_capabilities(provider_type),
+    }
+    if obj.get("name"):
+        data["name"] = name
+    return data
+
+
+def _write_global_config_raw(handler: HandlerProtocol, raw: dict[str, Any]) -> tuple[bool, str | None]:
+    config_path = handler.config_path
+    if not config_path:
+        return False, "config_path not available"
+    try:
+        yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
+    except Exception as e:
+        return False, f"YAML serialization failed: {e}"
+    tmp_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="wb", suffix=".yaml", delete=False, dir=str(config_path.parent)) as tmp:
+            tmp.write(yml.encode("utf-8"))
+            tmp_path = Path(tmp.name)
+        load_global_config(tmp_path)
+    except Exception as e:
+        if tmp_path and tmp_path.exists():
+            tmp_path.unlink()
+        return False, f"config validation failed: {e}"
+    _save_atomic(config_path, yml.encode("utf-8"))
+    if tmp_path and tmp_path.exists():
+        tmp_path.unlink()
+    handler.__class__._config_cache.invalidate_all()
+    return True, None
+
+
+def handle_get_providers(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
+    raw, error = _read_global_config_raw(handler.config_path)
+    if error:
+        return handler._send_json({"ok": False, "error": error}, 500)
+    providers = raw.get("ai", {}).get("providers", {}) if raw else {}
+    return handler._send_json({"ok": True, "providers": providers})
+
+
+def handle_post_provider(handler: HandlerProtocol, qs: dict[str, Any], obj: dict[str, Any]) -> None:
+    name = (obj.get("name") or "").strip()
+    if not name:
+        return handler._send_json({"ok": False, "error": "provider name is required"}, 400)
+    raw, error = _read_global_config_raw(handler.config_path)
+    if error:
+        return handler._send_json({"ok": False, "error": error}, 500)
+    assert raw is not None
+    providers = raw.setdefault("ai", {}).setdefault("providers", {})
+    if name in providers:
+        return handler._send_json({"ok": False, "error": f"provider already exists: {name}"}, 409)
+    provider = _normalize_provider(name, obj)
+    error = _provider_error(name, provider)
+    if error:
+        return handler._send_json({"ok": False, "error": error}, 400)
+    providers[name] = provider
+    ok, error = _write_global_config_raw(handler, raw)
+    if not ok:
+        return handler._send_json({"ok": False, "error": error}, 400)
+    return handler._send_json({"ok": True, "name": name, "provider": provider})
+
+
+def handle_put_provider(handler: HandlerProtocol, qs: dict[str, Any], obj: dict[str, Any], name: str) -> None:
+    name = unquote(name).strip()
+    raw, error = _read_global_config_raw(handler.config_path)
+    if error:
+        return handler._send_json({"ok": False, "error": error}, 500)
+    assert raw is not None
+    provider = _normalize_provider(name, obj)
+    error = _provider_error(name, provider)
+    if error:
+        return handler._send_json({"ok": False, "error": error}, 400)
+    providers = raw.setdefault("ai", {}).setdefault("providers", {})
+    providers[name] = provider
+    ok, error = _write_global_config_raw(handler, raw)
+    if not ok:
+        return handler._send_json({"ok": False, "error": error}, 400)
+    return handler._send_json({"ok": True, "name": name, "provider": provider})
+
+
+def handle_delete_provider(handler: HandlerProtocol, qs: dict[str, Any], name: str) -> None:
+    name = unquote(name).strip()
+    if error := _provider_name_error(name):
+        return handler._send_json({"ok": False, "error": error}, 400)
+    raw, error = _read_global_config_raw(handler.config_path)
+    if error:
+        return handler._send_json({"ok": False, "error": error}, 500)
+    assert raw is not None
+    providers = raw.setdefault("ai", {}).setdefault("providers", {})
+    if name not in providers:
+        return handler._send_json({"ok": False, "error": f"provider not found: {name}"}, 404)
+    del providers[name]
+    ok, error = _write_global_config_raw(handler, raw)
+    if not ok:
+        return handler._send_json({"ok": False, "error": error}, 400)
+    return handler._send_json({"ok": True, "name": name})
