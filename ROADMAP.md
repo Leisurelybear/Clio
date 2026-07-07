@@ -756,7 +756,7 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | --- | --- | --- | --- |
 | P-001 | AI analysis (analyze step) is pure serial, each video waits for previous upload+process+generate | ✅ Done: `ThreadPoolExecutor(max_workers)` added after RateLimiter refactor | ✅ |
 | P-002 | Repeated ffprobe calls to read same video's `duration_sec` / `size_mb` | Cache already-read info, reuse results | P3 |
-| P-003 | `GET /api/videos` iterates directory every time, high I/O cost | Add directory mtime cache, reuse unchanged scan results | P3 |
+| P-003 | `GET /api/videos` iterates directory every time, high I/O cost | ✅ Done: cache `/api/videos` payload by project/source and relevant file fingerprints | ✅ |
 
 ---
 
