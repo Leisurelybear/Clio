@@ -15,11 +15,17 @@ def _validate_config(config: AppConfig) -> None:
         )
     provider_names = set(config.ai.providers)
     for task_name, task_cfg in config.ai.tasks.items():
-        if task_cfg.provider not in provider_names:
+        provider = config.ai.providers.get(task_cfg.provider)
+        if provider is None:
             available = ", ".join(sorted(provider_names)) or "<无>"
             raise ValueError(
                 f"ai.tasks.{task_name}.provider = '{task_cfg.provider}'，"
                 f"但 ai.providers 里没有这个名字。"
                 f"已配置的厂家: {available}。"
                 "请检查拼写，或在 ai.providers 里补上对应厂家。"
+            )
+        if task_name == "video_analyze" and "video" not in provider.capabilities:
+            raise ValueError(
+                f"ai.tasks.video_analyze.provider = '{task_cfg.provider}'，"
+                "但该 provider 未声明 video 能力。请改用 capabilities 包含 video 的 provider。"
             )

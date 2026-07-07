@@ -9,6 +9,10 @@ const DEFAULT_MODELS = {
   openai: ['gpt-4o', 'gpt-4o-mini'],
   deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
 };
+const DEFAULT_CAPABILITIES = {
+  gemini: ['video', 'text'],
+  openai: ['text'],
+};
 
 const PROMPT_LABELS = {
   ANALYZE_PROMPT: '视频分析',
@@ -25,6 +29,10 @@ export function labelFromPath(path) {
   return path ? path.split('.').pop() : 'config';
 }
 
+function providerCapabilities(provider) {
+  if (provider?.capabilities?.length) return provider.capabilities;
+  return DEFAULT_CAPABILITIES[provider?.type] || ['text'];
+}
 
 function _resolveDescPath(path, descriptions) {
   if (!descriptions) return null;
@@ -398,7 +406,7 @@ export function _renderTaskBinding(tasks, providersObj, descs) {
 
       let eligibleProviders = providerKeys;
       if (taskKey === 'video_analyze') {
-        eligibleProviders = providerKeys.filter(k => providersObj[k]?.type === 'gemini');
+        eligibleProviders = providerKeys.filter(k => providerCapabilities(providersObj[k]).includes('video'));
       }
 
       html += '<div class="task-binding-row">';
@@ -413,7 +421,7 @@ export function _renderTaskBinding(tasks, providersObj, descs) {
       }
       html += '</select>';
       if (taskKey === 'video_analyze' && eligibleProviders.length === 0 && providerKeys.length > 0) {
-        html += '<span class="warn" style="font-size:var(--text-xs)">需要 type=gemini 的 Provider，当前仅注册了非 Gemini 类型</span>';
+        html += '<span class="warn" style="font-size:var(--text-xs)">需要 capabilities 包含 video 的 Provider</span>';
       }
       html += '</div>';
 
@@ -464,6 +472,9 @@ export function _renderProviderList(providers, descs) {
     const modelTags = hasModels
       ? p.models.map(m => `<span class="tag-chip">${escapeHtml(m)}</span>`).join(' ')
       : '<span class="warn">⚠️ 未注册模型</span>';
+    const capabilityTags = providerCapabilities(p)
+      .map(c => `<span class="tag-chip">${escapeHtml(c)}</span>`)
+      .join(' ');
 
     html += `<div class="provider-card" data-provider="${escapeHtml(name)}">
       <div class="provider-card-header">
@@ -478,6 +489,7 @@ export function _renderProviderList(providers, descs) {
         <div class="provider-card-field"><span class="provider-card-label">类型</span><span>${typeLabel}</span></div>
         <div class="provider-card-field"><span class="provider-card-label">API 密钥</span><span class="provider-key-wrap" data-provider="${escapeHtml(name)}"><span class="provider-key-masked">••••••••••</span><span class="provider-key-value" style="display:none"></span><button class="btn-provider-show-key">显示</button></span></div>
         ${p.type !== 'gemini' ? `<div class="provider-card-field"><span class="provider-card-label">接口地址</span><span>${escapeHtml(p.base_url || '(默认)')}</span></div>` : ''}
+        <div class="provider-card-field"><span class="provider-card-label">能力</span><span class="provider-card-models">${capabilityTags}</span></div>
         <div class="provider-card-field"><span class="provider-card-label">模型</span><span class="provider-card-models">${modelTags}</span></div>
       </div>
     </div>`;
@@ -530,6 +542,11 @@ function _showProviderModal(providersObj, name, onSave) {
         <div id="modal-provider-models"></div>
         <span class="hint">输入该厂商可用的模型名称。默认厂商已预填常用模型。这些模型将出现在项目标签页的任务绑定下拉菜单中。</span>
       </div>
+      <div class="form-group">
+        <label class="form-label">能力标签 <span class="muted">（按回车添加）</span></label>
+        <div id="modal-provider-capabilities"></div>
+        <span class="hint">常用标签：video 表示可做视频理解，text 表示可做文本生成。</span>
+      </div>
       <div class="modal-actions">
         <button id="modal-cancel" class="btn-secondary">取消</button>
         <button id="modal-save" class="btn-primary">${isEdit ? '保存修改' : '添加'}</button>
@@ -547,11 +564,24 @@ function _showProviderModal(providersObj, name, onSave) {
     modelsList = [];
   }
   _renderTagInput(modelsContainer, modelsList, () => {});
+  const capabilitiesContainer = backdrop.querySelector('#modal-provider-capabilities');
+  let capabilitiesList = existing
+    ? [...providerCapabilities(existing)]
+    : [...providerCapabilities({ type: backdrop.querySelector('#modal-provider-type').value })];
+  function renderCapabilitiesInput() {
+    capabilitiesContainer.innerHTML = '';
+    _renderTagInput(capabilitiesContainer, capabilitiesList, () => {});
+  }
+  renderCapabilitiesInput();
 
   // Type toggle → show/hide base URL
   backdrop.querySelector('#modal-provider-type').onchange = (e) => {
     const grp = backdrop.querySelector('#modal-base-url-group');
     grp.style.display = e.target.value === 'gemini' ? 'none' : '';
+    if (!isEdit) {
+      capabilitiesList = [...providerCapabilities({ type: e.target.value })];
+      renderCapabilitiesInput();
+    }
   };
 
   // Key visibility toggle
@@ -601,6 +631,7 @@ function _showProviderModal(providersObj, name, onSave) {
       api_key: '',
       base_url: newBaseUrl || '',
       models: modelsList,
+      capabilities: capabilitiesList,
     };
 
     if (isEdit) {
@@ -617,6 +648,7 @@ function _showProviderModal(providersObj, name, onSave) {
         api_key: '',
         base_url: newBaseUrl || '',
         models: [...modelsList],
+        capabilities: [...capabilitiesList],
       };
     }
 
@@ -886,6 +918,11 @@ function _attachContextTemplate(pane) {
 function _ensureDefaultProviderModels() {
   const providers = state.configGlobal?.ai?.providers;
   if (!providers) return;
+  for (const [name, p] of Object.entries(providers)) {
+    if (p && (!p.capabilities || p.capabilities.length === 0)) {
+      p.capabilities = [...providerCapabilities(p)];
+    }
+  }
   for (const name of DEFAULT_PROVIDERS) {
     const p = providers[name];
     if (p && (!p.models || p.models.length === 0)) {

@@ -29,6 +29,7 @@ class ProviderConfig:
     timeout_sec: float = 120.0
     max_tokens: int = 4096
     models: list[str] = field(default_factory=list)
+    capabilities: list[str] = field(default_factory=list)
 
 
 @dataclass

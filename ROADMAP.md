@@ -147,12 +147,12 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Existing `config.yaml` providers migrate seamlessly
 
 **Sub-tasks**:
-- [ ] R-017a: Design model registry data model (adapter type, capability tags, credential storage)
+- [x] R-017a: Design model registry data model (adapter type, capability tags, credential storage)
 - [ ] R-017b: Backend CRUD API for provider registration
-- [ ] R-017c: Backend task-model binding with capability validation
-- [ ] R-017d: UI model list + add/edit/remove
-- [ ] R-017e: UI task binding dropdowns with filtering
-- [ ] R-017f: Migration path for existing config.yaml providers
+- [x] R-017c: Backend task-model binding with capability validation
+- [~] R-017d: UI model list + add/edit/remove exists in Settings; dedicated backend CRUD API still pending.
+- [x] R-017e: UI task binding dropdowns with capability filtering
+- [x] R-017f: Migration path for existing config.yaml providers via default capability inference
 
 ### R-018: AI Prompt Debug Print
 

@@ -25,6 +25,7 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     "ai.providers.{name}.timeout_sec": "OpenAI 兼容接口的 HTTP 超时时间（秒），默认 120",
     "ai.providers.{name}.max_tokens": "AI 输出最大 token 数",
     "ai.providers.{name}.models": "该厂商支持的模型名称列表（如 gemini-2.5-flash），用于任务绑定的下拉选择",
+    "ai.providers.{name}.capabilities": "能力标签列表。video 表示可做视频理解，text 表示可做文本生成",
     "ai.providers.{name}.requests_per_minute": "每分钟最多调用次数，0 为不限流",
     # ai.tasks.*
     "ai.tasks.{name}.provider": "此任务使用的 AI 厂商名称（在 providers 中定义）",

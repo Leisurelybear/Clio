@@ -167,7 +167,7 @@ python main.py serve
 | 📋 剪辑规划 | **DeepSeek** / OpenAI | 纯文本 | 编排片段顺序 |
 | 🔧 AI 审阅 | 同上（可独立配置） | 纯文本 | 用 trip 上下文修正输出 |
 
-每个任务可独立指定厂家和模型（`project.yaml` 的 `ai.tasks`），支持 **OpenAI 兼容接口**（通义千问 / Kimi 等）。OpenAI 兼容厂家可设置 `timeout_sec`，用于慢速网关或本地模型。
+每个任务可独立指定厂家和模型（`project.yaml` 的 `ai.tasks`），支持 **OpenAI 兼容接口**（通义千问 / Kimi 等）。Provider 可通过 `capabilities` 声明 `video` / `text` 能力；视频分析任务会自动过滤并校验必须使用支持 `video` 的 Provider。OpenAI 兼容厂家可设置 `timeout_sec`，用于慢速网关或本地模型。
 
 📌 **trip 上下文自动注入**：行程背景、避免误判提示（如 "不要把戴高乐机场 RER 误认为曼谷"）统一写在 `templates/trip_context.md`，每次 AI 调用前自动插入。—
 

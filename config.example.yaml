@@ -52,6 +52,7 @@ ai:
       poll_interval_sec: 5
       retry_attempts: 5
       requests_per_minute: 0
+      capabilities: [video, text]
       models:
         - gemini-2.5-flash
         - gemini-2.5-flash-lite
@@ -63,6 +64,7 @@ ai:
       type: openai
       api_key_env: OPENAI_API_KEY
       base_url: https://api.openai.com/v1
+      capabilities: [text]
       # timeout_sec: 120
       models:
         - gpt-4o
@@ -72,6 +74,7 @@ ai:
       type: openai              # OpenAI 兼容接口
       api_key_env: DEEPSEEK_API_KEY
       base_url: https://api.deepseek.com/v1
+      capabilities: [text]
       models:
         - deepseek-v4-flash
         - deepseek-v4-pro
