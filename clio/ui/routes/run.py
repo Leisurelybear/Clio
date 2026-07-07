@@ -55,10 +55,18 @@ def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     try:
         while True:
             if progress_file.is_file():
-                raw = progress_file.read_text(encoding="utf-8")
+                try:
+                    raw = progress_file.read_text(encoding="utf-8")
+                except OSError:
+                    time.sleep(0.5)
+                    continue
                 if raw != last_data:
+                    try:
+                        parsed = json.loads(raw)
+                    except json.JSONDecodeError:
+                        time.sleep(0.5)
+                        continue
                     last_data = raw
-                    parsed = json.loads(raw)
                     with state.run_lock:
                         running = state.run_thread is not None and state.run_thread.is_alive()
                     parsed["running"] = running
@@ -79,8 +87,6 @@ def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
             time.sleep(0.5)
     except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
         pass  # Client disconnected
-    except json.JSONDecodeError:
-        pass  # Corrupted progress file (being written concurrently)
 
 
 def handle_get_run_status(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
