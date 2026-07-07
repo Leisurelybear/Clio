@@ -170,3 +170,11 @@ Settings includes a `Prompts` sub-tab for editing AI prompt templates from the b
 - Saving writes a project-level file under `<input_dir>/templates/prompts/{PROMPT_NAME}.md`.
 - Restore deletes project-level overrides for that prompt; repo-level overrides, if present, still apply.
 - The next AI call uses the updated prompt automatically.
+
+## Run Panel Input Directory
+
+The Run panel has a per-run input directory field with a browse button.
+
+- The value is sent only with the current run request and does not modify `project.yaml`.
+- If no files are selected in the sidebar, the selected steps process all videos in that directory.
+- If sidebar file selection is active, only the selected filenames are passed to the run request.

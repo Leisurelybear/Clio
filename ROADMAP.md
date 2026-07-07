@@ -277,9 +277,9 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - ⚠️ Auto-switch to corresponding view after completion — video/plan/steps reloaded, but no per-step smart view switch
 
 **Sub-tasks**:
-- [ ] R-008a: Backend `/api/run/step` endpoint (dedicated endpoint with `input_dir`) — **not started**. Existing `/api/run/start` + `/api/rerun` cover most use cases; missing standalone `input_dir` override.
+- [x] R-008a: Backend run endpoint supports per-run `input_dir` override via `/api/run/start` (no separate `/api/run/step` needed).
 - [x] R-008b: Run panel UI (step checkboxes → SSE progress → result/done state) — **done**. `runner.js` has 6 steps, ETA, stalled detection, processing state table.
-- [~] R-008c: File checkbox interaction: **done** (`sidebar.js` toggle + `sidebar-data.js` checkboxes + `runner.js` badge). Input directory selection/browse in run panel: **not done** (browse modal exists but not wired to run panel).
+- [x] R-008c: File checkbox interaction plus run-panel input directory selection/browse.
 - [~] R-008d: Auto-refresh after completion: **done** (videos/plans/steps reload). Per-step smart view switch: **not done** (e.g., compress completed → switch to compressed view).
 - [~] R-008e: Sidebar "▶ Run" entry: **done** (active, not grayed). README docs: **not done**. ROADMAP status: **now updated**.
 

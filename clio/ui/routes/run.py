@@ -21,6 +21,23 @@ if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
 
 
+def _apply_run_input_dir_override(cfg, input_dir_raw: str | None) -> tuple[Any, str | None]:
+    """Return a run-local config copy when the request overrides input_dir."""
+    if input_dir_raw is None:
+        return cfg, None
+    if not isinstance(input_dir_raw, str):
+        return cfg, "input_dir must be a string"
+    input_dir_raw = input_dir_raw.strip()
+    if not input_dir_raw:
+        return cfg, None
+    input_dir = Path(input_dir_raw).expanduser()
+    if not input_dir.is_dir():
+        return cfg, f"input_dir not found: {input_dir_raw}"
+    run_cfg = copy.deepcopy(cfg)
+    run_cfg.paths.input_dir = input_dir
+    return run_cfg, None
+
+
 def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """GET /api/run/stream — SSE endpoint for real-time run status."""
     proj_input = handler._resolve_project_input(qs)
@@ -97,6 +114,9 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
     steps = obj.get("steps")
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
+    cfg, cfg_error = _apply_run_input_dir_override(cfg, obj.get("input_dir"))
+    if cfg_error:
+        return handler._send_json({"ok": False, "error": cfg_error}, 400)
     state = handler._get_state(str(proj_input.resolve()))
     if "use_transcripts" in obj:
         cfg.plan.use_transcripts = obj["use_transcripts"]
