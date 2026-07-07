@@ -11,6 +11,14 @@ def test_load_prompt_uses_project_override(tmp_path):
     assert load_prompt("ANALYZE_PROMPT", "default", tmp_path) == "project override"
 
 
+def test_load_prompt_supports_txt_override(tmp_path):
+    prompt_dir = tmp_path / "templates" / "prompts"
+    prompt_dir.mkdir(parents=True)
+    (prompt_dir / "ANALYZE_PROMPT.txt").write_text("txt override", encoding="utf-8")
+
+    assert load_prompt("ANALYZE_PROMPT", "default", tmp_path) == "txt override"
+
+
 def test_load_prompt_ignores_empty_override(tmp_path):
     prompt_dir = tmp_path / "templates" / "prompts"
     prompt_dir.mkdir(parents=True)

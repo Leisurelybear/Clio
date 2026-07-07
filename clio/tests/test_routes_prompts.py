@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import MagicMock
 
+import clio.prompts
 from clio.ui.routes.prompts import handle_get_prompts, handle_put_prompt
 
 
@@ -32,6 +33,43 @@ def test_handle_get_prompts_uses_project_override(tmp_path: Path):
     assert item["content"] == "project prompt"
     assert item["override"] == "project prompt"
     assert item["has_override"] is True
+    assert item["source_path"] == str(prompt_dir / "ANALYZE_PROMPT.md")
+
+
+def test_handle_get_prompts_uses_project_txt_override(tmp_path: Path):
+    prompt_dir = tmp_path / "templates" / "prompts"
+    prompt_dir.mkdir(parents=True)
+    (prompt_dir / "ANALYZE_PROMPT.txt").write_text("project txt prompt", encoding="utf-8")
+    handler = MagicMock()
+    handler._resolve_project_input.return_value = tmp_path
+
+    handle_get_prompts(handler, {})
+
+    payload = handler._send_json.call_args.args[0]
+    item = next(p for p in payload["prompts"] if p["name"] == "ANALYZE_PROMPT")
+    assert item["content"] == "project txt prompt"
+    assert item["override"] == "project txt prompt"
+    assert item["has_override"] is True
+    assert item["source_path"] == str(prompt_dir / "ANALYZE_PROMPT.txt")
+
+
+def test_handle_get_prompts_reports_repo_override(tmp_path: Path, monkeypatch):
+    repo_root = tmp_path / "repo"
+    prompt_dir = repo_root / "templates" / "prompts"
+    prompt_dir.mkdir(parents=True)
+    (prompt_dir / "ANALYZE_PROMPT").write_text("repo prompt", encoding="utf-8")
+    monkeypatch.setattr(clio.prompts, "__file__", str(repo_root / "clio" / "prompts.py"))
+    handler = MagicMock()
+    handler._resolve_project_input.return_value = tmp_path / "project"
+
+    handle_get_prompts(handler, {})
+
+    payload = handler._send_json.call_args.args[0]
+    item = next(p for p in payload["prompts"] if p["name"] == "ANALYZE_PROMPT")
+    assert item["content"] == "repo prompt"
+    assert item["override"] == "repo prompt"
+    assert item["has_override"] is True
+    assert item["source_path"] == str(prompt_dir / "ANALYZE_PROMPT")
 
 
 def test_handle_put_prompt_saves_project_override(tmp_path: Path):

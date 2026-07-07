@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from clio.prompts import PROMPT_DEFAULTS, load_prompt
+from clio.prompts import PROMPT_DEFAULTS, find_prompt_override, load_prompt, prompt_override_dir
 from clio.ui.services.file_service import _save_atomic
 
 if TYPE_CHECKING:
@@ -20,7 +20,7 @@ def _normalize_prompt_name(name: str) -> str | None:
 
 def _project_prompt_path(handler: HandlerProtocol, qs: dict[str, Any], name: str):
     proj_input = handler._resolve_project_input(qs)
-    return proj_input / "templates" / "prompts" / f"{name}.md"
+    return prompt_override_dir(proj_input) / f"{name}.md"
 
 
 def handle_get_prompts(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
@@ -28,19 +28,20 @@ def handle_get_prompts(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     proj_input = handler._resolve_project_input(qs)
     prompts = []
     for name, default in PROMPT_DEFAULTS.items():
-        override_path = _project_prompt_path(handler, qs, name)
-        override = override_path.read_text(encoding="utf-8") if override_path.is_file() else None
+        override = find_prompt_override(name, proj_input)
+        save_path = _project_prompt_path(handler, qs, name)
         prompts.append(
             {
                 "name": name,
                 "default": default,
                 "content": load_prompt(name, default, proj_input),
-                "override": override,
+                "override": override.content if override else None,
                 "has_override": override is not None,
-                "override_path": str(override_path),
+                "override_path": str(save_path),
+                "source_path": str(override.path) if override else None,
             }
         )
-    handler._send_json({"prompts": prompts, "override_dir": str(proj_input / "templates" / "prompts")})
+    handler._send_json({"prompts": prompts, "override_dir": str(prompt_override_dir(proj_input))})
 
 
 def handle_put_prompt(handler: HandlerProtocol, qs: dict[str, Any], obj: dict, name: str) -> None:

@@ -1,18 +1,28 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 PROMPT_OVERRIDE_DIR = Path("templates") / "prompts"
+PROMPT_SUFFIXES = (".md", ".txt", "")
+
+
+@dataclass(frozen=True)
+class PromptOverride:
+    path: Path
+    content: str
 
 
 def _prompt_override_candidates(name: str, base_dir: Path) -> list[Path]:
     aliases = [name, name.lower()]
-    suffixes = [".md", ".txt", ""]
-    return [base_dir / PROMPT_OVERRIDE_DIR / f"{alias}{suffix}" for alias in aliases for suffix in suffixes]
+    return [base_dir / PROMPT_OVERRIDE_DIR / f"{alias}{suffix}" for alias in aliases for suffix in PROMPT_SUFFIXES]
 
 
-def load_prompt(name: str, default: str, project_dir: str | Path | None = None) -> str:
-    """Load a prompt override from templates/prompts before falling back to code defaults."""
+def prompt_override_dir(project_dir: str | Path) -> Path:
+    return Path(project_dir) / PROMPT_OVERRIDE_DIR
+
+
+def find_prompt_override(name: str, project_dir: str | Path | None = None) -> PromptOverride | None:
     search_roots: list[Path] = []
     if project_dir:
         search_roots.append(Path(project_dir))
@@ -28,7 +38,15 @@ def load_prompt(name: str, default: str, project_dir: str | Path | None = None) 
             if candidate.is_file():
                 text = candidate.read_text(encoding="utf-8").strip()
                 if text:
-                    return text
+                    return PromptOverride(path=candidate, content=text)
+    return None
+
+
+def load_prompt(name: str, default: str, project_dir: str | Path | None = None) -> str:
+    """Load a prompt override from templates/prompts before falling back to code defaults."""
+    override = find_prompt_override(name, project_dir)
+    if override:
+        return override.content
     return default
 
 
