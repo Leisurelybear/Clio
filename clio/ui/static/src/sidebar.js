@@ -4,7 +4,7 @@ import {
   updateSidebarDay, updateEntityUI,
 } from './utils.js';
 import { api } from './api.js';
-import { stopPreview } from './viewer.js';
+import { playVideoSegment, stopPreview } from './viewer.js';
 import { showRerunProgress, hideRerunProgress } from './sidebar-rerun.js';
 import { openBrowseDir, loadBrowseDir } from './sidebar-browse.js';
 import {
@@ -193,7 +193,10 @@ async function setSource(source) {
   if (state.previewActive) stopPreview();
   const oldVideo = state.videos.find(x => x.file === state.currentVideo);
   const oldMatchFile = oldVideo?.match?.file;
-  $('player-pane').classList.remove('plan-mode');
+  const wasPlanView = state.currentEntity === 'plan';
+  if (!wasPlanView) {
+    $('player-pane').classList.remove('plan-mode');
+  }
   state.source = source;
   state.currentVideo = null;
   state.selectionMode = false;
@@ -204,15 +207,12 @@ async function setSource(source) {
   saveProject();
   try {
     await loadVideos();
-    const target = oldVideo ? state.videos.find(v => v.file === oldMatchFile || v.match?.file === oldVideo.file) : null;
+    const target = _findSourceSwitchTarget(oldVideo, state.videos, oldMatchFile);
     if (state.videos.length) {
       if (state.currentEntity === 'plan') {
         import('./editor.js').then(mod => mod.renderActiveTab());
         if (target) {
-          state.currentVideo = target.file;
-          const projParam = state.currentProjectName ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
-          $('player').src = `/api/video?file=${encodeURIComponent(target.file)}&source=${source}${projParam}`;
-          $('player-name').textContent = target.file;
+          playVideoSegment(target.file, target.offset_sec || 0);
           setStatus(`已切到 ${source} 视图`, 'ok');
         } else {
           $('player').removeAttribute('src');
@@ -230,6 +230,15 @@ async function setSource(source) {
   } catch (e) {
     setStatus('切换源失败: ' + e.message, 'err');
   }
+}
+
+function _findSourceSwitchTarget(oldVideo, videos, oldMatchFile = null) {
+  if (!oldVideo) return null;
+  return videos.find(v =>
+    v.file === oldMatchFile
+    || v.match?.file === oldVideo.file
+    || (oldVideo.index && v.index === oldVideo.index)
+  ) || null;
 }
 
 async function switchToOriginalThenCompress() {
@@ -259,6 +268,7 @@ export {
   selectLogs,
   selectTokens,
   setSource,
+  _findSourceSwitchTarget,
   openBrowseDir,
   loadBrowseDir,
   switchToOriginalThenCompress,

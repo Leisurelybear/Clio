@@ -244,7 +244,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-006a: `clio/ui/static/index.html` + `style.css`: sidebar two-section structure + grayed styles  ← `a648e60`
 - [x] R-006b: `clio/ui/static/app.js`: state.currentEntity + selectPlan + right panel content dispatch; plan content extracted from tab as independent rendering branch  ← `c42d347`
 - [x] R-006c: `clio/ui/README.md`: updated layout diagram + project-level section description  ← `778c44a`
-- [!] R-006d: When switching source in plan view, player should auto-switch to the corresponding video in the new source (not clear the player). Current behavior: `setSource` in plan branch only clears the player — user must click the video in the left sidebar or a plan segment to load. Proposed fix: in plan branch, use `state.currentVideo?.index` to find the corresponding file in `state.videos` and call `playVideoSegment`.
+- [x] R-006d: When switching source in plan view, player auto-switches to the corresponding video in the new source.
 
 ## Feature R-007: Multi-Project Switching in UI
 
