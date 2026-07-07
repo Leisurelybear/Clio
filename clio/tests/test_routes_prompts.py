@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import clio.prompts
-from clio.ui.routes.prompts import handle_get_prompts, handle_put_prompt
+from clio.ui.routes.prompts import handle_delete_prompt, handle_get_prompts, handle_put_prompt
 
 
 def test_handle_get_prompts_lists_defaults(tmp_path: Path):
@@ -102,3 +102,35 @@ def test_handle_put_prompt_rejects_empty_content(tmp_path: Path):
     handle_put_prompt(handler, {}, {"content": "  "}, "ANALYZE_PROMPT")
 
     handler._send_json.assert_called_once_with({"ok": False, "error": "content cannot be empty"}, 400)
+
+
+def test_handle_delete_prompt_removes_project_overrides(tmp_path: Path):
+    prompt_dir = tmp_path / "templates" / "prompts"
+    prompt_dir.mkdir(parents=True)
+    files = [
+        prompt_dir / "ANALYZE_PROMPT.md",
+        prompt_dir / "analyze_prompt.txt",
+        prompt_dir / "ANALYZE_PROMPT",
+    ]
+    for f in files:
+        f.write_text("override", encoding="utf-8")
+    handler = MagicMock()
+    handler._resolve_project_input.return_value = tmp_path
+
+    handle_delete_prompt(handler, {}, "ANALYZE_PROMPT")
+
+    for f in files:
+        assert not f.exists()
+    payload = handler._send_json.call_args.args[0]
+    assert payload["ok"] is True
+    assert payload["name"] == "ANALYZE_PROMPT"
+    assert len(payload["deleted"]) == 3
+
+
+def test_handle_delete_prompt_rejects_unknown_name(tmp_path: Path):
+    handler = MagicMock()
+    handler._resolve_project_input.return_value = tmp_path
+
+    handle_delete_prompt(handler, {}, "../secret")
+
+    handler._send_json.assert_called_once_with({"ok": False, "error": "unknown prompt"}, 404)

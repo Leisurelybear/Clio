@@ -456,9 +456,11 @@ The web backend also exposes authenticated prompt management APIs:
 ```text
 GET /api/prompts
 PUT /api/prompts/{PROMPT_NAME}
+DELETE /api/prompts/{PROMPT_NAME}
 ```
 
 `PUT` accepts `{"content":"..."}` and writes a project-level override under `<input_dir>/templates/prompts/`.
+`DELETE` removes project-level overrides for the prompt; repo-level overrides, if present, still apply.
 
 ### AI Trip Context
 

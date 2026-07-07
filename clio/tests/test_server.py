@@ -632,6 +632,27 @@ class TestDoPUT:
 
 
 # ===========================================================================
+# do_DELETE routing
+# ===========================================================================
+
+
+class TestDoDELETE:
+    @patch("clio.ui.server.handle_delete_prompt")
+    def test_delete_prompt(self, mock_fn, handler_cls):
+        handler = _build_handler(handler_cls, path="/api/prompts/ANALYZE_PROMPT", method="DELETE")
+        handler.do_DELETE()
+        mock_fn.assert_called_once_with(handler, {}, "ANALYZE_PROMPT")
+
+    def test_delete_unknown(self, handler_cls):
+        handler = _build_handler(handler_cls, path="/api/nope", method="DELETE")
+        handler.do_DELETE()
+        handler.send_response.assert_called_once_with(404)
+        data = json.loads(handler.wfile.getvalue())
+        assert data["ok"] is False
+        assert data["error"] == "unknown endpoint"
+
+
+# ===========================================================================
 # do_POST routing
 # ===========================================================================
 

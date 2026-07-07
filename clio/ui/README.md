@@ -161,3 +161,12 @@ header 右侧的 **`压缩` / `原视频`** 切换按钮决定侧栏列的是哪
 | 保存后 clip 看到旧内容 | 按浏览器 `Ctrl+Shift+R` 强刷；服务器 `/api/videos` 走的是缓存头 `no-store`，但浏览器可能缓了 JSON |
 | 设置 tab 显示"配置数据不可用" | 当前项目没有 `project.yaml` 且全局 `config.yaml` 读取失败；检查 config.yaml 是否存在并格式正确 |
 | 切换项目后 AI 行为没变 | 检查项目目录下是否有 `project.yaml`；没有则使用全局 config.yaml 的 AI 配置 |
+
+## Prompt Management
+
+Settings includes a `Prompts` sub-tab for editing AI prompt templates from the browser.
+
+- The list shows every built-in prompt and whether the current project has an override.
+- Saving writes a project-level file under `<input_dir>/templates/prompts/{PROMPT_NAME}.md`.
+- Restore deletes project-level overrides for that prompt; repo-level overrides, if present, still apply.
+- The next AI call uses the updated prompt automatically.

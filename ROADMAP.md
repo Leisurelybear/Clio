@@ -316,7 +316,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-010b: Confidence scoring (modify prompts to make AI output `_confidence`)
 - [ ] R-010c: Multi-model comparison CLI
 - [x] R-010d: Backend `GET /api/prompts` returns all available prompts; `PUT /api/prompts/{name}` saves override
-- [ ] R-010e: UI Settings tab embeds Prompt Management panel (list + editor + restore default)
+- [x] R-010e: UI Settings tab embeds Prompt Management panel (list + editor + restore default)
 
 ## Feature R-002: One-Clip Cut (Extract All Segments from Plan)
 

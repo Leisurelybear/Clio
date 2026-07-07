@@ -16,7 +16,7 @@ class PromptOverride:
     content: str
 
 
-def _prompt_override_candidates(name: str, base_dir: Path) -> list[Path]:
+def prompt_override_candidates(name: str, base_dir: Path) -> list[Path]:
     aliases = [name, name.lower()]
     return [base_dir / PROMPT_OVERRIDE_DIR / f"{alias}{suffix}" for alias in aliases for suffix in PROMPT_SUFFIXES]
 
@@ -44,7 +44,7 @@ def find_prompt_override(name: str, project_dir: str | Path | None = None) -> Pr
 
     seen: set[Path] = set()
     for root in search_roots:
-        for candidate in _prompt_override_candidates(name, root):
+        for candidate in prompt_override_candidates(name, root):
             resolved = candidate.resolve()
             if resolved in seen:
                 continue

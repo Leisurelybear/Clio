@@ -4,7 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from clio.prompts import PROMPT_DEFAULTS, find_prompt_override, load_prompt, prompt_override_dir
+from clio.prompts import (
+    PROMPT_DEFAULTS,
+    find_prompt_override,
+    load_prompt,
+    prompt_override_candidates,
+    prompt_override_dir,
+)
 from clio.ui.services.file_service import _save_atomic
 
 if TYPE_CHECKING:
@@ -60,3 +66,24 @@ def handle_put_prompt(handler: HandlerProtocol, qs: dict[str, Any], obj: dict, n
     target.parent.mkdir(parents=True, exist_ok=True)
     _save_atomic(target, content.encode("utf-8"))
     handler._send_json({"ok": True, "name": prompt_name, "path": str(target)})
+
+
+def handle_delete_prompt(handler: HandlerProtocol, qs: dict[str, Any], name: str) -> None:
+    """Handle DELETE /api/prompts/{name}."""
+    prompt_name = _normalize_prompt_name(name)
+    if prompt_name is None:
+        return handler._send_json({"ok": False, "error": "unknown prompt"}, 404)
+
+    proj_input = handler._resolve_project_input(qs)
+    deleted: list[str] = []
+    seen: set = set()
+    for candidate in prompt_override_candidates(prompt_name, proj_input):
+        resolved = candidate.resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        if candidate.is_file():
+            candidate.unlink()
+            deleted.append(str(candidate))
+
+    handler._send_json({"ok": True, "name": prompt_name, "deleted": deleted})

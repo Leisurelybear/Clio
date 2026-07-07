@@ -10,6 +10,16 @@ const DEFAULT_MODELS = {
   deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
 };
 
+const PROMPT_LABELS = {
+  ANALYZE_PROMPT: '视频分析',
+  SCRIPT_PROMPT: '口播文案',
+  PLAN_PROMPT: '剪辑规划',
+  REFINE_TEXT_PROMPT: '素材精修',
+  REFINE_TEXT_FIX_PROMPT: '素材定向修复',
+  REFINE_SCRIPT_PROMPT: '脚本精修',
+  REFINE_SCRIPT_FIX_PROMPT: '脚本定向修复',
+};
+
 
 export function labelFromPath(path) {
   return path ? path.split('.').pop() : 'config';
@@ -204,6 +214,132 @@ function _renderConfigProject(projectData, globalData, descs) {
     descs || {},
   );
   return html;
+}
+
+function _promptLabel(name) {
+  return PROMPT_LABELS[name] || name;
+}
+
+function _promptSourceLabel(item) {
+  if (!item?.has_override) return '系统默认';
+  const source = item.source_path || item.override_path || '';
+  return source.includes('templates') ? '覆盖文件' : '项目覆盖';
+}
+
+export function _renderPromptManagement(payload, selectedName = null) {
+  const prompts = payload?.prompts || [];
+  if (!prompts.length) {
+    return '<div class="config-empty-state"><p class="muted">暂无可编辑 Prompt。</p></div>';
+  }
+  const selected = prompts.find(p => p.name === selectedName) || prompts[0];
+  const listHtml = prompts.map(p => {
+    const active = p.name === selected.name ? ' active' : '';
+    const badge = p.has_override ? '<span class="prompt-badge override">已覆盖</span>' : '<span class="prompt-badge">默认</span>';
+    return `<button class="prompt-list-item${active}" data-prompt-name="${escapeHtml(p.name)}">
+      <span class="prompt-list-title">${escapeHtml(_promptLabel(p.name))}</span>
+      <span class="prompt-list-name">${escapeHtml(p.name)}</span>
+      ${badge}
+    </button>`;
+  }).join('');
+  const sourcePath = selected.source_path || selected.override_path || '';
+  return `<div class="prompt-management">
+    <div class="prompt-list">${listHtml}</div>
+    <div class="prompt-editor">
+      <div class="prompt-editor-head">
+        <div>
+          <h4>${escapeHtml(_promptLabel(selected.name))}</h4>
+          <p class="hint">${escapeHtml(selected.name)} · ${escapeHtml(_promptSourceLabel(selected))}</p>
+        </div>
+        <div class="prompt-actions">
+          <button id="btn-prompt-save" class="btn-primary">${icon('save', 14)} 保存覆盖</button>
+          <button id="btn-prompt-restore" class="btn-secondary" ${selected.has_override ? '' : 'disabled'}>${icon('refresh', 14)} 恢复默认</button>
+        </div>
+      </div>
+      <textarea id="prompt-editor-text" class="prompt-editor-text" spellcheck="false">${escapeHtml(selected.content || '')}</textarea>
+      <div class="prompt-meta">
+        <span>保存路径: ${escapeHtml(selected.override_path || '')}</span>
+        ${sourcePath ? `<span>当前来源: ${escapeHtml(sourcePath)}</span>` : ''}
+      </div>
+      <details class="prompt-default-preview">
+        <summary>查看系统默认 Prompt</summary>
+        <pre>${escapeHtml(selected.default || '')}</pre>
+      </details>
+    </div>
+  </div>`;
+}
+
+async function _loadPromptManagement() {
+  const container = $('prompt-management-root');
+  if (!container) return;
+  container.innerHTML = '<p class="muted">加载 Prompt...</p>';
+  try {
+    state.promptPayload = await api('GET', '/api/prompts');
+    const prompts = state.promptPayload?.prompts || [];
+    if (!state.currentPromptName && prompts.length) {
+      state.currentPromptName = prompts[0].name;
+    }
+    _refreshPromptManagement();
+  } catch (e) {
+    container.innerHTML = `<p class="err">加载失败: ${escapeHtml(e.message || e)}</p>`;
+  }
+}
+
+function _refreshPromptManagement() {
+  const container = $('prompt-management-root');
+  if (!container) return;
+  container.innerHTML = _renderPromptManagement(state.promptPayload, state.currentPromptName);
+  _attachPromptManagementHandlers(container);
+}
+
+function _attachPromptManagementHandlers(container) {
+  container.querySelectorAll('.prompt-list-item').forEach(btn => {
+    btn.onclick = () => {
+      state.currentPromptName = btn.dataset.promptName;
+      _refreshPromptManagement();
+    };
+  });
+  const selected = (state.promptPayload?.prompts || []).find(p => p.name === state.currentPromptName)
+    || state.promptPayload?.prompts?.[0];
+  const textarea = container.querySelector('#prompt-editor-text');
+  const saveBtn = container.querySelector('#btn-prompt-save');
+  const restoreBtn = container.querySelector('#btn-prompt-restore');
+  if (saveBtn && selected && textarea) {
+    saveBtn.onclick = async () => {
+      const content = textarea.value.trim();
+      if (!content) {
+        setStatus('Prompt 内容不能为空', 'err');
+        return;
+      }
+      saveBtn.disabled = true;
+      try {
+        await api('PUT', `/api/prompts/${encodeURIComponent(selected.name)}`, { content });
+        setStatus('Prompt 覆盖已保存，下一次 AI 调用生效', 'ok');
+        state.promptPayload = await api('GET', '/api/prompts');
+        _refreshPromptManagement();
+      } catch (e) {
+        setStatus('保存失败: ' + (e.message || e), 'err');
+      } finally {
+        saveBtn.disabled = false;
+      }
+    };
+  }
+  if (restoreBtn && selected) {
+    restoreBtn.onclick = async () => {
+      if (!selected.has_override) return;
+      if (!confirm(`恢复 ${selected.name} 的项目级 Prompt 覆盖？`)) return;
+      restoreBtn.disabled = true;
+      try {
+        await api('DELETE', `/api/prompts/${encodeURIComponent(selected.name)}`);
+        setStatus('Prompt 覆盖已恢复默认', 'ok');
+        state.promptPayload = await api('GET', '/api/prompts');
+        _refreshPromptManagement();
+      } catch (e) {
+        setStatus('恢复失败: ' + (e.message || e), 'err');
+      } finally {
+        restoreBtn.disabled = false;
+      }
+    };
+  }
 }
 
 const TASK_LABELS = {
@@ -794,6 +930,8 @@ export function renderConfig() {
     const globalData = state.configGlobal || {};
     contentHtml = _renderEnvEditor()
       + `<div class="config-form">${_renderConfigGlobal(globalData, descs)}</div>`;
+  } else if (active === 'prompts') {
+    contentHtml = '<div id="prompt-management-root"></div>';
   } else {
     // Merged tab: read-only merged view
     const { _config_source, _needsConfigInit, _descriptions, ...configData } = state.configRaw;
@@ -805,6 +943,7 @@ export function renderConfig() {
     <div class="config-tab-bar">
       ${_tabBtn('项目', 'project', active === 'project')}
       ${_tabBtn('全局', 'global', active === 'global')}
+      ${_tabBtn('Prompts', 'prompts', active === 'prompts')}
       ${_tabBtn('合并视图', 'merged', active === 'merged')}
     </div>
     ${isFallback ? _renderFallbackWarn() : ''}
@@ -823,7 +962,7 @@ export function renderConfig() {
   // Hide save button for merged tab (read-only)
   const saveBtn = $('btn-save');
   if (saveBtn) {
-    saveBtn.style.display = active === 'merged' ? 'none' : '';
+    saveBtn.style.display = active === 'merged' || active === 'prompts' ? 'none' : '';
   }
 
   // Attach change handlers for the active tab
@@ -835,6 +974,8 @@ export function renderConfig() {
     _attachConfigForm(pane, state.configProject || {}, descs);
     _attachContextTemplate(pane);
     _attachTaskBindingHandlers(pane, state.configProject);
+  } else if (active === 'prompts') {
+    _loadPromptManagement();
   }
 
   // Model management stays in global tab (system-level)

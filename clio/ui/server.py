@@ -52,7 +52,7 @@ from clio.ui.routes.projects import (
     handle_post_project_remove,
     handle_put_project,
 )
-from clio.ui.routes.prompts import handle_get_prompts, handle_put_prompt
+from clio.ui.routes.prompts import handle_delete_prompt, handle_get_prompts, handle_put_prompt
 from clio.ui.routes.refine import handle_post_refine
 from clio.ui.routes.run import (
     handle_get_run_status,
@@ -407,6 +407,19 @@ def make_handler(
             if path == "/api/logs/clear":
                 clear_session_log()
                 return self._send_json({"ok": True})
+
+            return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
+
+        def do_DELETE(self):
+            url = urlparse(self.path)
+            qs = parse_qs(url.query)
+            path = url.path
+            if not self._require_auth():
+                return
+
+            if path.startswith("/api/prompts/"):
+                name = path[len("/api/prompts/") :]
+                return handle_delete_prompt(self, qs, name)
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
