@@ -280,8 +280,8 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-008a: Backend run endpoint supports per-run `input_dir` override via `/api/run/start` (no separate `/api/run/step` needed).
 - [x] R-008b: Run panel UI (step checkboxes → SSE progress → result/done state) — **done**. `runner.js` has 6 steps, ETA, stalled detection, processing state table.
 - [x] R-008c: File checkbox interaction plus run-panel input directory selection/browse.
-- [~] R-008d: Auto-refresh after completion: **done** (videos/plans/steps reload). Per-step smart view switch: **not done** (e.g., compress completed → switch to compressed view).
-- [~] R-008e: Sidebar "▶ Run" entry: **done** (active, not grayed). README docs: **not done**. ROADMAP status: **now updated**.
+- [x] R-008d: Auto-refresh after completion plus smart view switch from Run panel (plan → plan view; media steps → compressed video view with relevant tab).
+- [x] R-008e: Sidebar "▶ Run" entry and README docs.
 
 ## Feature R-009: Engineering Robustness
 

@@ -12,6 +12,7 @@ let _runEventSource = null;
 let _lastRunDay = 'day1';
 let _runActive = false;
 let _lastProgressSnapshot = null;
+let _lastRunSteps = [];
 
 const STEPS_KEY = 'vlog_ui_run_steps';
 
@@ -179,6 +180,7 @@ async function startRun() {
     return;
   }
   _lastRunDay = ($('run-day')?.value.trim() || state.currentDay);
+  _lastRunSteps = checked.slice();
   _stopRunSSE();
   try {
     const body = {
@@ -372,7 +374,12 @@ async function _handleRunStatus(s) {
       import('./sidebar.js').then(mod => mod.saveProject());
       try { state.plan = await api('GET', `/api/plan?day=${_lastRunDay}`); } catch {}
       await import('./sidebar.js').then(mod => mod.loadVideos());
-      if (state.currentEntity === 'plan') import('./sidebar.js').then(mod => mod.selectPlan());
+      const completedSteps = Array.isArray(s.steps) ? s.steps : _lastRunSteps;
+      if (state.currentEntity === 'run') {
+        await _showRunCompletionTarget(completedSteps);
+      } else if (state.currentEntity === 'plan') {
+        import('./sidebar.js').then(mod => mod.selectPlan());
+      }
     } else if (s.status === 'cancelled') {
       _lastProgressSnapshot = null;
       _runActive = false;
@@ -402,6 +409,37 @@ async function _handleRunStatus(s) {
 
 function _stopRunPoll() {
   _stopRunSSE();
+}
+
+function _completionTargetForSteps(steps) {
+  const stepSet = new Set(Array.isArray(steps) ? steps : []);
+  if (stepSet.has('plan')) return { entity: 'plan' };
+  if (stepSet.has('voiceover')) return { entity: 'video', tab: 'voiceover' };
+  if (stepSet.has('transcribe')) return { entity: 'video', tab: 'transcript' };
+  if (stepSet.has('analyze')) return { entity: 'video', tab: 'texts' };
+  if (stepSet.has('compress') || stepSet.has('label')) return { entity: 'video', tab: state.currentTab || 'texts' };
+  return null;
+}
+
+async function _showRunCompletionTarget(steps) {
+  const target = _completionTargetForSteps(steps);
+  if (!target) return;
+  const sidebar = await import('./sidebar.js');
+  if (target.entity === 'plan') {
+    await sidebar.selectPlan(_lastRunDay);
+    return;
+  }
+  state.currentTab = target.tab;
+  if (state.source !== 'compressed') {
+    await sidebar.setSource('compressed');
+    return;
+  }
+  const preferred = state.currentVideo && state.videos.some(v => v.file === state.currentVideo)
+    ? state.currentVideo
+    : state.videos[0]?.file;
+  if (preferred) {
+    await sidebar.selectVideo(preferred);
+  }
 }
 
 const _STEP_LABELS_SHORT = { compress: '压缩', analyze: '分析', voiceover: '口播', transcribe: '转录' };
@@ -435,4 +473,5 @@ export {
   startRun,
   _stopRunPoll,
   updateRunFilesBadge,
+  _completionTargetForSteps,
 };

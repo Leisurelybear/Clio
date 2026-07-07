@@ -178,3 +178,9 @@ The Run panel has a per-run input directory field with a browse button.
 - The value is sent only with the current run request and does not modify `project.yaml`.
 - If no files are selected in the sidebar, the selected steps process all videos in that directory.
 - If sidebar file selection is active, only the selected filenames are passed to the run request.
+
+After a run finishes while the Run panel is still open, the UI switches to the most relevant result view:
+
+- `plan` opens the generated plan for the selected day.
+- `voiceover`, `transcribe`, and `analyze` open the compressed video detail view on the matching tab.
+- `compress` and `label` open the compressed video list.
