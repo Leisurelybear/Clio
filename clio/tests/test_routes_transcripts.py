@@ -18,6 +18,7 @@ from clio.ui.routes.whisper_routes import (
     handle_post_whisper_model_delete,
     handle_put_whisper_model,
 )
+from clio.whisper_cache import REQUIRED_MODEL_FILES
 
 
 def _handler_with_config(tmp_path: Path, transcripts_subdir: str = "transcripts") -> MagicMock:
@@ -154,10 +155,7 @@ class TestListCachedModels:
         # Simulate huggingface cache structure
         model_dir = tmp_path / "models--Systran--faster-whisper-small"
         snapshots = model_dir / "snapshots" / "abc123"
-        snapshots.mkdir(parents=True)
-        # Create a >100MB dummy model file
-        model_file = snapshots / "model.bin"
-        model_file.write_bytes(b"\x00" * (101 * 1024 * 1024))
+        _write_complete_whisper_snapshot(snapshots)
 
         result = _list_cached_models(tmp_path)
         assert len(result) == 1
@@ -266,6 +264,12 @@ class TestHandlePostWhisperInstall:
 _DISK_USAGE = collections.namedtuple("Usage", "total used free")
 
 
+def _write_complete_whisper_snapshot(snapshots: Path) -> None:
+    snapshots.mkdir(parents=True, exist_ok=True)
+    for filename in REQUIRED_MODEL_FILES:
+        (snapshots / filename).write_bytes(b"data")
+
+
 class TestHandleGetWhisperModels:
     def test_returns_available_models(self, tmp_path: Path):
         handler = MagicMock()
@@ -304,8 +308,7 @@ class TestHandleGetWhisperModels:
         cache_dir.mkdir()
         model_dir = cache_dir / "models--Systran--faster-whisper-medium"
         snapshots = model_dir / "snapshots" / "abc123"
-        snapshots.mkdir(parents=True)
-        (snapshots / "model.bin").write_bytes(b"\x00" * (101 * 1024 * 1024))
+        _write_complete_whisper_snapshot(snapshots)
         handler._send_json = MagicMock()
 
         with (
@@ -388,6 +391,7 @@ class TestHandlePutWhisperModel:
         cfg = MagicMock()
         handler._get_config.return_value = cfg
         handler._send_json = MagicMock()
+        handler.__class__._config_cache = MagicMock()
 
         proj_yaml = tmp_path / "project.yaml"
         proj_yaml.write_text("paths:\n  input_dir: ./videos\n", encoding="utf-8")

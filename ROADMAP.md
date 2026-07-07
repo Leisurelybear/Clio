@@ -101,7 +101,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] U-007a: Replace `hf_hub_download` with chunked `requests.get(stream=True)` + `iter_content`
 - [x] U-007b: Per-chunk `_INSTALL_CANCEL.is_set()` check for clean interrupt
 - [x] U-007c: Remove `ctypes` thread-kill code
-- [ ] U-007d: Update tests _(no existing tests for this code path — new tests deferred)_
+- [x] U-007d: Update tests for chunked model download, required snapshot files, and cancel cleanup
 
 ### U-010: Server + fs.py Test Coverage (Phase 3 — Testing)
 

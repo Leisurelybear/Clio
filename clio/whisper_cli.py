@@ -8,6 +8,7 @@ from typing import Any
 from clio.config import load_config
 from clio.transcribe import PROJECT_ROOT, _resolve_cache_dir
 from clio.utils import run_subprocess
+from clio.whisper_cache import is_model_cache_complete, largest_model_file_size
 
 _snapshot_download: Any
 try:
@@ -106,38 +107,18 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
 
 def _model_in_cache(cache_dir: Path, model_name: str) -> bool:
     """Check if a model is completely cached and valid."""
-    if not cache_dir.is_dir():
-        return False
-    for entry in cache_dir.iterdir():
-        if not entry.is_dir():
-            continue
-        name = entry.name.lower()
-        if "whisper" in name and model_name.lower() in name:
-            snapshots = entry / "snapshots"
-            if not snapshots.is_dir():
-                continue
-            for snap_dir in snapshots.iterdir():
-                if not snap_dir.is_dir():
-                    continue
-                model_file_size = _find_model_file_size(snap_dir)
-                if model_file_size > 100 * 1024 * 1024:
-                    return True
-                print(f"  缓存不完整（{snap_dir.name}: 模型文件仅 {model_file_size // 1024 // 1024} MB），重新下载")
+    complete = is_model_cache_complete(cache_dir, model_name)
+    if complete:
+        return True
+    model_file_size = _find_model_file_size(cache_dir)
+    if model_file_size:
+        print(f"  缓存不完整（最大模型文件 {model_file_size // 1024 // 1024} MB），重新下载")
     return False
 
 
 def _find_model_file_size(dir_path: Path) -> int:
     """Find the largest file in a directory (likely the model binary)."""
-    max_size = 0
-    for f in dir_path.rglob("*"):
-        if f.is_file():
-            try:
-                sz = f.stat().st_size
-                if sz > max_size:
-                    max_size = sz
-            except OSError:
-                pass
-    return max_size
+    return largest_model_file_size(dir_path)
 
 
 def run_whisper_check(config_path: str | Path = "config.yaml") -> int:
