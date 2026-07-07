@@ -321,7 +321,34 @@ def _build_videos_payload(
                     if len(segment_matches) > 1:
                         seg_v["segment_matches"] = segment_matches
                     videos.append(seg_v)
+    videos.sort(key=_video_sort_key)
     return {"videos": videos, "source": source, "groups": groups}
+
+
+def _video_sort_key(video: dict[str, Any]) -> tuple[str, int, int, str]:
+    match_file = ""
+    if isinstance(video.get("match"), dict):
+        match_file = str(video["match"].get("file") or "")
+    source_name = match_file if video.get("source") == "compressed" and match_file else str(video.get("file") or "")
+    stem = Path(source_name).stem
+    if "_" in stem and stem.split("_", 1)[0].isdigit():
+        stem = stem.split("_", 1)[1]
+    stem = re.sub(r"_(?:seg|part|pt|chunk)\d+$", "", stem, flags=re.IGNORECASE)
+    seg = 0
+    label = str(video.get("segment_label") or "")
+    if "/" in label:
+        try:
+            seg = int(label.split("/", 1)[0])
+        except ValueError:
+            seg = 0
+    elif video.get("offset_sec"):
+        seg = int(float(video.get("offset_sec") or 0) * 1000)
+    idx = str(video.get("index") or "")
+    try:
+        idx_num = int(idx)
+    except ValueError:
+        idx_num = 0
+    return (stem.lower(), seg, idx_num, str(video.get("file") or "").lower())
 
 
 def handle_get_video(handler: HandlerProtocol, qs: dict[str, Any]) -> None:

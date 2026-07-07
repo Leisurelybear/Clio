@@ -116,6 +116,15 @@ export function renderSteps() {
 let _portalDropdown = null;
 let _portalCloseHandler = null;
 
+function scrollActiveVideoIntoView() {
+  requestAnimationFrame(() => {
+    const active = document.querySelector('#video-list .video-item.active');
+    if (active) {
+      active.scrollIntoView({ block: 'nearest' });
+    }
+  });
+}
+
 function renderVideoItem(v) {
   const li = document.createElement('li');
   let checkboxHtml = '';
@@ -318,15 +327,24 @@ export function renderVideoList() {
     return;
   }
 
-  const grouped = state.videos.filter(v => v.group_key);
-  const ungrouped = state.videos.filter(v => !v.group_key);
-
   const groups = {};
-  for (const v of grouped) {
+  for (const v of state.videos.filter(v => v.group_key)) {
     (groups[v.group_key] ??= []).push(v);
   }
+  const renderedGroups = new Set();
 
-  for (const [key, items] of Object.entries(groups)) {
+  for (const v of state.videos) {
+    if (!v.group_key) {
+      ul.appendChild(renderVideoItem(v));
+      continue;
+    }
+    const key = v.group_key;
+    if (renderedGroups.has(key)) continue;
+    renderedGroups.add(key);
+    const items = groups[key] || [];
+    if (items.some(item => item.file === state.currentVideo)) {
+      state.expandedGroups[key] = true;
+    }
     const header = document.createElement('li');
     header.className = 'video-group-header';
     const isExpanded = state.expandedGroups[key] !== false;
@@ -356,9 +374,6 @@ export function renderVideoList() {
     ul.appendChild(childUl);
   }
 
-  for (const v of ungrouped) {
-    ul.appendChild(renderVideoItem(v));
-  }
-
+  scrollActiveVideoIntoView();
   updateRunFilesBadge();
 }
