@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from http import HTTPStatus
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from clio.ui.routes.videos import _VIDEOS_CACHE, _parse_segment_info, handle_get_video, handle_get_videos
@@ -122,6 +124,31 @@ class TestHandleGetVideos:
         assert len(payload["videos"]) == 1
         assert payload["videos"][0]["match"]["file"] == "001_GL010695.mp4"
 
+    def test_source_original_uses_recursive_config(self, tmp_path: Path):
+        handler = MagicMock()
+        proj_input = tmp_path / "input"
+        nested = proj_input / "day1"
+        nested.mkdir(parents=True)
+        (nested / "GL010695.MP4").write_bytes(b"")
+        proj_out = tmp_path / "output"
+        proj_out.mkdir()
+        (proj_out / "compressed").mkdir()
+
+        handler._resolve_project_input.return_value = proj_input
+        handler._get_project_output.return_value = proj_out
+        handler._get_config.return_value = SimpleNamespace(
+            paths=SimpleNamespace(ffprobe="", recursive=True),
+            whisper=SimpleNamespace(transcripts_subdir="transcripts"),
+        )
+        handler._send_json = MagicMock()
+
+        handle_get_videos(handler, {"source": ["original"]})
+
+        payload = handler._send_json.call_args[0][0]
+        assert len(payload["videos"]) == 1
+        assert payload["videos"][0]["file"] == "day1/GL010695.MP4"
+        assert payload["videos"][0]["match"] is None
+
     def test_invalid_source(self, tmp_path: Path):
         handler = MagicMock()
         handler._send_json = MagicMock()
@@ -232,6 +259,23 @@ class TestHandleGetVideo:
 
         handler._send_video_range.assert_called_once()
 
+    def test_sends_nested_original_video(self, tmp_path: Path):
+        handler = MagicMock()
+        proj_input = tmp_path / "input"
+        nested = proj_input / "day1"
+        nested.mkdir(parents=True)
+        video = nested / "clip.mp4"
+        video.write_bytes(b"video data")
+        proj_out = tmp_path / "output"
+        proj_out.mkdir()
+        handler._resolve_project_input.return_value = proj_input
+        handler._get_project_output.return_value = proj_out
+        handler._send_video_range = MagicMock()
+
+        handle_get_video(handler, {"file": ["day1/clip.mp4"], "source": ["original"]})
+
+        handler._send_video_range.assert_called_once_with(video)
+
     def test_forbidden_basename(self, tmp_path: Path):
         handler = MagicMock()
         handler.send_error = MagicMock()
@@ -239,6 +283,20 @@ class TestHandleGetVideo:
         handle_get_video(handler, {"file": ["../secret.txt"], "source": ["compressed"]})
 
         handler.send_error.assert_called_once()
+
+    def test_forbidden_original_relative_traversal(self, tmp_path: Path):
+        handler = MagicMock()
+        proj_input = tmp_path / "input"
+        proj_input.mkdir()
+        proj_out = tmp_path / "output"
+        proj_out.mkdir()
+        handler._resolve_project_input.return_value = proj_input
+        handler._get_project_output.return_value = proj_out
+        handler.send_error = MagicMock()
+
+        handle_get_video(handler, {"file": ["../secret.mp4"], "source": ["original"]})
+
+        handler.send_error.assert_called_once_with(HTTPStatus.FORBIDDEN)
 
     def test_not_found(self, tmp_path: Path):
         handler = MagicMock()

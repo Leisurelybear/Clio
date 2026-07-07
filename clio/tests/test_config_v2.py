@@ -140,6 +140,47 @@ class TestV1ToV2Migration:
         assert cfg.compress.fps == 15
         assert cfg.compress.target_size_mb == 99
 
+    def test_project_yaml_relative_paths_resolve_from_project_dir(self, tmp_path: Path):
+        app_dir = tmp_path / "app"
+        project_dir = tmp_path / "projects" / "trip"
+        app_dir.mkdir()
+        project_dir.mkdir(parents=True)
+        cfg_path = app_dir / "config.yaml"
+        cfg_path.write_text(
+            yaml.dump(
+                {
+                    "config_version": "V2",
+                    "proxy": {"enabled": False},
+                    "ai": {
+                        "providers": {
+                            "deepseek": {
+                                "type": "openai",
+                                "api_key": "k",
+                                "base_url": "https://api.deepseek.com/v1",
+                            }
+                        },
+                    },
+                }
+            ),
+            encoding="utf-8",
+        )
+        (project_dir / "project.yaml").write_text(
+            yaml.dump(
+                {
+                    "paths": {"input_dir": "./videos", "output_dir": "./output"},
+                    "ai": {"tasks": {"voiceover": {"provider": "deepseek", "model": "deepseek-chat"}}},
+                    "script": {"template_file": "./templates/vlog_template.md"},
+                }
+            ),
+            encoding="utf-8",
+        )
+
+        cfg = load_config(cfg_path, project_dir=project_dir)
+
+        assert cfg.paths.input_dir == (project_dir / "videos").resolve()
+        assert cfg.paths.output_dir == (project_dir / "output").resolve()
+        assert cfg.script.template_file == (project_dir / "templates" / "vlog_template.md").resolve()
+
     def test_v2_config_without_project_yaml_uses_defaults(self, tmp_path: Path):
         cfg_path = tmp_path / "config.yaml"
         cfg_path.write_text(
@@ -154,6 +195,7 @@ class TestV1ToV2Migration:
         cfg = load_config(cfg_path, project_dir=tmp_path)
         assert cfg.compress.target_size_mb == 5
         assert cfg.analyze.skip_existing is True
+        assert cfg.ai.debug_print_prompt is False
 
 
 class TestCombinedWrappers:

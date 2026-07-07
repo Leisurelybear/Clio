@@ -4,6 +4,7 @@ import { api, submitToken } from './api.js';
 import { initLayout } from './layout.js';
 import { initTheme, toggleTheme } from './theme.js';
 import { addToast } from './toast.js';
+import { updateRuntimeWarnings } from './runtime-warnings.js';
 import { setupPlayer } from './viewer.js';
 import { save, initProjectConfig, renderActiveTab, refineCurrentFile } from './editor.js';
 import {
@@ -275,6 +276,7 @@ async function init() {
       state.currentProjectName = urlProject;
     }
     await loadConfig();
+    updateRuntimeWarnings(state.config);
     await loadProject();
     renderSteps();
     // 检查项目是否缺少 project.yaml，提示用户创建

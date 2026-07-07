@@ -35,6 +35,16 @@ Why it helps:
 - Cancellation/download status must remain safe on Windows and on interrupted network downloads.
 - It can route agents to `clio/ui/routes/whisper_*`, `clio/transcribe.py`, `clio/tasks/transcribe.py`, and transcript tests.
 
+## Existing Planned Skills To Revisit
+
+Historical docs already planned these project skills, but they are not currently committed as tracked project files:
+
+- `adding-ai-provider`
+- `adding-new-task`
+- `adding-cli-subcommand`
+
+Before creating them, run the `writing-skills` process: define pressure scenarios, observe baseline failures, write the minimal skill, validate with realistic tasks, then commit each skill separately.
+
 ## Not Worth A Skill Yet
 
 - One-off README wording updates.

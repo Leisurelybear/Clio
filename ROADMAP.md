@@ -30,7 +30,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] 1. Backend auth — `ServerConfig`, `--token` CLI, `_require_auth()`, auto-generate on non-localhost — commit `767bc92`
 - [x] 2. Frontend auth — `api.js` Bearer header + 401 modal, video `?token=` URL, auto-capture from URL — commit `767bc92`
 - [x] 3. Auth tests (12 test cases) — commit `ae56e6d`
-- [x] 4. Update README/UI docs with safe hosting guidance
+- [x] 4. Update README/UI docs with safe hosting guidance — this docs update
 
 ### Phase 4: Type and schema hardening ✅
 - [x] 1. Fix type contracts in config, utils, progress, vmeta, export
@@ -72,6 +72,61 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ---
 
+## Current Review Iteration (2026-07-04)
+
+**Source**: `docs/analysis/2026-07-04-current-project-review.md`
+
+### Completed Iterations
+- [x] Config validation now rejects invalid numeric ranges for runtime-sensitive settings such as `analyze.max_workers`, compression dimensions, provider TTL/rate/retry values, and `max_tokens` - this update
+- [x] UI original video browsing now honors `paths.recursive`, returns nested originals as safe relative paths, and serves them through bounded `/api/video` resolution - this update
+- [x] Split staging no longer writes raw intermediate segments into `compressed/`; `run_compress_all()` now stages split inputs under `output/<splits_subdir>/` while keeping the manifest in `compressed/` for existing metadata lookup — this update
+- [x] Example config and README drift reduced: DeepSeek defaults now include official model names used by `project.example.yaml`, Web UI `server.api_token` is documented in `config.example.yaml`, and README test-count badges now say 970+ — this update
+- [x] Prompt debug logging now defaults off in config models, loader fallback, and examples to avoid writing full prompts/context/transcripts to logs unless explicitly enabled — this update
+- [x] Token mode now requires auth for every `/api/*` GET route, including `/api/config`, while keeping the UI shell and static assets public — this update
+- [x] `input_dir` query switching now only accepts the default project directory or directories registered in `projects.json`, preventing arbitrary existing directories from being treated as projects — this update
+
+---
+
+### Remaining Review Items
+
+**Source**: `docs/analysis/2026-07-04-current-project-review.md`
+
+High-value open items that are not already covered by completed fixes:
+
+- [x] CR-001: Selected-video runs now filter later artifacts by canonical identity, not only filename stems.
+  - Current risk: selected `002_GL010684.mp4` can miss `texts/002_<AI title>.json`, so `voiceover`, `label`, or `refine` may process zero files.
+  - Proposed fix: add a shared artifact-selection helper that reads `media_identity.compressed_stem`, `media_identity.original_stem`, `compressed_file`, and index fallbacks.
+  - Required verification: realistic selected filename plus AI-generated analysis JSON title.
+- [x] CR-002: Config semantic validation now covers provider/task compatibility.
+  - Validate provider `type` against supported adapters.
+  - Validate `video_analyze` provider compatibility (`gemini`-type only).
+  - Reject when a task model is not listed in its provider `models` if the provider declares a model list.
+- [ ] CR-003: Make artifact identity a reusable project-level index service.
+  - Build a single lookup layer for original -> compressed segments -> texts -> scripts -> transcripts -> plan usage.
+  - Use it in `/api/videos`, selected-run filtering, rerun, label, cut, and export.
+- [x] CR-004: UI route authorization now has centralized policy metadata and route-matrix coverage.
+  - Route metadata now records method/path/auth policy for current API routes.
+  - Unknown `/api/*` remains auth-required in token mode.
+  - Route-matrix tests cover public static routes, known API routes, and unknown-route defaults.
+- [x] CR-005: Revisit config auto-upgrade write behavior.
+  - Decision (2026-07-06): keep current auto-upgrade behavior.
+  - Rationale: long-term configuration is UI-managed, so preserving YAML comments/manual formatting is not a product goal.
+  - Known trade-off accepted: ordinary config loads may rewrite YAML via PyYAML when defaults are injected, which can change comments/formatting and mark local config files dirty.
+- [ ] CR-006: Reduce frontend `innerHTML` interpolation risk.
+  - Prefer DOM creation plus `textContent` for filenames, provider names, model names, project names, logs, and AI titles.
+  - Add focused XSS regression tests around those values when frontend test runtime is upgraded.
+- [~] CR-007: Developer experience follow-ups.
+  - Documented Node.js 18+ requirement for local UI tests; CI uses Node 22.
+  - Documented recommended lint command as `ruff check clio main.py` and updated CI quality commands to match.
+  - Added `python main.py doctor` for config, ffmpeg, API keys, Node version, and write-permission checks.
+- [x] CR-008: UX/observability follow-ups.
+  - [x] Add pre-run summary showing selected videos, resolved artifact count per step, expected skips, and warnings.
+  - [x] Add provider/model test connection button.
+  - [x] Add visible warnings when `debug_print_prompt=true` or LAN host mode is active.
+  - [x] Add "why skipped" panel based on `.processing.json`.
+
+---
+
 ## In Progress
 
 ### U-002: ProviderManager (Phase 2 — Short-term)
@@ -109,6 +164,8 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Background**: `server.py` has 6% coverage, `fs.py` has 12% coverage. These are security-sensitive and critical files with minimal testing.
 
+**Status**: ✅ **Done** (`c0e88fc`)
+
 **Sub-tasks**:
 - [x] U-010a: Add tests for `server.py` dispatch logic (do_GET/do_PUT/do_POST routing) — 90% coverage
 - [x] U-010b: Add tests for `fs.py` directory browsing (boundary cases, permission errors) — 96% coverage
@@ -120,6 +177,8 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Background**: `/api/fs/dirs` has no path restriction, exposing full filesystem when `--host 0.0.0.0` is used. All write endpoints lack auth. Requires lightweight token-based protection.
 
+**Status**: ✅ **Done** (`b071758`, `767bc92`)
+
 **Sub-tasks**:
 - [x] U-008a: Restrict `handle_get_fs_dirs` to user home directory or a configurable root _(already implemented via `_is_allowed_path` in `fs.py:18-28`)_
 - [x] U-008b: Add `UI_TOKEN` env var check — when `--host` is not localhost, require `?token=` on all sensitive endpoints _(already implemented in `server.py:164-181` + `server.py:429-434`)_
@@ -128,7 +187,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ## Staging / WIP
 
-### R-017: Model Registry & Task Binding UI
+### R-017: Model Registry & Task Binding UI ✅
 
 **Background**: Currently users must manually edit `config.yaml` to change models — typing provider names, model strings, and API keys by hand. This is error-prone and unfriendly. Goal: a visual model registry where users can:
 
@@ -138,21 +197,21 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Register new models: name, API key, adapter type (OpenAI-compatible / Anthropic / Gemini), base URL, etc.
 - New registrations auto-populate the provider list in `config.yaml`
 
-**Acceptance Criteria**:
-- UI "Models" tab listing all registered models with adapter type + supported tasks
-- Task binding panel: each task (video_analyze, voiceover, refine_text, etc.) shows a dropdown of compatible models
-- "Add Model" form: name, api_key, base_url, adapter_type (openai / anthropic / gemini), optional tags
-- Auto-validate: video tasks filter out text-only models
-- Backend: CRUD API for models, stored in `ai.providers` section of config
-- Existing `config.yaml` providers migrate seamlessly
+**Acceptance Criteria** (all ✅):
+- ✅ Provider list in Settings Global tab with add/edit/delete
+- ✅ Task binding panel in Settings Project tab with dropdowns and capability filtering
+- ✅ Add/edit Provider modal: name, type, API key (stored in .env), base_url, model tag list
+- ✅ Auto-validate: video_analyze filters to gemini-type providers only
+- ✅ Backend: `ProviderConfig.models` field, frontend-only CRUD via existing PUT endpoints
+- ✅ Existing `config.yaml` providers migrate seamlessly (models field optional, defaults to empty)
 
 **Sub-tasks**:
 - [x] R-017a: Design model registry data model (adapter type, capability tags, credential storage)
-- [x] R-017b: Backend CRUD API for provider registration (`/api/providers`)
-- [x] R-017c: Backend task-model binding with capability validation
-- [x] R-017d: UI model list + add/edit/remove exists in Settings; dedicated backend CRUD API is available.
-- [x] R-017e: UI task binding dropdowns with capability filtering
-- [x] R-017f: Migration path for existing config.yaml providers via default capability inference
+- [x] R-017b: Backend CRUD API for provider registration (reuses PUT /api/config/global, no new endpoints)
+- [x] R-017c: Backend task-model binding with capability validation (frontend filters, backend runtime check)
+- [x] R-017d: UI model list + add/edit/remove
+- [x] R-017e: UI task binding dropdowns with filtering
+- [x] R-017f: Migration path for existing config.yaml providers
 
 ### R-018: AI Prompt Debug Print
 
@@ -244,7 +303,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-006a: `clio/ui/static/index.html` + `style.css`: sidebar two-section structure + grayed styles  ← `a648e60`
 - [x] R-006b: `clio/ui/static/app.js`: state.currentEntity + selectPlan + right panel content dispatch; plan content extracted from tab as independent rendering branch  ← `c42d347`
 - [x] R-006c: `clio/ui/README.md`: updated layout diagram + project-level section description  ← `778c44a`
-- [x] R-006d: When switching source in plan view, player auto-switches to the corresponding video in the new source.
+- [x] R-006d: When switching source in plan view, player auto-switches to the corresponding video in the new source. The plan branch now keeps the existing `match.file` lookup and falls back to `currentVideo.index` when metadata is incomplete.
 
 ## Feature R-007: Multi-Project Switching in UI
 
@@ -290,14 +349,14 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 **Acceptance Criteria**:
 - ✅ `requirements.txt` pins all dependency versions (`requirements-locked.txt`)
 - ✅ Core pure functions + route handlers + orchestration logic have unit tests (**381 test cases**, GitHub Actions CI)
-- [x] Add Linux/macOS `setup.sh` (equivalent to existing `setup.ps1`) — project primarily targets Windows
+- [x] Add Linux/macOS `setup.sh` (equivalent to existing `setup.ps1`) — syntax repaired and UTF-8 prompts restored
 - [x] `main.py check` venv detection compatible with both Linux `bin/` and Windows `Scripts/`
 
 **Sub-tasks**:
 - [x] R-009a: Pin dependency versions + migration guide
 - [x] R-009b: Linux `setup.sh` (low priority, project primarily targets Windows)
 - [x] R-009c: Core pure functions + routes + orchestration unit tests (pytest, 381 cases, CI Linux + Windows dual platform)
-- [x] R-009d: Cross-platform venv detection fix (B-007, affects Linux CI)
+- [x] R-009d: Cross-platform venv detection fix (B-007, affects Linux CI) — shared `is_virtualenv_python()` covers `pyvenv.cfg`, `.venv/bin`, and `.venv/Scripts`.
 
 ## Feature R-010: AI Output Quality & Prompt Management
 
@@ -312,11 +371,16 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - CLI supports analyzing the same video with multiple models and comparing results
 
 **Sub-tasks**:
-- [x] R-010a: External prompt file override mechanism (`templates/prompts/` same-named file takes priority)
-- [x] R-010b: Confidence scoring (modify prompts to make AI output `_confidence`)
-- [x] R-010c: Multi-model comparison CLI (`compare-models -i <video> --models provider:model ...`)
-- [x] R-010d: Backend `GET /api/prompts` returns all available prompts; `PUT /api/prompts/{name}` saves override
-- [x] R-010e: UI Settings tab embeds Prompt Management panel (list + editor + restore default)
+- [x] R-010a: External prompt file override mechanism (`templates/prompts/` same-named file takes priority; runtime `task_prompts` take priority; placeholder validation fails before AI calls)
+- [ ] R-010b: Confidence scoring (modify prompts to make AI output `_confidence`)
+- [ ] R-010c: Multi-model comparison CLI
+- [ ] R-010d: Backend `GET /api/prompts` returns all available prompts; `PUT /api/prompts/{name}` saves override
+- [ ] R-010e: UI Settings tab embeds Prompt Management panel (list + editor + restore default)
+
+**Prompt optimization note**:
+- Keep built-in prompts in `clio/prompts.py` unchanged until real output regressions are compared.
+- Trial prompt improvements through `templates/prompts/*.md` first; deleting the override file restores the built-in prompt.
+- Current optimization candidates: add `_confidence` to `video_analyze`; make travel-specific language easier to adapt for food/daily/sport vlogs; keep JSON output constraints strict.
 
 ## Feature R-002: One-Clip Cut (Extract All Segments from Plan)
 
@@ -514,11 +578,13 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-018d: Selected video highlight style + count display + selection mode badge
 - [x] R-018e: Disable run button + hint text when nothing selected
 
-### R-018 Follow-up: Compact JSON in Debug Prompt Output
+### R-018 Follow-up: Compact JSON in Debug Prompt Output ✅
 
 **Background**: `debug_print_prompt` prints the full prompt to console, but injected JSON (clips list, transcripts, analysis data) uses `json.dumps(..., indent=2)`, rendering across dozens of lines. This makes the log hard to scroll through and defeats the purpose of a quick debug glance.
 
 **Request**: Before `print(prompt)` in `_call_ai()`, compact all embedded JSON to single-line format. Suggestion: change all `json.dumps(...)` in prompt-formatting paths (`analyze.py:248/278/333/338/374/375`) to `indent=None` — the AI does not need pretty-printed JSON, and it reduces token count slightly.
+
+✅ Done — all `json.dumps(...)` in prompt-formatting paths use `indent=None`.
 
 ## Feature R-019: Run Panel Prompt Injection
 
@@ -558,7 +624,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | A-002 | app.js → 1509-line global functions | Split into src/ ES modules (Phase 1d complete, 8 modules) | ✅ |
 | A-003 | pipeline.py → 789-line pile | Split into tasks/ package (Phase 1b complete, 96 lines) | ✅ |
 | A-004 | `_write_text_file` / `_rewrite_text_file` 80% duplicate | Extract common function (Phase 1b moved to _helpers.py) | ✅ |
-| A-005 | `project.json` vs `project.yaml` out of sync | Two config sources inconsistent, should unify or make mutually aware | 🔴 |
+| A-005 | `project.json` vs `project.yaml` out of sync | `project.yaml.paths.output_dir` is now authoritative; `project.json.output_dir` remains a legacy fallback | ✅ |
 | A-006 | Frontend ES module dynamic import circular reference | viewer/editor/runner three-way dynamic import, can be refactored long-term | 🟡 |
 
 ## N-02: UI Documentation & Dead Code Cleanup
@@ -764,15 +830,10 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 | Commit | Description | Date |
 | --- | --- | --- |
+| `be636f2`~`2a712f7` (14 commits) | R-017: Model Registry & Task Binding UI (ProviderConfig.models, tag input, provider cards, task binding, tests, fixes) | 2026-07-02~07-03 |
 | `43a922b` | feat(ui): run panel prompt injection (R-019) | 2026-07-01 |
 | `05edab2` | fix(ui): segment-specific text/script matching in video list (B-097) | 2026-07-01 |
 
 Older completed sections (commit log, test coverage verification, code review audit) archived to [`docs/archive/2026-07-01-roadmap-archive.md`](docs/archive/2026-07-01-roadmap-archive.md).
 
-## 2026-07-07 Review Findings
-
-| ID | Type | Finding | Proposed fix | Status |
-| --- | --- | --- | --- | --- |
-| B-102 | Bug | Prompt management API only reports project-level `.md` overrides; repo-level overrides and `.txt`/suffixless files are invisible to `GET /api/prompts` and restore flows | Return effective source path and support every accepted suffix when resolving overrides | ✅ |
-| B-103 | Bug | External prompt files are rendered with `str.format()`, so a stray `{` or missing placeholder can crash AI calls at runtime | Add safe prompt rendering or validate overrides before use | ✅ |
-| P-004 | Optimization | Prompt overrides are re-read from disk on every AI call | Cache prompt files by mtime and invalidate when the file changes | ✅ |
+### Test count: 954 → 972 (R-017 added UI unit tests + backend model parsing tests)

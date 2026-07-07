@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -40,31 +41,20 @@ class TestWrapWithContext:
         assert "hello" in result
 
     def test_trip_context_file_loaded(self, monkeypatch, tmp_path: Path):
-        # Point __file__ to a temp location with a templates dir
+        import clio.analyze as analyze_mod
+
+        analyze_mod._trip_context_cache.clear()
         templates = tmp_path / "templates"
         templates.mkdir()
         ctx_file = templates / "trip_context.md"
         ctx_file.write_text("## Trip Context\n\nParis 2025", encoding="utf-8")
+        cfg = _fake_config("")
+        cfg.paths.input_dir = tmp_path
 
-        import clio.analyze as analyze_mod
+        result = _wrap_with_context("hello", cfg)
 
-        # Fake the __file__ to our temp path parent
-        orig_file = analyze_mod.__file__
-        try:
-            # Can't easily change __file__, so mock is_file to control behavior
-            monkeypatch.setattr(
-                "pathlib.Path.is_file",
-                lambda self: (
-                    self == Path(str(orig_file).replace("clio\\analyze.py", "templates\\trip_context.md"))
-                    and ctx_file.is_file()
-                    or self.name == "trip_context.md"
-                    and ctx_file.is_file()
-                    or False
-                ),
-            )
-            # Simpler approach: just monkeypatch the trip_ctx read
-        except Exception:
-            pass
+        assert "Paris 2025" in result
+        assert "hello" in result
 
     def test_config_context_and_trip_context_both(self, monkeypatch):
         """Both trip_context.md and config.ai.context should appear."""
@@ -163,54 +153,27 @@ class TestPlanDailyVlog:
 
         monkeypatch.setattr("clio.analyze.get_task_provider", lambda *a: (MagicMock(), "deepseek-chat"))
         monkeypatch.setattr("clio.analyze._wrap_with_context", lambda prompt, cfg, **kw: prompt)
-        monkeypatch.setattr("clio.analyze._call_ai", lambda *a, **kw: '{"sequence": []}')
+        monkeypatch.setattr("clio.analyze._call_ai", lambda *a, **kw: json.dumps(mock_result))
 
-        # Direct test of the filtering logic by testing the inner logic
-        valid_ints = set()
-        for c in clips:
-            idx = c.get("index")
-            try:
-                valid_ints.add(int(str(idx).strip()))
-            except (ValueError, TypeError):
-                valid_ints.add(str(idx))
+        result = plan_daily_vlog(clips, make_config())
 
-        # Simulate the filtering
-        filtered = []
-        for s in mock_result["sequence"]:
-            sidx = s.get("index")
-            try:
-                match = int(str(sidx).strip()) in valid_ints
-            except (ValueError, TypeError):
-                match = str(sidx) in valid_ints
-            if match:
-                filtered.append(s)
-        assert len(filtered) == 2
-        assert filtered[0]["index"] == "001"
-        assert filtered[1]["index"] == "003"
+        assert len(result["sequence"]) == 2
+        assert result["sequence"][0]["index"] == "001"
+        assert result["sequence"][1]["index"] == "003"
 
-    def test_filter_int_indices_compatibility(self):
+    def test_filter_int_indices_compatibility(self, monkeypatch):
         """Integer indices should be handled too (001 == 1)."""
         clips = [{"index": 1}, {"index": 3}]
-        sequence = [{"index": "001"}, {"index": 3}, {"index": "005"}]
-        valid_ints = set()
-        for c in clips:
-            idx = c.get("index")
-            try:
-                valid_ints.add(int(str(idx).strip()))
-            except (ValueError, TypeError):
-                valid_ints.add(str(idx))
-        assert valid_ints == {1, 3}
+        mock_result = {"sequence": [{"index": "001"}, {"index": 3}, {"index": "005"}]}
+        cfg = _fake_config()
+        cfg.ai.providers = {}
+        monkeypatch.setattr("clio.analyze.get_task_provider", lambda *a: (MagicMock(), "model"))
+        monkeypatch.setattr("clio.analyze._wrap_with_context", lambda prompt, cfg, **kw: prompt)
+        monkeypatch.setattr("clio.analyze._call_ai", lambda *a, **kw: json.dumps(mock_result))
 
-        filtered = []
-        for s in sequence:
-            sidx = s.get("index")
-            try:
-                match = int(str(sidx).strip()) in valid_ints
-            except (ValueError, TypeError):
-                match = str(sidx) in valid_ints
-            if match:
-                filtered.append(s)
-        assert len(filtered) == 2
+        result = plan_daily_vlog(clips, cfg)
+
+        assert len(result["sequence"]) == 2
 
     def test_filter_empty_sequence(self, monkeypatch):
         """Empty sequence should pass through."""

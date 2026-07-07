@@ -2,6 +2,9 @@
   "name": "vlog-editing-helper",
   "type": "module",
   "private": true,
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest"

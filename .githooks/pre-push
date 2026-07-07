@@ -4,6 +4,20 @@ import subprocess
 import sys
 from pathlib import Path
 
+
+def _reconfigure_stdio() -> None:
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_reconfigure_stdio()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 ruff_candidates = [
@@ -21,10 +35,10 @@ if RUFF is None:
         if result.returncode == 0:
             RUFF = [str(python), "-m", "ruff"]
         else:
-            print("⚠️  pre-push: ruff not found, skipping lint check")
+            print("[pre-push] ruff not found, skipping lint check")
             sys.exit(0)
     else:
-        print("⚠️  pre-push: no Python venv found, skipping lint check")
+        print("[pre-push] no Python venv found, skipping lint check")
         sys.exit(0)
 
 if not isinstance(RUFF, list):
@@ -41,5 +55,5 @@ py_files = result.stdout.splitlines()
 print(f"ruff check: {len(py_files)} files")
 check = subprocess.run([*RUFF, "check", *py_files], cwd=REPO_ROOT)
 if check.returncode != 0:
-    print("⚠️  pre-push: lint errors found, push blocked. Run `ruff check` locally to fix.")
+    print("[pre-push] lint errors found, push blocked. Run `ruff check` locally to fix.")
     sys.exit(1)

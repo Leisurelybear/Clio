@@ -14,6 +14,7 @@ from clio.ui.routes.run import (
     handle_get_run_status,
     handle_post_rerun,
     handle_post_run_cancel,
+    handle_post_run_preview,
     handle_post_run_start,
 )
 
@@ -120,12 +121,21 @@ class TestHandlePostRunStart:
         """Duplicate run request must NOT overwrite existing progress file."""
         handler = _handler
         handler._resolve_project_input.return_value = Path("/input")
+        out_dir = tmp_path / "output"
+        out_dir.mkdir()
+        progress = out_dir / ".progress.json"
+        original = {"status": "running", "phase": "analyze", "message": "still running"}
+        progress.write_text(json.dumps(original, ensure_ascii=False), encoding="utf-8")
+        cfg = MagicMock()
+        cfg.paths.output_dir = out_dir
+        handler._get_config.return_value = cfg
         handler.__class__._fake_state.run_thread = MagicMock()
         handler.__class__._fake_state.run_thread.is_alive.return_value = True
 
         handle_post_run_start(handler, {}, {})
 
         handler._send_json.assert_called_once_with({"ok": False, "error": "pipeline is already running"}, 409)
+        assert json.loads(progress.read_text(encoding="utf-8")) == original
 
     def test_starts_thread(self, tmp_path: Path, _no_thread, _handler):
         handler = _handler
@@ -148,6 +158,49 @@ class TestHandlePostRunStart:
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args.args[1] == 400
         assert "input_dir not found" in handler._send_json.call_args.args[0]["error"]
+
+
+class TestHandlePostRunPreview:
+    def test_builds_preview_from_request(self, tmp_path: Path, _handler, monkeypatch):
+        handler = _handler
+        proj_input = tmp_path / "input"
+        cfg = MagicMock()
+        handler._resolve_project_input.return_value = proj_input
+        handler._get_config.return_value = cfg
+        expected = {"input": {}, "steps": [], "totals": {}}
+        build = MagicMock(return_value=expected)
+        monkeypatch.setattr("clio.ui.routes.run.build_run_preview", build)
+
+        handle_post_run_preview(
+            handler,
+            {},
+            {
+                "day_label": "day3",
+                "steps": ["compress", "analyze"],
+                "use_transcripts": False,
+                "overwrite": True,
+                "files": ["A.mp4"],
+            },
+        )
+
+        build.assert_called_once_with(
+            cfg,
+            ["compress", "analyze"],
+            force=True,
+            use_transcripts=False,
+            files=["A.mp4"],
+            day_label="day3",
+        )
+        handler._send_json.assert_called_once_with({"ok": True, "preview": expected})
+
+    def test_rejects_non_list_files(self, tmp_path: Path, _handler):
+        handler = _handler
+        handler._resolve_project_input.return_value = tmp_path / "input"
+        handler._get_config.return_value = MagicMock()
+
+        handle_post_run_preview(handler, {}, {"files": "A.mp4"})
+
+        handler._send_json.assert_called_once_with({"ok": False, "error": "files must be a list of video names"}, 400)
 
 
 class TestHandlePostRerun:

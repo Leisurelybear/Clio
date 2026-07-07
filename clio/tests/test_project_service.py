@@ -12,6 +12,7 @@ from clio.ui.services.project_service import (
     _project_output_dir,
     _registry_path,
     _save_last_project,
+    resolve_project_input,
 )
 
 
@@ -205,3 +206,30 @@ class TestListProjects:
         names = [p["name"] for p in projects]
         assert "Tokyo" not in names
         assert "Current" in names
+
+
+class TestResolveProjectInput:
+    def test_rejects_unregistered_input_dir_query(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_bytes(b"")
+        default_input = tmp_path / "default"
+        default_input.mkdir()
+        arbitrary = tmp_path / "arbitrary"
+        arbitrary.mkdir()
+
+        result = resolve_project_input({"input_dir": [str(arbitrary)]}, default_input, cfg)
+
+        assert result == default_input
+
+    def test_accepts_registered_input_dir_query(self, tmp_path: Path):
+        cfg = tmp_path / "config.yaml"
+        cfg.write_bytes(b"")
+        default_input = tmp_path / "default"
+        default_input.mkdir()
+        registered = tmp_path / "registered"
+        registered.mkdir()
+        _add_to_registry(str(registered), cfg)
+
+        result = resolve_project_input({"input_dir": [str(registered)]}, default_input, cfg)
+
+        assert result == registered

@@ -7,7 +7,7 @@ const DEFAULT_PROVIDERS = ['gemini', 'openai', 'deepseek'];
 const DEFAULT_MODELS = {
   gemini: ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-3-flash', 'gemini-3.1-flash-lite', 'gemini-3.5-flash'],
   openai: ['gpt-4o', 'gpt-4o-mini'],
-  deepseek: ['deepseek-v4-flash', 'deepseek-v4-pro'],
+  deepseek: ['deepseek-chat', 'deepseek-reasoner'],
 };
 const DEFAULT_CAPABILITIES = {
   gemini: ['video', 'text'],
@@ -481,6 +481,7 @@ export function _renderProviderList(providers, descs) {
         <span class="provider-card-name">${escapeHtml(name)}</span>
         <span class="provider-card-type">${typeLabel}</span>
         <span class="provider-card-actions">
+          <button class="btn-provider-test" data-provider="${escapeHtml(name)}">测试</button>
           <button class="btn-provider-edit" data-provider="${escapeHtml(name)}">编辑</button>
           ${DEFAULT_PROVIDERS.includes(name) ? '' : `<button class="btn-provider-delete" data-provider="${escapeHtml(name)}">删除</button>`}
         </span>
@@ -491,6 +492,7 @@ export function _renderProviderList(providers, descs) {
         ${p.type !== 'gemini' ? `<div class="provider-card-field"><span class="provider-card-label">接口地址</span><span>${escapeHtml(p.base_url || '(默认)')}</span></div>` : ''}
         <div class="provider-card-field"><span class="provider-card-label">能力</span><span class="provider-card-models">${capabilityTags}</span></div>
         <div class="provider-card-field"><span class="provider-card-label">模型</span><span class="provider-card-models">${modelTags}</span></div>
+        <div class="provider-test-status" data-provider="${escapeHtml(name)}"></div>
       </div>
     </div>`;
   }
@@ -661,8 +663,74 @@ function _showProviderModal(providersObj, name, onSave) {
   backdrop.querySelector('.modal-backdrop').onclick = () => backdrop.remove();
 }
 
-function _attachProviderListHandlers(pane, providersObj) {
+function _escapeCssAttributeValue(value) {
+  return String(value).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\A ');
+}
+
+function _chooseProviderTestModel(provider) {
+  const models = provider?.models || [];
+  if (models.length === 0) return { ok: false, error: '请先添加模型' };
+  if (models.length === 1) return { ok: true, model: models[0] };
+
+  const selected = prompt(`请选择要测试的模型：\n${models.join('\n')}`, models[0]);
+  if (selected === null) return { ok: false, error: '已取消测试', canceled: true };
+  const model = selected.trim();
+  if (!models.includes(model)) return { ok: false, error: '请选择有效模型' };
+  return { ok: true, model };
+}
+
+export async function _testProvider(providersObj, providerName) {
+  const provider = providersObj?.[providerName];
+  const choice = _chooseProviderTestModel(provider);
+  if (!choice.ok) return choice;
+
+  return api('POST', '/api/ai/test', {
+    provider: providerName,
+    model: choice.model,
+  });
+}
+
+export function _attachProviderListHandlers(pane, providersObj) {
   const reRender = () => renderConfig();
+
+  // Test buttons
+  pane.querySelectorAll('.btn-provider-test').forEach(btn => {
+    btn.onclick = async () => {
+      const providerName = btn.dataset.provider;
+      const card = btn.closest('.provider-card');
+      const status = card?.querySelector('.provider-test-status');
+      btn.disabled = true;
+      if (status) {
+        status.className = 'provider-test-status';
+        status.textContent = '测试中...';
+      }
+      try {
+        const result = await _testProvider(providersObj, providerName);
+        if (result?.canceled) {
+          if (status) status.textContent = result.error || '已取消测试';
+          return;
+        }
+        if (result?.ok) {
+          if (status) {
+            status.className = 'provider-test-status ok';
+            status.textContent = `测试成功：${result.elapsed_ms ?? '?'} ms`;
+          }
+        } else {
+          if (status) {
+            status.className = 'provider-test-status err';
+            status.textContent = '测试失败：' + (result?.error || '未知错误');
+          }
+        }
+      } catch (e) {
+        if (status) {
+          status.className = 'provider-test-status err';
+          status.textContent = '测试失败：' + (e.message || e);
+        }
+      } finally {
+        btn.disabled = false;
+      }
+    };
+  });
 
   // Edit buttons
   pane.querySelectorAll('.btn-provider-edit').forEach(btn => {
@@ -794,7 +862,7 @@ function _attachTaskBindingHandlers(pane, projectCfg) {
       updateSaveBtn();
       renderConfig();
       setTimeout(() => {
-        const editBtn = document.querySelector(`.btn-provider-edit[data-provider="${escapeHtml(pName)}"]`);
+        const editBtn = document.querySelector(`.btn-provider-edit[data-provider="${_escapeCssAttributeValue(pName)}"]`);
         if (editBtn) editBtn.click();
       }, 100);
     };

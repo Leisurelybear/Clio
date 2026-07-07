@@ -36,10 +36,10 @@ jobs:
         pip install ruff mypy
 
     - name: Lint (ruff check)
-      run: ruff check --output-format=github
+      run: ruff check clio main.py --output-format=github
 
     - name: Format check (ruff format)
-      run: ruff format --check
+      run: ruff format --check clio main.py
 
     - name: Type check (mypy)
       run: |

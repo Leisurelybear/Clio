@@ -10,7 +10,13 @@ from clio.ai.token_usage import FileTokenUsageStore
 from clio.analyze import refine_script, refine_text
 from clio.config import AppConfig
 from clio.log import timed
-from clio.tasks._helpers import _eta_line, _rewrite_script_md, _rewrite_text_file
+from clio.tasks._helpers import (
+    _eta_line,
+    _matches_selected_artifact,
+    _rewrite_script_md,
+    _rewrite_text_file,
+    _selected_stems,
+)
 from clio.utils import write_json_atomic
 
 
@@ -46,6 +52,7 @@ def run_refine_texts(
     context_override: str | None = None,
     files: list[str] | None = None,
     overwrite: bool = False,
+    task_prompts: dict[str, str] | None = None,
 ) -> int:
     """审阅并修正 texts/*.json；同步重写同名 .txt。返回处理条数。
 
@@ -55,8 +62,8 @@ def run_refine_texts(
         raise ValueError("--fix 必须配合 -i 指定单个 json 文件，不能用于目录")
     target_files = _collect_target_files(path, config.texts_dir)
     if files is not None:
-        allowed = {Path(f).stem.lower() for f in files}
-        target_files = [f for f in target_files if f.stem.lower() in allowed]
+        selected = _selected_stems(files)
+        target_files = [f for f in target_files if _matches_selected_artifact(f, selected)]
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
     if not target_files:
         print(f"未找到 json 文件: {path or config.texts_dir}")
@@ -74,7 +81,12 @@ def run_refine_texts(
             try:
                 analysis = json.loads(json_file.read_text(encoding="utf-8"))
                 refined = refine_text(
-                    analysis, config, fix=fix, context_override=context_override, token_store=token_store
+                    analysis,
+                    config,
+                    fix=fix,
+                    context_override=context_override,
+                    token_store=token_store,
+                    task_prompts=task_prompts,
                 )
             except Exception as e:
                 print(f"  失败: {e}")
@@ -100,6 +112,7 @@ def run_refine_scripts(
     context_override: str | None = None,
     files: list[str] | None = None,
     overwrite: bool = False,
+    task_prompts: dict[str, str] | None = None,
 ) -> int:
     """审阅并修正 scripts/*_voiceover.json；同步重写同名 .md。
 
@@ -109,8 +122,8 @@ def run_refine_scripts(
         raise ValueError("--fix 必须配合 -i 指定单个 json 文件，不能用于目录")
     target_files = _collect_target_files(path, config.scripts_dir, pattern="*_voiceover.json")
     if files is not None:
-        allowed = {Path(f).stem.lower() for f in files}
-        target_files = [f for f in target_files if f.stem.lower() in allowed]
+        selected = _selected_stems(files)
+        target_files = [f for f in target_files if _matches_selected_artifact(f, selected)]
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
     if not target_files:
         print(f"未找到 voiceover json 文件: {path or config.scripts_dir}")
@@ -129,7 +142,13 @@ def run_refine_scripts(
                 script = json.loads(json_file.read_text(encoding="utf-8"))
                 analysis = _load_analysis_for_script(json_file, config.texts_dir)
                 refined = refine_script(
-                    script, analysis, config, fix=fix, context_override=context_override, token_store=token_store
+                    script,
+                    analysis,
+                    config,
+                    fix=fix,
+                    context_override=context_override,
+                    token_store=token_store,
+                    task_prompts=task_prompts,
                 )
             except Exception as e:
                 print(f"  失败: {e}")

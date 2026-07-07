@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import csv
+import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,6 +26,71 @@ class ClipRecord:
     duration_sec: float = 0.0
     meta: VideoMeta | None = None
     identity: MediaIdentity | None = None
+
+
+_INDEX_PREFIX_RE = re.compile(r"^\d+_(.+)$")
+_SEGMENT_SUFFIX_RE = re.compile(r"^(.+?)_seg\d+$")
+_ARTIFACT_SUFFIXES = ("_voiceover", "_transcript", "_labeled")
+
+
+def _strip_artifact_suffixes(stem: str) -> str:
+    changed = True
+    while changed:
+        changed = False
+        for suffix in _ARTIFACT_SUFFIXES:
+            if stem.endswith(suffix):
+                stem = stem[: -len(suffix)]
+                changed = True
+                break
+    return stem
+
+
+def _stem_variants(stem: str, *, include_segment_base: bool = False) -> set[str]:
+    base = _strip_artifact_suffixes(Path(stem).stem.lower())
+    variants = {base}
+    m = _INDEX_PREFIX_RE.match(base)
+    if m:
+        variants.add(m.group(1))
+    if include_segment_base:
+        for value in list(variants):
+            m = _SEGMENT_SUFFIX_RE.match(value)
+            if m:
+                variants.add(m.group(1))
+    return variants
+
+
+def _selected_stems(files: list[str]) -> set[str]:
+    selected: set[str] = set()
+    for name in files:
+        selected.update(_stem_variants(name))
+    return selected
+
+
+def _matches_selected_stem(path: Path, selected: set[str]) -> bool:
+    return bool(_stem_variants(path.stem, include_segment_base=True) & selected)
+
+
+def _matches_selected_artifact(path: Path, selected: set[str]) -> bool:
+    if _matches_selected_stem(path, selected):
+        return True
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    candidates: list[str] = []
+    identity = data.get("media_identity")
+    if isinstance(identity, dict):
+        candidates.extend(
+            str(value) for value in (identity.get("compressed_stem"), identity.get("original_stem")) if value
+        )
+    for key in ("compressed_file", "source_file", "index"):
+        value = data.get(key)
+        if value:
+            candidates.append(str(value))
+    for candidate in candidates:
+        if _stem_variants(candidate, include_segment_base=True) & selected:
+            return True
+    return False
 
 
 def _build_stem(index: int, title: str, config: AppConfig) -> str:

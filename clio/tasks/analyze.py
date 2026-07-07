@@ -22,6 +22,8 @@ from clio.schema import add_schema_version
 from clio.tasks._helpers import (
     ClipRecord,
     _build_stem,
+    _matches_selected_stem,
+    _selected_stems,
     _write_csv,
     _write_text_file,
 )
@@ -41,7 +43,11 @@ def _build_stem_to_path(input_dir: Path) -> dict[str, Path]:
     return mapping
 
 
-def _resolve_original(input_dir: Path, compressed_stem: str, stem_cache: dict[str, Path] | None = None) -> Path | None:
+def _resolve_original(
+    input_dir: Path,
+    compressed_stem: str,
+    stem_cache: dict[str, Path] | None = None,
+) -> Path | None:
     """Resolve original video path from a compressed file stem.
 
     Handles:
@@ -61,11 +67,31 @@ def _resolve_original(input_dir: Path, compressed_stem: str, stem_cache: dict[st
         key = stem.lower()
         if stem_cache is not None:
             return stem_cache.get(key)
-        for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
+        for ext in (
+            ".mp4",
+            ".mov",
+            ".mkv",
+            ".avi",
+            ".mts",
+            ".m2ts",
+            ".m4v",
+            ".webm",
+            ".lrv",
+        ):
             candidate = input_dir / f"{stem}{ext}"
             if candidate.is_file():
                 return candidate
-        for ext in (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv"):
+        for ext in (
+            ".mp4",
+            ".mov",
+            ".mkv",
+            ".avi",
+            ".mts",
+            ".m2ts",
+            ".m4v",
+            ".webm",
+            ".lrv",
+        ):
             for candidate in input_dir.rglob(f"{stem}{ext}"):
                 if candidate.is_file():
                     return candidate
@@ -93,6 +119,7 @@ def _process_video_item(
     error_count: list[int],
     cancel_event: threading.Event | None = None,
     context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
 ) -> ClipRecord | None:
     idx_val = int(idx_str)
 
@@ -130,7 +157,7 @@ def _process_video_item(
         identity = (
             resolve_identity(compressed, config.paths.input_dir, idx_str)
             if analysis is None
-            else load_identity(analysis) or resolve_identity(compressed, config.paths.input_dir, idx_str)
+            else (load_identity(analysis) or resolve_identity(compressed, config.paths.input_dir, idx_str))
         )
         return ClipRecord(
             index=idx_val,
@@ -169,6 +196,7 @@ def _process_video_item(
             token_store=token_store,
             cancel_event=cancel_event,
             context_override=context_override,
+            task_prompts=task_prompts,
         )
     except Exception as e:
         elapsed_total = time.monotonic() - t0
@@ -222,6 +250,7 @@ def run_analyze_all(
     files: list[str] | None = None,
     overwrite: bool = False,
     context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
     **kwargs: Any,
 ) -> list[ClipRecord]:
     """Analyze already-compressed videos using AI (compress step must precede this).
@@ -277,8 +306,10 @@ def run_analyze_all(
             items.append((p, orig_path, idx_str))
 
     if files is not None:
-        allowed = {Path(f).stem.lower() for f in files}
-        items = [it for it in items if it[0].stem.lower() in allowed]
+        selected = _selected_stems(files)
+        items = [
+            it for it in items if _matches_selected_stem(it[0], selected) or _matches_selected_stem(it[1], selected)
+        ]
 
     if not items:
         print(f"[错误] 压缩目录为空或无法匹配: {config.compressed_dir}，请先运行压缩步骤")
@@ -330,6 +361,7 @@ def run_analyze_all(
                         error_count,
                         cancel_event,
                         context_override,
+                        task_prompts,
                     )
                     batch_futures.append(f)
 

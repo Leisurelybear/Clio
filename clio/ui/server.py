@@ -24,6 +24,7 @@ from clio.session_log import clear as clear_session_log
 from clio.session_log import read as read_session_log
 from clio.shutdown import before_stop, install_hooks
 from clio.tasks.reindex import auto_reindex_if_needed
+from clio.ui.routes.ai import handle_post_ai_test
 from clio.ui.routes.config_routes import (
     handle_delete_provider,
     handle_get_config,
@@ -63,6 +64,7 @@ from clio.ui.routes.run import (
     handle_get_run_stream,
     handle_post_rerun,
     handle_post_run_cancel,
+    handle_post_run_preview,
     handle_post_run_start,
 )
 from clio.ui.routes.static_files import handle_favicon, handle_index, handle_static
@@ -102,6 +104,92 @@ from clio.ui.services.project_service import (
 from clio.utils import write_json_atomic
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+
+@dataclass(frozen=True)
+class RoutePolicy:
+    method: str
+    path: str
+    auth_required: bool = True
+    prefix: bool = False
+
+
+_ROUTE_POLICIES = (
+    RoutePolicy("GET", "/", auth_required=False),
+    RoutePolicy("GET", "/index.html", auth_required=False),
+    RoutePolicy("GET", "/favicon.ico", auth_required=False),
+    RoutePolicy("GET", "/static/", auth_required=False, prefix=True),
+    RoutePolicy("GET", "/api/config"),
+    RoutePolicy("GET", "/api/config/raw"),
+    RoutePolicy("GET", "/api/config/global"),
+    RoutePolicy("GET", "/api/config/project"),
+    RoutePolicy("GET", "/api/project"),
+    RoutePolicy("GET", "/api/projects"),
+    RoutePolicy("GET", "/api/videos"),
+    RoutePolicy("GET", "/api/video"),
+    RoutePolicy("GET", "/api/vmeta/", prefix=True),
+    RoutePolicy("GET", "/api/texts"),
+    RoutePolicy("GET", "/api/voiceover"),
+    RoutePolicy("GET", "/api/plans"),
+    RoutePolicy("GET", "/api/plan"),
+    RoutePolicy("GET", "/api/processing-state"),
+    RoutePolicy("GET", "/api/run/status"),
+    RoutePolicy("GET", "/api/run/stream"),
+    RoutePolicy("GET", "/api/fs/dirs"),
+    RoutePolicy("GET", "/api/transcripts"),
+    RoutePolicy("GET", "/api/whisper/check"),
+    RoutePolicy("GET", "/api/whisper/install/status"),
+    RoutePolicy("GET", "/api/whisper/models"),
+    RoutePolicy("GET", "/api/token-usage"),
+    RoutePolicy("GET", "/api/env"),
+    RoutePolicy("GET", "/api/logs"),
+    RoutePolicy("PUT", "/api/config/raw"),
+    RoutePolicy("PUT", "/api/config/global"),
+    RoutePolicy("PUT", "/api/config/project"),
+    RoutePolicy("PUT", "/api/project"),
+    RoutePolicy("PUT", "/api/texts"),
+    RoutePolicy("PUT", "/api/voiceover"),
+    RoutePolicy("PUT", "/api/plan"),
+    RoutePolicy("PUT", "/api/transcripts"),
+    RoutePolicy("PUT", "/api/whisper/model"),
+    RoutePolicy("PUT", "/api/env"),
+    RoutePolicy("POST", "/api/run/start"),
+    RoutePolicy("POST", "/api/run/preview"),
+    RoutePolicy("POST", "/api/run/cancel"),
+    RoutePolicy("POST", "/api/ai/test"),
+    RoutePolicy("POST", "/api/config/init"),
+    RoutePolicy("POST", "/api/cut"),
+    RoutePolicy("POST", "/api/refine"),
+    RoutePolicy("POST", "/api/export"),
+    RoutePolicy("POST", "/api/project/create"),
+    RoutePolicy("POST", "/api/project/add"),
+    RoutePolicy("POST", "/api/project/remove"),
+    RoutePolicy("POST", "/api/rerun"),
+    RoutePolicy("POST", "/api/transcripts"),
+    RoutePolicy("POST", "/api/whisper/install"),
+    RoutePolicy("POST", "/api/whisper/install/cancel"),
+    RoutePolicy("POST", "/api/whisper/models/delete"),
+    RoutePolicy("POST", "/api/logs/clear"),
+)
+_ROUTE_POLICY_BY_METHOD_PATH = {(policy.method, policy.path): policy for policy in _ROUTE_POLICIES if not policy.prefix}
+_ROUTE_PREFIX_POLICIES = tuple(policy for policy in _ROUTE_POLICIES if policy.prefix)
+
+
+def _get_route_policy(method: str, path: str) -> RoutePolicy:
+    method = method.upper()
+    exact = _ROUTE_POLICY_BY_METHOD_PATH.get((method, path))
+    if exact is not None:
+        return exact
+    for policy in _ROUTE_PREFIX_POLICIES:
+        if policy.method == method and path.startswith(policy.path):
+            return policy
+    if path.startswith("/api/"):
+        return RoutePolicy(method, path, auth_required=True)
+    return RoutePolicy(method, path, auth_required=method in {"PUT", "POST"})
+
+
+def _get_requires_auth(path: str, method: str = "GET") -> bool:
+    return _get_route_policy(method, path).auth_required
 
 
 @dataclass
@@ -256,23 +344,7 @@ def make_handler(
                 rel = path[len("/static/") :]
                 return handle_static(self, rel)
 
-            # Routes that require auth
-            _sensitive = {
-                "/api/env",
-                "/api/config/raw",
-                "/api/config/global",
-                "/api/config/project",
-                "/api/providers",
-                "/api/video",
-                "/api/run/status",
-                "/api/run/stream",
-                "/api/processing-state",
-                "/api/token-usage",
-                "/api/logs",
-                "/api/fs/dirs",
-                "/api/prompts",
-            }
-            if path in _sensitive and not self._require_auth():
+            if _get_requires_auth(path, "GET") and not self._require_auth():
                 return
 
             if path == "/api/config":
@@ -336,7 +408,7 @@ def make_handler(
             url = urlparse(self.path)
             qs = parse_qs(url.query)
             path = url.path
-            if not self._require_auth():
+            if _get_requires_auth(path, "PUT") and not self._require_auth():
                 return
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length) if length else b""
@@ -380,7 +452,7 @@ def make_handler(
             url = urlparse(self.path)
             qs = parse_qs(url.query)
             path = url.path
-            if not self._require_auth():
+            if _get_requires_auth(path, "POST") and not self._require_auth():
                 return
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length) if length else b""
@@ -393,8 +465,12 @@ def make_handler(
 
             if path in {"/api/run/start", "/api/webhook/trigger"}:
                 return handle_post_run_start(self, qs, obj)
+            if path == "/api/run/preview":
+                return handle_post_run_preview(self, qs, obj)
             if path == "/api/run/cancel":
                 return handle_post_run_cancel(self, qs, obj)
+            if path == "/api/ai/test":
+                return handle_post_ai_test(self, qs, obj)
             if path == "/api/config/init":
                 return handle_post_config_init(self, qs, obj)
             if path == "/api/providers":

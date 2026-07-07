@@ -5,6 +5,20 @@ import subprocess
 import sys
 from pathlib import Path
 
+
+def _reconfigure_stdio() -> None:
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
+
+_reconfigure_stdio()
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Locate ruff via project venv

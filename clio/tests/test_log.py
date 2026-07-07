@@ -135,5 +135,11 @@ class TestSetupLogging:
         assert logger1 is not None
 
     def test_teardown_before_setup_noop(self):
+        import sys
+
+        stdout = sys.stdout
+        stderr = sys.stderr
         teardown_logging()
         teardown_logging()
+        assert sys.stdout is stdout
+        assert sys.stderr is stderr

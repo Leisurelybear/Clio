@@ -16,6 +16,7 @@ from clio.progress import ProgressTracker
 from clio.tasks.transcribe import run_transcribe_one
 from clio.ui.services.file_service import _find_original_for_compressed, _find_texts_dirs, _is_safe_basename
 from clio.ui.services.project_service import _project_output_dir
+from clio.ui.services.run_preview import build_run_preview
 
 if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
@@ -168,6 +169,27 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
         state.run_thread.start()
     label = "+".join(steps) if steps else "all"
     handler._send_json({"ok": True, "message": f"pipeline started ({label})"})
+
+
+def handle_post_run_preview(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
+    """Handle POST /api/run/preview."""
+    day_label = obj.get("day_label", "day1")
+    steps = obj.get("steps")
+    files_list = obj.get("files")
+    if files_list is not None and not isinstance(files_list, list):
+        return handler._send_json({"ok": False, "error": "files must be a list of video names"}, 400)
+
+    proj_input = handler._resolve_project_input(qs)
+    cfg = handler._get_config(proj_input)
+    preview = build_run_preview(
+        cfg,
+        steps or [],
+        force=bool(obj.get("overwrite", False)),
+        use_transcripts=obj.get("use_transcripts", True),
+        files=files_list,
+        day_label=day_label,
+    )
+    handler._send_json({"ok": True, "preview": preview})
 
 
 def handle_post_run_cancel(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:

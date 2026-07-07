@@ -442,7 +442,7 @@ def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
     ai_raw = raw.get("ai", {})
     ai_cfg = GlobalAIConfig(
         providers=_parse_providers(ai_raw.get("providers")),
-        debug_print_prompt=ai_raw.get("debug_print_prompt", True),
+        debug_print_prompt=ai_raw.get("debug_print_prompt", False),
         provider_ttl_min=ai_raw.get("provider_ttl_min", 60),
     )
 
@@ -484,18 +484,17 @@ def load_project_config(
     with project_yaml.open(encoding="utf-8") as f:
         raw: dict[str, Any] = yaml.safe_load(f) or {}
 
-    base = project_dir.resolve()
-    if config_path is not None:
-        base = config_path.parent
+    project_base = project_dir.resolve()
+    config_base = config_path.parent if config_path is not None else project_base
 
     paths_raw = raw.get("paths", {})
     ai_raw = raw.get("ai", {})
-    context = _load_context(ai_raw, base, project_dir=project_dir)
+    context = _load_context(ai_raw, config_base, project_dir=project_dir)
 
     return ProjectConfig(
         paths=ProjectPathsConfig(
-            input_dir=_path(paths_raw.get("input_dir", "."), base),
-            output_dir=_path(paths_raw.get("output_dir", "./output"), base),
+            input_dir=_path(paths_raw.get("input_dir", "."), project_base),
+            output_dir=_path(paths_raw.get("output_dir", "./output"), project_base),
             recursive=paths_raw.get("recursive", False),
         ),
         ai=ProjectAIConfig(
@@ -514,7 +513,7 @@ def load_project_config(
             scripts_subdir=raw.get("script", {}).get("scripts_subdir", "scripts"),
             template_file=_path(
                 raw.get("script", {}).get("template_file", "./templates/vlog_template.md"),
-                base,
+                project_base,
             ),
             target_words=raw.get("script", {}).get("target_words", 80),
         ),
@@ -542,7 +541,14 @@ def load_config(
     """
     config_file = Path(config_path).resolve()
     global_cfg = load_global_config(config_file)
-    project_cfg = load_project_config(project_dir, config_path=config_file) if project_dir is not None else None
+    effective_project_dir = project_dir
+    if effective_project_dir is None and (config_file.parent / "project.yaml").is_file():
+        effective_project_dir = config_file.parent
+    project_cfg = (
+        load_project_config(effective_project_dir, config_path=config_file)
+        if effective_project_dir is not None
+        else None
+    )
 
     config = AppConfig(global_cfg=global_cfg, project_cfg=project_cfg)
     _validate_config(config)

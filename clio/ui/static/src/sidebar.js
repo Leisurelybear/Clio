@@ -183,6 +183,17 @@ function toggleSelection() {
   }
 }
 
+function sameVideoIndex(a, b) {
+  if (a === undefined || a === null || b === undefined || b === null) return false;
+  const left = String(a).trim();
+  const right = String(b).trim();
+  if (!left || !right) return false;
+  if (left === right) return true;
+  const leftNum = Number.parseInt(left, 10);
+  const rightNum = Number.parseInt(right, 10);
+  return Number.isFinite(leftNum) && Number.isFinite(rightNum) && leftNum === rightNum;
+}
+
 async function setSource(source, options = {}) {
   if (source === state.source) return;
   if (state.dirty) {
@@ -211,22 +222,22 @@ async function setSource(source, options = {}) {
         import('./editor.js').then(mod => mod.renderActiveTab());
         if (target) {
           playVideoSegment(target.file, target.offset_sec || 0);
-          setStatus(`已切到 ${source} 视图`, 'ok');
+          setStatus(`?????${source} ???`, 'ok');
         } else {
           $('player').removeAttribute('src');
-          $('player-name').textContent = '请选择左侧视频或规划节点';
-          setStatus(`已切到 ${source} 视图（仍停留在规划）`, 'ok');
+          $('player-name').textContent = '???????????????????';
+          setStatus(`?????${source} ???????????????`, 'ok');
         }
       } else {
         await selectVideo(target ? target.file : state.videos[0].file);
       }
     } else {
       $('player').removeAttribute('src');
-      $('player-name').textContent = '请选择左侧视频';
-      setStatus(`当前视图没有视频 (${source})`, 'warn');
+      $('player-name').textContent = '???????????';
+      setStatus(`???????????? (${source})`, 'warn');
     }
   } catch (e) {
-    setStatus('切换源失败: ' + e.message, 'err');
+    setStatus('???????? ' + e.message, 'err');
   }
 }
 

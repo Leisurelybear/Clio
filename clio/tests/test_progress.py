@@ -95,9 +95,11 @@ class TestProgressTracker:
         for i in range(20):
             t.next(message=f"step {i}")
             try:
-                json.loads(t._path.read_text(encoding="utf-8"))
+                data = json.loads(t._path.read_text(encoding="utf-8"))
             except json.JSONDecodeError:
                 pytest.fail("corrupted JSON on read")
+        assert data["current"] == 20
+        assert data["message"] == "step 19"
 
     def test_output_dir_created(self, tmp_path):
         sub = tmp_path / "nested" / "dirs"

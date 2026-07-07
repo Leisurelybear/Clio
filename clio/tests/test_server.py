@@ -11,7 +11,7 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from clio.ui.server import STATIC_DIR, _ServerState, make_handler
+from clio.ui.server import STATIC_DIR, _get_requires_auth, _ServerState, make_handler
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -684,6 +684,21 @@ class TestDoPOST:
         handler.do_POST()
         mock_fn.assert_called_once()
 
+    @patch("clio.ui.server.handle_post_run_preview")
+    def test_post_run_preview(self, mock_fn, handler_cls):
+        handler = self._post_handler(handler_cls, {}, "/api/run/preview")
+        handler.do_POST()
+        mock_fn.assert_called_once()
+
+    @patch("clio.ui.server.handle_post_ai_test")
+    def test_post_ai_test(self, mock_fn, handler_cls):
+        handler = self._post_handler(handler_cls, {"provider": "deepseek"}, "/api/ai/test")
+        handler.do_POST()
+        mock_fn.assert_called_once()
+        assert mock_fn.call_args[0][0] is handler
+        assert mock_fn.call_args[0][1] == {}
+        assert mock_fn.call_args[0][2] == {"provider": "deepseek"}
+
     @patch("clio.ui.server.handle_post_run_cancel")
     def test_post_run_cancel(self, mock_fn, handler_cls):
         handler = self._post_handler(handler_cls, {}, "/api/run/cancel")
@@ -852,12 +867,21 @@ class TestAuth:
         handler.do_GET()
         mock_fn.assert_called_once()
 
-    def test_non_sensitive_get_works_without_token(self, auth_cls):
-        """GET /api/config (non-sensitive) works without token."""
+    def test_api_config_returns_401_without_token(self, auth_cls):
+        """GET /api/config returns 401 in token mode."""
         handler = _build_handler(auth_cls, path="/api/config")
         with patch("clio.ui.server.handle_get_config") as mock_fn:
             handler.do_GET()
-            mock_fn.assert_called_once()
+            handler.send_response.assert_called_once_with(401)
+            mock_fn.assert_not_called()
+
+    @patch("clio.ui.server.handle_get_config")
+    def test_api_config_works_with_bearer_token(self, mock_fn, auth_cls):
+        """GET /api/config with valid Bearer token works."""
+        handler = _build_handler(auth_cls, path="/api/config")
+        handler.headers.get.side_effect = lambda k, d=None: "Bearer test-token-789" if k == "Authorization" else "0"
+        handler.do_GET()
+        mock_fn.assert_called_once()
 
     # --- PUT route auth ---
 
@@ -900,3 +924,82 @@ class TestAuth:
             handler = _build_handler(handler_cls, path="/api/env")
             handler.do_GET()
             mock_fn.assert_called_once()
+
+
+class TestRouteAuthPolicy:
+    @pytest.mark.parametrize(
+        ("method", "path", "expected"),
+        [
+            ("GET", "/", False),
+            ("GET", "/index.html", False),
+            ("GET", "/favicon.ico", False),
+            ("GET", "/static/app.js", False),
+            ("GET", "/api/config", True),
+            ("GET", "/api/config/raw", True),
+            ("GET", "/api/config/global", True),
+            ("GET", "/api/config/project", True),
+            ("GET", "/api/project", True),
+            ("GET", "/api/projects", True),
+            ("GET", "/api/videos", True),
+            ("GET", "/api/video", True),
+            ("GET", "/api/vmeta/001_test", True),
+            ("GET", "/api/texts", True),
+            ("GET", "/api/voiceover", True),
+            ("GET", "/api/plans", True),
+            ("GET", "/api/plan", True),
+            ("GET", "/api/processing-state", True),
+            ("GET", "/api/run/status", True),
+            ("GET", "/api/run/stream", True),
+            ("GET", "/api/fs/dirs", True),
+            ("GET", "/api/transcripts", True),
+            ("GET", "/api/whisper/check", True),
+            ("GET", "/api/whisper/install/status", True),
+            ("GET", "/api/whisper/models", True),
+            ("GET", "/api/token-usage", True),
+            ("GET", "/api/env", True),
+            ("GET", "/api/logs", True),
+            ("PUT", "/api/config/raw", True),
+            ("PUT", "/api/config/global", True),
+            ("PUT", "/api/config/project", True),
+            ("PUT", "/api/project", True),
+            ("PUT", "/api/texts", True),
+            ("PUT", "/api/voiceover", True),
+            ("PUT", "/api/plan", True),
+            ("PUT", "/api/transcripts", True),
+            ("PUT", "/api/whisper/model", True),
+            ("PUT", "/api/env", True),
+            ("POST", "/api/run/start", True),
+            ("POST", "/api/run/preview", True),
+            ("POST", "/api/run/cancel", True),
+            ("POST", "/api/ai/test", True),
+            ("POST", "/api/config/init", True),
+            ("POST", "/api/cut", True),
+            ("POST", "/api/refine", True),
+            ("POST", "/api/export", True),
+            ("POST", "/api/project/create", True),
+            ("POST", "/api/project/add", True),
+            ("POST", "/api/project/remove", True),
+            ("POST", "/api/rerun", True),
+            ("POST", "/api/transcripts", True),
+            ("POST", "/api/whisper/install", True),
+            ("POST", "/api/whisper/install/cancel", True),
+            ("POST", "/api/whisper/models/delete", True),
+            ("POST", "/api/logs/clear", True),
+        ],
+    )
+    def test_known_route_auth_policy_matrix(self, method, path, expected):
+        assert _get_requires_auth(path, method) is expected
+
+    @pytest.mark.parametrize(
+        ("method", "path", "expected"),
+        [
+            ("GET", "/api/new-route", True),
+            ("POST", "/api/new-route", True),
+            ("PUT", "/api/new-route", True),
+            ("GET", "/not-api", False),
+            ("PUT", "/not-api", True),
+            ("POST", "/not-api", True),
+        ],
+    )
+    def test_unknown_route_auth_policy_defaults(self, method, path, expected):
+        assert _get_requires_auth(path, method) is expected

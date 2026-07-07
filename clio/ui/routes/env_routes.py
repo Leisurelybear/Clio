@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from clio.config import _load_dotenv
+from clio.utils import write_text_atomic
 
 if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
@@ -38,7 +39,7 @@ def handle_put_env(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> N
         return handler._send_json({"ok": False, "error": "config_path not available"}, 500)
     content = obj.get("content", "")
     env_path.parent.mkdir(parents=True, exist_ok=True)
-    env_path.write_text(content, encoding="utf-8")
+    write_text_atomic(env_path, content)
     # Reload env vars into os.environ so subsequent load_config picks them up
     _load_dotenv(env_path.parent, override=True)
     # Clear config cache so next request rebuilds with the new API keys

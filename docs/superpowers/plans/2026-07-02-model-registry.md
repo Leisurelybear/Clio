@@ -26,7 +26,7 @@
 - Modify: `clio/config/descriptions.py:26`
 - Test: `clio/tests/test_config.py`
 
-- [ ] **Step 1: Add `models` field to `ProviderConfig`**
+- [x] **Step 1: Add `models` field to `ProviderConfig`**
 
 In `clio/config/models.py`, add after line 29:
 
@@ -34,7 +34,7 @@ In `clio/config/models.py`, add after line 29:
     models: list[str] = field(default_factory=list)
 ```
 
-- [ ] **Step 2: Read `models` in `_parse_providers()`**
+- [x] **Step 2: Read `models` in `_parse_providers()`**
 
 In `clio/config/parsers.py`, add after line 34:
 
@@ -59,7 +59,7 @@ The full `ProviderConfig(...)` call becomes:
         )
 ```
 
-- [ ] **Step 3: Add description for `models` field**
+- [x] **Step 3: Add description for `models` field**
 
 In `clio/config/descriptions.py`, add after line 26:
 
@@ -67,7 +67,7 @@ In `clio/config/descriptions.py`, add after line 26:
     "ai.providers.{name}.models": "该厂商支持的模型名称列表（如 gemini-2.5-flash），用于任务绑定的下拉选择",
 ```
 
-- [ ] **Step 4: Write tests for `models` field**
+- [x] **Step 4: Write tests for `models` field**
 
 In `clio/tests/test_config.py`, add within `TestLoadConfig`:
 
@@ -92,7 +92,7 @@ In `clio/tests/test_config.py`, add within `TestLoadConfig`:
 
 Also need to update `tmp_config` fixture to include `models` in the test config. Find the `tmp_config` fixture (in conftest.py) and add `models: [gemini-2.5-flash, gemini-2.0-flash]` to the gemini provider.
 
-- [ ] **Step 5: Update `tmp_config` fixture**
+- [x] **Step 5: Update `tmp_config` fixture**
 
 In `conftest.py`, find the `tmp_config` fixture. The gemini provider entry currently has:
 ```yaml
@@ -111,7 +111,7 @@ providers:
     models: [gemini-2.5-flash, gemini-2.0-flash]
 ```
 
-- [ ] **Step 6: Run tests and commit**
+- [x] **Step 6: Run tests and commit**
 
 ```bash
 python -m pytest clio/tests/test_config.py -v --tb=short
@@ -127,7 +127,7 @@ git commit -m "feat(config): add ProviderConfig.models field for model registry"
 - Modify: `clio/ui/static/src/editor-config.js` — add `_renderTagInput` function
 - Modify: `clio/ui/static/style.css` — add tag input styles
 
-- [ ] **Step 1: Add `_renderTagInput()` function**
+- [x] **Step 1: Add `_renderTagInput()` function**
 
 Add to `editor-config.js` (after the `_renderTooltip` function around line 30):
 
@@ -183,7 +183,7 @@ export function _renderTagInput(container, values, onChange) {
 }
 ```
 
-- [ ] **Step 2: Add CSS for tag input**
+- [x] **Step 2: Add CSS for tag input**
 
 Add to `style.css`:
 
@@ -235,7 +235,7 @@ Add to `style.css`:
 }
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add -A
@@ -244,14 +244,14 @@ git commit -m "feat(ui): add tag input component for model name editing"
 
 ---
 
-### Task 3: Provider List UI (Settings → Global tab)
+### Task 3: Provider List UI (Settings → Global tab) ✅
 
 **Files:**
 - Modify: `clio/ui/static/src/editor-config.js`
 
 **Architecture note:** In `renderConfig()`, the Global tab currently renders `state.configGlobal` via `_renderConfigForm()`. We intercept the `ai` section specifically: instead of calling `_renderConfigForm(globalData['ai'], 'ai', descs)`, we call a custom `_renderProviderList()` function.
 
-- [ ] **Step 1: Understand the rendering flow in `renderConfig()`**
+- [x] **Step 1: Understand the rendering flow in `renderConfig()`**
 
 Current flow for Global tab (around line 258-261):
 ```javascript
@@ -272,7 +272,7 @@ contentHtml = _renderEnvEditor()
 
 Where `_renderConfigGlobal()` iterates sections and uses `_renderProviderList()` for `ai`, `_renderConfigForm()` for others.
 
-- [ ] **Step 2: Add `_renderProviderList()` to `editor-config.js`**
+- [x] **Step 2: Add `_renderProviderList()` to `editor-config.js`**
 
 ```javascript
 function _renderProviderList(providers, descs) {
@@ -316,7 +316,7 @@ function _renderProviderList(providers, descs) {
 }
 ```
 
-- [ ] **Step 3: Add provider modal HTML/JS functions**
+- [x] **Step 3: Add provider modal HTML/JS functions**
 
 ```javascript
 function _showProviderModal(providersObj, name, onSave) {
@@ -456,7 +456,7 @@ function _showProviderModal(providersObj, name, onSave) {
 }
 ```
 
-- [ ] **Step 4: Modify `renderConfig()` to use custom AI renderer for Global tab**
+- [x] **Step 4: Modify `renderConfig()` to use custom AI renderer for Global tab**
 
 Replace lines 257-261 in `editor-config.js`:
 
@@ -495,7 +495,7 @@ function _renderConfigGlobal(globalData, descs) {
 }
 ```
 
-- [ ] **Step 5: Attach event handlers for provider list buttons**
+- [x] **Step 5: Attach event handlers for provider list buttons**
 
 In `renderConfig()`, after rendering the Global tab content (~line 296-297):
 
@@ -557,21 +557,17 @@ function _attachProviderListHandlers(pane, providersObj) {
 }
 ```
 
-- [ ] **Step 6: Commit**
-
-```bash
-git add -A
-git commit -m "feat(ui): add provider list UI with add/edit/delete in Settings Global tab"
+- [x] **Step 6: Commit: `5d4c8fc` feat(ui): add provider list UI with add/edit/delete in Settings Global tab**
 ```
 
 ---
 
-### Task 4: Task Binding UI (Settings → Project tab)
+### Task 4: Task Binding UI (Settings → Project tab) ✅
 
 **Files:**
 - Modify: `clio/ui/static/src/editor-config.js`
 
-- [ ] **Step 1: Understand the Project tab rendering flow**
+- [x] **Step 1: Understand the Project tab rendering flow**
 
 Current flow for Project tab (~line 255-256):
 ```javascript
@@ -581,7 +577,7 @@ contentHtml = `<div class="config-form">${_renderConfigForm(projectData, '', des
 
 We need to intercept the `ai` section similarly to Global tab.
 
-- [ ] **Step 2: Add `_renderTaskBinding()` function**
+- [x] **Step 2: Add `_renderTaskBinding()` function**
 
 ```javascript
 const TASK_LABELS = {
@@ -686,7 +682,7 @@ function _renderTaskBinding(tasks, providersObj, descs) {
 }
 ```
 
-- [ ] **Step 3: Modify `renderConfig()` to use custom AI renderer for Project tab**
+- [x] **Step 3: Modify `renderConfig()` to use custom AI renderer for Project tab**
 
 Replace lines 254-256:
 ```javascript
@@ -721,7 +717,7 @@ function _renderConfigProject(projectData, globalData, descs) {
 }
 ```
 
-- [ ] **Step 4: Attach event handlers for task binding**
+- [x] **Step 4: Attach event handlers for task binding**
 
 In `renderConfig()`, after the Project tab handler (~line 298-300):
 ```javascript
@@ -817,7 +813,7 @@ function _attachTaskBindingHandlers(pane, projectCfg) {
 }
 ```
 
-- [ ] **Step 5: Update save flow for Project tab**
+- [x] **Step 5: Update save flow for Project tab**
 
 The existing save flow in `editor.js` (the `save()` function) needs to handle the new structure correctly. Currently it calls `PUT /api/config/project` with `state.configProject`. Since we mutate `state.configProject.ai.tasks` directly, the existing save should work as-is. Verify:
 
@@ -828,21 +824,17 @@ const r = await api('PUT', '/api/config/project', state.configProject);
 
 No changes needed to the save flow.
 
-- [ ] **Step 6: Commit**
-
-```bash
-git add -A
-git commit -m "feat(ui): add task binding panel with dropdowns in Settings Project tab"
+- [x] **Step 6: Commit: `87cd821` feat(ui): add task binding panel with dropdowns in Settings Project tab**
 ```
 
 ---
 
-### Task 5: CSS styles for provider cards, modals, empty states
+### Task 5: CSS styles for provider cards, modals, empty states ✅
 
 **Files:**
 - Modify: `clio/ui/static/style.css`
 
-- [ ] **Step 1: Add provider card styles**
+- [x] **Step 1: Add provider card styles**
 
 ```css
 /* Provider cards (model registry) */
@@ -996,7 +988,7 @@ git commit -m "feat(ui): add task binding panel with dropdowns in Settings Proje
 }
 ```
 
-- [ ] **Step 2: Commit**
+- [x] **Step 2: Commit: `61d50b8` feat(ui): add CSS styles for provider cards and task binding cards**
 
 ```bash
 git add -A
@@ -1005,9 +997,9 @@ git commit -m "style(ui): add CSS for provider cards, task binding, modals, tag 
 
 ---
 
-### Task 6: Integration & full test suite
+### Task 6: Integration & full test suite ✅
 
-- [ ] **Step 1: Run full test suite**
+- [x] **Step 1: Run full test suite (972 passed)**
 
 ```bash
 python -m pytest clio/tests/ -v --tb=short 2>&1 | tail -20
@@ -1015,14 +1007,14 @@ python -m pytest clio/tests/ -v --tb=short 2>&1 | tail -20
 
 Expected: 970+ passed (existing tests + new tests added).
 
-- [ ] **Step 2: Verify build/lint**
+- [x] **Step 2: Verify build/lint**
 
 ```bash
 ruff check .
 ruff format . --check
 ```
 
-- [ ] **Step 3: Manual verification flow**
+- [x] **Step 3: Manual verification flow**
 
 1. Start server: `python main.py serve --no-browser`
 2. Open browser → Settings tab → Global sub-tab
@@ -1038,16 +1030,16 @@ ruff format . --check
 12. Verify: Cross-tab navigation link works from Project→Global
 13. Verify: Save config → reload → data persists
 
-- [ ] **Step 4: Commit any remaining fixes**
+- [x] **Step 4: Commit any remaining fixes (7 fix commits: fe63fe6, d550715, 21307f5, a1e5b32, 9b9a7ab, 86c88e7, 2a712f7)**
 
 ```bash
 git add -A
 git commit -m "fix(ui): address integration issues in model registry UI"
 ```
 
-- [ ] **Step 5: Update ROADMAP.md** — mark R-017a through R-017f as done
+- [x] **Step 5: Update ROADMAP.md** — mark R-017a through R-017f as done
 
-- [ ] **Step 6: Final commit**
+- [x] **Step 6: Final commit**
 
 ```bash
 git add -A

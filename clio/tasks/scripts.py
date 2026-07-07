@@ -16,6 +16,7 @@ from clio.log import timed
 from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
 from clio.schema import add_schema_version
+from clio.tasks._helpers import _matches_selected_artifact, _selected_stems
 from clio.utils import write_json_atomic, write_text_atomic
 
 
@@ -29,6 +30,7 @@ def _process_one_script(
     state: ProcessingState,
     tracker: ProgressTracker | None,
     context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
 ) -> bool | str:
     """Process a single voiceover script. Returns True (ok), False (skipped), or error string."""
     if cancel_event and cancel_event.is_set():
@@ -48,7 +50,13 @@ def _process_one_script(
     if tracker:
         tracker.next(message=f"生成口播 {json_file.stem}")
     script = generate_voiceover(
-        data, template, config, token_store=token_store, cancel_event=cancel_event, context_override=context_override
+        data,
+        template,
+        config,
+        token_store=token_store,
+        cancel_event=cancel_event,
+        context_override=context_override,
+        task_prompts=task_prompts,
     )
     add_schema_version(script)
     write_json_atomic(out, script)
@@ -75,6 +83,7 @@ def run_generate_scripts(
     files: list[str] | None = None,
     overwrite: bool = False,
     context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
     **kwargs: Any,
 ) -> None:
     config.scripts_dir.mkdir(parents=True, exist_ok=True)
@@ -87,8 +96,8 @@ def run_generate_scripts(
     else:
         input_files = sorted(config.texts_dir.glob("*.json"))
     if files is not None:
-        allowed = {Path(f).stem.lower() for f in files}
-        input_files = [f for f in input_files if f.stem.lower() in allowed]
+        selected = _selected_stems(files)
+        input_files = [f for f in input_files if _matches_selected_artifact(f, selected)]
     if not input_files:
         return
     if tracker:
@@ -105,7 +114,16 @@ def run_generate_scripts(
                 print(f"  [口播] {json_file.stem}")
                 t0 = time.monotonic()
                 result = _process_one_script(
-                    json_file, config, template, token_store, cancel_event, overwrite, state, tracker, context_override
+                    json_file,
+                    config,
+                    template,
+                    token_store,
+                    cancel_event,
+                    overwrite,
+                    state,
+                    tracker,
+                    context_override,
+                    task_prompts,
                 )
                 elapsed = time.monotonic() - t0
                 if isinstance(result, str) and result == "cancelled":
@@ -132,6 +150,7 @@ def run_generate_scripts(
                         state,
                         tracker,
                         context_override,
+                        task_prompts,
                     )
                     futures[f] = json_file
 

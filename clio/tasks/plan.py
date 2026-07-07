@@ -1,8 +1,9 @@
-"""Planning task — generate daily vlog editing plan."""
+"""Planning task - generate daily vlog editing plan."""
 
 from __future__ import annotations
 
 import json
+import re
 import threading
 from pathlib import Path
 from typing import Any
@@ -44,6 +45,7 @@ def run_plan_vlog(
     overwrite: bool = False,
     context_override: str | None = None,
     filter_by_day: bool = False,
+    task_prompts: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
     config.plans_dir.mkdir(parents=True, exist_ok=True)
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
@@ -72,13 +74,12 @@ def run_plan_vlog(
             continue
         raw_idx = data.get("index")
         if raw_idx is None:
-            raw_idx = json_file.stem[:3]  # fallback: 从文件名取前缀 "001"
+            raw_idx = json_file.stem[:3]
         try:
             idx = int(raw_idx)
         except (ValueError, TypeError):
             print(f"  [跳过] 无效 index '{raw_idx}' 在 {json_file.name}")
             continue
-        # Use media_identity.original_stem for v2 files
         identity = load_identity(data)
         if identity is not None:
             source_stem = identity.original_stem
@@ -101,23 +102,20 @@ def run_plan_vlog(
         print("没有可用的分析结果，请先运行 analyze")
         return None
 
-    # 加载 transcript 数据
     transcripts_map: dict[str, dict] = {}
     trans_dir = config.transcripts_dir
     if trans_dir.is_dir() and config.whisper.enabled and config.plan.use_transcripts:
         for tf in sorted(trans_dir.glob("*_transcript.json")):
             try:
                 data = json.loads(tf.read_text(encoding="utf-8"))
-                # Try v2 identity first, then fall back to v1 source_stem → extract_orig_stem
                 identity = load_identity(data)
                 if identity is not None:
                     stem = identity.original_stem
                 else:
                     stem = data.get("source_stem", "")
-                    # Fallback: extract original stem from compressed stem
                     if "_" in stem:
                         stem = stem.split("_", 1)[1]
-                    stem = __import__("re").sub(r"_seg\d+$", "", stem)
+                    stem = re.sub(r"_seg\d+$", "", stem)
                 if stem:
                     transcripts_map[stem.lower()] = data
             except (json.JSONDecodeError, KeyError):
@@ -138,6 +136,7 @@ def run_plan_vlog(
             use_transcripts=config.plan.use_transcripts,
             token_store=token_store,
             context_override=context_override,
+            task_prompts=task_prompts,
         )
         if config.plan.use_transcripts:
             plan["_transcripts_missing"] = not transcripts_map
@@ -190,6 +189,7 @@ def run_plan_all_days(
     cancel_event: threading.Event | None = None,
     overwrite: bool = False,
     context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
     labels = _discover_day_labels(config)
     if not labels:
@@ -209,6 +209,7 @@ def run_plan_all_days(
             overwrite=overwrite,
             context_override=context_override,
             filter_by_day=True,
+            task_prompts=task_prompts,
         )
         if plan is None:
             continue

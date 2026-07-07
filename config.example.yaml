@@ -22,6 +22,12 @@ proxy:
   enabled: false
   url: "socks5://127.0.0.1:1080"
 
+server:
+  # Optional fixed token for Web UI API access.
+  # Leave empty to disable auth on localhost; non-localhost serve mode auto-generates a token if this is empty.
+  # Set to a long random string to persist a token across server restarts.
+  api_token: ""
+
 # AI 厂家配置（全局，密钥管理见下方说明）
 #
 # API 密钥管理：
@@ -76,9 +82,8 @@ ai:
       base_url: https://api.deepseek.com/v1
       capabilities: [text]
       models:
-        - deepseek-v4-flash
-        - deepseek-v4-pro
-      # timeout_sec: 120
+        - deepseek-chat
+        - deepseek-reasoner
       # max_tokens: 4096
   #
   # ⚠️ 注意：不要在 config.yaml 里写 api_key 字段，密钥请放在 .env 文件中

@@ -9,6 +9,7 @@ import sys
 from pathlib import Path
 
 from clio.config import apply_run_paths, load_config
+from clio.doctor import is_virtualenv_python, run_doctor
 from clio.log import setup_logging
 from clio.shutdown import before_stop, install_hooks
 from clio.ui import run as run_ui
@@ -60,7 +61,7 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
             ok = False
 
     print("环境检查:")
-    venv_ok = sys.prefix != sys.base_prefix or ".venv" in sys.executable
+    venv_ok = is_virtualenv_python()
     status(
         "虚拟环境",
         venv_ok,
@@ -149,6 +150,9 @@ def main(argv: list[str] | None = None) -> int:
 
     p_check = sub.add_parser("check", help="检查环境配置是否就绪")
     p_check.add_argument("-i", "--input", type=Path, help="检查指定素材文件夹")
+
+    p_doctor = sub.add_parser("doctor", help="诊断本机环境、依赖、配置和常见运行风险")
+    p_doctor.add_argument("-i", "--input", type=Path, help="诊断指定素材文件夹")
 
     p_plan = sub.add_parser("plan", help="生成单日 vlog 剪辑规划")
     _add_io_args(p_plan)
@@ -269,6 +273,9 @@ def main(argv: list[str] | None = None) -> int:
     if not config_path.exists():
         print(f"配置文件不存在: {config_path}", file=sys.stderr)
         return 1
+
+    if args.command == "doctor":
+        return run_doctor(config_path, getattr(args, "input", None))
 
     base_config = load_config(config_path)
     setup_logging(base_config.paths.logs_dir)

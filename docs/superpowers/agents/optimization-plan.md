@@ -1,6 +1,6 @@
-# Optimization Plan — Active Refactoring Items
+# Optimization Plan - Active Refactoring Items
 
-> Extracted from AGENTS.md §11. Reference document — load on demand when planning refactoring work.
+> Extracted from AGENTS.md section 11. Reference document - load on demand when planning refactoring work.
 
 ## 11. Optimization Plan (2026-06-20 Code Review)
 
@@ -38,11 +38,11 @@ Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cros
 |-------|--------|-----|
 | `server.py:524` hardcodes `config_path.parent / "projects.json"` instead of `_registry_path()` | Fragile duplicate path logic | **U-004** |
 | `serve.ps1`/`serve.sh` has hardcoded project paths | Not distributable | Needs de-localization |
-| ROADMAP.md 656 lines — completed features not archived | Maintenance burden | Periodic cleanup |
-| AGENTS.md §7 commit history overly long (100+ entries) | Should trim to ~30 | Periodic cleanup |
-| `transcribe.py` low-confidence segs silently dropped | Information loss for downstream | **U-009** |
-| `server.py` 6% coverage + `fs.py` 12% coverage | Security-sensitive untested surface | **U-010** ✅ |
-| ~~`videos.py:101` sidecar mapping — all split segments to first sidecar~~ | ~~All split segments share same text/script in UI~~ | ~~B-097~~ ✅ `05edab2` |
+| ROADMAP.md 656 lines - completed features not archived | Maintenance burden | Periodic cleanup |
+| AGENTS.md section 7 commit history overly long (100+ entries) | Should trim to ~30 | Periodic cleanup |
+| `transcribe.py` low-confidence segs silently dropped | Information loss for downstream | ✅ **U-009** (`fcbf9f3`) |
+| `server.py` 6% coverage + `fs.py` 12% coverage | Security-sensitive untested surface | ✅ **U-010** (`c0e88fc`) |
+| ~~`videos.py:101` sidecar mapping - all split segments to first sidecar~~ | ~~All split segments share same text/script in UI~~ | ~~B-097~~ ✅ `05edab2` |
 
 ### Tracking
 

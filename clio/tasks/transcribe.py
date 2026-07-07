@@ -17,6 +17,7 @@ from clio.log import format_duration
 from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
 from clio.schema import add_schema_version
+from clio.tasks._helpers import _matches_selected_stem, _selected_stems
 from clio.tasks.transcript_align import enrich_matching_analysis_files
 from clio.transcribe import check_whisper, transcribe_audio
 from clio.utils import find_videos, popen_subprocess, resolve_binary, write_json_atomic
@@ -153,8 +154,8 @@ def run_transcribe_all(
         return 0
     videos = find_videos(compressed_dir)
     if files is not None:
-        allowed = {Path(f).stem.lower() for f in files}
-        videos = [v for v in videos if v.stem.lower() in allowed]
+        selected = _selected_stems(files)
+        videos = [v for v in videos if _matches_selected_stem(v, selected)]
     total = len(videos)
     if total == 0:
         print("没有找到需要转录的视频")
