@@ -264,6 +264,11 @@ def make_handler(
                 "/api/config/project",
                 "/api/providers",
                 "/api/video",
+                "/api/run/status",
+                "/api/run/stream",
+                "/api/processing-state",
+                "/api/token-usage",
+                "/api/logs",
                 "/api/fs/dirs",
                 "/api/prompts",
             }

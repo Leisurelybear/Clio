@@ -244,13 +244,18 @@ function _startRunSSE() {
   _stopRunSSE();
   let url = '/api/run/stream';
   let sep = '?';
-  if (state.currentProjectName) {
-    url += sep + 'project=' + encodeURIComponent(state.currentProjectName);
+  const addQuery = (key, value) => {
+    if (!value) return;
+    url += sep + key + '=' + encodeURIComponent(value);
     sep = '&';
+  };
+  if (state.currentProjectName) {
+    addQuery('project', state.currentProjectName);
   }
   if (state.currentProjectInputDir) {
-    url += sep + 'input_dir=' + encodeURIComponent(state.currentProjectInputDir);
+    addQuery('input_dir', state.currentProjectInputDir);
   }
+  addQuery('token', sessionStorage.getItem('api_token'));
   _runEventSource = new EventSource(url);
   _runEventSource.onmessage = (event) => {
     try {
