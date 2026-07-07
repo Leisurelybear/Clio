@@ -363,7 +363,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] R-003d: UI: each video list item has dropdown "Rerun texts / voiceover / all"
 - [x] R-003f: Backend `POST /api/rerun` accepts `{video, task, source}`
 - [x] R-003e: UI refine tab adds temporary context textarea (deferred to separate task)
-- [ ] R-003g: Pipeline `run_rerun_single` (single-file support already exists, no separate function needed)
+- [x] R-003g: Pipeline `run_rerun_single` not needed; single-file support already exists in task functions and `/api/rerun`.
 
 ## ✅ Feature R-011: Plan Panel Preview Playback
 
