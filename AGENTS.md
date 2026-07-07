@@ -14,7 +14,7 @@ An **AI preprocessing pipeline**: raw travel vlog footage → ffmpeg compression
 - **google-genai** (Gemini 2.5 Flash video File API)
 - **httpx** (DeepSeek / OpenAI compatible calls)
 - **PyYAML** (config parsing; split into `config.yaml` global + `project.yaml` per-project)
-- **pytest** (unit tests, auto-run in CI; **914 test cases**)
+- **pytest** (unit tests, auto-run in CI; **1010 test cases**)
 
 Dependencies in `requirements.txt`; `setup.ps1`/`setup.sh` creates venv + installs ffmpeg + copies `.env` in one click.
 
@@ -54,7 +54,7 @@ vlog-video-analysis/
 ├── config.example.yaml / .env.example
 ├── requirements.txt / requirements-locked.txt
 ├── .github/workflows/test.yml
-└── clio/tests/            pytest unit tests (864 cases)
+└── clio/tests/            pytest unit tests (1010 cases)
 ```
 
 > See `docs/superpowers/agents/directory-tree.md` for full tree with file-level annotations and test coverage details.
@@ -176,8 +176,13 @@ python main.py serve --no-browser              # Verify UI starts
 | Understand the project quickly | AGENTS.md (already loaded) |
 | See project history and recent changes | `CHANGELOG.md` |
 | Know known pitfalls and traps | `docs/superpowers/agents/gotchas.md` |
+| Plan non-trivial maintenance safely | `docs/superpowers/agents/maintenance-instructions.md` |
 | Check active refactoring items | `docs/superpowers/agents/optimization-plan.md` |
 | See full directory tree with annotations | `docs/superpowers/agents/directory-tree.md` |
+| Decide what workflow deserves a skill | `docs/superpowers/agents/skill-candidates.md` |
 | Add a new AI provider | Skill: `adding-ai-provider` |
 | Add a new AI task | Skill: `adding-new-task` |
 | Add a new CLI subcommand | Skill: `adding-cli-subcommand` |
+| Change config schema or config UI | Skill: `vlog-config-split-changes` |
+| Fix original/compressed/split matching | Skill: `vlog-artifact-identity-fixes` |
+| Work through review findings | Skill: `vlog-review-iteration` |

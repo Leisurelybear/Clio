@@ -12,15 +12,15 @@ Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cros
 |---------|--------|-------|--------|
 | `make_handler` closure too large (432 lines) | Extract business logic to services | **U-001** | ✅ mostly done (routes/ + services/) |
 | config.py 406 lines, 14 dataclasses | Split into `config/` package | **U-003** | ✅ done |
-| File system as database | Repository layer (long-term) | Phase 3 | — |
+| File system as database | Repository layer (long-term) | Phase 3 | still future |
 | Config cache not true LRU | Fix in U-001a | **U-001** | ✅ done (`config_cache.py`) |
-| No domain models | `@dataclass VideoAnalysis/Segment/VoiceoverScript` | Phase 3 | — |
-| No token cost tracking | `ai/cost_tracker.py` | Phase 3 | — |
+| No domain models | `@dataclass VideoAnalysis/Segment/VoiceoverScript` | Phase 3 | still future |
+| No token cost tracking | `ai/cost_tracker.py` | Phase 3 | ✅ done via `clio/ai/token_usage.py` |
 | Pipeline cancel not covering analyze/scripts/plan/label | Add cancel_event to all loop steps | **U-005** | ✅ done |
 | `RateLimiter` lock blocks parallel AI calls | Split acquire from sleep | **U-006** | ✅ done |
 | Whisper download ctypes thread kill unsafe | Replace with chunked download | **U-007** | ✅ done |
-| `/api/fs/dirs` no auth/restriction for LAN mode | Add root restriction + token | **U-008** |
-| Whisper low-confidence segments silently dropped | Mark `low_confidence` flag | **U-009** |
+| `/api/fs/dirs` no auth/restriction for LAN mode | Add root restriction + token | **U-008** | ✅ done |
+| Whisper low-confidence segments silently dropped | Mark `low_confidence` flag | **U-009** | ✅ done |
 
 ### What reviews got wrong (already fixed)
 
@@ -41,9 +41,9 @@ Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cros
 | ROADMAP.md 656 lines — completed features not archived | Maintenance burden | Periodic cleanup |
 | AGENTS.md §7 commit history overly long (100+ entries) | Should trim to ~30 | Periodic cleanup |
 | `transcribe.py` low-confidence segs silently dropped | Information loss for downstream | **U-009** |
-| `server.py` 6% coverage + `fs.py` 12% coverage | Security-sensitive untested surface | **U-010** |
+| `server.py` 6% coverage + `fs.py` 12% coverage | Security-sensitive untested surface | **U-010** ✅ |
 | ~~`videos.py:101` sidecar mapping — all split segments to first sidecar~~ | ~~All split segments share same text/script in UI~~ | ~~B-097~~ ✅ `05edab2` |
 
 ### Tracking
 
-See `ROADMAP.md` section "In Progress" — entries **U-002**, **U-007**, **U-008**, **U-010**.
+See `ROADMAP.md` for current active work. This file is a compact review-derived reference, not the source of truth for task status.

@@ -6,7 +6,7 @@
 
 In `scale=min(640,iw):-2`, the `,` is parsed by ffmpeg as a filter chain separator.
 **Must** be written as `scale=min(640\,iw):-2` (in Python source: `\\,`).
-See `vlog_tool/compress.py:24`.
+See `clio/compress.py`.
 
 ### 9.2 Windows + `git filter-branch --msg-filter`
 
@@ -30,7 +30,7 @@ See `vlog_tool/compress.py:24`.
 
 - This is the **environment variable name** (e.g. `DEEPSEEK_API_KEY`), not the key itself
 - Old code incorrectly filled the actual key into the `api_key_env` field, causing error messages to leak the key
-- Fix: `vlog_tool/utils.py:mask_if_looks_like_key()` detects `sk-` / `AIza` prefixes and masks them
+- Fix: `clio/utils.py:mask_if_looks_like_key()` detects `sk-` / `AIza` prefixes and masks them
 
 ### 9.6 Misleading Name `analyze.skip_existing`
 
@@ -91,32 +91,27 @@ See `vlog_tool/compress.py:24`.
 
 ### 9.15 `cancel_event` Propagation in Pipeline
 
-- `pipeline.py:108` only passes `cancel_event` to `compress`, `transcribe`, `cut`
-- `run_analyze_all` / `run_generate_scripts` / `run_plan_vlog` / `run_label_videos` have **no** `cancel_event` parameter
-- When adding cancel support to a new step, follow the pattern in `cut.py`: accept `cancel_event: threading.Event | None` in function signature, check `if cancel_event and cancel_event.is_set(): break` inside the main loop
-- All steps should propagate `cancel_event`; if a new step is added, add it to the propagation list in `pipeline.py`
+- This is fixed for current steps, but it remains a contract for new steps.
+- New task functions should accept `cancel_event: threading.Event | None` when they do long-running work.
+- Check cancellation inside the main loop and pass the event from UI/CLI route handlers through `run_pipeline_steps()`.
+- Keep rerun, selected-file runs, and full pipeline behavior consistent.
 
 ### 9.16 `RateLimiter` Lock Reentrancy
 
-- `RateLimiter.__enter__` holds `self._lock` during `time.sleep(wait)` — this blocks all threads even if their rate limit windows haven't expired
-- This is safe for single-threaded use but defeats parallelism when `ThreadPoolExecutor` is used for concurrent AI calls
-- Fix pattern: split into `acquire()` (locked, returns wait time) and let the caller sleep + make the API call outside the lock
-- Any parallelization effort (P-001/Perf-1) must refactor this first
+- The original lock-sleep issue has been fixed, but keep this invariant: rate limiting should compute waits under a lock and sleep outside shared locks.
+- Any new provider or parallel AI path should reuse the existing rate limiter pattern rather than adding ad hoc sleeps.
 
 ### 9.17 Whisper Download Thread Cancellation
 
-- `whisper_routes.py` uses `ctypes.pythonapi.PyThreadState_SetAsyncExc` to kill the download thread
-- This is unsafe: if the thread is blocked in a C extension (e.g., socket read), the exception injection is silently deferred
-- `SystemExit` may skip `finally` blocks, leaving file locks / `.lock` files in inconsistent state
-- Preferred approach: chunked `requests.get(stream=True)` with per-chunk cancel check, no `ctypes` needed
-- Mark `B-092` / `U-007` for the fix
+- The unsafe `ctypes.pythonapi.PyThreadState_SetAsyncExc` approach has been removed.
+- Keep model downloads chunked and cancellation-aware: stream downloads, check cancel flags between chunks, and clean partial files explicitly.
+- Relevant modules are split across `clio/ui/routes/whisper_check.py`, `whisper_download.py`, and `whisper_models.py`.
 
 ### 9.18 `/api/fs/dirs` Security
 
-- `fs.py` has no path restriction — full filesystem is browseable
-- When combined with `--host 0.0.0.0`, any device on LAN can read directory structure, video files, and write config
-- Fix: restrict to user home directory by default, add `UI_TOKEN` env var for LAN mode
-- The file has only 12% test coverage — a security-sensitive untested surface
+- Path restriction and token auth are implemented. Preserve this contract when adding browse-like routes.
+- When serving with `--host 0.0.0.0`, sensitive routes must require token auth.
+- Keep route coverage in `clio/tests/test_fs.py` and `clio/tests/test_server.py` when changing filesystem browsing.
 
 ### 9.19 beforeStop Hook (`shutdown.py`)
 

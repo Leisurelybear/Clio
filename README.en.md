@@ -212,7 +212,7 @@ vlog-video-analysis/
 │   ├── ai/                    # 🧠 AI adapters (Gemini / OpenAI compat)
 │   ├── tasks/                 # 📂 Step implementations
 │   ├── ui/                    # 🌐 Web UI (stdlib only, zero deps)
-│   └── tests/                 # 🧪 860+ unit tests
+│   └── tests/                 # 🧪 1000+ unit tests
 └── output/
     ├── compressed/            # 🗜️ Compressed videos
     ├── texts/                 # 📝 AI analysis JSON
@@ -230,7 +230,7 @@ vlog-video-analysis/
 ```bash
 python -m pytest clio/tests/ -v
 
-# 860+ tests · GitHub Actions CI (Ubuntu + Windows · 3.11 / 3.12)
+# 1000+ tests · GitHub Actions CI (Ubuntu + Windows · 3.11 / 3.12)
 # Code style: ruff (format + lint)
 ```
 

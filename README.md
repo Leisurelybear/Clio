@@ -7,7 +7,7 @@
 [![CI](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml/badge.svg)](https://github.com/Leisurelybear/vlog-editing-helper/actions/workflows/test.yml)
 [![codecov](https://codecov.io/gh/Leisurelybear/vlog-editing-helper/graph/badge.svg?token=CODECOV_TOKEN)](https://codecov.io/gh/Leisurelybear/vlog-editing-helper)
 ![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)
-![tests](https://img.shields.io/badge/tests-860%2B-brightgreen)
+![tests](https://img.shields.io/badge/tests-1000%2B-brightgreen)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 [English](README.en.md) · **简体中文**
@@ -227,7 +227,7 @@ vlog-video-analysis/
 │   ├── ai/                    # 🧠 AI 适配层（Gemini / OpenAI 兼容）
 │   ├── tasks/                 # 📂 各步骤具体实现
 │   ├── ui/                    # 🌐 Web UI（零依赖纯 stdlib）
-│   └── tests/                 # 🧪 860+ 单元测试
+│   └── tests/                 # 🧪 1000+ 单元测试
 └── output/
     ├── compressed/            # 🗜️ 压缩后的视频
     ├── texts/                 # 📝 AI 分析结果 JSON
@@ -246,7 +246,7 @@ vlog-video-analysis/
 # 跑全部测试
 python -m pytest clio/tests/ -v
 
-# 860+ 用例 · GitHub Actions CI（Ubuntu + Windows · 3.11 / 3.12）
+# 1000+ 用例 · GitHub Actions CI（Ubuntu + Windows · 3.11 / 3.12）
 # 代码风格: ruff (format + lint)
 ```
 
