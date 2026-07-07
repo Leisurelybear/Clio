@@ -7,6 +7,7 @@ from pathlib import Path
 PROMPT_OVERRIDE_DIR = Path("templates") / "prompts"
 PROMPT_SUFFIXES = (".md", ".txt", "")
 _PLACEHOLDER_RE = re.compile(r"(?<!\{)\{([A-Za-z_][A-Za-z0-9_]*)\}(?!\})")
+_PROMPT_FILE_CACHE: dict[Path, tuple[int, int, str]] = {}
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,17 @@ def prompt_override_dir(project_dir: str | Path) -> Path:
     return Path(project_dir) / PROMPT_OVERRIDE_DIR
 
 
+def _read_prompt_file(path: Path) -> str:
+    resolved = path.resolve()
+    stat = path.stat()
+    cached = _PROMPT_FILE_CACHE.get(resolved)
+    if cached and cached[0] == stat.st_mtime_ns and cached[1] == stat.st_size:
+        return cached[2]
+    text = path.read_text(encoding="utf-8").strip()
+    _PROMPT_FILE_CACHE[resolved] = (stat.st_mtime_ns, stat.st_size, text)
+    return text
+
+
 def find_prompt_override(name: str, project_dir: str | Path | None = None) -> PromptOverride | None:
     search_roots: list[Path] = []
     if project_dir:
@@ -38,7 +50,7 @@ def find_prompt_override(name: str, project_dir: str | Path | None = None) -> Pr
                 continue
             seen.add(resolved)
             if candidate.is_file():
-                text = candidate.read_text(encoding="utf-8").strip()
+                text = _read_prompt_file(candidate)
                 if text:
                     return PromptOverride(path=candidate, content=text)
     return None
