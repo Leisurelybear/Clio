@@ -104,6 +104,7 @@ graph LR
 
 > 💡 支持**单个文件**处理：`python main.py analyze -i "output/compressed/001_GL010685.mp4"`
 > 💡 每步独立运行、自动跳过已有输出，加 `--force` 强制重跑
+> 💡 对比多个视频模型：`python main.py compare-models -i "output/compressed/001_GL010685.mp4" --models gemini:gemini-2.5-flash gemini:gemini-2.0-flash`
 
 ---
 
@@ -169,6 +170,16 @@ python main.py serve
 每个任务可独立指定厂家和模型（`project.yaml` 的 `ai.tasks`），支持 **OpenAI 兼容接口**（通义千问 / Kimi 等）。OpenAI 兼容厂家可设置 `timeout_sec`，用于慢速网关或本地模型。
 
 📌 **trip 上下文自动注入**：行程背景、避免误判提示（如 "不要把戴高乐机场 RER 误认为曼谷"）统一写在 `templates/trip_context.md`，每次 AI 调用前自动插入。—
+
+多模型视频分析对比：
+
+```bash
+python main.py compare-models \
+  -i "output/compressed/001_GL010685.mp4" \
+  --models gemini:gemini-2.5-flash gemini:gemini-2.0-flash
+```
+
+输出写入 `output/model_compare/`，包含完整 JSON 和 Markdown 摘要表，方便比较标题、地点、摘要、时间轴数量、highlight 数量和 `_confidence`。
 
 ## 🎯 典型工作流
 

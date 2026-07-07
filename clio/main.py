@@ -211,6 +211,23 @@ def main(argv: list[str] | None = None) -> int:
         help="临时上下文说明，附加到 ai.context 之后（仅本次 refine 生效）",
     )
 
+    p_compare = sub.add_parser("compare-models", help="用多个视频模型分析同一视频并生成对比报告")
+    p_compare.add_argument("-i", "--input", type=Path, required=True, help="要分析的视频文件")
+    p_compare.add_argument(
+        "--models",
+        nargs="+",
+        required=True,
+        help="模型列表，格式 provider:model；也支持逗号分隔",
+    )
+    p_compare.add_argument("--out-dir", type=Path, default=None, help="报告输出目录（默认 output/model_compare/）")
+    p_compare.add_argument(
+        "--context",
+        "-C",
+        type=str,
+        default="",
+        help="临时上下文说明，附加到 ai.context 之后（仅本次对比生效）",
+    )
+
     p_migrate = sub.add_parser("migrate-config", help="扫描已有项目的 project.yaml，补充缺失的 provider 配置字段")
     p_migrate.add_argument("--projects-root", type=Path, default=None, help="项目根目录（扫描子目录中的 project.yaml）")
 
@@ -277,6 +294,19 @@ def main(argv: list[str] | None = None) -> int:
             return run_whisper_install(config_path)
         elif args.whisper_command == "check":
             return run_whisper_check(config_path)
+
+    elif args.command == "compare-models":
+        from clio.tasks.compare_models import run_compare_models
+
+        config = load_config(config_path)
+        context_override = (getattr(args, "context", "") or "").strip() or None
+        return run_compare_models(
+            config,
+            args.input,
+            args.models,
+            output_dir=args.out_dir,
+            context_override=context_override,
+        )
 
     # ── Single-file detection ────────────────────────────────────────
     # If -i points to a single file for compress/analyze/scripts,
