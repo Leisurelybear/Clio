@@ -774,5 +774,5 @@ Older completed sections (commit log, test coverage verification, code review au
 | ID | Type | Finding | Proposed fix | Status |
 | --- | --- | --- | --- | --- |
 | B-102 | Bug | Prompt management API only reports project-level `.md` overrides; repo-level overrides and `.txt`/suffixless files are invisible to `GET /api/prompts` and restore flows | Return effective source path and support every accepted suffix when resolving overrides | ✅ |
-| B-103 | Bug | External prompt files are rendered with `str.format()`, so a stray `{` or missing placeholder can crash AI calls at runtime | Add safe prompt rendering or validate overrides before use | 🆕 |
+| B-103 | Bug | External prompt files are rendered with `str.format()`, so a stray `{` or missing placeholder can crash AI calls at runtime | Add safe prompt rendering or validate overrides before use | ✅ |
 | P-004 | Optimization | Prompt overrides are re-read from disk on every AI call | Cache prompt files by mtime and invalidate when the file changes | 🆕 |
