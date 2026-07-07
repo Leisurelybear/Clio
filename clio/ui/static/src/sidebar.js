@@ -38,14 +38,12 @@ async function selectVideo(file) {
   player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${projParam}${extraParam}`;
   $('player-name').textContent = file;
 
-  if (state.source === 'original') {
-    player.onloadedmetadata = () => {
-      $('player-time').textContent = `${fmtTime(0)} / ${fmtTime(player.duration)}`;
-      if ((v.offset_sec || 0) > 0) {
-        player.currentTime = v.offset_sec;
-      }
-    };
-  }
+  player.onloadedmetadata = () => {
+    $('player-time').textContent = `${fmtTime(0)} / ${fmtTime(player.duration)}`;
+    if (state.source === 'original' && (v.offset_sec || 0) > 0) {
+      player.currentTime = v.offset_sec;
+    }
+  };
 
   if (v.text_json) {
     try {
@@ -185,14 +183,14 @@ function toggleSelection() {
   }
 }
 
-async function setSource(source) {
+async function setSource(source, options = {}) {
   if (source === state.source) return;
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换源吗？')) return;
   }
   if (state.previewActive) stopPreview();
-  const oldVideo = state.videos.find(x => x.file === state.currentVideo);
-  const oldMatchFile = oldVideo?.match?.file;
+  const oldVideo = options.fromVideo || state.videos.find(x => x.file === state.currentVideo);
+  const oldMatchFile = options.matchFile ?? oldVideo?.match?.file;
   const wasPlanView = state.currentEntity === 'plan';
   if (!wasPlanView) {
     $('player-pane').classList.remove('plan-mode');
@@ -241,6 +239,15 @@ function _findSourceSwitchTarget(oldVideo, videos, oldMatchFile = null) {
   ) || null;
 }
 
+async function jumpToCounterpart(video) {
+  if (!video?.match?.source) return;
+  if (video.match.source === state.source) {
+    await selectVideo(video.match.file);
+    return;
+  }
+  await setSource(video.match.source, { fromVideo: video, matchFile: video.match.file });
+}
+
 async function switchToOriginalThenCompress() {
   await setSource('original');
 }
@@ -268,6 +275,7 @@ export {
   selectLogs,
   selectTokens,
   setSource,
+  jumpToCounterpart,
   _findSourceSwitchTarget,
   openBrowseDir,
   loadBrowseDir,

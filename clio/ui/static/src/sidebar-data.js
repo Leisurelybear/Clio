@@ -145,9 +145,9 @@ function renderVideoItem(v) {
   if (v.match) {
     if (v.segment_matches && v.segment_matches.length > 1) {
       const segList = v.segment_matches.map(m => m.file).join(', ');
-      matchBadge = `<span class="match-badge" title="${escapeHtml(segList)}">→ ${counterpartLabel}: ${v.segment_matches.length} 段</span>`;
+      matchBadge = `<button type="button" class="match-badge match-jump" title="${escapeHtml(segList)}">→ ${counterpartLabel}: ${escapeHtml(v.index || '')}/${v.segment_matches.length} 段</button>`;
     } else {
-      matchBadge = `<span class="match-badge" title="${escapeHtml(v.match.file)}">→ ${counterpartLabel}: ${escapeHtml(v.match.file)}</span>`;
+      matchBadge = `<button type="button" class="match-badge match-jump" title="${escapeHtml(v.match.file)}">→ ${counterpartLabel}: ${escapeHtml(v.match.file)}</button>`;
     }
   } else {
     matchBadge = `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
@@ -187,6 +187,7 @@ function renderVideoItem(v) {
   `;
 
   li.onclick = (e) => {
+    if (e.target.closest('.match-jump')) return;
     if (e.target.closest('.video-actions')) return;
     if (state.selectionMode) {
       if (e.target.closest('.video-checkbox')) return;
@@ -196,6 +197,15 @@ function renderVideoItem(v) {
     }
     import('./sidebar.js').then(mod => mod.selectVideo(v.file));
   };
+
+  const matchJump = li.querySelector('.match-jump');
+  if (matchJump) {
+    matchJump.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      import('./sidebar.js').then(mod => mod.jumpToCounterpart(v));
+    };
+  }
 
   const menuBtn = li.querySelector('.menu-btn');
   const dropdown = li.querySelector('.menu-dropdown');

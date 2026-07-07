@@ -507,9 +507,12 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
   display: inline-flex; align-items: center; gap: 3px;
   font-size: 10px; background: var(--success-bg);
   color: var(--success); padding: 1px 6px;
+  border: 0;
   border-radius: 10px; font-family: var(--font-mono);
   white-space: nowrap; font-weight: 500;
 }
+button.match-badge { cursor: pointer; }
+button.match-badge:hover { background: var(--bg-hover); color: var(--text-primary); }
 .match-badge.miss { background: var(--error-bg); color: var(--error); }
 .video-item.active .match-badge { background: var(--accent-bg); color: var(--accent); }
 
