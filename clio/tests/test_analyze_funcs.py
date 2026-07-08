@@ -94,12 +94,17 @@ class TestWrapWithContext:
 def test_analyze_video_uses_prompt_override(tmp_path, monkeypatch):
     from clio.analyze import analyze_video
 
+    template_file = tmp_path / "templates" / "vlog_template.md"
+    template_file.parent.mkdir(parents=True)
+    template_file.write_text("template", encoding="utf-8")
+
     prompt_dir = tmp_path / "templates" / "prompts"
     prompt_dir.mkdir(parents=True)
-    (prompt_dir / "ANALYZE_PROMPT.md").write_text("override analyze prompt", encoding="utf-8")
+    (prompt_dir / "video_analyze.md").write_text("override analyze prompt", encoding="utf-8")
 
     cfg = _fake_config()
     cfg.paths.input_dir = tmp_path
+    cfg.script.template_file = template_file
     provider = MagicMock(provider_id="mock")
     provider.analyze_video.return_value = AIResponse('{"title":"x","summary":"y","timeline":[]}')
 
