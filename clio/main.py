@@ -157,6 +157,7 @@ def main(argv: list[str] | None = None) -> int:
     p_plan = sub.add_parser("plan", help="生成单日 vlog 剪辑规划")
     _add_io_args(p_plan)
     p_plan.add_argument("--day", default="day1", help="日 vlog 标签")
+    p_plan.add_argument("--all-days", action="store_true", help="按分析结果中的 day/day_label 批量生成多日规划")
     p_plan.add_argument("--no-transcripts", action="store_true", help="不注入语音转录信息到 prompt")
 
     p_run = sub.add_parser("run", help="一键执行完整流程")
@@ -212,6 +213,23 @@ def main(argv: list[str] | None = None) -> int:
         type=str,
         default="",
         help="临时上下文说明，附加到 ai.context 之后（仅本次 refine 生效）",
+    )
+
+    p_compare = sub.add_parser("compare-models", help="用多个视频模型分析同一视频并生成对比报告")
+    p_compare.add_argument("-i", "--input", type=Path, required=True, help="要分析的视频文件")
+    p_compare.add_argument(
+        "--models",
+        nargs="+",
+        required=True,
+        help="模型列表，格式 provider:model；也支持逗号分隔",
+    )
+    p_compare.add_argument("--out-dir", type=Path, default=None, help="报告输出目录（默认 output/model_compare/）")
+    p_compare.add_argument(
+        "--context",
+        "-C",
+        type=str,
+        default="",
+        help="临时上下文说明，附加到 ai.context 之后（仅本次对比生效）",
     )
 
     p_migrate = sub.add_parser("migrate-config", help="扫描已有项目的 project.yaml，补充缺失的 provider 配置字段")
@@ -284,6 +302,19 @@ def main(argv: list[str] | None = None) -> int:
         elif args.whisper_command == "check":
             return run_whisper_check(config_path)
 
+    elif args.command == "compare-models":
+        from clio.tasks.compare_models import run_compare_models
+
+        config = load_config(config_path)
+        context_override = (getattr(args, "context", "") or "").strip() or None
+        return run_compare_models(
+            config,
+            args.input,
+            args.models,
+            output_dir=args.out_dir,
+            context_override=context_override,
+        )
+
     # ── Single-file detection ────────────────────────────────────────
     # If -i points to a single file for compress/analyze/scripts,
     # don't let _prepare_config set it as input_dir (refine already handles -i correctly)
@@ -332,12 +363,15 @@ def main(argv: list[str] | None = None) -> int:
             auto_reindex_if_needed(config)
             run_label_videos(config)
         elif args.command == "plan":
-            from clio.pipeline import run_plan_vlog
+            from clio.pipeline import run_plan_all_days, run_plan_vlog
             from clio.tasks.reindex import auto_reindex_if_needed
 
             auto_reindex_if_needed(config)
             config.plan.use_transcripts = not getattr(args, "no_transcripts", False)
-            run_plan_vlog(config, args.day)
+            if getattr(args, "all_days", False):
+                run_plan_all_days(config)
+            else:
+                run_plan_vlog(config, args.day)
         elif args.command == "run":
             from clio.pipeline import run_full_pipeline
 

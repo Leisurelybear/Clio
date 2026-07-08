@@ -32,6 +32,7 @@ from clio.config.models import (
     TaskConfig,
 )
 from clio.config.parsers import (
+    _infer_provider_capabilities,
     _parse_providers,
     _parse_tasks,
 )
@@ -152,6 +153,8 @@ def _upgrade_config_file(yaml_path: Path, *, section_map: dict[str, type]) -> No
                 val = _resolve_field_default(fd)
                 if val is _MISSING:
                     continue
+                if fd.name == "capabilities":
+                    val = _infer_provider_capabilities(pcfg.get("type", "gemini"))
                 pcfg[fd.name] = val
                 added.append(f"ai.providers.{pname}.{fd.name}")
                 changed = True

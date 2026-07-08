@@ -49,7 +49,7 @@ ai:
   # 设为 0 表示永不过期。
   # provider_ttl_min: 60
 
-  # debug_print_prompt: true  # 调试用：设为 true 时打印完整 prompt；默认关闭，避免日志记录上下文/转录等隐私内容
+  # debug_print_prompt: false  # 调试用：每次 AI 调用前打印完整 prompt 到控制台（默认关闭；排查 AI 输出时可改为 true）
   providers:
     gemini:
       type: gemini
@@ -58,6 +58,7 @@ ai:
       poll_interval_sec: 5
       retry_attempts: 5
       requests_per_minute: 0
+      capabilities: [video, text]
       models:
         - gemini-2.5-flash
         - gemini-2.5-flash-lite
@@ -69,6 +70,8 @@ ai:
       type: openai
       api_key_env: OPENAI_API_KEY
       base_url: https://api.openai.com/v1
+      capabilities: [text]
+      # timeout_sec: 120
       models:
         - gpt-4o
         - gpt-4o-mini
@@ -77,6 +80,7 @@ ai:
       type: openai              # OpenAI 兼容接口
       api_key_env: DEEPSEEK_API_KEY
       base_url: https://api.deepseek.com/v1
+      capabilities: [text]
       models:
         - deepseek-chat
         - deepseek-reasoner

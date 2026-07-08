@@ -19,20 +19,29 @@ def _resolve_api_key(provider_raw: dict) -> str:
     return provider_raw.get("api_key", "")
 
 
+def _infer_provider_capabilities(provider_type: str) -> list[str]:
+    if provider_type == "gemini":
+        return ["video", "text"]
+    return ["text"]
+
+
 def _parse_providers(raw: dict) -> dict[str, ProviderConfig]:
     providers: dict[str, ProviderConfig] = {}
     for name, cfg in (raw or {}).items():
+        provider_type = cfg.get("type", "gemini")
         providers[name] = ProviderConfig(
             name=name,
-            type=cfg.get("type", "gemini"),
+            type=provider_type,
             api_key=_resolve_api_key(cfg),
             api_key_env=cfg.get("api_key_env", ""),
             base_url=cfg.get("base_url", ""),
             poll_interval_sec=cfg.get("poll_interval_sec", 5),
             retry_attempts=cfg.get("retry_attempts", 2),
             requests_per_minute=cfg.get("requests_per_minute", 0),
+            timeout_sec=cfg.get("timeout_sec", 120.0),
             max_tokens=cfg.get("max_tokens", 4096),
             models=cfg.get("models", []),
+            capabilities=cfg.get("capabilities") or _infer_provider_capabilities(provider_type),
         )
     return providers
 

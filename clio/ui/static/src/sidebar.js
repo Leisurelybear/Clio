@@ -4,7 +4,7 @@ import {
   updateSidebarDay, updateEntityUI,
 } from './utils.js';
 import { api } from './api.js';
-import { stopPreview } from './viewer.js';
+import { playVideoSegment, stopPreview } from './viewer.js';
 import { showRerunProgress, hideRerunProgress } from './sidebar-rerun.js';
 import { openBrowseDir, loadBrowseDir } from './sidebar-browse.js';
 import {
@@ -38,14 +38,12 @@ async function selectVideo(file) {
   player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${projParam}${extraParam}`;
   $('player-name').textContent = file;
 
-  if (state.source === 'original') {
-    player.onloadedmetadata = () => {
-      $('player-time').textContent = `${fmtTime(0)} / ${fmtTime(player.duration)}`;
-      if ((v.offset_sec || 0) > 0) {
-        player.currentTime = v.offset_sec;
-      }
-    };
-  }
+  player.onloadedmetadata = () => {
+    $('player-time').textContent = `${fmtTime(0)} / ${fmtTime(player.duration)}`;
+    if (state.source === 'original' && (v.offset_sec || 0) > 0) {
+      player.currentTime = v.offset_sec;
+    }
+  };
 
   if (v.text_json) {
     try {
@@ -196,15 +194,18 @@ function sameVideoIndex(a, b) {
   return Number.isFinite(leftNum) && Number.isFinite(rightNum) && leftNum === rightNum;
 }
 
-async function setSource(source) {
+async function setSource(source, options = {}) {
   if (source === state.source) return;
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换源吗？')) return;
   }
   if (state.previewActive) stopPreview();
-  const oldVideo = state.videos.find(x => x.file === state.currentVideo);
-  const oldMatchFile = oldVideo?.match?.file;
-  $('player-pane').classList.remove('plan-mode');
+  const oldVideo = options.fromVideo || state.videos.find(x => x.file === state.currentVideo);
+  const oldMatchFile = options.matchFile ?? oldVideo?.match?.file;
+  const wasPlanView = state.currentEntity === 'plan';
+  if (!wasPlanView) {
+    $('player-pane').classList.remove('plan-mode');
+  }
   state.source = source;
   state.currentVideo = null;
   state.selectionMode = false;
@@ -215,40 +216,47 @@ async function setSource(source) {
   saveProject();
   try {
     await loadVideos();
-    const target = oldVideo
-      ? state.videos.find(v =>
-          v.file === oldMatchFile
-          || v.match?.file === oldVideo.file
-          || sameVideoIndex(v.index, oldVideo.index)
-        )
-      : null;
+    const target = _findSourceSwitchTarget(oldVideo, state.videos, oldMatchFile);
     if (state.videos.length) {
       if (state.currentEntity === 'plan') {
         import('./editor.js').then(mod => mod.renderActiveTab());
         if (target) {
-          state.currentVideo = target.file;
-          const projParam = state.currentProjectName ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
-          const tokenParam = sessionStorage.getItem('api_token');
-          const extraParam = tokenParam ? `&token=${encodeURIComponent(tokenParam)}` : '';
-          $('player').src = `/api/video?file=${encodeURIComponent(target.file)}&source=${source}${projParam}${extraParam}`;
-          $('player-name').textContent = target.file;
-          setStatus(`已切到 ${source} 视图`, 'ok');
+          playVideoSegment(target.file, target.offset_sec || 0);
+          setStatus(`?????${source} ???`, 'ok');
         } else {
           $('player').removeAttribute('src');
-          $('player-name').textContent = '请选择左侧视频或规划节点';
-          setStatus(`已切到 ${source} 视图（仍停留在规划）`, 'ok');
+          $('player-name').textContent = '???????????????????';
+          setStatus(`?????${source} ???????????????`, 'ok');
         }
       } else {
         await selectVideo(target ? target.file : state.videos[0].file);
       }
     } else {
       $('player').removeAttribute('src');
-      $('player-name').textContent = '请选择左侧视频';
-      setStatus(`当前视图没有视频 (${source})`, 'warn');
+      $('player-name').textContent = '???????????';
+      setStatus(`???????????? (${source})`, 'warn');
     }
   } catch (e) {
-    setStatus('切换源失败: ' + e.message, 'err');
+    setStatus('???????? ' + e.message, 'err');
   }
+}
+
+function _findSourceSwitchTarget(oldVideo, videos, oldMatchFile = null) {
+  if (!oldVideo) return null;
+  return videos.find(v =>
+    v.file === oldMatchFile
+    || v.match?.file === oldVideo.file
+    || (oldVideo.index && v.index === oldVideo.index)
+  ) || null;
+}
+
+async function jumpToCounterpart(video) {
+  if (!video?.match?.source) return;
+  if (video.match.source === state.source) {
+    await selectVideo(video.match.file);
+    return;
+  }
+  await setSource(video.match.source, { fromVideo: video, matchFile: video.match.file });
 }
 
 async function switchToOriginalThenCompress() {
@@ -278,6 +286,8 @@ export {
   selectLogs,
   selectTokens,
   setSource,
+  jumpToCounterpart,
+  _findSourceSwitchTarget,
   openBrowseDir,
   loadBrowseDir,
   switchToOriginalThenCompress,

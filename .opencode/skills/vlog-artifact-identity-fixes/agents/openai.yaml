@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vlog Artifact Identity Fixes"
+  short_description: "Guide original/compressed/split identity fixes."
+  default_prompt: "Use this skill when changing Clio video identity, sidecar matching, split segments, or plan/export resolution."

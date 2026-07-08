@@ -5,9 +5,13 @@ from __future__ import annotations
 from http import HTTPStatus
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
-from clio.ui.routes.videos import _parse_segment_info, handle_get_video, handle_get_videos
+from clio.ui.routes.videos import _VIDEOS_CACHE, _parse_segment_info, handle_get_video, handle_get_videos
+
+
+def _clear_videos_cache() -> None:
+    _VIDEOS_CACHE.clear()
 
 
 class TestParseSegmentInfo:
@@ -69,6 +73,9 @@ class TestParseSegmentInfo:
 
 
 class TestHandleGetVideos:
+    def setup_method(self):
+        _clear_videos_cache()
+
     def test_source_compressed(self, tmp_path: Path):
         handler = MagicMock()
         proj_input = tmp_path / "input"
@@ -179,6 +186,59 @@ class TestHandleGetVideos:
         assert vid0["group_key"] == "GL010695"
         assert vid0["segment_label"] == "1/2"
         assert vid1["segment_label"] == "2/2"
+
+    def test_repeated_request_uses_cache(self, tmp_path: Path):
+        handler = MagicMock()
+        proj_input = tmp_path / "input"
+        proj_input.mkdir()
+        proj_out = tmp_path / "output"
+        proj_out.mkdir()
+        comp_dir = proj_out / "compressed"
+        comp_dir.mkdir()
+        (comp_dir / "001_GL010695.mp4").write_bytes(b"")
+
+        handler._resolve_project_input.return_value = proj_input
+        handler._get_project_output.return_value = proj_out
+        handler._send_json = MagicMock()
+
+        with patch(
+            "clio.ui.routes.videos._build_videos_payload",
+            wraps=__import__("clio.ui.routes.videos", fromlist=["_build_videos_payload"])._build_videos_payload,
+        ) as mock_build:
+            handle_get_videos(handler, {"source": ["compressed"]})
+            handle_get_videos(handler, {"source": ["compressed"]})
+
+        assert mock_build.call_count == 1
+        assert handler._send_json.call_count == 2
+
+    def test_sidecar_change_invalidates_cache(self, tmp_path: Path):
+        handler = MagicMock()
+        proj_input = tmp_path / "input"
+        proj_input.mkdir()
+        proj_out = tmp_path / "output"
+        proj_out.mkdir()
+        comp_dir = proj_out / "compressed"
+        comp_dir.mkdir()
+        texts_dir = proj_out / "texts"
+        texts_dir.mkdir()
+        (comp_dir / "001_GL010695.mp4").write_bytes(b"")
+
+        handler._resolve_project_input.return_value = proj_input
+        handler._get_project_output.return_value = proj_out
+        handler._send_json = MagicMock()
+
+        import clio.ui.routes.videos as videos_route
+
+        with patch(
+            "clio.ui.routes.videos._build_videos_payload", wraps=videos_route._build_videos_payload
+        ) as mock_build:
+            handle_get_videos(handler, {"source": ["compressed"]})
+            (texts_dir / "001_GL010695.json").write_text('{"title":"新标题","index":"001"}', encoding="utf-8")
+            handle_get_videos(handler, {"source": ["compressed"]})
+
+        assert mock_build.call_count == 2
+        payload = handler._send_json.call_args[0][0]
+        assert payload["videos"][0]["title"] == "新标题"
 
 
 class TestHandleGetVideo:

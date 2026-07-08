@@ -16,6 +16,10 @@ from clio.shutdown import register_process, unregister_process
 
 T = TypeVar("T")
 JsonValue = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
+MAX_EXTRACT_JSON_SCAN_CHARS = 2_000_000
+_PROBE_INFO_CACHE_MAX = 512
+_PROBE_INFO_CACHE_LOCK = threading.Lock()
+_PROBE_INFO_CACHE: dict[tuple[str, str, int, int], dict[str, float]] = {}
 
 # ---- subprocess wrappers for cross-platform encoding safety ----
 # On Chinese Windows text=True defaults to GBK, which crashes on UTF-8
@@ -104,6 +108,11 @@ def extract_json(text: str) -> dict:
     except json.JSONDecodeError:
         pass
 
+    if len(text) > MAX_EXTRACT_JSON_SCAN_CHARS:
+        raise ValueError(
+            f"AI 返回内容过长，已跳过 JSON 正则提取：{len(text)} 字符 > {MAX_EXTRACT_JSON_SCAN_CHARS} 字符"
+        )
+
     match = re.search(r"\{[\s\S]*\}", text)
     if not match:
         raise ValueError(f"AI 返回内容无法解析为 JSON:\n{text[:500]}")
@@ -185,7 +194,36 @@ def find_videos(directory: Path, recursive: bool = False) -> list[Path]:
     return files
 
 
+def _probe_cache_key(video_path: Path, ffprobe: str) -> tuple[str, str, int, int] | None:
+    try:
+        st = video_path.stat()
+    except OSError:
+        return None
+    return (ffprobe, str(video_path.resolve()), st.st_size, st.st_mtime_ns)
+
+
+def _get_cached_probe_info(key: tuple[str, str, int, int] | None) -> dict[str, float] | None:
+    if key is None:
+        return None
+    with _PROBE_INFO_CACHE_LOCK:
+        cached = _PROBE_INFO_CACHE.get(key)
+        return dict(cached) if cached is not None else None
+
+
+def _set_cached_probe_info(key: tuple[str, str, int, int] | None, info: dict[str, float]) -> None:
+    if key is None:
+        return
+    with _PROBE_INFO_CACHE_LOCK:
+        if len(_PROBE_INFO_CACHE) >= _PROBE_INFO_CACHE_MAX and key not in _PROBE_INFO_CACHE:
+            _PROBE_INFO_CACHE.pop(next(iter(_PROBE_INFO_CACHE)))
+        _PROBE_INFO_CACHE[key] = dict(info)
+
+
 def get_duration_sec(video_path: Path, ffprobe: str) -> float:
+    key = _probe_cache_key(video_path, ffprobe)
+    cached = _get_cached_probe_info(key)
+    if cached is not None and "duration_sec" in cached:
+        return cached["duration_sec"]
     cmd = [
         ffprobe,
         "-v",
@@ -200,7 +238,11 @@ def get_duration_sec(video_path: Path, ffprobe: str) -> float:
     raw = result.stdout.strip()
     if raw in ("N/A", "inf", "-inf", ""):
         raise ValueError(f"ffprobe 返回无效时长 '{raw}' for {video_path}")
-    return float(raw)
+    duration = float(raw)
+    if key is not None:
+        size_mb = key[2] / (1024 * 1024)
+        _set_cached_probe_info(key, {"duration_sec": duration, "size_mb": size_mb})
+    return duration
 
 
 def write_json_atomic(path: Path, data: JsonValue, *, ensure_ascii: bool = False, indent: int = 2) -> None:
@@ -238,8 +280,13 @@ def format_index(index: int, width: int) -> str:
 
 
 def probe_video_info(video_path: Path, ffprobe: str) -> dict:
+    key = _probe_cache_key(video_path, ffprobe)
+    cached = _get_cached_probe_info(key)
+    if cached is not None and "duration_sec" in cached and "size_mb" in cached:
+        return {"duration_sec": round(cached["duration_sec"], 2), "size_mb": round(cached["size_mb"], 2)}
     duration = get_duration_sec(video_path, ffprobe)
     size_mb = video_path.stat().st_size / (1024 * 1024)
+    _set_cached_probe_info(key, {"duration_sec": duration, "size_mb": size_mb})
     return {"duration_sec": round(duration, 2), "size_mb": round(size_mb, 2)}
 
 

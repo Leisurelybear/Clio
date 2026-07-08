@@ -1,10 +1,12 @@
-"""Planning task — generate daily vlog editing plan."""
+"""Planning task - generate daily vlog editing plan."""
 
 from __future__ import annotations
 
 import json
+import re
 import threading
 from pathlib import Path
+from typing import Any
 
 from clio.ai.token_usage import FileTokenUsageStore
 from clio.analyze import plan_daily_vlog
@@ -17,6 +19,23 @@ from clio.schema import add_schema_version
 from clio.utils import format_index, write_json_atomic, write_text_atomic
 
 
+def _analysis_day_label(data: dict) -> str:
+    raw = data.get("day_label") or data.get("day") or data.get("dayLabel") or "day1"
+    label = str(raw).strip()
+    return label or "day1"
+
+
+def _discover_day_labels(config: AppConfig) -> list[str]:
+    labels: set[str] = set()
+    for json_file in sorted(config.texts_dir.glob("*.json")):
+        try:
+            data = json.loads(json_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            continue
+        labels.add(_analysis_day_label(data))
+    return sorted(labels)
+
+
 def run_plan_vlog(
     config: AppConfig,
     day_label: str = "day1",
@@ -25,8 +44,9 @@ def run_plan_vlog(
     files: list[str] | None = None,
     overwrite: bool = False,
     context_override: str | None = None,
+    filter_by_day: bool = False,
     task_prompts: dict[str, str] | None = None,
-) -> None:
+) -> dict[str, Any] | None:
     config.plans_dir.mkdir(parents=True, exist_ok=True)
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
 
@@ -42,7 +62,7 @@ def run_plan_vlog(
             print(f"  [重新规划] {day_label} (已有规划文件损坏)")
         else:
             print(f"[跳过] {day_label} 计划 (已存在)")
-            return
+            return json.loads(out_json.read_text(encoding="utf-8"))
 
     clips = []
     for json_file in sorted(config.texts_dir.glob("*.json")):
@@ -50,15 +70,16 @@ def run_plan_vlog(
             print("[取消] plan 步骤被用户终止")
             return
         data = json.loads(json_file.read_text(encoding="utf-8"))
+        if filter_by_day and _analysis_day_label(data) != day_label:
+            continue
         raw_idx = data.get("index")
         if raw_idx is None:
-            raw_idx = json_file.stem[:3]  # fallback: 从文件名取前缀 "001"
+            raw_idx = json_file.stem[:3]
         try:
             idx = int(raw_idx)
         except (ValueError, TypeError):
             print(f"  [跳过] 无效 index '{raw_idx}' 在 {json_file.name}")
             continue
-        # Use media_identity.original_stem for v2 files
         identity = load_identity(data)
         if identity is not None:
             source_stem = identity.original_stem
@@ -79,25 +100,22 @@ def run_plan_vlog(
 
     if not clips:
         print("没有可用的分析结果，请先运行 analyze")
-        return
+        return None
 
-    # 加载 transcript 数据
     transcripts_map: dict[str, dict] = {}
     trans_dir = config.transcripts_dir
     if trans_dir.is_dir() and config.whisper.enabled and config.plan.use_transcripts:
         for tf in sorted(trans_dir.glob("*_transcript.json")):
             try:
                 data = json.loads(tf.read_text(encoding="utf-8"))
-                # Try v2 identity first, then fall back to v1 source_stem → extract_orig_stem
                 identity = load_identity(data)
                 if identity is not None:
                     stem = identity.original_stem
                 else:
                     stem = data.get("source_stem", "")
-                    # Fallback: extract original stem from compressed stem
                     if "_" in stem:
                         stem = stem.split("_", 1)[1]
-                    stem = __import__("re").sub(r"_seg\d+$", "", stem)
+                    stem = re.sub(r"_seg\d+$", "", stem)
                 if stem:
                     transcripts_map[stem.lower()] = data
             except (json.JSONDecodeError, KeyError):
@@ -162,3 +180,56 @@ def run_plan_vlog(
         source_stem = clip.get("source_stem", "")
         if source_stem:
             state.mark(source_stem, "plan", "done")
+    return plan
+
+
+def run_plan_all_days(
+    config: AppConfig,
+    tracker: ProgressTracker | None = None,
+    cancel_event: threading.Event | None = None,
+    overwrite: bool = False,
+    context_override: str | None = None,
+    task_prompts: dict[str, str] | None = None,
+) -> dict[str, Any] | None:
+    labels = _discover_day_labels(config)
+    if not labels:
+        print("没有可用的分析结果，请先运行 analyze")
+        return None
+
+    summary: dict[str, Any] = {"days": []}
+    for day_label in labels:
+        if cancel_event and cancel_event.is_set():
+            print("[取消] all-days plan 被用户终止")
+            break
+        plan = run_plan_vlog(
+            config,
+            day_label=day_label,
+            tracker=tracker,
+            cancel_event=cancel_event,
+            overwrite=overwrite,
+            context_override=context_override,
+            filter_by_day=True,
+            task_prompts=task_prompts,
+        )
+        if plan is None:
+            continue
+        sequence = plan.get("sequence", [])
+        summary["days"].append(
+            {
+                "day_label": day_label,
+                "day_title": plan.get("day_title", day_label),
+                "theme": plan.get("theme", ""),
+                "clip_count": len(sequence) if isinstance(sequence, list) else 0,
+                "total_estimated_sec": plan.get("total_estimated_sec", 0),
+                "plan_file": f"{day_label}_plan.json",
+            }
+        )
+
+    if not summary["days"]:
+        return None
+    add_schema_version(summary)
+    config.plans_dir.mkdir(parents=True, exist_ok=True)
+    out_json = config.plans_dir / "trip_plan.json"
+    write_json_atomic(out_json, summary)
+    print(f"  -> {out_json.name}")
+    return summary

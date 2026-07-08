@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+from copy import deepcopy
 from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -23,6 +25,9 @@ if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
 
 _SEG_RE = re.compile(r"^(.+)_(?:seg|part|pt|chunk)(\d+)$", re.IGNORECASE)
+_VIDEOS_CACHE_LOCK = threading.Lock()
+_VIDEOS_CACHE_MAX = 20
+_VIDEOS_CACHE: dict[tuple[str, str, str], tuple[tuple[Any, ...], dict[str, Any]]] = {}
 
 
 def _parse_segment_info(stem: str) -> tuple[str | None, int | None]:
@@ -66,7 +71,61 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     if source not in ("compressed", "original"):
         return handler._send_json({"ok": False, "error": "source must be compressed|original"}, 400)
     comp_dir = proj_out / "compressed"
+    cfg = handler._get_config(proj_input)
+    cache_key = (str(proj_input.resolve()), str(proj_out.resolve()), source)
+    signature = _videos_cache_signature(proj_input, proj_out, comp_dir, cfg)
+    with _VIDEOS_CACHE_LOCK:
+        cached = _VIDEOS_CACHE.get(cache_key)
+        if cached is not None and cached[0] == signature:
+            return handler._send_json(deepcopy(cached[1]))
 
+    payload = _build_videos_payload(handler, proj_input, proj_out, comp_dir, source, cfg)
+    with _VIDEOS_CACHE_LOCK:
+        if len(_VIDEOS_CACHE) >= _VIDEOS_CACHE_MAX and cache_key not in _VIDEOS_CACHE:
+            _VIDEOS_CACHE.pop(next(iter(_VIDEOS_CACHE)))
+        _VIDEOS_CACHE[cache_key] = (signature, deepcopy(payload))
+    handler._send_json(payload)
+
+
+def _videos_cache_signature(proj_input: Path, proj_out: Path, comp_dir: Path, cfg: Any) -> tuple[Any, ...]:
+    text_dirs = tuple(_find_texts_dirs(proj_out))
+    return (
+        _dir_fingerprint(proj_input, video_only=True),
+        _dir_fingerprint(comp_dir),
+        tuple((str(td), _dir_fingerprint(td, json_only=True)) for td in text_dirs),
+        _dir_fingerprint(proj_out / "scripts", json_only=True),
+        _dir_fingerprint(proj_out / cfg.whisper.transcripts_subdir, json_only=True),
+        cfg.whisper.transcripts_subdir,
+        cfg.paths.ffprobe,
+    )
+
+
+def _dir_fingerprint(path: Path, *, video_only: bool = False, json_only: bool = False) -> tuple[Any, ...]:
+    if not path.is_dir():
+        return ()
+    entries = []
+    for p in sorted(path.iterdir()):
+        if video_only and p.suffix.lower() not in VIDEO_EXTS:
+            continue
+        if json_only and p.suffix.lower() != ".json":
+            continue
+        try:
+            st = p.stat()
+        except OSError:
+            continue
+        kind = "dir" if p.is_dir() else "file"
+        entries.append((p.name, kind, st.st_size, st.st_mtime_ns))
+    return tuple(entries)
+
+
+def _build_videos_payload(
+    handler: HandlerProtocol,
+    proj_input: Path,
+    proj_out: Path,
+    comp_dir: Path,
+    source: str,
+    cfg: Any,
+) -> dict[str, Any]:
     # -- Build text/script sidecar lookup ----------------------------------
     # Three lookup strategies for the same data:
     #   1) compressed_file → texts JSON filename (exact, for v2+ data)
@@ -126,7 +185,6 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                 script_by_compressed_stem[cstem] = f.name
 
     # build transcript lookup: original stem -> bool
-    cfg = handler._get_config(proj_input)
     transcripts_dir = proj_out / cfg.whisper.transcripts_subdir
     transcripts_set: set[str] = set()
     if transcripts_dir.is_dir():
@@ -281,7 +339,34 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                     if len(segment_matches) > 1:
                         seg_v["segment_matches"] = segment_matches
                     videos.append(seg_v)
-    handler._send_json({"videos": videos, "source": source, "groups": groups})
+    videos.sort(key=_video_sort_key)
+    return {"videos": videos, "source": source, "groups": groups}
+
+
+def _video_sort_key(video: dict[str, Any]) -> tuple[str, int, int, str]:
+    match_file = ""
+    if isinstance(video.get("match"), dict):
+        match_file = str(video["match"].get("file") or "")
+    source_name = match_file if video.get("source") == "compressed" and match_file else str(video.get("file") or "")
+    stem = Path(source_name).stem
+    if "_" in stem and stem.split("_", 1)[0].isdigit():
+        stem = stem.split("_", 1)[1]
+    stem = re.sub(r"_(?:seg|part|pt|chunk)\d+$", "", stem, flags=re.IGNORECASE)
+    seg = 0
+    label = str(video.get("segment_label") or "")
+    if "/" in label:
+        try:
+            seg = int(label.split("/", 1)[0])
+        except ValueError:
+            seg = 0
+    elif video.get("offset_sec"):
+        seg = int(float(video.get("offset_sec") or 0) * 1000)
+    idx = str(video.get("index") or "")
+    try:
+        idx_num = int(idx)
+    except ValueError:
+        idx_num = 0
+    return (stem.lower(), seg, idx_num, str(video.get("file") or "").lower())
 
 
 def handle_get_video(handler: HandlerProtocol, qs: dict[str, Any]) -> None:

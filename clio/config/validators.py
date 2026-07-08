@@ -26,7 +26,7 @@ def _require_supported_provider_type(provider_name: str, provider_type: str) -> 
 def _require_video_provider_compatible(task_name: str, provider_name: str, provider_type: str) -> None:
     if task_name == "video_analyze" and provider_type != "gemini":
         raise ValueError(
-            "ai.tasks.video_analyze.provider 必须绑定 gemini 类型 provider。"
+            "ai.tasks.video_analyze.provider 必须绑定 gemini 类型 provider."
             f"'{provider_name}' 当前类型为 '{provider_type}'。"
         )
 

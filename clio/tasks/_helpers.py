@@ -141,6 +141,8 @@ def _write_text_file(path: Path, analysis: dict, source: Path, compressed: Path)
     ]
     for item in analysis.get("timeline", []):
         lines.append(f"- [{item.get('start', '?')} - {item.get('end', '?')}] {item.get('description', '')}")
+        if item.get("transcript"):
+            lines.append(f"  - 同期声: {item.get('transcript')}")
     lines.extend(["", "## 亮点"])
     for h in analysis.get("highlights", []):
         lines.append(f"- {h}")
@@ -167,6 +169,8 @@ def _rewrite_text_file(path: Path, analysis: dict) -> None:
     ]
     for item in analysis.get("timeline", []):
         lines.append(f"- [{item.get('start', '?')} - {item.get('end', '?')}] {item.get('description', '')}")
+        if item.get("transcript"):
+            lines.append(f"  - 同期声: {item.get('transcript')}")
     lines.extend(["", "## 亮点"])
     for h in analysis.get("highlights", []):
         lines.append(f"- {h}")

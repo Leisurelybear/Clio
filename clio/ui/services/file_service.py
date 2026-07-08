@@ -91,13 +91,14 @@ def _create_project_yaml(proj_input: Path, config_path: Path | None, proj_out: P
 
 
 def _inject_provider_defaults(raw: dict) -> None:
-    """Inject default provider fields (requests_per_minute, retry_attempts) into
+    """Inject default provider fields into
     the ai.providers section of a config dict. Only touches provider blocks."""
     providers = raw.get("ai", {}).get("providers", {})
     for pname, pcfg in providers.items():
         if isinstance(pcfg, dict):
             pcfg.setdefault("requests_per_minute", 0)
             pcfg.setdefault("retry_attempts", 2)
+            pcfg.setdefault("timeout_sec", 120.0)
 
 
 def _inject_whisper_defaults(raw: dict) -> None:

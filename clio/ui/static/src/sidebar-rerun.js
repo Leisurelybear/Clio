@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { $, escapeHtml, setStatus, updateEntityUI } from './utils.js';
 import { api } from './api.js';
+import { addToast } from './toast.js';
 import { loadVideos, renderSteps } from './sidebar-data.js';
 
 let _rerunPollTimer = null;
@@ -44,6 +45,7 @@ function _rerunPollError(statusEl, label, msg) {
   if (_rerunPollTimer) { clearInterval(_rerunPollTimer); _rerunPollTimer = null; }
   if (statusEl) statusEl.innerHTML = `<span class="err">✗ ${escapeHtml(label)}</span>`;
   setStatus(msg, 'err');
+  addToast(msg, 'error', 6000);
   setTimeout(hideRerunProgress, 8000);
 }
 
@@ -92,6 +94,7 @@ async function pollRerunStatus(task, file) {
       }
       if (statusEl) statusEl.innerHTML = '<span class="ok">✓ 完成</span>';
       setStatus('重跑完成', 'ok');
+      addToast('重跑完成', 'success');
       setTimeout(() => {
         hideRerunProgress();
         refreshAfterRerun(task, file);
@@ -104,6 +107,7 @@ async function pollRerunStatus(task, file) {
       }
       if (statusEl) statusEl.innerHTML = '<span class="err">✗ 出错</span>';
       setStatus('重跑出错', 'err');
+      addToast('重跑出错', 'error', 6000);
       setTimeout(() => {
         hideRerunProgress();
       }, 8000);

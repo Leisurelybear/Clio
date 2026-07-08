@@ -26,14 +26,18 @@ from clio.shutdown import before_stop, install_hooks
 from clio.tasks.reindex import auto_reindex_if_needed
 from clio.ui.routes.ai import handle_post_ai_test
 from clio.ui.routes.config_routes import (
+    handle_delete_provider,
     handle_get_config,
     handle_get_config_global,
     handle_get_config_project,
     handle_get_config_raw,
+    handle_get_providers,
     handle_post_config_init,
+    handle_post_provider,
     handle_put_config_global,
     handle_put_config_project,
     handle_put_config_raw,
+    handle_put_provider,
 )
 from clio.ui.routes.env_routes import handle_get_env, handle_put_env
 from clio.ui.routes.export import handle_post_export
@@ -53,6 +57,7 @@ from clio.ui.routes.projects import (
     handle_post_project_remove,
     handle_put_project,
 )
+from clio.ui.routes.prompts import handle_delete_prompt, handle_get_prompts, handle_put_prompt
 from clio.ui.routes.refine import handle_post_refine
 from clio.ui.routes.run import (
     handle_get_run_status,
@@ -350,6 +355,8 @@ def make_handler(
                 return handle_get_config_global(self, qs)
             if path == "/api/config/project":
                 return handle_get_config_project(self, qs)
+            if path == "/api/providers":
+                return handle_get_providers(self, qs)
             if path == "/api/project":
                 return handle_get_project(self, qs)
             if path == "/api/projects":
@@ -389,6 +396,8 @@ def make_handler(
                 return handle_get_token_usage(self, qs)
             if path == "/api/env":
                 return handle_get_env(self, qs)
+            if path == "/api/prompts":
+                return handle_get_prompts(self, qs)
             if path == "/api/logs":
                 offset = int(qs.get("offset", ["0"])[0])
                 return self._send_json(read_session_log(offset))
@@ -416,6 +425,9 @@ def make_handler(
                 return handle_put_config_global(self, qs, obj)
             if path == "/api/config/project":
                 return handle_put_config_project(self, qs, obj)
+            if path.startswith("/api/providers/"):
+                name = path[len("/api/providers/") :]
+                return handle_put_provider(self, qs, obj, name)
             if path == "/api/project":
                 return handle_put_project(self, qs, obj)
             if path == "/api/texts":
@@ -430,6 +442,9 @@ def make_handler(
                 return handle_put_whisper_model(self, qs, obj)
             if path == "/api/env":
                 return handle_put_env(self, qs, obj)
+            if path.startswith("/api/prompts/"):
+                name = path[len("/api/prompts/") :]
+                return handle_put_prompt(self, qs, obj, name)
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
@@ -448,7 +463,7 @@ def make_handler(
             except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
                 return self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, 400)
 
-            if path == "/api/run/start":
+            if path in {"/api/run/start", "/api/webhook/trigger"}:
                 return handle_post_run_start(self, qs, obj)
             if path == "/api/run/preview":
                 return handle_post_run_preview(self, qs, obj)
@@ -458,6 +473,8 @@ def make_handler(
                 return handle_post_ai_test(self, qs, obj)
             if path == "/api/config/init":
                 return handle_post_config_init(self, qs, obj)
+            if path == "/api/providers":
+                return handle_post_provider(self, qs, obj)
             if path == "/api/cut":
                 return handle_post_cut(self, qs, obj)
             if path == "/api/refine":
@@ -483,6 +500,22 @@ def make_handler(
             if path == "/api/logs/clear":
                 clear_session_log()
                 return self._send_json({"ok": True})
+
+            return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
+
+        def do_DELETE(self):
+            url = urlparse(self.path)
+            qs = parse_qs(url.query)
+            path = url.path
+            if not self._require_auth():
+                return
+
+            if path.startswith("/api/prompts/"):
+                name = path[len("/api/prompts/") :]
+                return handle_delete_prompt(self, qs, name)
+            if path.startswith("/api/providers/"):
+                name = path[len("/api/providers/") :]
+                return handle_delete_provider(self, qs, name)
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 

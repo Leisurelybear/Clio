@@ -9,12 +9,30 @@ const DEFAULT_MODELS = {
   openai: ['gpt-4o', 'gpt-4o-mini'],
   deepseek: ['deepseek-chat', 'deepseek-reasoner'],
 };
+const DEFAULT_CAPABILITIES = {
+  gemini: ['video', 'text'],
+  openai: ['text'],
+};
+
+const PROMPT_LABELS = {
+  ANALYZE_PROMPT: '视频分析',
+  SCRIPT_PROMPT: '口播文案',
+  PLAN_PROMPT: '剪辑规划',
+  REFINE_TEXT_PROMPT: '素材精修',
+  REFINE_TEXT_FIX_PROMPT: '素材定向修复',
+  REFINE_SCRIPT_PROMPT: '脚本精修',
+  REFINE_SCRIPT_FIX_PROMPT: '脚本定向修复',
+};
 
 
 export function labelFromPath(path) {
   return path ? path.split('.').pop() : 'config';
 }
 
+function providerCapabilities(provider) {
+  if (provider?.capabilities?.length) return provider.capabilities;
+  return DEFAULT_CAPABILITIES[provider?.type] || ['text'];
+}
 
 function _resolveDescPath(path, descriptions) {
   if (!descriptions) return null;
@@ -206,6 +224,132 @@ function _renderConfigProject(projectData, globalData, descs) {
   return html;
 }
 
+function _promptLabel(name) {
+  return PROMPT_LABELS[name] || name;
+}
+
+function _promptSourceLabel(item) {
+  if (!item?.has_override) return '系统默认';
+  const source = item.source_path || item.override_path || '';
+  return source.includes('templates') ? '覆盖文件' : '项目覆盖';
+}
+
+export function _renderPromptManagement(payload, selectedName = null) {
+  const prompts = payload?.prompts || [];
+  if (!prompts.length) {
+    return '<div class="config-empty-state"><p class="muted">暂无可编辑 Prompt。</p></div>';
+  }
+  const selected = prompts.find(p => p.name === selectedName) || prompts[0];
+  const listHtml = prompts.map(p => {
+    const active = p.name === selected.name ? ' active' : '';
+    const badge = p.has_override ? '<span class="prompt-badge override">已覆盖</span>' : '<span class="prompt-badge">默认</span>';
+    return `<button class="prompt-list-item${active}" data-prompt-name="${escapeHtml(p.name)}">
+      <span class="prompt-list-title">${escapeHtml(_promptLabel(p.name))}</span>
+      <span class="prompt-list-name">${escapeHtml(p.name)}</span>
+      ${badge}
+    </button>`;
+  }).join('');
+  const sourcePath = selected.source_path || selected.override_path || '';
+  return `<div class="prompt-management">
+    <div class="prompt-list">${listHtml}</div>
+    <div class="prompt-editor">
+      <div class="prompt-editor-head">
+        <div>
+          <h4>${escapeHtml(_promptLabel(selected.name))}</h4>
+          <p class="hint">${escapeHtml(selected.name)} · ${escapeHtml(_promptSourceLabel(selected))}</p>
+        </div>
+        <div class="prompt-actions">
+          <button id="btn-prompt-save" class="btn-primary">${icon('save', 14)} 保存覆盖</button>
+          <button id="btn-prompt-restore" class="btn-secondary" ${selected.has_override ? '' : 'disabled'}>${icon('refresh', 14)} 恢复默认</button>
+        </div>
+      </div>
+      <textarea id="prompt-editor-text" class="prompt-editor-text" spellcheck="false">${escapeHtml(selected.content || '')}</textarea>
+      <div class="prompt-meta">
+        <span>保存路径: ${escapeHtml(selected.override_path || '')}</span>
+        ${sourcePath ? `<span>当前来源: ${escapeHtml(sourcePath)}</span>` : ''}
+      </div>
+      <details class="prompt-default-preview">
+        <summary>查看系统默认 Prompt</summary>
+        <pre>${escapeHtml(selected.default || '')}</pre>
+      </details>
+    </div>
+  </div>`;
+}
+
+async function _loadPromptManagement() {
+  const container = $('prompt-management-root');
+  if (!container) return;
+  container.innerHTML = '<p class="muted">加载 Prompt...</p>';
+  try {
+    state.promptPayload = await api('GET', '/api/prompts');
+    const prompts = state.promptPayload?.prompts || [];
+    if (!state.currentPromptName && prompts.length) {
+      state.currentPromptName = prompts[0].name;
+    }
+    _refreshPromptManagement();
+  } catch (e) {
+    container.innerHTML = `<p class="err">加载失败: ${escapeHtml(e.message || e)}</p>`;
+  }
+}
+
+function _refreshPromptManagement() {
+  const container = $('prompt-management-root');
+  if (!container) return;
+  container.innerHTML = _renderPromptManagement(state.promptPayload, state.currentPromptName);
+  _attachPromptManagementHandlers(container);
+}
+
+function _attachPromptManagementHandlers(container) {
+  container.querySelectorAll('.prompt-list-item').forEach(btn => {
+    btn.onclick = () => {
+      state.currentPromptName = btn.dataset.promptName;
+      _refreshPromptManagement();
+    };
+  });
+  const selected = (state.promptPayload?.prompts || []).find(p => p.name === state.currentPromptName)
+    || state.promptPayload?.prompts?.[0];
+  const textarea = container.querySelector('#prompt-editor-text');
+  const saveBtn = container.querySelector('#btn-prompt-save');
+  const restoreBtn = container.querySelector('#btn-prompt-restore');
+  if (saveBtn && selected && textarea) {
+    saveBtn.onclick = async () => {
+      const content = textarea.value.trim();
+      if (!content) {
+        setStatus('Prompt 内容不能为空', 'err');
+        return;
+      }
+      saveBtn.disabled = true;
+      try {
+        await api('PUT', `/api/prompts/${encodeURIComponent(selected.name)}`, { content });
+        setStatus('Prompt 覆盖已保存，下一次 AI 调用生效', 'ok');
+        state.promptPayload = await api('GET', '/api/prompts');
+        _refreshPromptManagement();
+      } catch (e) {
+        setStatus('保存失败: ' + (e.message || e), 'err');
+      } finally {
+        saveBtn.disabled = false;
+      }
+    };
+  }
+  if (restoreBtn && selected) {
+    restoreBtn.onclick = async () => {
+      if (!selected.has_override) return;
+      if (!confirm(`恢复 ${selected.name} 的项目级 Prompt 覆盖？`)) return;
+      restoreBtn.disabled = true;
+      try {
+        await api('DELETE', `/api/prompts/${encodeURIComponent(selected.name)}`);
+        setStatus('Prompt 覆盖已恢复默认', 'ok');
+        state.promptPayload = await api('GET', '/api/prompts');
+        _refreshPromptManagement();
+      } catch (e) {
+        setStatus('恢复失败: ' + (e.message || e), 'err');
+      } finally {
+        restoreBtn.disabled = false;
+      }
+    };
+  }
+}
+
 const TASK_LABELS = {
   video_analyze: '视频分析',
   voiceover: '口播文案',
@@ -262,7 +406,7 @@ export function _renderTaskBinding(tasks, providersObj, descs) {
 
       let eligibleProviders = providerKeys;
       if (taskKey === 'video_analyze') {
-        eligibleProviders = providerKeys.filter(k => providersObj[k]?.type === 'gemini');
+        eligibleProviders = providerKeys.filter(k => providerCapabilities(providersObj[k]).includes('video'));
       }
 
       html += '<div class="task-binding-row">';
@@ -277,7 +421,7 @@ export function _renderTaskBinding(tasks, providersObj, descs) {
       }
       html += '</select>';
       if (taskKey === 'video_analyze' && eligibleProviders.length === 0 && providerKeys.length > 0) {
-        html += '<span class="warn" style="font-size:var(--text-xs)">需要 type=gemini 的 Provider，当前仅注册了非 Gemini 类型</span>';
+        html += '<span class="warn" style="font-size:var(--text-xs)">需要 capabilities 包含 video 的 Provider</span>';
       }
       html += '</div>';
 
@@ -328,6 +472,9 @@ export function _renderProviderList(providers, descs) {
     const modelTags = hasModels
       ? p.models.map(m => `<span class="tag-chip">${escapeHtml(m)}</span>`).join(' ')
       : '<span class="warn">⚠️ 未注册模型</span>';
+    const capabilityTags = providerCapabilities(p)
+      .map(c => `<span class="tag-chip">${escapeHtml(c)}</span>`)
+      .join(' ');
 
     html += `<div class="provider-card" data-provider="${escapeHtml(name)}">
       <div class="provider-card-header">
@@ -343,6 +490,7 @@ export function _renderProviderList(providers, descs) {
         <div class="provider-card-field"><span class="provider-card-label">类型</span><span>${typeLabel}</span></div>
         <div class="provider-card-field"><span class="provider-card-label">API 密钥</span><span class="provider-key-wrap" data-provider="${escapeHtml(name)}"><span class="provider-key-masked">••••••••••</span><span class="provider-key-value" style="display:none"></span><button class="btn-provider-show-key">显示</button></span></div>
         ${p.type !== 'gemini' ? `<div class="provider-card-field"><span class="provider-card-label">接口地址</span><span>${escapeHtml(p.base_url || '(默认)')}</span></div>` : ''}
+        <div class="provider-card-field"><span class="provider-card-label">能力</span><span class="provider-card-models">${capabilityTags}</span></div>
         <div class="provider-card-field"><span class="provider-card-label">模型</span><span class="provider-card-models">${modelTags}</span></div>
         <div class="provider-test-status" data-provider="${escapeHtml(name)}"></div>
       </div>
@@ -396,6 +544,11 @@ function _showProviderModal(providersObj, name, onSave) {
         <div id="modal-provider-models"></div>
         <span class="hint">输入该厂商可用的模型名称。默认厂商已预填常用模型。这些模型将出现在项目标签页的任务绑定下拉菜单中。</span>
       </div>
+      <div class="form-group">
+        <label class="form-label">能力标签 <span class="muted">（按回车添加）</span></label>
+        <div id="modal-provider-capabilities"></div>
+        <span class="hint">常用标签：video 表示可做视频理解，text 表示可做文本生成。</span>
+      </div>
       <div class="modal-actions">
         <button id="modal-cancel" class="btn-secondary">取消</button>
         <button id="modal-save" class="btn-primary">${isEdit ? '保存修改' : '添加'}</button>
@@ -413,11 +566,24 @@ function _showProviderModal(providersObj, name, onSave) {
     modelsList = [];
   }
   _renderTagInput(modelsContainer, modelsList, () => {});
+  const capabilitiesContainer = backdrop.querySelector('#modal-provider-capabilities');
+  let capabilitiesList = existing
+    ? [...providerCapabilities(existing)]
+    : [...providerCapabilities({ type: backdrop.querySelector('#modal-provider-type').value })];
+  function renderCapabilitiesInput() {
+    capabilitiesContainer.innerHTML = '';
+    _renderTagInput(capabilitiesContainer, capabilitiesList, () => {});
+  }
+  renderCapabilitiesInput();
 
   // Type toggle → show/hide base URL
   backdrop.querySelector('#modal-provider-type').onchange = (e) => {
     const grp = backdrop.querySelector('#modal-base-url-group');
     grp.style.display = e.target.value === 'gemini' ? 'none' : '';
+    if (!isEdit) {
+      capabilitiesList = [...providerCapabilities({ type: e.target.value })];
+      renderCapabilitiesInput();
+    }
   };
 
   // Key visibility toggle
@@ -467,6 +633,7 @@ function _showProviderModal(providersObj, name, onSave) {
       api_key: '',
       base_url: newBaseUrl || '',
       models: modelsList,
+      capabilities: capabilitiesList,
     };
 
     if (isEdit) {
@@ -483,6 +650,7 @@ function _showProviderModal(providersObj, name, onSave) {
         api_key: '',
         base_url: newBaseUrl || '',
         models: [...modelsList],
+        capabilities: [...capabilitiesList],
       };
     }
 
@@ -818,6 +986,11 @@ function _attachContextTemplate(pane) {
 function _ensureDefaultProviderModels() {
   const providers = state.configGlobal?.ai?.providers;
   if (!providers) return;
+  for (const [name, p] of Object.entries(providers)) {
+    if (p && (!p.capabilities || p.capabilities.length === 0)) {
+      p.capabilities = [...providerCapabilities(p)];
+    }
+  }
   for (const name of DEFAULT_PROVIDERS) {
     const p = providers[name];
     if (p && (!p.models || p.models.length === 0)) {
@@ -862,6 +1035,8 @@ export function renderConfig() {
     const globalData = state.configGlobal || {};
     contentHtml = _renderEnvEditor()
       + `<div class="config-form">${_renderConfigGlobal(globalData, descs)}</div>`;
+  } else if (active === 'prompts') {
+    contentHtml = '<div id="prompt-management-root"></div>';
   } else {
     // Merged tab: read-only merged view
     const { _config_source, _needsConfigInit, _descriptions, ...configData } = state.configRaw;
@@ -873,6 +1048,7 @@ export function renderConfig() {
     <div class="config-tab-bar">
       ${_tabBtn('项目', 'project', active === 'project')}
       ${_tabBtn('全局', 'global', active === 'global')}
+      ${_tabBtn('Prompts', 'prompts', active === 'prompts')}
       ${_tabBtn('合并视图', 'merged', active === 'merged')}
     </div>
     ${isFallback ? _renderFallbackWarn() : ''}
@@ -891,7 +1067,7 @@ export function renderConfig() {
   // Hide save button for merged tab (read-only)
   const saveBtn = $('btn-save');
   if (saveBtn) {
-    saveBtn.style.display = active === 'merged' ? 'none' : '';
+    saveBtn.style.display = active === 'merged' || active === 'prompts' ? 'none' : '';
   }
 
   // Attach change handlers for the active tab
@@ -903,6 +1079,8 @@ export function renderConfig() {
     _attachConfigForm(pane, state.configProject || {}, descs);
     _attachContextTemplate(pane);
     _attachTaskBindingHandlers(pane, state.configProject);
+  } else if (active === 'prompts') {
+    _loadPromptManagement();
   }
 
   // Model management stays in global tab (system-level)

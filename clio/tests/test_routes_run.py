@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
 
 from clio.ui.routes.run import (
+    _apply_run_input_dir_override,
     handle_get_run_status,
     handle_post_rerun,
     handle_post_run_cancel,
@@ -74,6 +76,36 @@ class TestHandleGetRunStatus:
         assert payload["running"] is True
 
 
+class TestApplyRunInputDirOverride:
+    def test_none_keeps_config(self, tmp_path: Path):
+        cfg = SimpleNamespace(paths=SimpleNamespace(input_dir=tmp_path))
+
+        result, error = _apply_run_input_dir_override(cfg, None)
+
+        assert result is cfg
+        assert error is None
+
+    def test_valid_input_dir_returns_config_copy(self, tmp_path: Path):
+        cfg = SimpleNamespace(paths=SimpleNamespace(input_dir=tmp_path / "old"))
+        new_input = tmp_path / "new"
+        new_input.mkdir()
+
+        result, error = _apply_run_input_dir_override(cfg, str(new_input))
+
+        assert error is None
+        assert result is not cfg
+        assert result.paths.input_dir == new_input
+        assert cfg.paths.input_dir == tmp_path / "old"
+
+    def test_missing_input_dir_returns_error(self, tmp_path: Path):
+        cfg = SimpleNamespace(paths=SimpleNamespace(input_dir=tmp_path))
+
+        result, error = _apply_run_input_dir_override(cfg, str(tmp_path / "missing"))
+
+        assert result is cfg
+        assert "input_dir not found" in error
+
+
 class TestHandlePostRunStart:
     def test_already_running(self, _handler):
         handler = _handler
@@ -114,6 +146,18 @@ class TestHandlePostRunStart:
 
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args[0][0]["ok"] is True
+
+    def test_rejects_missing_input_dir_override(self, tmp_path: Path, _handler):
+        handler = _handler
+        handler._resolve_project_input.return_value = tmp_path / "input"
+        cfg = SimpleNamespace(paths=SimpleNamespace(input_dir=tmp_path / "input", output_dir=tmp_path / "output"))
+        handler._get_config.return_value = cfg
+
+        handle_post_run_start(handler, {}, {"input_dir": str(tmp_path / "missing")})
+
+        handler._send_json.assert_called_once()
+        assert handler._send_json.call_args.args[1] == 400
+        assert "input_dir not found" in handler._send_json.call_args.args[0]["error"]
 
 
 class TestHandlePostRunPreview:

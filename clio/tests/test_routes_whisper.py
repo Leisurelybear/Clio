@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -10,6 +11,7 @@ import yaml
 
 from clio.ui.routes.whisper_download import (
     _install_progress_path,
+    _run_install,
     handle_post_whisper_install_cancel,
 )
 from clio.ui.routes.whisper_models import _get_cache_dir
@@ -40,6 +42,7 @@ def _make_handler(proj_input: Path, proj_output: Path) -> MagicMock:
     handler._get_config.return_value = cfg
 
     handler._send_json = MagicMock()
+    handler.__class__._config_cache = MagicMock()
     return handler
 
 
@@ -127,6 +130,7 @@ class TestPutWhisperModelPersistence:
         assert proj_yaml.is_file()
         raw = yaml.safe_load(proj_yaml.read_text(encoding="utf-8"))
         assert raw["whisper"]["model_size"] == "medium"
+        handler.__class__._config_cache.invalidate_key.assert_called_with(str(proj_input.resolve()))
 
     def test_updates_existing_project_yaml(self, tmp_path: Path) -> None:
         """If project.yaml exists, it should be updated with the new model_size."""
@@ -233,6 +237,95 @@ class TestHandlePostWhisperInstallCancel:
         handle_post_whisper_install_cancel(handler, qs)
 
         handler._send_json.assert_called_once_with({"ok": True, "message": "cancel requested"})
+
+
+class TestRunWhisperInstall:
+    def test_downloads_required_snapshot_files(self, tmp_path: Path) -> None:
+        proj_input = tmp_path / "input"
+        proj_input.mkdir()
+        proj_output = tmp_path / "output"
+        proj_output.mkdir()
+        handler = _make_handler(proj_input, proj_output)
+        cache_dir = tmp_path / "models"
+        handler._get_config.return_value.whisper.cache_dir = str(cache_dir)
+        handler._get_config.return_value.whisper.model_size = "small"
+        qs = {"project": "test"}
+        progress_file = _install_progress_path(handler, qs)
+
+        fake_hub = types.SimpleNamespace(hf_hub_url=lambda repo_id, filename: f"https://example.test/{filename}")
+
+        class Response:
+            headers = {"Content-Length": "4"}
+
+            def raise_for_status(self) -> None:
+                return None
+
+            def iter_content(self, chunk_size: int):
+                yield b"data"
+
+        with (
+            patch.dict("sys.modules", {"huggingface_hub": fake_hub}),
+            patch("clio.ui.routes.whisper_download._get_model_download_size", return_value=16),
+            patch("clio.ui.routes.whisper_download._req.get", return_value=Response()) as mock_get,
+        ):
+            _run_install(handler, qs, progress_file)
+
+        snap = cache_dir / "models--Systran--faster-whisper-small" / "snapshots" / "downloaded"
+        assert (snap / "config.json").read_bytes() == b"data"
+        assert (snap / "model.bin").read_bytes() == b"data"
+        assert (snap / "tokenizer.json").read_bytes() == b"data"
+        assert (snap / "vocabulary.txt").read_bytes() == b"data"
+        assert (cache_dir / "models--Systran--faster-whisper-small" / "refs" / "main").read_text(
+            encoding="utf-8"
+        ) == "downloaded"
+        assert mock_get.call_count == 4
+        status = json.loads(progress_file.read_text(encoding="utf-8"))
+        assert status["status"] == "done"
+        assert status["progress_pct"] == 100
+
+    def test_download_cancel_removes_tmp_file(self, tmp_path: Path) -> None:
+        from clio.ui.routes import whisper_download
+
+        proj_input = tmp_path / "input"
+        proj_input.mkdir()
+        proj_output = tmp_path / "output"
+        proj_output.mkdir()
+        handler = _make_handler(proj_input, proj_output)
+        cache_dir = tmp_path / "models"
+        handler._get_config.return_value.whisper.cache_dir = str(cache_dir)
+        handler._get_config.return_value.whisper.model_size = "small"
+        qs = {"project": "test"}
+        progress_file = _install_progress_path(handler, qs)
+
+        fake_hub = types.SimpleNamespace(hf_hub_url=lambda repo_id, filename: f"https://example.test/{filename}")
+
+        class Response:
+            headers = {"Content-Length": "8"}
+
+            def raise_for_status(self) -> None:
+                return None
+
+            def iter_content(self, chunk_size: int):
+                yield b"data"
+                whisper_download._INSTALL_CANCEL.set()
+                yield b"more"
+
+        whisper_download._INSTALL_CANCEL.clear()
+        with (
+            patch.dict("sys.modules", {"huggingface_hub": fake_hub}),
+            patch("clio.ui.routes.whisper_download._get_model_download_size", return_value=8),
+            patch("clio.ui.routes.whisper_download._req.get", return_value=Response()),
+        ):
+            _run_install(handler, qs, progress_file)
+
+        status = json.loads(progress_file.read_text(encoding="utf-8"))
+        assert status["status"] == "idle"
+        assert "取消" in status["message"]
+        assert list(cache_dir.rglob("*.tmp")) == []
+        assert not (
+            cache_dir / "models--Systran--faster-whisper-small" / "snapshots" / "downloaded" / "config.json"
+        ).exists()
+        whisper_download._INSTALL_CANCEL.clear()
 
     def test_cancel_with_corrupted_progress_file(self, tmp_path: Path) -> None:
         """Cancel should not crash on corrupted progress file."""

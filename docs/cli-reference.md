@@ -66,6 +66,9 @@ Output trilogy:
 - `output/<media folder name>/texts/<index>_<title>.json` — Structured analysis (machine-readable)
 - `output/<media folder name>/texts/<index>_<title>.txt` — Human-readable version (with timeline)
 - `output/<media folder name>/summary.csv` — Full media overview table (one row per entry)
+- `output/<media folder name>/covers/<index>_<title>.jpg` — Optional cover frame when analysis returns `cover_timestamp`
+
+If a matching transcript already exists, timeline entries are enriched with `transcript` and `transcript_segments`. If transcription runs after analysis, the transcribe step updates the matching analysis JSON/TXT before planning.
 
 > Re-running will **automatically skip** already generated `.json` / `.txt` (when `analyze.skip_existing: true`).
 > Add `--force` to rerun everything.
@@ -95,9 +98,11 @@ Feed all `texts/` summaries for a day to the `ai.tasks.vlog_plan` provider, lett
 ```bash
 python main.py plan --day day1
 python main.py plan --day "Day2_卢瓦尔河谷"
+python main.py plan --all-days
 ```
 
 The `--day` label appears in the output filename and vlog title. Output to `output/<media folder name>/plans/<day>_plan.{json,md}`.
+`--all-days` scans `texts/*.json` for `day_label`, `day`, or `dayLabel`; files without a day field are grouped into `day1`. It generates one `<day>_plan.{json,md}` per day plus `plans/trip_plan.json`.
 
 ---
 
@@ -123,6 +128,19 @@ python main.py reindex -i "E:/Videos/Franch3"
 ```
 
 The UI automatically reindexes when opening a project for the first time.
+
+---
+
+## `verify` — Check .vmeta / .vindex Integrity
+
+Verify existing `.vindex` and `.vmeta` sidecars against source videos and compressed segments.
+This reports missing sources, stale source metadata, missing segments, missing `.vmeta` files, and compressed-file hash mismatches.
+
+```bash
+python main.py verify
+```
+
+Exit code is `0` when every indexed source is OK, otherwise `1`. If verification reports stale or missing sidecars, run `python main.py reindex`; if compressed-file hashes mismatch, rerun compression for the affected source.
 
 ---
 
@@ -239,7 +257,7 @@ python main.py transcribe
 python main.py transcribe --force
 ```
 
-> Note: transcript data is injected into the `plan` prompt, so the AI can reference actual voiceover content to optimize editing arrangement.
+> Note: transcript data is attached to matching analysis timeline entries and injected into the `plan` prompt, so the AI can reference actual voiceover content to optimize editing arrangement.
 
 ---
 
@@ -261,6 +279,19 @@ python main.py serve --no-browser       # Don't auto-open browser (for remote ma
 
 Page after startup: left side video list (auto-scans `output/compressed/`), center is video player (supports seek / Range requests), right side three tabs: Analysis (texts), Voiceover (scripts), Vlog Editing Plan (plan). Clicking timeline / plan segments automatically seeks to the corresponding time; `Ctrl+S` to save.
 See `vlog_tool/ui/README.md` for details.
+
+### External Trigger
+
+Automation tools such as NAS download tasks or Syncthing hooks can trigger the same pipeline start behavior through the authenticated webhook endpoint:
+
+```bash
+curl -X POST "http://127.0.0.1:8765/api/webhook/trigger" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <api-token-if-configured>" \
+  -d '{"steps":["compress","analyze"],"day_label":"day1"}'
+```
+
+The JSON body is the same as `POST /api/run/start`, including `steps`, `files`, `overwrite`, `day_label`, `use_transcripts`, `context_override`, and `task_prompts`.
 
 ---
 
@@ -393,10 +424,12 @@ ai:
       type: openai
       api_key_env: OPENAI_API_KEY
       base_url: https://api.openai.com/v1
+      timeout_sec: 120
     deepseek:
       type: openai              # OpenAI compatible API
       api_key_env: DEEPSEEK_API_KEY
       base_url: https://api.deepseek.com/v1
+      timeout_sec: 120
 
   tasks:
     video_analyze:              # Video understanding (must support video, e.g. gemini)
@@ -419,6 +452,40 @@ ai:
 
 > `refine_text` falls back to `video_analyze`'s provider by default. Both texts and scripts
 > review share this single task (both are text-only); declaring it explicitly in `ai.tasks` allows switching to a cheaper model.
+
+For OpenAI-compatible providers, `timeout_sec` controls the HTTP client timeout. Increase it for slow third-party gateways or local model servers; decrease it when you want failures to surface faster.
+
+### Prompt Overrides
+
+Default prompt constants live in `clio/prompts.py`. To override them without editing code, create files under either project-level `<input_dir>/templates/prompts/` or repo-level `templates/prompts/`.
+Project-level files take priority.
+
+Supported names are the prompt constant names, with `.md`, `.txt`, or no suffix. Lowercase names also work:
+
+```text
+templates/prompts/ANALYZE_PROMPT.md
+templates/prompts/SCRIPT_PROMPT.md
+templates/prompts/PLAN_PROMPT.md
+templates/prompts/REFINE_TEXT_PROMPT.md
+templates/prompts/REFINE_TEXT_FIX_PROMPT.md
+templates/prompts/REFINE_SCRIPT_PROMPT.md
+templates/prompts/REFINE_SCRIPT_FIX_PROMPT.md
+```
+
+Keep the same `{placeholder}` names as the built-in prompt when overriding formatted prompts such as script, plan, or refine prompts.
+
+Generated analysis, voiceover, and plan JSON may include `_confidence` as a 0-1 self-assessed confidence score. Missing values are treated as `0.0` so older outputs remain valid.
+
+The web backend also exposes authenticated prompt management APIs:
+
+```text
+GET /api/prompts
+PUT /api/prompts/{PROMPT_NAME}
+DELETE /api/prompts/{PROMPT_NAME}
+```
+
+`PUT` accepts `{"content":"..."}` and writes a project-level override under `<input_dir>/templates/prompts/`.
+`DELETE` removes project-level overrides for the prompt; repo-level overrides, if present, still apply.
 
 ### AI Trip Context
 

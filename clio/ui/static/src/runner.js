@@ -6,11 +6,13 @@ import {
   updateSidebarDay,
 } from './utils.js';
 import { api, icon } from './api.js';
+import { addToast } from './toast.js';
 
 let _runEventSource = null;
 let _lastRunDay = 'day1';
 let _runActive = false;
 let _lastProgressSnapshot = null;
+let _lastRunSteps = [];
 
 const STEPS_KEY = 'vlog_ui_run_steps';
 
@@ -72,6 +74,14 @@ function renderRun() {
   pane.innerHTML = `
     <h3>运行流水线</h3>
     <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
+    <label class="run-option">
+      <span class="run-option-label">本次素材目录</span>
+      <span class="input-with-browse">
+        <input id="run-input-dir" class="run-option-input" value="${escapeHtml(state.config?.input_dir || state.currentProjectInputDir || '')}" placeholder="留空则使用当前项目的 input_dir">
+        <button class="browse-btn" data-target="run-input-dir" type="button">浏览</button>
+      </span>
+    </label>
+    <p class="hint" style="margin-top:-4px">仅影响本次运行，不会写入 project.yaml。未选择具体文件时，将处理该目录下的所有视频。</p>
     <div class="run-step-list">${stepChecks}</div>
     <details class="run-prompt-section" style="margin:12px 0">
       <summary style="cursor:pointer;font-size:var(--text-sm);color:var(--text-secondary);user-select:none">⌨ 高级提示词（可选）</summary>
@@ -88,7 +98,6 @@ function renderRun() {
         <span>覆盖现有输出</span>
       </label>
     </div>
-    <div id="run-preview" class="run-preview" style="margin-top:12px">${renderRunPreviewHtml(null)}</div>
     <div id="run-progress" style="margin-top:12px"></div>
     <div id="run-state-container"></div>
   `;
@@ -102,7 +111,6 @@ function renderRun() {
       });
       saveStepSelection(checks, $('run-use-transcripts')?.checked ?? true);
       togglePlanSubOptions();
-      refreshRunPreview();
     });
   });
   // wire use_transcripts change → persist
@@ -114,15 +122,11 @@ function renderRun() {
         checks[c.dataset.step] = c.checked;
       });
       saveStepSelection(checks, useTransCb.checked);
-      refreshRunPreview();
     });
   }
 
   togglePlanSubOptions();
   updateRunFilesBadge();
-  $('run-day')?.addEventListener('input', () => refreshRunPreview({ silent: true }));
-  $('run-overwrite')?.addEventListener('change', () => refreshRunPreview());
-  refreshRunPreview({ silent: true });
 
   const runBtn = $('btn-run-start');
   runBtn.onclick = startRun;
@@ -146,39 +150,6 @@ function getRunButtonText() {
     return `${icon('play', 16)} 运行选中步骤 (${state.selectedFiles.length})`;
   }
   return `${icon('play', 16)} 运行选中步骤`;
-}
-
-function updateRunFilesBadge() {
-  const badge = $('run-files-badge');
-  const overwrap = $('option-overwrite-wrap');
-  if (!badge || !overwrap) return;
-  if (state.selectionMode && state.selectedFiles.length > 0) {
-    const numFiles = state.selectedFiles.length;
-    badge.textContent = `(${numFiles} 个视频)`;
-    badge.style.display = 'inline';
-    overwrap.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
-    overwrap.style.display = 'none';
-  }
-  if ($('run-preview')) refreshRunPreview({ silent: true });
-}
-
-function collectRunOptions() {
-  const steps = [...document.querySelectorAll('.run-step-cb:checked')].map(cb => cb.dataset.step);
-  const body = {
-    day_label: $('run-day')?.value.trim() || state.currentDay || 'day1',
-    steps,
-    use_transcripts: $('run-use-transcripts')?.checked ?? true,
-  };
-  if (state.selectionMode && state.selectedFiles.length > 0) {
-    body.files = state.selectedFiles;
-  }
-  const overwriteCb = $('run-overwrite');
-  if (overwriteCb && overwriteCb.checked) {
-    body.overwrite = true;
-  }
-  return body;
 }
 
 function renderRunPreviewHtml(preview) {
@@ -231,12 +202,29 @@ async function refreshRunPreview({ silent = false } = {}) {
   }
   try {
     const response = await api('POST', '/api/run/preview', options);
-    if (!response.ok) throw new Error(response.error || '预览失败');
-    container.innerHTML = renderRunPreviewHtml(response.preview);
-    return response.preview;
-  } catch (e) {
-    container.innerHTML = `<p class="warn">运行预览暂不可用：${escapeHtml(e.message)}</p>`;
-    return null;
+    if (response.preview) {
+      container.innerHTML = renderRunPreviewHtml(response.preview);
+    } else {
+      container.innerHTML = renderRunPreviewHtml(null);
+    }
+  } catch {
+    container.innerHTML = renderRunPreviewHtml(null);
+  }
+  return null;
+}
+
+function updateRunFilesBadge() {
+  const badge = $('run-files-badge');
+  const overwrap = $('option-overwrite-wrap');
+  if (!badge || !overwrap) return;
+  if (state.selectionMode && state.selectedFiles.length > 0) {
+    const numFiles = state.selectedFiles.length;
+    badge.textContent = `(${numFiles} 个视频)`;
+    badge.style.display = 'inline';
+    overwrap.style.display = 'flex';
+  } else {
+    badge.style.display = 'none';
+    overwrap.style.display = 'none';
   }
 }
 
@@ -245,17 +233,33 @@ async function startRun() {
   if (btn.disabled) return;
   btn.disabled = true;
   btn.textContent = '启动中...';
-  const body = collectRunOptions();
-  if (!body.steps.length) {
+  const checked = [...document.querySelectorAll('.run-step-cb:checked')].map(cb => cb.dataset.step);
+  if (!checked.length) {
     btn.disabled = false;
     btn.textContent = '运行选中步骤';
     setStatus('请至少选择一个步骤', 'warn');
     return;
   }
-  _lastRunDay = body.day_label;
+  _lastRunDay = ($('run-day')?.value.trim() || state.currentDay);
+  _lastRunSteps = checked.slice();
   _stopRunSSE();
   try {
-    await refreshRunPreview({ silent: true });
+    const body = {
+      day_label: _lastRunDay,
+      steps: checked,
+      use_transcripts: $('run-use-transcripts').checked,
+    };
+    const runInputDir = $('run-input-dir')?.value?.trim();
+    if (runInputDir) {
+      body.input_dir = runInputDir;
+    }
+    if (state.selectionMode && state.selectedFiles.length > 0) {
+      body.files = state.selectedFiles;
+    }
+    const overwriteCb = $('run-overwrite');
+    if (overwriteCb && overwriteCb.checked) {
+      body.overwrite = true;
+    }
     const contextOverride = $('run-context-override')?.value?.trim();
     if (contextOverride) {
       body.context_override = contextOverride;
@@ -263,7 +267,9 @@ async function startRun() {
     const r = await api('POST', '/api/run/start', body);
     if (r.ok) {
       _runActive = true;
-      setStatus(r.message || '流水线已启动', 'ok');
+      const msg = r.message || '流水线已启动';
+      setStatus(msg, 'ok');
+      addToast(msg, 'success');
       $('run-progress').innerHTML = '<p class="muted">流水线已启动，等待进度...</p>';
       _startRunSSE();
     } else {
@@ -271,7 +277,9 @@ async function startRun() {
     }
   } catch (e) {
     $('run-progress').innerHTML = `<p class="err">${escapeHtml(e.message)}</p>`;
-    setStatus('启动失败: ' + e.message, 'err');
+    const msg = '启动失败: ' + e.message;
+    setStatus(msg, 'err');
+    addToast(msg, 'error', 6000);
     btn.disabled = false;
     btn.innerHTML = `${icon('play', 16)} 运行选中步骤`;
   }
@@ -282,9 +290,13 @@ async function cancelRun() {
   if (btn) { btn.disabled = true; btn.innerHTML = '⏹ 正在取消...'; }
   try {
     const r = await api('POST', '/api/run/cancel', {});
-    setStatus(r.message || '取消请求已发送', 'warn');
+    const msg = r.message || '取消请求已发送';
+    setStatus(msg, 'warn');
+    addToast(msg, 'warning');
   } catch (e) {
-    setStatus('取消失败: ' + e.message, 'err');
+    const msg = '取消失败: ' + e.message;
+    setStatus(msg, 'err');
+    addToast(msg, 'error', 6000);
     if (btn) { btn.disabled = false; btn.innerHTML = '取消'; }
   }
 }
@@ -293,18 +305,18 @@ function _startRunSSE() {
   _stopRunSSE();
   let url = '/api/run/stream';
   let sep = '?';
-  if (state.currentProjectName) {
-    url += sep + 'project=' + encodeURIComponent(state.currentProjectName);
+  const addQuery = (key, value) => {
+    if (!value) return;
+    url += sep + key + '=' + encodeURIComponent(value);
     sep = '&';
+  };
+  if (state.currentProjectName) {
+    addQuery('project', state.currentProjectName);
   }
   if (state.currentProjectInputDir) {
-    url += sep + 'input_dir=' + encodeURIComponent(state.currentProjectInputDir);
-    sep = '&';
+    addQuery('input_dir', state.currentProjectInputDir);
   }
-  const token = sessionStorage.getItem('api_token');
-  if (token) {
-    url += sep + 'token=' + encodeURIComponent(token);
-  }
+  addQuery('token', sessionStorage.getItem('api_token'));
   _runEventSource = new EventSource(url);
   _runEventSource.onmessage = (event) => {
     try {
@@ -397,6 +409,7 @@ async function _handleRunStatus(s) {
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="ok">✓ 流水线完成</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线完成', 'ok');
+      addToast(s.message || '流水线完成', 'success');
       renderProcessingState($('run-state-container'));
       // 检查是否有转录失败（如缺少模型），弹出下载引导
       (async () => {
@@ -427,7 +440,12 @@ async function _handleRunStatus(s) {
       import('./sidebar.js').then(mod => mod.saveProject());
       try { state.plan = await api('GET', `/api/plan?day=${_lastRunDay}`); } catch {}
       await import('./sidebar.js').then(mod => mod.loadVideos());
-      if (state.currentEntity === 'plan') import('./sidebar.js').then(mod => mod.selectPlan());
+      const completedSteps = Array.isArray(s.steps) ? s.steps : _lastRunSteps;
+      if (state.currentEntity === 'run') {
+        await _showRunCompletionTarget(completedSteps);
+      } else if (state.currentEntity === 'plan') {
+        import('./sidebar.js').then(mod => mod.selectPlan());
+      }
     } else if (s.status === 'cancelled') {
       _lastProgressSnapshot = null;
       _runActive = false;
@@ -438,6 +456,7 @@ async function _handleRunStatus(s) {
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="warn">⏹ 流水线已取消</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线已取消', 'warn');
+      addToast(s.message || '流水线已取消', 'warning');
       renderProcessingState($('run-state-container'));
     } else if (s.status === 'error') {
       _lastProgressSnapshot = null;
@@ -449,12 +468,44 @@ async function _handleRunStatus(s) {
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
       prog.innerHTML = `<p class="err">✗ 流水线出错</p><p>${escapeHtml(s.message || '')}</p>${logsHtml}`;
       setStatus('流水线出错', 'err');
+      addToast(s.message || '流水线出错', 'error', 6000);
       renderProcessingState($('run-state-container'));
     }
 }
 
 function _stopRunPoll() {
   _stopRunSSE();
+}
+
+function _completionTargetForSteps(steps) {
+  const stepSet = new Set(Array.isArray(steps) ? steps : []);
+  if (stepSet.has('plan')) return { entity: 'plan' };
+  if (stepSet.has('voiceover')) return { entity: 'video', tab: 'voiceover' };
+  if (stepSet.has('transcribe')) return { entity: 'video', tab: 'transcript' };
+  if (stepSet.has('analyze')) return { entity: 'video', tab: 'texts' };
+  if (stepSet.has('compress') || stepSet.has('label')) return { entity: 'video', tab: state.currentTab || 'texts' };
+  return null;
+}
+
+async function _showRunCompletionTarget(steps) {
+  const target = _completionTargetForSteps(steps);
+  if (!target) return;
+  const sidebar = await import('./sidebar.js');
+  if (target.entity === 'plan') {
+    await sidebar.selectPlan(_lastRunDay);
+    return;
+  }
+  state.currentTab = target.tab;
+  if (state.source !== 'compressed') {
+    await sidebar.setSource('compressed');
+    return;
+  }
+  const preferred = state.currentVideo && state.videos.some(v => v.file === state.currentVideo)
+    ? state.currentVideo
+    : state.videos[0]?.file;
+  if (preferred) {
+    await sidebar.selectVideo(preferred);
+  }
 }
 
 const _STEP_LABELS_SHORT = {
@@ -467,50 +518,13 @@ const _STEP_LABELS_SHORT = {
 };
 const _STATUS_ICON = { done: '✅', skipped: '⏭️', error: '✗', cancelled: '⏹', running: '…' };
 const _SKIP_REASON_HINTS = {
-  compress: '已找到可复用的压缩文件或分段输出。勾选“覆盖现有输出”后会重新压缩。',
+  compress: '已找到可复用的压缩文件或分段输出。勾选"覆盖现有输出"后会重新压缩。',
   analyze: '通常是分析 JSON 已存在；也可能是视频超过 analyze.max_analyze_duration_min 时长限制。',
-  voiceover: '口播 JSON 已存在。需要重写文案时勾选“覆盖现有输出”。',
+  voiceover: '口播 JSON 已存在。需要重写文案时勾选"覆盖现有输出"。',
   transcribe: '通常是转录 JSON 已存在；也可能是找不到原始视频或音频提取失败。',
-  plan: '剪辑规划文件已存在。需要重建规划时勾选“覆盖现有输出”。',
+  plan: '剪辑规划文件已存在。需要重建规划时勾选"覆盖现有输出"。',
   label: '可能是标号视频已存在，或找不到对应的压缩视频。',
 };
-
-function buildSkippedDiagnostics(processingState) {
-  const files = processingState?.files || {};
-  const stateSteps = Array.isArray(processingState?.steps) ? processingState.steps : Object.keys(_STEP_LABELS_SHORT);
-  const stepKeys = stateSteps.filter(step => step in _STEP_LABELS_SHORT);
-  const diagnostics = [];
-  for (const [file, steps] of Object.entries(files).sort((a, b) => a[0].localeCompare(b[0]))) {
-    if (!steps || typeof steps !== 'object') continue;
-    for (const step of stepKeys) {
-      if (steps[step] !== 'skipped') continue;
-      diagnostics.push({
-        file,
-        step,
-        label: _STEP_LABELS_SHORT[step] || step,
-        reason: _SKIP_REASON_HINTS[step] || '该步骤被记录为 skipped；请检查运行日志和对应输出文件。',
-      });
-    }
-  }
-  return diagnostics;
-}
-
-function renderSkippedDiagnosticsHtml(diagnostics) {
-  const rows = (diagnostics || []).map(item => `
-    <div class="skip-row">
-      <span class="skip-file">${escapeHtml(item.file)}</span>
-      <span class="skip-step">${escapeHtml(item.label || item.step)}</span>
-      <span class="skip-reason">${escapeHtml(item.reason)}</span>
-    </div>
-  `).join('');
-  return `
-    <details class="skip-panel" ${rows ? 'open' : ''}>
-      <summary>为什么被跳过</summary>
-      <p class="muted">基于 .processing.json 的 skipped 状态推断；精确原因以运行日志和实际输出文件为准。</p>
-      ${rows ? `<div class="skip-table">${rows}</div>` : '<p class="muted">当前没有 skipped 记录。</p>'}
-    </details>
-  `;
-}
 
 async function renderProcessingState(container) {
   try {
@@ -536,14 +550,48 @@ async function renderProcessingState(container) {
   } catch { /* ignore */ }
 }
 
+function buildSkippedDiagnostics(processingState) {
+  const files = processingState?.files || {};
+  const stateSteps = Array.isArray(processingState?.steps) ? processingState.steps : Object.keys(_STEP_LABELS_SHORT);
+  const stepKeys = stateSteps.filter(step => step in _STEP_LABELS_SHORT);
+  const diagnostics = [];
+  for (const [file, steps] of Object.entries(files).sort((a, b) => a[0].localeCompare(b[0]))) {
+    if (!steps || typeof steps !== 'object') continue;
+    for (const step of stepKeys) {
+      if (steps[step] !== 'skipped') continue;
+      diagnostics.push({
+        file,
+        step,
+        label: _STEP_LABELS_SHORT[step] || step,
+        reason: _SKIP_REASON_HINTS[step] || '该步骤被记录为 skipped；请检查运行日志和对应输出文件。',
+      });
+    }
+  }
+  return diagnostics;
+}
+function renderSkippedDiagnosticsHtml(diagnostics) {
+  const rows = (diagnostics || []).map(item => `
+    <div class="skip-row">
+      <span class="skip-file">${escapeHtml(item.file)}</span>
+      <span class="skip-step">${escapeHtml(item.label || item.step)}</span>
+      <span class="skip-reason">${escapeHtml(item.reason)}</span>
+    </div>
+  `).join('');
+  return `
+    <details class="skip-panel" ${rows ? 'open' : ''}>
+      <summary>为什么被跳过</summary>
+      <p class="muted">基于 .processing.json 的 skipped 状态推断；精确原因以运行日志和实际输出文件为准。</p>
+      ${rows ? `<div class="skip-table">${rows}</div>` : '<p class="muted">当前没有 skipped 记录。</p>'}
+    </details>
+  `;
+}
 export {
   renderRun,
   startRun,
   _stopRunPoll,
   updateRunFilesBadge,
-  collectRunOptions,
+  _completionTargetForSteps,
   renderRunPreviewHtml,
-  refreshRunPreview,
   buildSkippedDiagnostics,
   renderSkippedDiagnosticsHtml,
 };

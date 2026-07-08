@@ -1,6 +1,6 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
 import { api } from '../api.js';
-import { _attachProviderListHandlers, _renderTagInput, _renderProviderList, _renderTaskBinding } from '../editor-config.js';
+import { _attachProviderListHandlers, _renderPromptManagement, _renderTagInput, _renderProviderList, _renderTaskBinding } from '../editor-config.js';
 
 vi.mock('../api.js', async () => {
   const actual = await vi.importActual('../api.js');
@@ -491,5 +491,72 @@ describe('_renderTaskBinding', () => {
     expect(html).toContain('&lt;script&gt;p&lt;/script&gt;');
     expect(html).toContain('&lt;script&gt;m&lt;/script&gt;');
     expect(html).not.toContain('<script>p</script>');
+  });
+});
+
+describe('_renderPromptManagement', () => {
+  const payload = {
+    prompts: [
+      {
+        name: 'ANALYZE_PROMPT',
+        default: 'default analyze',
+        content: 'custom analyze',
+        has_override: true,
+        override_path: 'project/templates/prompts/ANALYZE_PROMPT.md',
+        source_path: 'project/templates/prompts/ANALYZE_PROMPT.md',
+      },
+      {
+        name: 'SCRIPT_PROMPT',
+        default: 'default script',
+        content: 'default script',
+        has_override: false,
+        override_path: 'project/templates/prompts/SCRIPT_PROMPT.md',
+        source_path: null,
+      },
+    ],
+  };
+
+  it('renders prompt list and selected editor', () => {
+    const html = _renderPromptManagement(payload, 'ANALYZE_PROMPT');
+    expect(html).toContain('prompt-management');
+    expect(html).toContain('ANALYZE_PROMPT');
+    expect(html).toContain('SCRIPT_PROMPT');
+    expect(html).toContain('custom analyze');
+    expect(html).toContain('保存覆盖');
+    expect(html).toContain('恢复默认');
+  });
+
+  it('marks overridden prompts and enables restore', () => {
+    const html = _renderPromptManagement(payload, 'ANALYZE_PROMPT');
+    expect(html).toContain('prompt-badge override');
+    expect(html).toContain('已覆盖');
+    expect(html).not.toContain('id="btn-prompt-restore" class="btn-secondary" disabled');
+  });
+
+  it('disables restore for default prompts', () => {
+    const html = _renderPromptManagement(payload, 'SCRIPT_PROMPT');
+    expect(html).toContain('id="btn-prompt-restore" class="btn-secondary" disabled');
+    expect(html).toContain('系统默认');
+  });
+
+  it('escapes prompt content and paths', () => {
+    const html = _renderPromptManagement({
+      prompts: [{
+        name: 'ANALYZE_PROMPT',
+        default: '<default>',
+        content: '<script>alert(1)</script>',
+        has_override: true,
+        override_path: '<path>',
+        source_path: '<source>',
+      }],
+    });
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt;');
+    expect(html).toContain('&lt;path&gt;');
+    expect(html).not.toContain('<script>alert(1)</script>');
+  });
+
+  it('renders empty state without prompts', () => {
+    const html = _renderPromptManagement({ prompts: [] });
+    expect(html).toContain('config-empty-state');
   });
 });

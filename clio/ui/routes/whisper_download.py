@@ -15,6 +15,12 @@ import requests as _req
 from clio.transcribe import _resolve_cache_dir
 from clio.ui.handler_protocol import HandlerProtocol
 from clio.utils import run_subprocess
+from clio.whisper_cache import (
+    REQUIRED_MODEL_FILES,
+    ensure_model_cache_refs,
+    is_model_cache_complete,
+    model_snapshot_dir,
+)
 
 _INSTALL_LOCK = threading.Lock()
 _INSTALL_THREAD: threading.Thread | None = None
@@ -109,14 +115,14 @@ _KNOWN_MODEL_SIZES: dict[str, int] = {
 }
 
 
-def _get_model_file_size(repo_id: str, cfg: Any) -> int:
+def _get_remote_file_size(repo_id: str, filename: str, cfg: Any) -> int:
     import requests as _req
     from huggingface_hub import hf_hub_url
 
     proxy_url = cfg.proxy.url if (cfg.proxy.enabled and cfg.proxy.url) else None
     proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
     try:
-        url = hf_hub_url(repo_id, filename="model.bin")
+        url = hf_hub_url(repo_id, filename=filename)
         r = _req.head(url, proxies=proxies, timeout=15, allow_redirects=True)
         r.raise_for_status()
         size = int(r.headers.get("Content-Length", 0))
@@ -124,6 +130,15 @@ def _get_model_file_size(repo_id: str, cfg: Any) -> int:
             return size
     except Exception:
         pass
+    return 0
+
+
+def _get_model_download_size(repo_id: str, cfg: Any) -> int:
+    total = 0
+    for filename in REQUIRED_MODEL_FILES:
+        total += _get_remote_file_size(repo_id, filename, cfg)
+    if total:
+        return total
     for key, sz in _KNOWN_MODEL_SIZES.items():
         if key in repo_id:
             return sz
@@ -143,26 +158,6 @@ def _download_error_detail(e: Exception, cfg: Any) -> str:
         msg.append("    - 如果不需要镜像，删除 config.yaml 中的 ai.whisper.hf_endpoint")
         msg.append("    - 若需代理，在 config.yaml 中配置 proxy: { enabled: true, url: http://127.0.0.1:7890 }")
     return "\n".join(msg)
-
-
-def _find_model_file(cache_dir: Path, model_name: str) -> Path | None:
-    repo_cache = cache_dir / f"models--Systran--faster-whisper-{model_name}"
-    if not repo_cache.is_dir():
-        return None
-    snapshots = repo_cache / "snapshots"
-    if snapshots.is_dir():
-        for rev_dir in snapshots.iterdir():
-            model_file = rev_dir / "model.bin"
-            if model_file.is_file():
-                return model_file
-    blobs = repo_cache / "blobs"
-    if blobs.is_dir():
-        for f in blobs.iterdir():
-            if f.name.endswith(".incomplete") or f.name.startswith("."):
-                return f
-            if f.is_file() and f.stat().st_size > 0:
-                return f
-    return None
 
 
 def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Path) -> None:
@@ -203,7 +198,18 @@ def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Pa
         model_name = cfg.whisper.model_size
         repo_id = f"Systran/faster-whisper-{model_name}"
 
-        total_size = _get_model_file_size(repo_id, cfg)
+        if is_model_cache_complete(cache_dir, model_name):
+            _write_install_progress(
+                progress_path,
+                {
+                    "status": "done",
+                    "progress_pct": 100,
+                    "message": f"模型 {model_name} 已下载",
+                },
+            )
+            return
+
+        total_size = _get_model_download_size(repo_id, cfg)
 
         _write_install_progress(
             progress_path,
@@ -216,84 +222,96 @@ def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Pa
 
         from huggingface_hub import hf_hub_url
 
-        url = hf_hub_url(repo_id, filename="model.bin")
         proxy_url = cfg.proxy.url if (cfg.proxy.enabled and cfg.proxy.url) else None
         proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
 
-        model_cache_dir = cache_dir / f"models--Systran--faster-whisper-{model_name}"
-        snapshots = model_cache_dir / "snapshots" / "downloaded"
+        snapshots = model_snapshot_dir(cache_dir, model_name)
         snapshots.mkdir(parents=True, exist_ok=True)
-        model_path = snapshots / "model.bin"
-        tmp_path = model_path.with_name(model_path.name + ".tmp")
 
         _INSTALL_CANCEL.clear()
-        try:
-            response = _req.get(url, stream=True, proxies=proxies, timeout=30, allow_redirects=True)
-            response.raise_for_status()
-        except _req.exceptions.RequestException as e:
-            raise RuntimeError(_download_error_detail(e, cfg)) from e
-
-        total_size = int(response.headers.get("Content-Length", 0)) or total_size
 
         downloaded = 0
         start = time.monotonic()
         last_report_time = 0.0
         last_pct = 0
 
-        with open(tmp_path, "wb") as f:
-            for chunk in response.iter_content(chunk_size=8192):
-                if _INSTALL_CANCEL.is_set():
-                    tmp_path.unlink(missing_ok=True)
-                    _write_install_progress(
-                        progress_path,
-                        {"status": "idle", "progress_pct": 0, "message": "下载已取消"},
-                    )
-                    return
-                if chunk:
-                    f.write(chunk)
-                    downloaded += len(chunk)
+        for filename in REQUIRED_MODEL_FILES:
+            target = snapshots / filename
+            if target.is_file() and target.stat().st_size > 0:
+                downloaded += target.stat().st_size
+                continue
+            url = hf_hub_url(repo_id, filename=filename)
+            tmp_path = target.with_name(target.name + ".tmp")
+            try:
+                response = _req.get(url, stream=True, proxies=proxies, timeout=30, allow_redirects=True)
+                response.raise_for_status()
+            except _req.exceptions.RequestException as e:
+                raise RuntimeError(_download_error_detail(e, cfg)) from e
 
-                now = time.monotonic()
-                if now - last_report_time < 1.0:
-                    continue
-                last_report_time = now
-                pct = int(downloaded / total_size * 100) if total_size else 0
-                speed_bps = downloaded / max(now - start, 1.0)
-                speed_str = (
-                    f"{speed_bps / 1024 / 1024:.1f} MB/s"
-                    if speed_bps > 1024 * 1024
-                    else f"{speed_bps / 1024:.0f} KB/s"
-                    if speed_bps
-                    else ""
+            if not total_size:
+                total_size += int(response.headers.get("Content-Length", 0))
+
+            cancelled = False
+            with open(tmp_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    if _INSTALL_CANCEL.is_set():
+                        cancelled = True
+                        break
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+
+                    now = time.monotonic()
+                    if now - last_report_time < 1.0:
+                        continue
+                    last_report_time = now
+                    pct = int(downloaded / total_size * 100) if total_size else 0
+                    speed_bps = downloaded / max(now - start, 1.0)
+                    speed_str = (
+                        f"{speed_bps / 1024 / 1024:.1f} MB/s"
+                        if speed_bps > 1024 * 1024
+                        else f"{speed_bps / 1024:.0f} KB/s"
+                        if speed_bps
+                        else ""
+                    )
+                    eta_sec = int((total_size - downloaded) / max(speed_bps, 1)) if total_size and speed_bps else None
+                    if total_size and pct >= last_pct + 2:
+                        _write_install_progress(
+                            progress_path,
+                            {
+                                "status": "downloading",
+                                "progress_pct": pct,
+                                "message": f"下载模型 {model_name}: {filename} ({pct}%)",
+                                "speed": speed_str,
+                                "eta_sec": eta_sec,
+                            },
+                        )
+                        last_pct = pct
+                    elif not total_size:
+                        _write_install_progress(
+                            progress_path,
+                            {
+                                "status": "downloading",
+                                "progress_pct": 0,
+                                "message": f"下载模型 {model_name}: {filename} ({int(now - start)}s, "
+                                f"{_format_bytes(downloaded)} 已下载)",
+                            },
+                        )
+
+            if cancelled:
+                tmp_path.unlink(missing_ok=True)
+                _write_install_progress(
+                    progress_path,
+                    {"status": "idle", "progress_pct": 0, "message": "下载已取消"},
                 )
-                eta_sec = int((total_size - downloaded) / max(speed_bps, 1)) if total_size and speed_bps else None
-                if total_size and pct >= last_pct + 2:
-                    _write_install_progress(
-                        progress_path,
-                        {
-                            "status": "downloading",
-                            "progress_pct": pct,
-                            "message": f"下载模型 {model_name} ({pct}%)",
-                            "speed": speed_str,
-                            "eta_sec": eta_sec,
-                        },
-                    )
-                    last_pct = pct
-                elif not total_size:
-                    _write_install_progress(
-                        progress_path,
-                        {
-                            "status": "downloading",
-                            "progress_pct": 0,
-                            "message": f"下载模型 {model_name} ({int(now - start)}s, "
-                            f"{_format_bytes(downloaded)} 已下载)",
-                        },
-                    )
+                return
 
-        try:
-            tmp_path.replace(model_path)
-        except OSError as e:
-            raise RuntimeError(_download_error_detail(e, cfg)) from e
+            try:
+                tmp_path.replace(target)
+            except OSError as e:
+                raise RuntimeError(_download_error_detail(e, cfg)) from e
+
+        ensure_model_cache_refs(cache_dir, model_name)
         _write_install_progress(
             progress_path,
             {

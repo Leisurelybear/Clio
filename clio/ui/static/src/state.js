@@ -4,7 +4,9 @@ const state = {
   configRaw: null,
   configGlobal: null,
   configProject: null,
-  configTab: 'project',  // 'project' | 'global' | 'merged'
+  configTab: 'project',  // 'project' | 'global' | 'merged' | 'prompts'
+  promptPayload: null,
+  currentPromptName: null,
   source: 'compressed',
   videos: [],
   currentEntity: 'video',  // 'video' | 'plan' | 'run' | 'config'

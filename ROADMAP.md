@@ -156,7 +156,7 @@ High-value open items that are not already covered by completed fixes:
 - [x] U-007a: Replace `hf_hub_download` with chunked `requests.get(stream=True)` + `iter_content`
 - [x] U-007b: Per-chunk `_INSTALL_CANCEL.is_set()` check for clean interrupt
 - [x] U-007c: Remove `ctypes` thread-kill code
-- [ ] U-007d: Update tests _(no existing tests for this code path — new tests deferred)_
+- [x] U-007d: Update tests for chunked model download, required snapshot files, and cancel cleanup
 
 ### U-010: Server + fs.py Test Coverage (Phase 3 — Testing)
 
@@ -182,7 +182,7 @@ High-value open items that are not already covered by completed fixes:
 **Sub-tasks**:
 - [x] U-008a: Restrict `handle_get_fs_dirs` to user home directory or a configurable root _(already implemented via `_is_allowed_path` in `fs.py:18-28`)_
 - [x] U-008b: Add `UI_TOKEN` env var check — when `--host` is not localhost, require `?token=` on all sensitive endpoints _(already implemented in `server.py:164-181` + `server.py:429-434`)_
-- [ ] U-008c: Update README.md with explicit security warning for `--host 0.0.0.0`
+- [x] U-008c: Update README.md with explicit security warning for `--host 0.0.0.0`
 - [x] U-008d: Add tests for `fs.py` _(92% coverage now, U-010b)_
 
 ## Staging / WIP
@@ -330,17 +330,17 @@ High-value open items that are not already covered by completed fixes:
 **Acceptance Criteria**:
 - ✅ Enable sidebar "▶ Run" as the R-008 entry point
 - ✅ Right panel shows run panel: step selection (compress / analyze / voiceover / plan / all)
-- ❌ Input directory can be independently selected (not limited to config's `input_dir`, can manually enter path or browse)
+- ✅ Input directory can be independently selected (not limited to config's `input_dir`, can manually enter path or browse)
 - ✅ Files within the selected directory can be checked individually (not "run all") — multi-select via "选择视频" button
 - ✅ After clicking execute, panel shows real-time progress + ETA (SSE via `/api/run/stream`)
-- ⚠️ Auto-switch to corresponding view after completion — video/plan/steps reloaded, but no per-step smart view switch
+- ✅ Auto-switch to corresponding view after completion — plan opens the plan view; media steps open compressed video results
 
 **Sub-tasks**:
-- [ ] R-008a: Backend `/api/run/step` endpoint (dedicated endpoint with `input_dir`) — **not started**. Existing `/api/run/start` + `/api/rerun` cover most use cases; missing standalone `input_dir` override.
+- [x] R-008a: Backend run endpoint supports per-run `input_dir` override via `/api/run/start` (no separate `/api/run/step` needed).
 - [x] R-008b: Run panel UI (step checkboxes → SSE progress → result/done state) — **done**. `runner.js` has 6 steps, ETA, stalled detection, processing state table.
-- [~] R-008c: File checkbox interaction: **done** (`sidebar.js` toggle + `sidebar-data.js` checkboxes + `runner.js` badge). Input directory selection/browse in run panel: **not done** (browse modal exists but not wired to run panel).
-- [~] R-008d: Auto-refresh after completion: **done** (videos/plans/steps reload). Per-step smart view switch: **not done** (e.g., compress completed → switch to compressed view).
-- [~] R-008e: Sidebar "▶ Run" entry: **done** (active, not grayed). README docs: **not done**. ROADMAP status: **now updated**.
+- [x] R-008c: File checkbox interaction plus run-panel input directory selection/browse.
+- [x] R-008d: Auto-refresh after completion plus smart view switch from Run panel (plan → plan view; media steps → compressed video view with relevant tab).
+- [x] R-008e: Sidebar "▶ Run" entry and README docs.
 
 ## Feature R-009: Engineering Robustness
 
@@ -427,7 +427,7 @@ High-value open items that are not already covered by completed fixes:
 - [x] R-003d: UI: each video list item has dropdown "Rerun texts / voiceover / all"
 - [x] R-003f: Backend `POST /api/rerun` accepts `{video, task, source}`
 - [x] R-003e: UI refine tab adds temporary context textarea (deferred to separate task)
-- [ ] R-003g: Pipeline `run_rerun_single` (single-file support already exists, no separate function needed)
+- [x] R-003g: Pipeline `run_rerun_single` not needed; single-file support already exists in task functions and `/api/rerun`.
 
 ## ✅ Feature R-011: Plan Panel Preview Playback
 
@@ -633,10 +633,10 @@ High-value open items that are not already covered by completed fixes:
 
 | Sub-task | Status |
 |----------|--------|
-| Remove `clio/ui/static/app.js` — legacy shim with no entry point | [ ] |
-| Update `clio/ui/README.md` — add transcript tab, tokens panel, auth modal, `Ctrl+1~5`/`Escape` shortcuts, preview playback; update ASCII layout | [ ] |
-| Wire toast system (`addToast`) into actual call sites — currently exposed globally but never called | [ ] |
-| Unify open-project modal `#op-custom-path` to use `.input-with-browse` class | [ ] |
+| Remove `clio/ui/static/app.js` — legacy shim with no entry point | [x] |
+| Update `clio/ui/README.md` — add transcript tab, tokens panel, auth modal, `Ctrl+1~5`/`Escape` shortcuts, preview playback; update ASCII layout | [x] |
+| Wire toast system (`addToast`) into actual call sites — currently exposed globally but never called | [x] |
+| Unify open-project modal `#op-custom-path` to use `.input-with-browse` class | [x] |
 
 ## U-011: Configuration Safety & Housekeeping
 
@@ -644,9 +644,44 @@ High-value open items that are not already covered by completed fixes:
 
 | Sub-task | Status |
 |----------|--------|
-| Add `project.yaml`, `**/.vmeta/`, `**/.vindex` to `.gitignore` | [ ] |
-| Change `debug_print_prompt` default from `True` to `False` in `clio/config/models.py` | [ ] |
-| Update `config.example.yaml` to reflect `debug_print_prompt: false` by default | [ ] |
+| Add `project.yaml`, `**/.vmeta/`, `**/.vindex` to `.gitignore` | [x] |
+| Change `debug_print_prompt` default from `True` to `False` in `clio/config/models.py` | [x] |
+| Update `config.example.yaml` to reflect `debug_print_prompt: false` by default | [x] |
+
+## Analysis Document Triage (2026-07-07)
+
+**Source**: `docs/analysis/*.md` review pass. Valuable items from analysis docs have been merged below; already-implemented items are marked done to avoid repeated audits.
+
+### Already Absorbed / Completed
+
+| Source item | Status |
+| --- | --- |
+| 2026-06-28 BUG-001/BUG-002: rerun analyze/voiceover cancel propagation | [x] `clio/ui/routes/run.py`, `clio/tasks/scripts.py`, `clio/analyze.py` pass `cancel_event` |
+| 2026-06-28 BUG-005: `jianying.py` debug prints | [x] Replaced with `logger.debug()` |
+| 2026-06-28 FD-001/ARCH-002: JianYing canvas ratio / export config | [x] `ExportConfig.canvas_ratio`, presets, `jianying_draft_dir`, `auto_copy_draft` |
+| 2026-06-28 FD-002: `AppConfig.transcripts_dir` missing | [x] Added `config.transcripts_dir` property |
+| 2026-06-28 FD-004 / N-01: UI JianYing export entry | [x] Plan view has export button and result path display |
+| 2026-06-28 FD-006: unfriendly missing `faster-whisper` failure | [x] `run_transcribe_all` checks `check_whisper()` and logs actionable message |
+| 2026-06-28 OPT-002: unbounded `ProgressTracker.logs` | [x] Logs capped to last 100 entries |
+| 2026-06-28 NEW-001: auto-copy JianYing draft | [x] `auto_copy_draft` copies `draft_content.json` when configured |
+| 2026-06-28 NEW-005 / 2026-06-17 P1-3: SSE run progress | [x] `/api/run/stream` + frontend `EventSource` |
+| 2026-06-24 A-05: label/cut missing `ProcessingState.mark()` | [x] `tasks/label.py` and `tasks/cut.py` mark skipped/done/error |
+
+### New / Still Useful Backlog
+
+| ID | Source | Item | Suggested approach | Status |
+| --- | --- | --- | --- | --- |
+| A-007 | 2026-06-28 ARCH-001 | Replace `server.py` hand-written route `if` chain with a route registry | Keep stdlib `http.server`; add `clio/ui/router.py` with method/path registration and path params | [ ] |
+| A-008 | 2026-06-28 ARCH-004 | Debounce `ProcessingState.mark()` disk flushes | Batch writes by time or pending count, flush on shutdown | [x] |
+| B-099 | 2026-06-24 O-06 | OpenAI-compatible provider timeout is hardcoded to 120s | Add `ProviderConfig.timeout_sec`, parse YAML, pass to `httpx.Client(timeout=...)` | [x] |
+| B-100 | 2026-06-24 O-07 | `extract_json()` has no response length guard | Add maximum response length / warning before regex scan to avoid pathological AI responses | [x] |
+| B-101 | 2026-06-28 OPT-003 | `.vmeta verify` hash is written but not checked | Either validate `verify` in `is_stale()` or explicitly document it as reserved metadata | [x] |
+| R-020 | 2026-06-28 NEW-002 | `vmeta` / `.vindex` integrity verification CLI | Add `python main.py verify` to report OK / STALE / MISSING and recommend reindex/recompress | [x] |
+| R-021 | 2026-06-28 NEW-004 / 2026-06-17 UX-6 | Multi-day planning | Add `plan --all-days`, scan day labels, generate per-day plans and optional `trip_plan.json` | [x] |
+| R-022 | 2026-06-24 N-05 | Smart cover frame extraction | Add `cover_timestamp` in analysis output, extract JPEG with ffmpeg, show candidates in UI | [x] |
+| R-023 | 2026-06-24 N-06 | Align transcript segments with visual timeline | Attach transcript snippets to timeline entries by time overlap; expose to plan prompt/UI | [x] |
+| R-024 | 2026-06-21 F-4 | GoPro GPMF telemetry as highlight signal | Parse telemetry timestamps (speed/elevation/location), feed highlight windows into analysis prompt | [ ] |
+| R-025 | 2026-06-24 N-04 | Webhook / external trigger | Add authenticated `POST /api/webhook/trigger` for NAS/Syncthing automation | [x] |
 
 ## Known Issues (Bug Tracker)
 
@@ -785,9 +820,9 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 | ID | Bottleneck | Optimization Plan | Priority |
 | --- | --- | --- | --- |
-| P-001 | AI analysis (analyze step) is pure serial, each video waits for previous upload+process+generate | `ThreadPoolExecutor(max_workers=3~5)` after RateLimiter refactoring (U-006). See part2 review §P-1 for details | P2 |
-| P-002 | Repeated ffprobe calls to read same video's `duration_sec` / `size_mb` | Cache already-read info, reuse results | P3 |
-| P-003 | `GET /api/videos` iterates directory every time, high I/O cost | Add directory mtime cache, reuse unchanged scan results | P3 |
+| P-001 | AI analysis (analyze step) is pure serial, each video waits for previous upload+process+generate | ✅ Done: `ThreadPoolExecutor(max_workers)` added after RateLimiter refactor | ✅ |
+| P-002 | Repeated ffprobe calls to read same video's `duration_sec` / `size_mb` | Cache already-read info, reuse results | ✅ |
+| P-003 | `GET /api/videos` iterates directory every time, high I/O cost | ✅ Done: cache `/api/videos` payload by project/source and relevant file fingerprints | ✅ |
 
 ---
 

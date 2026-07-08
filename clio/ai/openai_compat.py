@@ -26,7 +26,7 @@ class OpenAICompatProvider:
             )
         self._api_key = cfg.api_key
         self._base_url = (cfg.base_url or "https://api.openai.com/v1").rstrip("/")
-        client_kwargs: dict = {"timeout": 120.0}
+        client_kwargs: dict = {"timeout": float(cfg.timeout_sec)}
         if proxy.enabled and proxy.url:
             client_kwargs["proxy"] = proxy.url
         self._client = httpx.Client(**client_kwargs)

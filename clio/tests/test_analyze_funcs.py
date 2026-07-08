@@ -7,7 +7,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
-from clio.analyze import _wrap_with_context, plan_daily_vlog
+from clio.ai.base import AIResponse
+from clio.analyze import _validate_analysis, _validate_plan, _validate_voiceover, _wrap_with_context, plan_daily_vlog
 
 
 def _fake_config(context: str = "", context_override: str | None = None) -> SimpleNamespace:
@@ -88,6 +89,49 @@ class TestWrapWithContext:
         assert "Trip: Paris" in result
         assert "user context" in result
         assert "prompt" in result
+
+
+def test_analyze_video_uses_prompt_override(tmp_path, monkeypatch):
+    from clio.analyze import analyze_video
+
+    template_file = tmp_path / "templates" / "vlog_template.md"
+    template_file.parent.mkdir(parents=True)
+    template_file.write_text("template", encoding="utf-8")
+
+    prompt_dir = tmp_path / "templates" / "prompts"
+    prompt_dir.mkdir(parents=True)
+    (prompt_dir / "video_analyze.md").write_text("override analyze prompt", encoding="utf-8")
+
+    cfg = _fake_config()
+    cfg.paths.input_dir = tmp_path
+    cfg.script.template_file = template_file
+    provider = MagicMock(provider_id="mock")
+    provider.analyze_video.return_value = AIResponse('{"title":"x","summary":"y","timeline":[]}')
+
+    monkeypatch.setattr("clio.analyze.get_video_provider", lambda *a: (provider, "model"))
+    result = analyze_video("clip.mp4", cfg)
+
+    assert result["title"] == "x"
+    _, prompt, _ = provider.analyze_video.call_args.args[:3]
+    assert "override analyze prompt" in prompt
+
+
+def test_validate_analysis_defaults_confidence():
+    result = _validate_analysis({"title": "x", "summary": "y", "timeline": []}, "clip.mp4")
+
+    assert result["_confidence"] == 0.0
+
+
+def test_validate_voiceover_defaults_confidence():
+    result = _validate_voiceover({"title": "x", "voiceover": "hello"}, "clip.mp4")
+
+    assert result["_confidence"] == 0.0
+
+
+def test_validate_plan_defaults_confidence():
+    result = _validate_plan({"day_title": "day1", "sequence": []}, "day1")
+
+    assert result["_confidence"] == 0.0
 
 
 class TestPlanDailyVlog:

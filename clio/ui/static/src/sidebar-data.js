@@ -116,6 +116,15 @@ export function renderSteps() {
 let _portalDropdown = null;
 let _portalCloseHandler = null;
 
+function scrollActiveVideoIntoView() {
+  requestAnimationFrame(() => {
+    const active = document.querySelector('#video-list .video-item.active');
+    if (active) {
+      active.scrollIntoView({ block: 'nearest' });
+    }
+  });
+}
+
 function renderVideoItem(v) {
   const li = document.createElement('li');
   let checkboxHtml = '';
@@ -145,9 +154,9 @@ function renderVideoItem(v) {
   if (v.match) {
     if (v.segment_matches && v.segment_matches.length > 1) {
       const segList = v.segment_matches.map(m => m.file).join(', ');
-      matchBadge = `<span class="match-badge" title="${escapeHtml(segList)}">→ ${counterpartLabel}: ${v.segment_matches.length} 段</span>`;
+      matchBadge = `<button type="button" class="match-badge match-jump" title="${escapeHtml(segList)}">→ ${counterpartLabel}: ${escapeHtml(v.index || '')}/${v.segment_matches.length} 段</button>`;
     } else {
-      matchBadge = `<span class="match-badge" title="${escapeHtml(v.match.file)}">→ ${counterpartLabel}: ${escapeHtml(v.match.file)}</span>`;
+      matchBadge = `<button type="button" class="match-badge match-jump" title="${escapeHtml(v.match.file)}">→ ${counterpartLabel}: ${escapeHtml(v.match.file)}</button>`;
     }
   } else {
     matchBadge = `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
@@ -187,6 +196,7 @@ function renderVideoItem(v) {
   `;
 
   li.onclick = (e) => {
+    if (e.target.closest('.match-jump')) return;
     if (e.target.closest('.video-actions')) return;
     if (state.selectionMode) {
       if (e.target.closest('.video-checkbox')) return;
@@ -196,6 +206,15 @@ function renderVideoItem(v) {
     }
     import('./sidebar.js').then(mod => mod.selectVideo(v.file));
   };
+
+  const matchJump = li.querySelector('.match-jump');
+  if (matchJump) {
+    matchJump.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      import('./sidebar.js').then(mod => mod.jumpToCounterpart(v));
+    };
+  }
 
   const menuBtn = li.querySelector('.menu-btn');
   const dropdown = li.querySelector('.menu-dropdown');
@@ -308,15 +327,24 @@ export function renderVideoList() {
     return;
   }
 
-  const grouped = state.videos.filter(v => v.group_key);
-  const ungrouped = state.videos.filter(v => !v.group_key);
-
   const groups = {};
-  for (const v of grouped) {
+  for (const v of state.videos.filter(v => v.group_key)) {
     (groups[v.group_key] ??= []).push(v);
   }
+  const renderedGroups = new Set();
 
-  for (const [key, items] of Object.entries(groups)) {
+  for (const v of state.videos) {
+    if (!v.group_key) {
+      ul.appendChild(renderVideoItem(v));
+      continue;
+    }
+    const key = v.group_key;
+    if (renderedGroups.has(key)) continue;
+    renderedGroups.add(key);
+    const items = groups[key] || [];
+    if (items.some(item => item.file === state.currentVideo)) {
+      state.expandedGroups[key] = true;
+    }
     const header = document.createElement('li');
     header.className = 'video-group-header';
     const isExpanded = state.expandedGroups[key] !== false;
@@ -346,9 +374,6 @@ export function renderVideoList() {
     ul.appendChild(childUl);
   }
 
-  for (const v of ungrouped) {
-    ul.appendChild(renderVideoItem(v));
-  }
-
+  scrollActiveVideoIntoView();
   updateRunFilesBadge();
 }

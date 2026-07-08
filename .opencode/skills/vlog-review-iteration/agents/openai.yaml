@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vlog Review Iteration"
+  short_description: "Guide one-item review remediation work."
+  default_prompt: "Use this skill when continuing remediation from a Clio project review document or ROADMAP bug item."

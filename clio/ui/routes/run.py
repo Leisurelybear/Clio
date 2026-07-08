@@ -22,6 +22,23 @@ if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
 
 
+def _apply_run_input_dir_override(cfg, input_dir_raw: str | None) -> tuple[Any, str | None]:
+    """Return a run-local config copy when the request overrides input_dir."""
+    if input_dir_raw is None:
+        return cfg, None
+    if not isinstance(input_dir_raw, str):
+        return cfg, "input_dir must be a string"
+    input_dir_raw = input_dir_raw.strip()
+    if not input_dir_raw:
+        return cfg, None
+    input_dir = Path(input_dir_raw).expanduser()
+    if not input_dir.is_dir():
+        return cfg, f"input_dir not found: {input_dir_raw}"
+    run_cfg = copy.deepcopy(cfg)
+    run_cfg.paths.input_dir = input_dir
+    return run_cfg, None
+
+
 def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """GET /api/run/stream — SSE endpoint for real-time run status."""
     proj_input = handler._resolve_project_input(qs)
@@ -39,10 +56,18 @@ def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     try:
         while True:
             if progress_file.is_file():
-                raw = progress_file.read_text(encoding="utf-8")
+                try:
+                    raw = progress_file.read_text(encoding="utf-8")
+                except OSError:
+                    time.sleep(0.5)
+                    continue
                 if raw != last_data:
+                    try:
+                        parsed = json.loads(raw)
+                    except json.JSONDecodeError:
+                        time.sleep(0.5)
+                        continue
                     last_data = raw
-                    parsed = json.loads(raw)
                     with state.run_lock:
                         running = state.run_thread is not None and state.run_thread.is_alive()
                     parsed["running"] = running
@@ -63,8 +88,6 @@ def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
             time.sleep(0.5)
     except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
         pass  # Client disconnected
-    except json.JSONDecodeError:
-        pass  # Corrupted progress file (being written concurrently)
 
 
 def handle_get_run_status(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
@@ -98,6 +121,9 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
     steps = obj.get("steps")
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
+    cfg, cfg_error = _apply_run_input_dir_override(cfg, obj.get("input_dir"))
+    if cfg_error:
+        return handler._send_json({"ok": False, "error": cfg_error}, 400)
     state = handler._get_state(str(proj_input.resolve()))
     if "use_transcripts" in obj:
         cfg.plan.use_transcripts = obj["use_transcripts"]

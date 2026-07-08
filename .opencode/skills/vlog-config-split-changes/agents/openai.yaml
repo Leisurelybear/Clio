@@ -1,0 +1,4 @@
+interface:
+  display_name: "Vlog Config Split Changes"
+  short_description: "Guide config schema, ownership, examples, and UI save changes."
+  default_prompt: "Use this skill when changing Clio global/project config schema or config UI behavior."

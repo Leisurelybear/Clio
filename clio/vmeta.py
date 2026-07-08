@@ -105,10 +105,17 @@ class VideoMeta:
     def source_path_obj(self) -> Path:
         return Path(self.source_path)
 
-    def is_stale(self, source: Path) -> bool:
+    def is_stale(self, source: Path, target: Path | None = None) -> bool:
         try:
             st = source.stat()
-            return int(st.st_mtime) != self.source_modifyTime or st.st_size != self.source_size
+            if int(st.st_mtime) != self.source_modifyTime or st.st_size != self.source_size:
+                return True
+            if target is None:
+                return False
+            target_st = target.stat()
+            if int(target_st.st_mtime) != self.target_modifyTime or target_st.st_size != self.target_size:
+                return True
+            return bool(self.verify and _quick_hash(target) != self.verify)
         except OSError:
             return True
 

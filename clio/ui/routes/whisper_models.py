@@ -12,6 +12,7 @@ import yaml
 from clio.config import WhisperModelSize
 from clio.transcribe import _resolve_cache_dir
 from clio.ui.handler_protocol import HandlerProtocol
+from clio.whisper_cache import REQUIRED_MODEL_FILES, is_model_cache_complete
 
 
 def _get_cache_dir(handler: HandlerProtocol, qs: dict[str, Any]) -> Path:
@@ -44,7 +45,7 @@ def _list_cached_models(cache_dir: Path) -> list[dict]:
         if not snapshots.is_dir():
             continue
         total_size = 0
-        model_file_found = False
+        required_found = {filename: False for filename in REQUIRED_MODEL_FILES}
         for snap_dir in snapshots.iterdir():
             if not snap_dir.is_dir():
                 continue
@@ -53,17 +54,18 @@ def _list_cached_models(cache_dir: Path) -> list[dict]:
                     try:
                         sz = f.stat().st_size
                         total_size += sz
-                        if sz > 100 * 1024 * 1024:
-                            model_file_found = True
+                        if f.name in required_found and sz > 0:
+                            required_found[f.name] = True
                     except OSError:
                         pass
-        model_size = name.rsplit("-", 1)[-1] if "-" in name else name
+        prefix = "models--Systran--faster-whisper-"
+        model_size = name[len(prefix) :] if name.startswith(prefix) else name
         models.append(
             {
                 "name": model_size,
                 "size_bytes": total_size,
                 "size_display": _format_bytes(total_size),
-                "valid": model_file_found,
+                "valid": all(required_found.values()) or is_model_cache_complete(cache_dir, model_size),
             }
         )
     return models
@@ -152,4 +154,5 @@ def handle_put_whisper_model(handler: HandlerProtocol, qs: dict[str, Any], obj: 
         tmp.unlink(missing_ok=True)
         handler._send_json({"ok": False, "error": "写入配置文件失败"}, 500)
         return
+    handler.__class__._config_cache.invalidate_key(str(proj_input.resolve()))
     handler._send_json({"ok": True, "model_size": model_name})

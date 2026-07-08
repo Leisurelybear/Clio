@@ -509,6 +509,12 @@ class TestDoGET:
         handler.do_GET()
         mock_fn.assert_called_once()
 
+    @patch("clio.ui.server.handle_get_prompts")
+    def test_api_prompts(self, mock_fn, handler_cls):
+        handler = _build_handler(handler_cls, path="/api/prompts")
+        handler.do_GET()
+        mock_fn.assert_called_once()
+
     @patch("clio.ui.server.read_session_log")
     def test_api_logs(self, mock_read, handler_cls):
         mock_read.return_value = {"logs": []}
@@ -602,6 +608,12 @@ class TestDoPUT:
         handler.do_PUT()
         mock_fn.assert_called_once()
 
+    @patch("clio.ui.server.handle_put_prompt")
+    def test_put_prompt(self, mock_fn, handler_cls):
+        handler = self._put_handler(handler_cls, {"content": "prompt"}, "/api/prompts/ANALYZE_PROMPT")
+        handler.do_PUT()
+        mock_fn.assert_called_once_with(handler, {}, {"content": "prompt"}, "ANALYZE_PROMPT")
+
     def test_put_unknown(self, handler_cls):
         handler = self._put_handler(handler_cls, {}, "/api/nope")
         handler.do_PUT()
@@ -617,6 +629,27 @@ class TestDoPUT:
         handler.rfile = io.BytesIO(b"")
         handler.do_PUT()
         handler.send_response.assert_called_once_with(400)
+
+
+# ===========================================================================
+# do_DELETE routing
+# ===========================================================================
+
+
+class TestDoDELETE:
+    @patch("clio.ui.server.handle_delete_prompt")
+    def test_delete_prompt(self, mock_fn, handler_cls):
+        handler = _build_handler(handler_cls, path="/api/prompts/ANALYZE_PROMPT", method="DELETE")
+        handler.do_DELETE()
+        mock_fn.assert_called_once_with(handler, {}, "ANALYZE_PROMPT")
+
+    def test_delete_unknown(self, handler_cls):
+        handler = _build_handler(handler_cls, path="/api/nope", method="DELETE")
+        handler.do_DELETE()
+        handler.send_response.assert_called_once_with(404)
+        data = json.loads(handler.wfile.getvalue())
+        assert data["ok"] is False
+        assert data["error"] == "unknown endpoint"
 
 
 # ===========================================================================
@@ -642,6 +675,12 @@ class TestDoPOST:
     @patch("clio.ui.server.handle_post_run_start")
     def test_post_run_start(self, mock_fn, handler_cls):
         handler = self._post_handler(handler_cls, {}, "/api/run/start")
+        handler.do_POST()
+        mock_fn.assert_called_once()
+
+    @patch("clio.ui.server.handle_post_run_start")
+    def test_post_webhook_trigger(self, mock_fn, handler_cls):
+        handler = self._post_handler(handler_cls, {}, "/api/webhook/trigger")
         handler.do_POST()
         mock_fn.assert_called_once()
 

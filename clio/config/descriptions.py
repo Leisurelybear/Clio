@@ -22,8 +22,10 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     "ai.providers.{name}.base_url": "API 基础地址，OpenAI 兼容接口需要填写",
     "ai.providers.{name}.poll_interval_sec": "Gemini 文件处理状态轮询间隔（秒）",
     "ai.providers.{name}.retry_attempts": "额外重试次数（默认 2，总计尝试 3 次）",
+    "ai.providers.{name}.timeout_sec": "OpenAI 兼容接口的 HTTP 超时时间（秒），默认 120",
     "ai.providers.{name}.max_tokens": "AI 输出最大 token 数",
     "ai.providers.{name}.models": "该厂商支持的模型名称列表（如 gemini-2.5-flash），用于任务绑定的下拉选择",
+    "ai.providers.{name}.capabilities": "能力标签列表。video 表示可做视频理解，text 表示可做文本生成",
     "ai.providers.{name}.requests_per_minute": "每分钟最多调用次数，0 为不限流",
     # ai.tasks.*
     "ai.tasks.{name}.provider": "此任务使用的 AI 厂商名称（在 providers 中定义）",

@@ -30,7 +30,7 @@ Do not assume a step runs only from the full pipeline. Rerun, selected-file runs
 
 The project relies heavily on generated filenames, sidecar JSON files, split segments, compressed stems, and index prefixes. Do not reimplement matching logic inline unless the existing helper cannot express the case.
 
-Prefer existing helpers in `clio.tasks._helpers`, `clio.ui.services.file_service`, `clio.vmeta`, and `clio.ui.services.run_preview`. Always sort filesystem iteration before assigning indices or comparing generated artifacts, because Windows and Linux directory order differ.
+Prefer existing helpers in `clio.tasks._helpers`, `clio.ui.services.file_service`, `clio.vmeta`, and `clio.ui.routes.videos`. Always sort filesystem iteration before assigning indices or comparing generated artifacts, because Windows and Linux directory order differ.
 
 ## 4. Be careful with AI provider lifecycle and retry semantics
 
@@ -51,4 +51,3 @@ Rate limiting should sleep outside shared locks when concurrency is involved.
 The useful Python tests call production entry points and assert observable results. Avoid tests that duplicate production loops or only prove "does not raise" unless no observable state exists.
 
 Route-dispatch tests are allowed to be mock-heavy, but handler behavior belongs in handler/service tests. Frontend tests require Node 18 or newer; local Node 16 fails before Vitest can execute because Vite imports newer `node:fs/promises` APIs.
-
