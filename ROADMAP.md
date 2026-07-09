@@ -11,7 +11,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | --- | --- | --- | --- |
 | CR-003 | Reusable artifact identity index service | Large | Medium |
 | CR-006 | Reduce frontend `innerHTML` risk (121 usages) | Large | ✅ Done |
-| R-017 | Plan panel timeline drag-and-drop navigation | Medium | Low |
+| R-017 | Plan panel timeline drag-and-drop navigation | Medium | ✅ Done |
 | R-024 | GoPro GPMF telemetry as highlight signal | Large | Low |
 | A-007 | Route registry (`clio/ui/router.py`) | Medium | Low |
 | R-004 | Visual config editing (deferred from global/project split) | Small | Low |
@@ -562,15 +562,15 @@ High-value open items that are not already covered by completed fixes:
 - ✅ Player area height is draggable
 - ✅ Layout state persisted to localStorage — `clio/ui/static/src/layout.js`
 
-## Feature R-017: Plan Panel Timeline Drag-and-Drop Navigation
+## Feature R-017: Plan Panel Timeline Drag-and-Drop Navigation ✅
 
 **Background**: The current plan panel only shows a segment list; clicking jumps to the video. Users want to drag along a timeline to view corresponding video content for different segments.
 
 **Acceptance Criteria**:
-- Plan panel top shows an overall timeline (representing the plan's sequence[])
-- Each segment is displayed as a different-colored block on the timeline
-- Users can drag a slider on the timeline / click blocks to jump to the corresponding segment
-- Timeline sync: during preview playback, the timeline highlight follows the current segment
+- ✅ Plan panel top shows an overall timeline (representing the plan's sequence[]) — `viewer.js:renderPreviewBar()`
+- ✅ Each segment is displayed as a different-colored block on the timeline — `.preview-seg-block` with done/active/pending CSS classes
+- ✅ Users can drag a slider on the timeline / click blocks to jump to the corresponding segment — `viewer.js:_setupPreviewBarDrag()` with mousedown/mousemove/mouseup
+- ✅ Timeline sync: during preview playback, the timeline highlight follows the current segment — `renderPreviewBar()` called in `_playPreviewSegment()`
 
 ## Feature R-018: Multi-Video Selection + Step Execution
 
