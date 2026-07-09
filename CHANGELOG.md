@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-07-10
+
+### Added (merged from feat/ui-redesign, PR #17/#18)
+- R-010b: Confidence scoring (`_confidence` field in AI outputs)
+- R-010c: Multi-model comparison CLI (`main.py compare-models`)
+- R-010d: Backend prompt management API (`GET/PUT/DELETE /api/prompts`)
+- R-010e: UI Prompt Management panel (Settings tab)
+- R-016: Draggable UI layout (`layout.js`, localStorage persistence)
+- R-019f: context_override propagation tests
+- R-020: `main.py verify` sidecar integrity CLI (`clio/tasks/verify.py`)
+- R-021: All-days planning (`plan --all-days`)
+- R-022: Smart cover frame extraction (`clio/tasks/cover.py`)
+- R-023: Transcript/visual timeline alignment (`clio/tasks/transcript_align.py`)
+- R-025: Webhook trigger endpoint (`POST /api/webhook/trigger`)
+- Provider connection test button + skipped diagnostics panel (CR-008)
+- Video counterpart navigation (jump between compressed ↔ original)
+- Toast notifications for key actions
+- `whisper_cache.py` — Whisper model cache management
+- `template/prompts/README.md` — prompt override documentation
+- Config semantic validation for provider/task compatibility (CR-002)
+
+### Fixed
+- Runner.js and editor-plan.js merge corruption repaired
+- Whisper model download completion flow
+- Various test alignment with new `resolve_prompt_template` naming
+- README restored from clean commit
+
 ## 2026-07-03
 
 ### Added

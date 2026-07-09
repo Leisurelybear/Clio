@@ -5,6 +5,18 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
+## Remaining Open Items (2026-07-10)
+
+| ID | Item | Effort | Priority |
+| --- | --- | --- | --- |
+| CR-003 | Reusable artifact identity index service | Large | Medium |
+| CR-006 | Reduce frontend `innerHTML` risk (121 usages) | Large | Medium |
+| R-017 | Plan panel timeline drag-and-drop navigation | Medium | Low |
+| R-024 | GoPro GPMF telemetry as highlight signal | Large | Low |
+| A-007 | Route registry (`clio/ui/router.py`) | Medium | Low |
+| R-004 | Visual config editing (deferred from global/project split) | Small | Low |
+| Documentation | Update AGENTS.md §7 commit history, CHANGELOG.md | Small | Low |
+
 ## Project Review Remediation Plan (2026-06-26)
 
 **Source**: `docs/analysis/2026-06-26-project-review.md` §6
@@ -115,10 +127,10 @@ High-value open items that are not already covered by completed fixes:
 - [ ] CR-006: Reduce frontend `innerHTML` interpolation risk.
   - Prefer DOM creation plus `textContent` for filenames, provider names, model names, project names, logs, and AI titles.
   - Add focused XSS regression tests around those values when frontend test runtime is upgraded.
-- [~] CR-007: Developer experience follow-ups.
-  - Documented Node.js 18+ requirement for local UI tests; CI uses Node 22.
-  - Documented recommended lint command as `ruff check clio main.py` and updated CI quality commands to match.
-  - Added `python main.py doctor` for config, ffmpeg, API keys, Node version, and write-permission checks.
+- [x] CR-007: Developer experience follow-ups.
+  - [x] Documented Node.js 18+ requirement for local UI tests; CI uses Node 22.
+  - [x] Documented recommended lint command as `ruff check clio main.py` and updated CI quality commands to match.
+  - [x] Added `python main.py doctor` for config, ffmpeg, API keys, Node version, and write-permission checks.
 - [x] CR-008: UX/observability follow-ups.
   - [x] Add pre-run summary showing selected videos, resolved artifact count per step, expected skips, and warnings.
   - [x] Add provider/model test connection button.
@@ -372,10 +384,10 @@ High-value open items that are not already covered by completed fixes:
 
 **Sub-tasks**:
 - [x] R-010a: External prompt file override mechanism (`templates/prompts/` same-named file takes priority; runtime `task_prompts` take priority; placeholder validation fails before AI calls)
-- [ ] R-010b: Confidence scoring (modify prompts to make AI output `_confidence`)
-- [ ] R-010c: Multi-model comparison CLI
-- [ ] R-010d: Backend `GET /api/prompts` returns all available prompts; `PUT /api/prompts/{name}` saves override
-- [ ] R-010e: UI Settings tab embeds Prompt Management panel (list + editor + restore default)
+- [x] R-010b: Confidence scoring (modify prompts to make AI output `_confidence`) — `2c1488e`
+- [x] R-010c: Multi-model comparison CLI — `9167417`, `clio/tasks/compare_models.py`
+- [x] R-010d: Backend `GET /api/prompts` returns all available prompts; `PUT /api/prompts/{name}` saves override — `9a3eb3f`, `clio/ui/routes/prompts.py`
+- [x] R-010e: UI Settings tab embeds Prompt Management panel (list + editor + restore default) — `0600915`
 
 **Prompt optimization note**:
 - Keep built-in prompts in `clio/prompts.py` unchanged until real output regressions are compared.
@@ -540,14 +552,14 @@ High-value open items that are not already covered by completed fixes:
 
 - (None)
 
-## Feature R-016: Draggable UI Layout
+## Feature R-016: Draggable UI Layout ✅
 
 **Background**: The current UI three-column layout (sidebar / player / editor area) has fixed width and height, unable to adapt to different screen sizes or user preferences.
 
 **Acceptance Criteria**:
-- Dividers between sidebar, player, and editor areas are draggable to adjust widths
-- Player area height is draggable
-- Layout state persisted to `project.json` or localStorage
+- ✅ Dividers between sidebar, player, and editor areas are draggable to adjust widths
+- ✅ Player area height is draggable
+- ✅ Layout state persisted to localStorage — `clio/ui/static/src/layout.js`
 
 ## Feature R-017: Plan Panel Timeline Drag-and-Drop Navigation
 
@@ -605,7 +617,7 @@ High-value open items that are not already covered by completed fixes:
 - [x] R-019c: Frontend: add collapsible prompt section in run panel (runner.js), send values in POST body
 - [x] R-019d: Frontend: add per-step tag hint placeholder (e.g. `[voiceover]`, `[plan]`, `[analyze]`)
 - [x] R-019e: Ensure existing `debug_print_prompt` (R-018) shows injected prompt in debug output — `_wrap_with_context` already prints context_override in prompt
-- [ ] R-019f: Add tests for context_override propagation through pipeline steps (deferred)
+- [x] R-019f: Add tests for context_override propagation through pipeline steps — `clio/tests/test_analyze_funcs.py:test_with_context_override`, `clio/tests/test_refine_routes.py:test_refine_texts_with_context`
 
 ## Documentation Maintenance (from 2026-06-10 Full Review)
 
@@ -830,10 +842,10 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 | Commit | Description | Date |
 | --- | --- | --- |
-| `be636f2`~`2a712f7` (14 commits) | R-017: Model Registry & Task Binding UI (ProviderConfig.models, tag input, provider cards, task binding, tests, fixes) | 2026-07-02~07-03 |
+| `c7bc732` (PR #18) | Merge feat/ui-redesign → main: prompt management (R-010d/e), confidence scoring (R-010b), model comparison CLI (R-010c), cover frame extraction (R-022), transcript alignment (R-023), webhook trigger (R-025), all-days planning (R-021), verify sidecar (R-020), progress debounce, toast notifications, provider connection test (CR-008), skipped diagnostics (CR-008), layout resize (R-016), video counterpart navigation, context_override tests (R-019f), and 41 other commits | 2026-07-10 |
+| `be636f2`~`2a712f7` (14 commits) | R-017: Model Registry & Task Binding UI | 2026-07-02~07-03 |
 | `43a922b` | feat(ui): run panel prompt injection (R-019) | 2026-07-01 |
-| `05edab2` | fix(ui): segment-specific text/script matching in video list (B-097) | 2026-07-01 |
 
 Older completed sections (commit log, test coverage verification, code review audit) archived to [`docs/archive/2026-07-01-roadmap-archive.md`](docs/archive/2026-07-01-roadmap-archive.md).
 
-### Test count: 954 → 972 (R-017 added UI unit tests + backend model parsing tests)
+### Test count: 954 → 1010+ (R-017 added UI unit tests + backend model parsing tests; feat/ui-redesign merge added prompt routes, cover, transcript_align tests)
