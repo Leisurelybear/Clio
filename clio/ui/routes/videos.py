@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import re
 import threading
 from copy import deepcopy
@@ -11,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from clio._constants import VIDEO_EXTS
-from clio.identity import load_identity
+from clio.index import ArtifactIndex
 from clio.ui.services.file_service import (
     _find_compressed_for_original,
     _find_original_for_compressed,
@@ -126,80 +125,22 @@ def _build_videos_payload(
     source: str,
     cfg: Any,
 ) -> dict[str, Any]:
-    # -- Build text/script sidecar lookup ----------------------------------
-    # Three lookup strategies for the same data:
-    #   1) compressed_file → texts JSON filename (exact, for v2+ data)
-    #   2) compressed_stem → texts JSON filename (segment-specific, stem without extension)
-    #   3) index (zero-padded) → texts JSON filename (fallback for v1 data)
-    text_by_compressed: dict[str, str] = {}  # compressed_basename  → texts_json_filename
-    text_by_compressed_stem: dict[str, str] = {}  # compressed_stem   → texts_json_filename
-    text_sidecars: dict[str, list[str]] = {}  # zero-padded index    → [texts_json_filenames]
+    # -- Build artifact index ------------------------------------------------
+    index = ArtifactIndex(
+        output_dir=proj_out,
+        input_dir=proj_input,
+        compressed_dir=comp_dir,
+        texts_dir=proj_out / "texts",
+        scripts_dir=proj_out / "scripts",
+        transcripts_dir=proj_out / cfg.whisper.transcripts_subdir,
+    )
+    index.build()
+
+    # Keep text_titles by index for original source view
     text_titles: dict[str, str] = {}
-    text_identities: dict[str, Any] = {}
-    for td in _find_texts_dirs(proj_out):
-        for f in sorted(td.iterdir()):
-            if f.suffix != ".json":
-                continue
-            try:
-                data = json.loads(f.read_text(encoding="utf-8"))
-            except Exception:
-                continue
-            # Strategy 1: exact compressed → texts mapping (v2+)
-            comp_name: str | None = data.get("compressed_file")
-            if comp_name:
-                text_by_compressed[comp_name] = f.name
-                # Strategy 2: also index by stem (no extension) for segment matching
-                text_by_compressed_stem[Path(comp_name).stem] = f.name
-            # Strategy 3: index-based fallback (v1)
-            if "_" in f.stem:
-                idx = f.stem.split("_", 1)[0]
-            else:
-                idx = str(data.get("index", ""))
-                if not idx:
-                    continue
-            text_sidecars.setdefault(idx, []).append(f.name)
-            if idx not in text_titles:
-                text_titles[idx] = data.get("title", "")
-            if idx not in text_identities:
-                identity = load_identity(data)
-                if identity is not None:
-                    text_identities[idx] = identity
-
-    # Script lookup: same three strategies
-    script_by_compressed_stem: dict[str, str] = {}  # compressed_stem → script filename
-    script_sidecars: dict[str, list[str]] = {}  # zero-padded index → [script_filenames]
-    # Build reverse map: text_stem → compressed_stem for O(1) script lookup
-    text_stem_to_compressed: dict[str, str] = {}
-    for cstem, tname in text_by_compressed_stem.items():
-        text_stem_to_compressed[Path(tname).stem] = cstem
-    sd = proj_out / "scripts"
-    if sd.is_dir():
-        for f in sorted(sd.iterdir()):
-            if f.suffix != ".json" or "_" not in f.stem:
-                continue
-            idx = f.stem.split("_", 1)[0]
-            script_sidecars.setdefault(idx, []).append(f.name)
-            text_stem = f.stem[: -len("_voiceover")] if f.stem.endswith("_voiceover") else f.stem
-            cstem = text_stem_to_compressed.get(text_stem)
-            if cstem:
-                script_by_compressed_stem[cstem] = f.name
-
-    # build transcript lookup: original stem -> bool
-    transcripts_dir = proj_out / cfg.whisper.transcripts_subdir
-    transcripts_set: set[str] = set()
-    if transcripts_dir.is_dir():
-        for f in transcripts_dir.iterdir():
-            if f.suffix == ".json" and f.stem.endswith("_transcript"):
-                # Add compressed stem (v1 behavior)
-                transcripts_set.add(f.stem[: -len("_transcript")])
-                # Also add original_stem if v2 (in case transcript files were re-run)
-                try:
-                    tf_data = json.loads(f.read_text(encoding="utf-8"))
-                    identity = load_identity(tf_data)
-                    if identity is not None:
-                        transcripts_set.add(identity.original_stem)
-                except Exception:
-                    pass
+    for g in index.all_groups():
+        if g.texts:
+            text_titles[g.compressed.index] = g.texts[0].title
 
     videos: list[dict] = []
     groups: dict[str, dict] = {}
@@ -213,26 +154,17 @@ def _build_videos_payload(
                     continue
                 stem = p.stem
                 idx = stem.split("_", 1)[0] if "_" in stem else ""
-                orig = _find_original_for_compressed(stem, proj_input, comp_dir)
-                orig_stem = Path(orig).stem if orig else None
                 group_key, seg_num = _parse_segment_info(stem)
+                group = index.lookup(compressed_stem=stem)
+                orig = _find_original_for_compressed(stem, proj_input, comp_dir)
                 v: dict[str, Any] = {
                     "file": p.name,
                     "source": "compressed",
                     "index": idx,
-                    "title": text_titles.get(idx, ""),
-                    "text_json": text_by_compressed.get(p.name)
-                    or text_by_compressed_stem.get(p.stem)
-                    or next((x for x in text_sidecars.get(idx, []) if x is not None), None),
-                    "script_json": script_by_compressed_stem.get(p.stem)
-                    or next((x for x in script_sidecars.get(idx, []) if x is not None), None),
-                    "transcript_file": (
-                        text_identities[idx].original_stem
-                        if idx in text_identities and text_identities[idx].original_stem in transcripts_set
-                        else orig_stem
-                        if orig_stem and orig_stem in transcripts_set
-                        else None
-                    ),
+                    "title": group.texts[0].title if group and group.texts else text_titles.get(idx, ""),
+                    "text_json": group.texts[0].path.name if group and group.texts else None,
+                    "script_json": group.script.path.name if group and group.script else None,
+                    "transcript_file": group.transcript.stem if group and group.transcript else None,
                     "match": ({"source": "original", "file": orig} if orig else None),
                     "group_key": group_key,
                     "segment_label": None,
@@ -302,13 +234,15 @@ def _build_videos_payload(
                 rel_name = _original_rel_name(p, proj_input)
                 comp = _find_compressed_for_original(p.stem, comp_dir)
                 if not comp:
+                    orig_groups = index.lookup(original_stem=p.stem)
+                    has_transcript = any(g.transcript is not None for g in (orig_groups or []))
                     videos.append(
                         {
                             "file": rel_name,
                             "source": "original",
                             "index": None,
                             "match": None,
-                            "transcript_file": p.stem if p.stem in transcripts_set else None,
+                            "transcript_file": p.stem if has_transcript else None,
                         }
                     )
                     continue
@@ -324,16 +258,16 @@ def _build_videos_payload(
                         pass
                 segment_matches = [{"source": "compressed", "file": cf, "index": ci} for cf, ci in comp]
                 for c_file, c_idx in comp:
+                    group = index.lookup(compressed_stem=Path(c_file).stem)
                     seg_v: dict[str, Any] = {
                         "file": f"{c_idx}_{rel_name}",
                         "source": "original",
                         "index": c_idx,
                         "title": text_titles.get(c_idx, ""),
                         "offset_sec": seg_offsets.get(c_idx, 0.0),
-                        "text_json": text_by_compressed.get(c_file)
-                        or next((x for x in text_sidecars.get(c_idx, []) if x is not None), None),
-                        "script_json": next((x for x in script_sidecars.get(c_idx, []) if x is not None), None),
-                        "transcript_file": p.stem if p.stem in transcripts_set else None,
+                        "text_json": group.texts[0].path.name if group and group.texts else None,
+                        "script_json": group.script.path.name if group and group.script else None,
+                        "transcript_file": group.transcript.stem if group and group.transcript else None,
                         "match": {"source": "compressed", "file": c_file, "index": c_idx},
                     }
                     if len(segment_matches) > 1:
