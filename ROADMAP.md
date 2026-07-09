@@ -10,7 +10,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
 | CR-003 | Reusable artifact identity index service | Large | Medium |
-| CR-006 | Reduce frontend `innerHTML` risk (121 usages) | Large | Medium |
+| CR-006 | Reduce frontend `innerHTML` risk (121 usages) | Large | ✅ Done |
 | R-017 | Plan panel timeline drag-and-drop navigation | Medium | Low |
 | R-024 | GoPro GPMF telemetry as highlight signal | Large | Low |
 | A-007 | Route registry (`clio/ui/router.py`) | Medium | Low |
@@ -124,9 +124,10 @@ High-value open items that are not already covered by completed fixes:
   - Decision (2026-07-06): keep current auto-upgrade behavior.
   - Rationale: long-term configuration is UI-managed, so preserving YAML comments/manual formatting is not a product goal.
   - Known trade-off accepted: ordinary config loads may rewrite YAML via PyYAML when defaults are injected, which can change comments/formatting and mark local config files dirty.
-- [ ] CR-006: Reduce frontend `innerHTML` interpolation risk.
+- [x] CR-006: Reduce frontend `innerHTML` interpolation risk.
   - Prefer DOM creation plus `textContent` for filenames, provider names, model names, project names, logs, and AI titles.
-  - Add focused XSS regression tests around those values when frontend test runtime is upgraded.
+  - Audit found 121 innerHTML usages; only 2 were unescaped — fixed in `sidebar-browse.js` (directory paths) and `toast.js` (message text).
+  - Add focused XSS regression tests around those values when frontend test runtime is upgraded (deferred).
 - [x] CR-007: Developer experience follow-ups.
   - [x] Documented Node.js 18+ requirement for local UI tests; CI uses Node 22.
   - [x] Documented recommended lint command as `ruff check clio main.py` and updated CI quality commands to match.

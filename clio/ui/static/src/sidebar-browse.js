@@ -1,4 +1,4 @@
-import { $ } from './utils.js';
+import { $, escapeHtml } from './utils.js';
 import { api } from './api.js';
 
 window._browseResolve = null;
@@ -36,11 +36,11 @@ export async function loadBrowseDir(path) {
     }
     if (r.is_drive_list) {
       listEl.innerHTML = r.dirs.map(d =>
-        `<div class="browse-item" data-path="${d}">📁 ${d}</div>`
+        `<div class="browse-item" data-path="${escapeHtml(d)}">📁 ${escapeHtml(d)}</div>`
       ).join('');
     } else {
       listEl.innerHTML = r.dirs.map(d =>
-        `<div class="browse-item" data-path="${d}">📁 ${d.replace(/^.*[\\/]/, '')}</div>`
+        `<div class="browse-item" data-path="${escapeHtml(d)}">📁 ${escapeHtml(d.replace(/^.*[\\/]/, ''))}</div>`
       ).join('');
     }
     listEl.querySelectorAll('.browse-item').forEach(el => {

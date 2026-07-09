@@ -1,3 +1,5 @@
+import { escapeHtml } from './utils.js';
+
 const container = document.getElementById('toast-container');
 const MAX_VISIBLE = 3;
 let queue = [];
@@ -12,7 +14,7 @@ function addToast(message, type = 'info', duration = 4000) {
 
   toast.innerHTML = `
     <span class="toast-icon">${icons[type] || 'i'}</span>
-    <span class="toast-message">${message}</span>
+    <span class="toast-message">${escapeHtml(message)}</span>
     <button class="toast-close">&times;</button>
   `;
 
