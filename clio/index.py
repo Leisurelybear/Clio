@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from clio.identity import MediaIdentity, load_identity
+from clio.identity import MediaIdentity, _extract_original_stem, load_identity
 from clio.vmeta import VideoMeta
 
 # ── Data types ──────────────────────────────────────────────────────────
@@ -116,22 +116,43 @@ class ArtifactIndex:
 
         # Built maps
         self._by_compressed_stem: dict[str, ArtifactGroup] = {}
+        self._by_original_stem: dict[str, list[ArtifactGroup]] = {}
+        self._groups: list[ArtifactGroup] = []
 
     # ── Public API ──────────────────────────────────────────────────────
 
     def build(self) -> None:
         """Scan all artifact directories and build the index."""
         self._by_compressed_stem.clear()
+        self._by_original_stem.clear()
+        self._groups = []
         self._scan_compressed()
         self._scan_texts()
         self._scan_scripts()
         self._scan_transcripts()
         self._scan_covers()
+        self._build_original_stem_index()
+        self._groups = list(self._by_compressed_stem.values())
 
-    def lookup(self, *, compressed_stem: str | None = None) -> ArtifactGroup | None:
-        """Look up all artifacts associated with the given compressed stem."""
+    def all_groups(self) -> list[ArtifactGroup]:
+        """Return all artifact groups in the project."""
+        return self._groups
+
+    def lookup(
+        self,
+        *,
+        compressed_stem: str | None = None,
+        original_stem: str | None = None,
+    ) -> ArtifactGroup | list[ArtifactGroup] | None:
+        """Look up artifacts by compressed stem or original stem.
+
+        Returns a single ArtifactGroup for compressed_stem lookup,
+        or a list of groups for original_stem lookup (one per segment).
+        """
         if compressed_stem is not None:
             return self._by_compressed_stem.get(compressed_stem.lower())
+        if original_stem is not None:
+            return self._by_original_stem.get(original_stem.lower())
         return None
 
     # ── Scan helpers ────────────────────────────────────────────────────
@@ -160,10 +181,8 @@ class ArtifactIndex:
             meta = VideoMeta.read(p)
             identity: MediaIdentity | None = None
             if meta is not None:
-                from clio.identity import MediaIdentity as MI
-
                 si = meta.split_info
-                identity = MI(
+                identity = MediaIdentity(
                     original_stem=si.original_stem if si else "",
                     original_path=meta.source_path,
                     compressed_stem=stem,
@@ -266,3 +285,18 @@ class ArtifactIndex:
                     if t.stem == stem:
                         g.cover = CoverEntry(path=p, stem=stem)
                         break
+
+    def _build_original_stem_index(self) -> None:
+        """Build the original_stem -> groups map from compressed identity info."""
+        self._by_original_stem.clear()
+        for group in self._by_compressed_stem.values():
+            identity = group.compressed.identity
+            if identity and identity.original_stem:
+                key = identity.original_stem.lower()
+                self._by_original_stem.setdefault(key, []).append(group)
+            else:
+                # Fallback: derive original stem from compressed stem
+                stem = group.compressed.stem
+                orig = _extract_original_stem(stem)
+                if orig:
+                    self._by_original_stem.setdefault(orig.lower(), []).append(group)
