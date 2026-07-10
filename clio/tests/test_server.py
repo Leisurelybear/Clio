@@ -612,7 +612,7 @@ class TestDoPUT:
     def test_put_prompt(self, mock_fn, handler_cls):
         handler = self._put_handler(handler_cls, {"content": "prompt"}, "/api/prompts/ANALYZE_PROMPT")
         handler.do_PUT()
-        mock_fn.assert_called_once_with(handler, {}, {"content": "prompt"}, "ANALYZE_PROMPT")
+        mock_fn.assert_called_once_with(handler, {}, {"content": "prompt"}, name="ANALYZE_PROMPT")
 
     def test_put_unknown(self, handler_cls):
         handler = self._put_handler(handler_cls, {}, "/api/nope")
@@ -641,7 +641,7 @@ class TestDoDELETE:
     def test_delete_prompt(self, mock_fn, handler_cls):
         handler = _build_handler(handler_cls, path="/api/prompts/ANALYZE_PROMPT", method="DELETE")
         handler.do_DELETE()
-        mock_fn.assert_called_once_with(handler, {}, "ANALYZE_PROMPT")
+        mock_fn.assert_called_once_with(handler, {}, name="ANALYZE_PROMPT")
 
     def test_delete_unknown(self, handler_cls):
         handler = _build_handler(handler_cls, path="/api/nope", method="DELETE")
@@ -696,8 +696,8 @@ class TestDoPOST:
         handler.do_POST()
         mock_fn.assert_called_once()
         assert mock_fn.call_args[0][0] is handler
-        assert mock_fn.call_args[0][1] == {}
-        assert mock_fn.call_args[0][2] == {"provider": "deepseek"}
+        assert mock_fn.call_args[1]["qs"] == {}
+        assert mock_fn.call_args[1]["obj"] == {"provider": "deepseek"}
 
     @patch("clio.ui.server.handle_post_run_cancel")
     def test_post_run_cancel(self, mock_fn, handler_cls):
@@ -763,13 +763,13 @@ class TestDoPOST:
     def test_post_whisper_install(self, mock_fn, handler_cls):
         handler = self._post_handler(handler_cls, {}, "/api/whisper/install")
         handler.do_POST()
-        mock_fn.assert_called_once_with(handler, {})
+        mock_fn.assert_called_once_with(handler, qs={})
 
     @patch("clio.ui.server.handle_post_whisper_install_cancel")
     def test_post_whisper_install_cancel(self, mock_fn, handler_cls):
         handler = self._post_handler(handler_cls, {}, "/api/whisper/install/cancel")
         handler.do_POST()
-        mock_fn.assert_called_once_with(handler, {})
+        mock_fn.assert_called_once_with(handler, qs={})
 
     @patch("clio.ui.server.handle_post_whisper_model_delete")
     def test_post_whisper_model_delete(self, mock_fn, handler_cls):

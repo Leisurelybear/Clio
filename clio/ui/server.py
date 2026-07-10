@@ -6,6 +6,7 @@
 - Writes use atomic rename, first overwrite leaves a .bak copy
 """
 
+# ruff: noqa: F401 — all handler imports used by router resolver (lazy lookup)
 from __future__ import annotations
 
 import json
@@ -105,35 +106,6 @@ from clio.ui.services.project_service import (
 from clio.utils import write_json_atomic
 
 STATIC_DIR = Path(__file__).parent / "static"
-
-# Keep handler references alive — used by router resolver (lazy lookup via module namespace)
-_GET_HANDLERS = [
-    handle_get_config,
-    handle_get_config_global,
-    handle_get_config_project,
-    handle_get_config_raw,
-    handle_get_providers,
-    handle_get_env,
-    handle_get_fs_dirs,
-    handle_get_plan,
-    handle_get_plans,
-    handle_get_processing_state,
-    handle_get_project,
-    handle_get_projects,
-    handle_get_prompts,
-    handle_get_run_status,
-    handle_get_run_stream,
-    handle_get_texts,
-    handle_get_voiceover,
-    handle_get_token_usage,
-    handle_get_transcripts,
-    handle_get_video,
-    handle_get_videos,
-    handle_get_vmeta,
-    handle_get_whisper_check,
-    handle_get_whisper_install_status,
-    handle_get_whisper_models,
-]
 
 
 def _handle_get_logs(handler, qs):
@@ -410,34 +382,13 @@ def make_handler(
             except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
                 return self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, 400)
 
-            if path == "/api/config/raw":
-                return handle_put_config_raw(self, qs, obj)
-            if path == "/api/config/global":
-                return handle_put_config_global(self, qs, obj)
-            if path == "/api/config/project":
-                return handle_put_config_project(self, qs, obj)
-            if path.startswith("/api/providers/"):
-                name = path[len("/api/providers/") :]
-                return handle_put_provider(self, qs, obj, name)
-            if path == "/api/project":
-                return handle_put_project(self, qs, obj)
-            if path == "/api/texts":
-                return handle_put_texts(self, qs, obj)
-            if path == "/api/voiceover":
-                return handle_put_voiceover(self, qs, obj)
-            if path == "/api/plan":
-                return handle_put_plan(self, qs, obj)
-            if path == "/api/transcripts":
-                return handle_put_transcripts(self, qs, obj)
-            if path == "/api/whisper/model":
-                return handle_put_whisper_model(self, qs, obj)
-            if path == "/api/env":
-                return handle_put_env(self, qs, obj)
-            if path.startswith("/api/prompts/"):
-                name = path[len("/api/prompts/") :]
-                return handle_put_prompt(self, qs, obj, name)
+            handler_fn, path_kwargs, route = router.dispatch("PUT", path)
+            if handler_fn is None:
+                return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
-            return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
+            if path_kwargs:
+                return handler_fn(self, qs, obj, **path_kwargs)
+            return handler_fn(self, qs, obj)
 
         def do_POST(self):
             url = urlparse(self.path)
@@ -454,45 +405,19 @@ def make_handler(
             except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
                 return self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, 400)
 
-            if path in {"/api/run/start", "/api/webhook/trigger"}:
-                return handle_post_run_start(self, qs, obj)
-            if path == "/api/run/preview":
-                return handle_post_run_preview(self, qs, obj)
-            if path == "/api/run/cancel":
-                return handle_post_run_cancel(self, qs, obj)
-            if path == "/api/ai/test":
-                return handle_post_ai_test(self, qs, obj)
-            if path == "/api/config/init":
-                return handle_post_config_init(self, qs, obj)
-            if path == "/api/providers":
-                return handle_post_provider(self, qs, obj)
-            if path == "/api/cut":
-                return handle_post_cut(self, qs, obj)
-            if path == "/api/refine":
-                return handle_post_refine(self, qs, obj)
-            if path == "/api/export":
-                return handle_post_export(self, qs, obj)
-            if path == "/api/project/create":
-                return handle_post_project_create(self, obj)
-            if path == "/api/project/add":
-                return handle_post_project_add(self, obj)
-            if path == "/api/project/remove":
-                return handle_post_project_remove(self, obj)
-            if path == "/api/rerun":
-                return handle_post_rerun(self, qs, obj)
-            if path == "/api/transcripts":
-                return handle_post_transcripts(self, qs, obj)
-            if path == "/api/whisper/install":
-                return handle_post_whisper_install(self, qs)
-            if path == "/api/whisper/install/cancel":
-                return handle_post_whisper_install_cancel(self, qs)
-            if path == "/api/whisper/models/delete":
-                return handle_post_whisper_model_delete(self, qs, obj)
-            if path == "/api/logs/clear":
-                clear_session_log()
-                return self._send_json({"ok": True})
+            handler_fn, path_kwargs, route = router.dispatch("POST", path)
+            if handler_fn is None:
+                return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
-            return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
+            handler_key = route.handler if isinstance(route.handler, str) else ""
+            params = _POST_HANDLER_PARAMS.get(handler_key, {"qs", "obj"})
+            call_kwargs: dict[str, Any] = {}
+            if "qs" in params:
+                call_kwargs["qs"] = qs
+            if "obj" in params:
+                call_kwargs["obj"] = obj
+            call_kwargs.update(path_kwargs)
+            return handler_fn(self, **call_kwargs)
 
         def do_DELETE(self):
             url = urlparse(self.path)
@@ -501,20 +426,28 @@ def make_handler(
             if not self._require_auth():
                 return
 
-            if path.startswith("/api/prompts/"):
-                name = path[len("/api/prompts/") :]
-                return handle_delete_prompt(self, qs, name)
-            if path.startswith("/api/providers/"):
-                name = path[len("/api/providers/") :]
-                return handle_delete_provider(self, qs, name)
+            handler_fn, path_kwargs, route = router.dispatch("DELETE", path)
+            if handler_fn is None:
+                return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
 
-            return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
+            if path_kwargs:
+                return handler_fn(self, qs, **path_kwargs)
+            return handler_fn(self, qs)
 
     def _resolve_handler(name: str):
         """Look up handler function from module namespace (supports @patch in tests)."""
         import sys
 
         return getattr(sys.modules["clio.ui.server"], name, None)
+
+    # Handlers with non-standard POST signatures (no qs or no obj)
+    _POST_HANDLER_PARAMS = {
+        "handle_post_whisper_install": {"qs"},
+        "handle_post_whisper_install_cancel": {"qs"},
+        "handle_post_project_create": {"obj"},
+        "handle_post_project_add": {"obj"},
+        "handle_post_project_remove": {"obj"},
+    }
 
     router = Router(resolver=_resolve_handler)
     router.add_list(
@@ -545,6 +478,39 @@ def make_handler(
             Route("GET", "/api/env", "handle_get_env"),
             Route("GET", "/api/prompts", "handle_get_prompts"),
             Route("GET", "/api/logs", "_handle_get_logs"),
+            Route("PUT", "/api/config/raw", "handle_put_config_raw"),
+            Route("PUT", "/api/config/global", "handle_put_config_global"),
+            Route("PUT", "/api/config/project", "handle_put_config_project"),
+            Route("PUT", "/api/providers/{name}", "handle_put_provider"),
+            Route("PUT", "/api/project", "handle_put_project"),
+            Route("PUT", "/api/texts", "handle_put_texts"),
+            Route("PUT", "/api/voiceover", "handle_put_voiceover"),
+            Route("PUT", "/api/plan", "handle_put_plan"),
+            Route("PUT", "/api/transcripts", "handle_put_transcripts"),
+            Route("PUT", "/api/whisper/model", "handle_put_whisper_model"),
+            Route("PUT", "/api/env", "handle_put_env"),
+            Route("PUT", "/api/prompts/{name}", "handle_put_prompt"),
+            Route("POST", "/api/run/start", "handle_post_run_start"),
+            Route("POST", "/api/webhook/trigger", "handle_post_run_start"),
+            Route("POST", "/api/run/preview", "handle_post_run_preview"),
+            Route("POST", "/api/run/cancel", "handle_post_run_cancel"),
+            Route("POST", "/api/ai/test", "handle_post_ai_test"),
+            Route("POST", "/api/config/init", "handle_post_config_init"),
+            Route("POST", "/api/providers", "handle_post_provider"),
+            Route("POST", "/api/cut", "handle_post_cut"),
+            Route("POST", "/api/refine", "handle_post_refine"),
+            Route("POST", "/api/export", "handle_post_export"),
+            Route("POST", "/api/project/create", "handle_post_project_create"),
+            Route("POST", "/api/project/add", "handle_post_project_add"),
+            Route("POST", "/api/project/remove", "handle_post_project_remove"),
+            Route("POST", "/api/rerun", "handle_post_rerun"),
+            Route("POST", "/api/transcripts", "handle_post_transcripts"),
+            Route("POST", "/api/whisper/install", "handle_post_whisper_install"),
+            Route("POST", "/api/whisper/install/cancel", "handle_post_whisper_install_cancel"),
+            Route("POST", "/api/whisper/models/delete", "handle_post_whisper_model_delete"),
+            Route("POST", "/api/logs/clear", "_handle_post_logs_clear"),
+            Route("DELETE", "/api/prompts/{name}", "handle_delete_prompt"),
+            Route("DELETE", "/api/providers/{name}", "handle_delete_provider"),
         ]
     )
 
