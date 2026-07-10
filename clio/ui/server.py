@@ -118,92 +118,6 @@ def _handle_post_logs_clear(handler, qs, obj):
     return handler._send_json({"ok": True})
 
 
-@dataclass(frozen=True)
-class RoutePolicy:
-    method: str
-    path: str
-    auth_required: bool = True
-    prefix: bool = False
-
-
-_ROUTE_POLICIES = (
-    RoutePolicy("GET", "/", auth_required=False),
-    RoutePolicy("GET", "/index.html", auth_required=False),
-    RoutePolicy("GET", "/favicon.ico", auth_required=False),
-    RoutePolicy("GET", "/static/", auth_required=False, prefix=True),
-    RoutePolicy("GET", "/api/config"),
-    RoutePolicy("GET", "/api/config/raw"),
-    RoutePolicy("GET", "/api/config/global"),
-    RoutePolicy("GET", "/api/config/project"),
-    RoutePolicy("GET", "/api/project"),
-    RoutePolicy("GET", "/api/projects"),
-    RoutePolicy("GET", "/api/videos"),
-    RoutePolicy("GET", "/api/video"),
-    RoutePolicy("GET", "/api/vmeta/", prefix=True),
-    RoutePolicy("GET", "/api/texts"),
-    RoutePolicy("GET", "/api/voiceover"),
-    RoutePolicy("GET", "/api/plans"),
-    RoutePolicy("GET", "/api/plan"),
-    RoutePolicy("GET", "/api/processing-state"),
-    RoutePolicy("GET", "/api/run/status"),
-    RoutePolicy("GET", "/api/run/stream"),
-    RoutePolicy("GET", "/api/fs/dirs"),
-    RoutePolicy("GET", "/api/transcripts"),
-    RoutePolicy("GET", "/api/whisper/check"),
-    RoutePolicy("GET", "/api/whisper/install/status"),
-    RoutePolicy("GET", "/api/whisper/models"),
-    RoutePolicy("GET", "/api/token-usage"),
-    RoutePolicy("GET", "/api/env"),
-    RoutePolicy("GET", "/api/logs"),
-    RoutePolicy("PUT", "/api/config/raw"),
-    RoutePolicy("PUT", "/api/config/global"),
-    RoutePolicy("PUT", "/api/config/project"),
-    RoutePolicy("PUT", "/api/project"),
-    RoutePolicy("PUT", "/api/texts"),
-    RoutePolicy("PUT", "/api/voiceover"),
-    RoutePolicy("PUT", "/api/plan"),
-    RoutePolicy("PUT", "/api/transcripts"),
-    RoutePolicy("PUT", "/api/whisper/model"),
-    RoutePolicy("PUT", "/api/env"),
-    RoutePolicy("POST", "/api/run/start"),
-    RoutePolicy("POST", "/api/run/preview"),
-    RoutePolicy("POST", "/api/run/cancel"),
-    RoutePolicy("POST", "/api/ai/test"),
-    RoutePolicy("POST", "/api/config/init"),
-    RoutePolicy("POST", "/api/cut"),
-    RoutePolicy("POST", "/api/refine"),
-    RoutePolicy("POST", "/api/export"),
-    RoutePolicy("POST", "/api/project/create"),
-    RoutePolicy("POST", "/api/project/add"),
-    RoutePolicy("POST", "/api/project/remove"),
-    RoutePolicy("POST", "/api/rerun"),
-    RoutePolicy("POST", "/api/transcripts"),
-    RoutePolicy("POST", "/api/whisper/install"),
-    RoutePolicy("POST", "/api/whisper/install/cancel"),
-    RoutePolicy("POST", "/api/whisper/models/delete"),
-    RoutePolicy("POST", "/api/logs/clear"),
-)
-_ROUTE_POLICY_BY_METHOD_PATH = {(policy.method, policy.path): policy for policy in _ROUTE_POLICIES if not policy.prefix}
-_ROUTE_PREFIX_POLICIES = tuple(policy for policy in _ROUTE_POLICIES if policy.prefix)
-
-
-def _get_route_policy(method: str, path: str) -> RoutePolicy:
-    method = method.upper()
-    exact = _ROUTE_POLICY_BY_METHOD_PATH.get((method, path))
-    if exact is not None:
-        return exact
-    for policy in _ROUTE_PREFIX_POLICIES:
-        if policy.method == method and path.startswith(policy.path):
-            return policy
-    if path.startswith("/api/"):
-        return RoutePolicy(method, path, auth_required=True)
-    return RoutePolicy(method, path, auth_required=method in {"PUT", "POST"})
-
-
-def _get_requires_auth(path: str, method: str = "GET") -> bool:
-    return _get_route_policy(method, path).auth_required
-
-
 @dataclass
 class _ServerState:
     run_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -371,7 +285,7 @@ def make_handler(
             url = urlparse(self.path)
             qs = parse_qs(url.query)
             path = url.path
-            if _get_requires_auth(path, "PUT") and not self._require_auth():
+            if router.get_policy("PUT", path).auth_required and not self._require_auth():
                 return
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length) if length else b""
@@ -394,7 +308,7 @@ def make_handler(
             url = urlparse(self.path)
             qs = parse_qs(url.query)
             path = url.path
-            if _get_requires_auth(path, "POST") and not self._require_auth():
+            if router.get_policy("POST", path).auth_required and not self._require_auth():
                 return
             length = int(self.headers.get("Content-Length", 0))
             raw = self.rfile.read(length) if length else b""
