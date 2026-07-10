@@ -46,31 +46,43 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
         return 1
     print("faster-whisper 安装完成")
 
+    import platform
+
+    is_windows = platform.system() == "Windows"
     try:
         from ctranslate2 import get_cuda_device_count
 
         cuda_avail = get_cuda_device_count() > 0
     except (ImportError, OSError):
         cuda_avail = False
+
+    # cuBLAS DLL (nvidia-cublas-cu12) is required by CTranslate2
+    # even for CPU-only inference on Windows. Install unconditionally.
+    cublas_pkgs = ["nvidia-cublas-cu12"]
     if cuda_avail:
+        print("检测到 NVIDIA GPU，安装 CUDA 运行时加速...")
+        cublas_pkgs.append("nvidia-cudnn-cu12")
+    elif is_windows:
+        print("Windows 上 CTranslate2 需要 cuBLAS DLL（即使 CPU 模式），正在安装...")
+    else:
+        print("CUDA: 不可用（使用 CPU）")
+    if cublas_pkgs:
         import shutil
 
         cuda_size_mb = 2800
         tmp_free = shutil.disk_usage(tempfile.gettempdir()).free // (1024 * 1024)
         if tmp_free < cuda_size_mb:
-            print(f"  [跳过] 磁盘空间不足（临时目录剩余 {tmp_free} MB，需要 ~{cuda_size_mb} MB），CUDA 加速跳过")
-            print("  [提示] 如需 CUDA 加速，请手动执行: pip install nvidia-cublas-cu12 nvidia-cudnn-cu12")
+            print(f"  [跳过] 磁盘空间不足（临时目录剩余 {tmp_free} MB，需要 ~{cuda_size_mb} MB）")
+            if cuda_avail:
+                print("  [提示] 如需 CUDA 加速，请手动执行: pip install nvidia-cublas-cu12 nvidia-cudnn-cu12")
         else:
-            print("检测到 NVIDIA GPU，安装 CUDA 运行时加速...")
             r = run_subprocess(
-                [sys.executable, "-m", "pip", "install", "nvidia-cublas-cu12", "nvidia-cudnn-cu12", "-q"],
+                [sys.executable, "-m", "pip", "install", *cublas_pkgs, "-q"],
             )
             if r.returncode == 0:
-                print("CUDA 运行时安装完成")
+                print(f"  {'/'.join(cublas_pkgs)} 安装完成")
             else:
-                print(f"  [警告] CUDA 运行时安装失败（返回码 {r.returncode}），将使用 CPU 运行")
-    else:
-        print("CUDA: 不可用（使用 CPU）")
+                print(f"  [警告] {'/'.join(cublas_pkgs)} 安装失败（返回码 {r.returncode}）")
 
     model_name = cfg.whisper.model_size
     cache_dir = _resolve_cache_dir(cfg)
