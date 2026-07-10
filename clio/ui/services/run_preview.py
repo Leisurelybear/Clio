@@ -129,7 +129,7 @@ def _step_preview(
             return _warning_step(step, "字幕开关未启用，转录步骤不会在本次运行中执行。")
         return _transcribe_step(config, compressed_videos, all_recursive_source_videos, force=force, index=index)
     if step == "voiceover":
-        return _voiceover_step(config, analysis_jsons, force=force, index=index)
+        return _voiceover_step(config, analysis_jsons, force=force)
     if step == "plan":
         return _plan_step(config, all_analysis_jsons, day_label=day_label, force=force)
     if step == "label":
@@ -184,7 +184,10 @@ def _transcribe_step(
 
 
 def _voiceover_step(
-    config: AppConfig, analysis_jsons: list[Path], *, force: bool, index: ArtifactIndex
+    config: AppConfig,
+    analysis_jsons: list[Path],
+    *,
+    force: bool,
 ) -> dict[str, Any]:
     total = len(analysis_jsons)
     if total == 0:

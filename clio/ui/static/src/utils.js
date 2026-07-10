@@ -85,6 +85,8 @@ function updateEntityUI() {
     : state.currentEntity === 'tokens' ? 'entity-tokens'
     : 'entity-video';
   $('editor').className = cls;
+  const previewBar = $('preview-bar');
+  if (previewBar) previewBar.style.display = state.currentEntity === 'plan' ? 'flex' : 'none';
   $$('.project-item').forEach(p => p.classList.remove('active'));
   if (state.currentEntity === 'plan') {
     document.querySelector('.project-item[data-entity="plan"]').classList.add('active');
