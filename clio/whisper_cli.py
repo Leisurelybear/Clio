@@ -6,7 +6,14 @@ from pathlib import Path
 from typing import Any
 
 from clio.config import load_config
-from clio.transcribe import PROJECT_ROOT, _resolve_cache_dir
+from clio.transcribe import (
+    PROJECT_ROOT,
+    _clear_model_cache,
+    _get_model,
+    _resolve_cache_dir,
+    check_cublas,
+    pip_mirror_for_config,
+)
 from clio.utils import run_subprocess
 from clio.whisper_cache import is_model_cache_complete, largest_model_file_size
 
@@ -36,8 +43,14 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
     if not req.is_file():
         print(f"未找到依赖文件: {req}")
         return 1
+    pip_mirror = pip_mirror_for_config(cfg)
+    if pip_mirror:
+        print(f"检测到国内 HF 镜像，pip 使用国内源: {pip_mirror}")
+    install_base = [sys.executable, "-m", "pip", "install"]
+    if pip_mirror:
+        install_base += ["-i", pip_mirror]
     result = run_subprocess(
-        [sys.executable, "-m", "pip", "install", "-r", str(req)],
+        [*install_base, "-r", str(req)],
         capture_output=True,
         text=True,
     )
@@ -77,7 +90,7 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
                 print("  [提示] 如需 CUDA 加速，请手动执行: pip install nvidia-cublas-cu12 nvidia-cudnn-cu12")
         else:
             r = run_subprocess(
-                [sys.executable, "-m", "pip", "install", *cublas_pkgs, "-q"],
+                [*install_base, *cublas_pkgs, "-q"],
             )
             if r.returncode == 0:
                 print(f"  {'/'.join(cublas_pkgs)} 安装完成")
@@ -90,7 +103,7 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
 
     if _model_in_cache(cache_dir, model_name):
         print(f"模型 '{model_name}' 已在缓存中，跳过下载")
-        return 0
+        return _verify_install(cfg)
 
     repo_id = f"Systran/faster-whisper-{model_name}"
     print(f"正在预下载模型 '{model_name}' 到 {cache_dir}...")
@@ -114,6 +127,25 @@ def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
         return 1
 
     print(f"模型 '{model_name}' 已就绪")
+    return _verify_install(cfg)
+
+
+def _verify_install(cfg: Any) -> int:
+    """Smoke-test the install: confirm cuBLAS is loadable and the model loads."""
+    print("验证安装（加载模型以确认依赖完整）...")
+    if not check_cublas():
+        print("  [错误] cuBLAS 仍未就绪，转录将失败。请手动执行:")
+        print("         pip install nvidia-cublas-cu12")
+        return 1
+    try:
+        _get_model(cfg)
+    except Exception as e:
+        print(f"  [错误] 模型加载验证失败: {e}")
+        print("  [提示] faster-whisper 或 cuBLAS 可能未正确安装，请重试 python main.py whisper install")
+        return 1
+    finally:
+        _clear_model_cache()
+    print("验证通过 ✔ 转录功能已就绪")
     return 0
 
 

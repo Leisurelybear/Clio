@@ -122,6 +122,8 @@ class TestRunWhisperInstall:
             patch("clio.whisper_cli._resolve_cache_dir") as mock_cache,
             patch("clio.whisper_cli.PROJECT_ROOT", config_file.parent),
             patch("clio.whisper_cli._snapshot_download", mock_dl),
+            patch("clio.whisper_cli.check_cublas", return_value=True),
+            patch("clio.whisper_cli._get_model", return_value=MagicMock()),
             patch("ctranslate2.get_cuda_device_count", return_value=0),
         ):
             mock_cache.return_value = config_file.parent / "models"
