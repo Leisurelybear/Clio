@@ -1032,6 +1032,53 @@ button.match-badge:focus-visible { outline: 2px solid var(--border-focus); outli
 .config-form .config-desc-icon.show .config-desc-tooltip { display: block; }
 .config-form .config-fieldset > legend .config-desc-icon { vertical-align: middle; }
 
+/* Config Section Cards (R-004) */
+.config-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-3);
+  overflow: hidden;
+  border-left: 3px solid var(--accent);
+}
+.config-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+  user-select: none;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--text-secondary);
+  transition: background var(--transition-fast);
+  border-bottom: 1px solid var(--border);
+}
+.config-card-header:hover { background: var(--bg-hover); }
+.config-card-arrow {
+  font-size: 10px;
+  transform: rotate(90deg);
+  transition: transform var(--transition-fast);
+  color: var(--text-tertiary);
+  line-height: 1;
+}
+.config-card.collapsed .config-card-arrow { transform: rotate(0deg); }
+.config-card-title { flex: 1; }
+.config-card-body {
+  padding: var(--space-3);
+  display: block;
+}
+.config-card.collapsed .config-card-body { display: none; }
+.config-card-body .config-fieldset {
+  border: none;
+  margin: 0;
+  padding: 0;
+}
+.config-card-body .config-fieldset > legend {
+  display: none;
+}
+
+
 /* Prompt Management */
 .prompt-management {
   display: grid;
