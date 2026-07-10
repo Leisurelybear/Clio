@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from clio.transcribe import _resolve_cache_dir, check_whisper
+from clio.transcribe import _resolve_cache_dir, check_cublas, check_whisper
 from clio.ui.handler_protocol import HandlerProtocol
 from clio.whisper_cache import is_model_cache_complete
 
@@ -36,6 +36,7 @@ def handle_get_whisper_check(handler: HandlerProtocol, qs: dict[str, Any]) -> No
         {
             "ok": True,
             "installed": installed,
+            "cublas": check_cublas(),
             "cuda": cuda,
             "cache_path": cache_path,
             "model_cached": model_cached,
