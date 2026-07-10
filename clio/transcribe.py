@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import ctypes
 import os
+import platform
 import threading
 from collections.abc import Callable
 from pathlib import Path
@@ -12,9 +14,29 @@ def check_whisper() -> bool:
     try:
         import faster_whisper  # noqa: F401
 
-        return True
     except ImportError:
         return False
+    if not check_cublas():
+        return False
+    return True
+
+
+def check_cublas() -> bool:
+    """Check whether the cuBLAS runtime can be loaded.
+
+    CTranslate2 (faster-whisper's engine) requires cublas64_12.dll on Windows
+    even for CPU-only inference, so its absence means transcription will fail
+    with "Library cublas64_12.dll is not found".
+    """
+    if platform.system() != "Windows":
+        return True
+    for dll in ("cublas64_12.dll", "cublas64_11.dll"):
+        try:
+            ctypes.CDLL(dll)
+            return True
+        except OSError:
+            continue
+    return False
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent

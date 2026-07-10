@@ -19,6 +19,8 @@ from clio.transcribe import (
     _resolve_cache_dir,
     _resolve_compute_types,
     _resolve_device,
+    check_cublas,
+    check_whisper,
     transcribe_audio,
 )
 
@@ -31,6 +33,23 @@ def cfg() -> AppConfig:
             whisper=ProjectWhisperConfig(enabled=True, model_size="small", language="zh", device="cpu"),
         ),
     )
+
+
+def test_check_cublas_returns_bool():
+    assert isinstance(check_cublas(), bool)
+
+
+def test_check_whisper_false_without_cublas():
+    with patch("clio.transcribe.check_cublas", return_value=False):
+        assert check_whisper() is False
+
+
+def test_check_whisper_true_with_cublas_and_import():
+    with (
+        patch("clio.transcribe.check_cublas", return_value=True),
+        patch.dict("sys.modules", {"faster_whisper": MagicMock()}),
+    ):
+        assert check_whisper() is True
 
 
 class TestResolveCacheDir:
