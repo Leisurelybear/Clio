@@ -429,7 +429,7 @@ class TestDoGET:
     def test_api_vmeta(self, mock_fn, handler_cls):
         handler = _build_handler(handler_cls, path="/api/vmeta/001_test")
         handler.do_GET()
-        mock_fn.assert_called_once_with(handler, {}, "001_test")
+        mock_fn.assert_called_once_with(handler, {}, stem="001_test")
 
     @patch("clio.ui.server.handle_get_texts")
     def test_api_texts(self, mock_fn, handler_cls):

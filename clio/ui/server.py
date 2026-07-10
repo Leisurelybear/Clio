@@ -24,6 +24,7 @@ from clio.session_log import clear as clear_session_log
 from clio.session_log import read as read_session_log
 from clio.shutdown import before_stop, install_hooks
 from clio.tasks.reindex import auto_reindex_if_needed
+from clio.ui.router import Route, Router
 from clio.ui.routes.ai import handle_post_ai_test
 from clio.ui.routes.config_routes import (
     handle_delete_provider,
@@ -104,6 +105,45 @@ from clio.ui.services.project_service import (
 from clio.utils import write_json_atomic
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+# Keep handler references alive — used by router resolver (lazy lookup via module namespace)
+_GET_HANDLERS = [
+    handle_get_config,
+    handle_get_config_global,
+    handle_get_config_project,
+    handle_get_config_raw,
+    handle_get_providers,
+    handle_get_env,
+    handle_get_fs_dirs,
+    handle_get_plan,
+    handle_get_plans,
+    handle_get_processing_state,
+    handle_get_project,
+    handle_get_projects,
+    handle_get_prompts,
+    handle_get_run_status,
+    handle_get_run_stream,
+    handle_get_texts,
+    handle_get_voiceover,
+    handle_get_token_usage,
+    handle_get_transcripts,
+    handle_get_video,
+    handle_get_videos,
+    handle_get_vmeta,
+    handle_get_whisper_check,
+    handle_get_whisper_install_status,
+    handle_get_whisper_models,
+]
+
+
+def _handle_get_logs(handler, qs):
+    offset = int(qs.get("offset", ["0"])[0])
+    return handler._send_json(read_session_log(offset))
+
+
+def _handle_post_logs_clear(handler, qs, obj):
+    clear_session_log()
+    return handler._send_json({"ok": True})
 
 
 @dataclass(frozen=True)
@@ -344,65 +384,16 @@ def make_handler(
                 rel = path[len("/static/") :]
                 return handle_static(self, rel)
 
-            if _get_requires_auth(path, "GET") and not self._require_auth():
+            handler_fn, path_kwargs, route = router.dispatch("GET", path)
+            if handler_fn is None:
+                return self.send_error(HTTPStatus.NOT_FOUND)
+
+            if route and route.auth_required and not self._require_auth():
                 return
 
-            if path == "/api/config":
-                return handle_get_config(self, qs)
-            if path == "/api/config/raw":
-                return handle_get_config_raw(self, qs)
-            if path == "/api/config/global":
-                return handle_get_config_global(self, qs)
-            if path == "/api/config/project":
-                return handle_get_config_project(self, qs)
-            if path == "/api/providers":
-                return handle_get_providers(self, qs)
-            if path == "/api/project":
-                return handle_get_project(self, qs)
-            if path == "/api/projects":
-                return handle_get_projects(self, qs)
-            if path == "/api/videos":
-                return handle_get_videos(self, qs)
-            if path == "/api/video":
-                return handle_get_video(self, qs)
-            if path.startswith("/api/vmeta/"):
-                stem = path[len("/api/vmeta/") :]
-                return handle_get_vmeta(self, qs, stem)
-            if path == "/api/texts":
-                return handle_get_texts(self, qs)
-            if path == "/api/voiceover":
-                return handle_get_voiceover(self, qs)
-            if path == "/api/plans":
-                return handle_get_plans(self, qs)
-            if path == "/api/run/status":
-                return handle_get_run_status(self, qs)
-            if path == "/api/run/stream":
-                return handle_get_run_stream(self, qs)
-            if path == "/api/plan":
-                return handle_get_plan(self, qs)
-            if path == "/api/processing-state":
-                return handle_get_processing_state(self, qs)
-            if path == "/api/fs/dirs":
-                return handle_get_fs_dirs(self, qs)
-            if path == "/api/transcripts":
-                return handle_get_transcripts(self, qs)
-            if path == "/api/whisper/check":
-                return handle_get_whisper_check(self, qs)
-            if path == "/api/whisper/install/status":
-                return handle_get_whisper_install_status(self, qs)
-            if path == "/api/whisper/models":
-                return handle_get_whisper_models(self, qs)
-            if path == "/api/token-usage":
-                return handle_get_token_usage(self, qs)
-            if path == "/api/env":
-                return handle_get_env(self, qs)
-            if path == "/api/prompts":
-                return handle_get_prompts(self, qs)
-            if path == "/api/logs":
-                offset = int(qs.get("offset", ["0"])[0])
-                return self._send_json(read_session_log(offset))
-
-            return self.send_error(HTTPStatus.NOT_FOUND)
+            if path_kwargs:
+                return handler_fn(self, qs, **path_kwargs)
+            return handler_fn(self, qs)
 
         def do_PUT(self):
             url = urlparse(self.path)
@@ -518,6 +509,44 @@ def make_handler(
                 return handle_delete_provider(self, qs, name)
 
             return self._send_json({"ok": False, "error": "unknown endpoint"}, 404)
+
+    def _resolve_handler(name: str):
+        """Look up handler function from module namespace (supports @patch in tests)."""
+        import sys
+
+        return getattr(sys.modules["clio.ui.server"], name, None)
+
+    router = Router(resolver=_resolve_handler)
+    router.add_list(
+        [
+            Route("GET", "/api/config", "handle_get_config"),
+            Route("GET", "/api/config/raw", "handle_get_config_raw"),
+            Route("GET", "/api/config/global", "handle_get_config_global"),
+            Route("GET", "/api/config/project", "handle_get_config_project"),
+            Route("GET", "/api/providers", "handle_get_providers"),
+            Route("GET", "/api/project", "handle_get_project"),
+            Route("GET", "/api/projects", "handle_get_projects"),
+            Route("GET", "/api/videos", "handle_get_videos"),
+            Route("GET", "/api/video", "handle_get_video"),
+            Route("GET", "/api/vmeta/{stem}", "handle_get_vmeta"),
+            Route("GET", "/api/texts", "handle_get_texts"),
+            Route("GET", "/api/voiceover", "handle_get_voiceover"),
+            Route("GET", "/api/plans", "handle_get_plans"),
+            Route("GET", "/api/run/status", "handle_get_run_status"),
+            Route("GET", "/api/run/stream", "handle_get_run_stream"),
+            Route("GET", "/api/plan", "handle_get_plan"),
+            Route("GET", "/api/processing-state", "handle_get_processing_state"),
+            Route("GET", "/api/fs/dirs", "handle_get_fs_dirs"),
+            Route("GET", "/api/transcripts", "handle_get_transcripts"),
+            Route("GET", "/api/whisper/check", "handle_get_whisper_check"),
+            Route("GET", "/api/whisper/install/status", "handle_get_whisper_install_status"),
+            Route("GET", "/api/whisper/models", "handle_get_whisper_models"),
+            Route("GET", "/api/token-usage", "handle_get_token_usage"),
+            Route("GET", "/api/env", "handle_get_env"),
+            Route("GET", "/api/prompts", "handle_get_prompts"),
+            Route("GET", "/api/logs", "_handle_get_logs"),
+        ]
+    )
 
     # Per-project state dict and config cache (set from closure, not class default)
     Handler._project_states = {}

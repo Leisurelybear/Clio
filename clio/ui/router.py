@@ -23,14 +23,15 @@ class RoutePolicy:
 class Route:
     method: str
     path: str
-    handler: Callable
+    handler: Callable | str
     auth_required: bool = True
     prefix: bool = False
 
 
 class Router:
-    def __init__(self) -> None:
+    def __init__(self, resolver: Callable[[str], Callable | None] | None = None) -> None:
         self._routes: dict[str, list[tuple[re.Pattern, list[str], Route]]] = {}
+        self._resolver = resolver or (lambda k: None)
 
     def add(self, route: Route) -> None:
         pattern, param_names = self._compile(route.path)
@@ -40,16 +41,21 @@ class Router:
         for r in routes:
             self.add(r)
 
+    def _resolve_handler(self, route: Route) -> Callable | None:
+        if isinstance(route.handler, str):
+            return self._resolver(route.handler)
+        return route.handler
+
     def dispatch(self, method: str, path: str) -> tuple[Callable | None, dict[str, str], Route | None]:
         for pattern, param_names, route in self._routes.get(method, []):
             if route.prefix:
                 if path.startswith(route.path):
-                    return route.handler, {}, route
+                    return self._resolve_handler(route), {}, route
             else:
                 m = pattern.match(path)
                 if m:
                     kwargs = dict(zip(param_names, m.groups()))
-                    return route.handler, kwargs, route
+                    return self._resolve_handler(route), kwargs, route
         return None, {}, None
 
     def get_policy(self, method: str, path: str) -> RoutePolicy:
