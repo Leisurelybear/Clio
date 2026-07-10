@@ -167,7 +167,11 @@ def transcribe_audio(
             print(f"  [警告] CUDA 模型加载/推理失败 ({e})，回退到 CPU 重试")
             _clear_model_cache()
             _orig_device = config.whisper.device
-            config.whisper.device = "cpu"
+            try:
+                config.whisper.device = "cpu"
+            except AttributeError:
+                if config.whisper._project is not None:
+                    config.whisper._project.device = "cpu"
             try:
                 model = _get_model(config)
                 segments_iter, info = model.transcribe(
@@ -186,7 +190,11 @@ def transcribe_audio(
                 print("         pip install nvidia-cublas-cu12 nvidia-cudnn-cu12")
                 raise
             finally:
-                config.whisper.device = _orig_device
+                try:
+                    config.whisper.device = _orig_device
+                except AttributeError:
+                    if config.whisper._project is not None:
+                        config.whisper._project.device = _orig_device
         else:
             raise
 
