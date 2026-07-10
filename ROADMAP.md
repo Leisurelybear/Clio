@@ -113,7 +113,7 @@ High-value open items that are not already covered by completed fixes:
   - Validate provider `type` against supported adapters.
   - Validate `video_analyze` provider compatibility (`gemini`-type only).
   - Reject when a task model is not listed in its provider `models` if the provider declares a model list.
-- [ ] CR-003: Make artifact identity a reusable project-level index service.
+- [x] CR-003: Make artifact identity a reusable project-level index service.
   - Build a single lookup layer for original -> compressed segments -> texts -> scripts -> transcripts -> plan usage.
   - Use it in `/api/videos`, selected-run filtering, rerun, label, cut, and export.
 - [x] CR-004: UI route authorization now has centralized policy metadata and route-matrix coverage.
