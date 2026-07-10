@@ -161,6 +161,52 @@ export function _renderConfigForm(obj, path, descriptions = null) {
 }
 
 
+const _collapsedCards = new Set();
+
+const _SECTION_LABELS = {
+  proxy: '代理',
+  server: '服务',
+  naming: '编号命名',
+  paths: '路径',
+  compress: '压缩',
+  whisper: 'Whisper 语音识别',
+  ai: 'AI 配置',
+  analyze: 'AI 分析',
+  script: '口播脚本',
+  plan: '剪辑规划',
+  export: '导出设置',
+};
+
+function _isSectionCollapsed(key, isGlobal) {
+  if (isGlobal) {
+    return ['proxy', 'compress', 'whisper'].includes(key);
+  }
+  return ['analyze', 'script', 'whisper', 'export'].includes(key);
+}
+
+function _renderSectionCard(key, val, descs, isGlobal) {
+  const label = _SECTION_LABELS[key] || key;
+  const sectionKey = (isGlobal ? 'global.' : 'project.') + key;
+  const wasCollapsed = _collapsedCards.has(sectionKey);
+  const collapsed = wasCollapsed !== undefined ? wasCollapsed : _isSectionCollapsed(key, isGlobal);
+  let fieldsHtml = '';
+  if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
+    for (const [k, v] of Object.entries(val)) {
+      fieldsHtml += _renderConfigForm(v, `${key}.${k}`, descs);
+    }
+  } else {
+    fieldsHtml = _renderConfigForm(val, key, descs);
+  }
+  return `<div class="config-card${collapsed ? ' collapsed' : ''}" data-section-key="${sectionKey}">
+    <div class="config-card-header" tabindex="0" role="button">
+      <span class="config-card-arrow">▶</span>
+      <span class="config-card-title">${label}</span>
+    </div>
+    <div class="config-card-body">${fieldsHtml}</div>
+  </div>`;
+}
+
+
 export async function initProjectConfig() {
   try {
     const btn = $('btn-config-init');
@@ -191,36 +237,52 @@ export async function initProjectConfig() {
 
 
 function _renderConfigGlobal(globalData, descs) {
+  const order = ['paths', 'server', 'naming', 'proxy', 'compress', 'whisper'];
   let html = '';
-  for (const [key, val] of Object.entries(globalData)) {
-    if (key === 'ai') continue;
-    html += _renderConfigForm({ [key]: val }, '', descs);
+  for (const key of order) {
+    if (key in globalData) {
+      html += _renderSectionCard(key, globalData[key], descs, true);
+    }
   }
   const aiCfg = globalData.ai || {};
   const { providers, ...otherAiFields } = aiCfg;
   if (Object.keys(otherAiFields).length > 0) {
-    html += _renderConfigForm(otherAiFields, 'ai', descs);
+    html += _renderSectionCard('ai', otherAiFields, descs, true);
   }
-  html += _renderProviderList(providers || {}, descs);
+  html += `<div class="config-card" data-section-key="global.providers">
+    <div class="config-card-header" tabindex="0" role="button">
+      <span class="config-card-arrow">▶</span>
+      <span class="config-card-title">AI 模型列表</span>
+    </div>
+    <div class="config-card-body">${_renderProviderList(providers || {}, descs)}</div>
+  </div>`;
   return html;
 }
 
 function _renderConfigProject(projectData, globalData, descs) {
+  const order = ['paths', 'compress', 'analyze', 'script', 'plan', 'whisper', 'export'];
   let html = '';
-  for (const [key, val] of Object.entries(projectData)) {
-    if (key === 'ai') continue;
-    html += _renderConfigForm({ [key]: val }, '', descs);
+  for (const key of order) {
+    if (key in projectData) {
+      html += _renderSectionCard(key, projectData[key], descs, false);
+    }
   }
   const aiCfg = projectData.ai || {};
-  const { tasks, context, ...otherAiFields } = aiCfg;
-  if (Object.keys(otherAiFields).length > 0 || context !== undefined) {
-    html += _renderConfigForm({ context, ...otherAiFields }, 'ai', descs);
+  const { tasks, ...aiNonTaskFields } = aiCfg;
+  if (Object.keys(aiNonTaskFields).length > 0) {
+    html += _renderSectionCard('ai', aiNonTaskFields, descs, false);
   }
-  html += _renderTaskBinding(
-    tasks || {},
-    globalData?.ai?.providers || {},
-    descs || {},
-  );
+  html += `<div class="config-card" data-section-key="project.task-binding">
+    <div class="config-card-header" tabindex="0" role="button">
+      <span class="config-card-arrow">▶</span>
+      <span class="config-card-title">AI 任务绑定</span>
+    </div>
+    <div class="config-card-body">${_renderTaskBinding(
+      tasks || {},
+      globalData?.ai?.providers || {},
+      descs || {},
+    )}</div>
+  </div>`;
   return html;
 }
 
@@ -1085,8 +1147,40 @@ export function renderConfig() {
 
   // Model management stays in global tab (system-level)
   if (active === 'global') {
-    pane.querySelector('#config-tab-content')?.appendChild(renderModelManagement());
+    const wrapper = document.createElement('div');
+    wrapper.className = 'config-card';
+    wrapper.dataset.sectionKey = 'global.whisper-model';
+    wrapper.innerHTML = `
+      <div class="config-card-header" tabindex="0" role="button">
+        <span class="config-card-arrow">▶</span>
+        <span class="config-card-title">Whisper 模型管理</span>
+      </div>
+      <div class="config-card-body"></div>`;
+    wrapper.querySelector('.config-card-body').appendChild(renderModelManagement());
+    pane.querySelector('#config-tab-content')?.appendChild(wrapper);
     _loadModelMgmt();
+  }
+
+  // Section card collapse toggle (delegated)
+  const contentEl = pane.querySelector('#config-tab-content');
+  if (contentEl) {
+    contentEl.addEventListener('click', (e) => {
+      const header = e.target.closest('.config-card-header');
+      if (header) {
+        const card = header.closest('.config-card');
+        if (card) {
+          const isNowCollapsed = card.classList.toggle('collapsed');
+          const sectionKey = card.dataset.sectionKey;
+          if (sectionKey) {
+            if (isNowCollapsed) {
+              _collapsedCards.add(sectionKey);
+            } else {
+              _collapsedCards.delete(sectionKey);
+            }
+          }
+        }
+      }
+    });
   }
 }
 
@@ -1195,9 +1289,8 @@ let _installPollTimer = null;
 function renderModelManagement() {
   const div = document.createElement('div');
   div.id = 'whisper-model-mgmt';
-  div.style.cssText = 'margin-top:12px;padding:12px;background:var(--bg-surface,#1e1e1e);border:1px solid var(--border,#333);border-radius:6px';
+  div.style.cssText = 'padding:0;background:transparent;border:none;border-radius:0';
   div.innerHTML = `
-    <p style="margin:0 0 8px;font-weight:600">Whisper 模型管理</p>
     <div id="model-mgmt-content">
       <p class="muted">加载中...</p>
     </div>
