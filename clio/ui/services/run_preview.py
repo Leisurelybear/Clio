@@ -8,6 +8,7 @@ from typing import Any
 
 from clio._constants import VIDEO_EXTENSIONS
 from clio.config.models import AppConfig
+from clio.index import ArtifactIndex
 from clio.tasks._helpers import _matches_selected_artifact, _matches_selected_stem, _selected_stems
 
 STEP_LABELS = {
@@ -36,6 +37,15 @@ def build_run_preview(
     all_recursive_source_videos = _video_files(config.paths.input_dir, recursive=True)
     compressed_input_info, all_compressed_videos = _compressed_input_info(config)
     all_analysis_jsons = _analysis_jsons(config)
+    index = ArtifactIndex(
+        output_dir=config.paths.output_dir,
+        input_dir=config.paths.input_dir,
+        compressed_dir=config.compressed_dir,
+        texts_dir=config.texts_dir,
+        scripts_dir=config.scripts_dir,
+        transcripts_dir=config.transcripts_dir,
+    )
+    index.build()
 
     source_videos = _filter_stem_paths(all_source_videos, selected)
     compressed_videos = _filter_stem_paths(all_compressed_videos, selected)
@@ -56,6 +66,7 @@ def build_run_preview(
             compressed_videos=compressed_videos,
             analysis_jsons=analysis_jsons,
             all_analysis_jsons=all_analysis_jsons,
+            index=index,
             force=force,
             use_transcripts=use_transcripts,
             day_label=day_label,
@@ -104,6 +115,7 @@ def _step_preview(
     compressed_videos: list[Path],
     analysis_jsons: list[Path],
     all_analysis_jsons: list[Path],
+    index: ArtifactIndex,
     force: bool,
     use_transcripts: bool,
     day_label: str,
@@ -111,13 +123,13 @@ def _step_preview(
     if step == "compress":
         return _compress_step(config, source_videos, force=force)
     if step == "analyze":
-        return _analyze_step(config, compressed_videos, all_recursive_source_videos, force=force)
+        return _analyze_step(config, compressed_videos, all_recursive_source_videos, force=force, index=index)
     if step == "transcribe":
         if not use_transcripts:
             return _warning_step(step, "字幕开关未启用，转录步骤不会在本次运行中执行。")
-        return _transcribe_step(config, compressed_videos, all_recursive_source_videos, force=force)
+        return _transcribe_step(config, compressed_videos, all_recursive_source_videos, force=force, index=index)
     if step == "voiceover":
-        return _voiceover_step(config, analysis_jsons, force=force)
+        return _voiceover_step(config, analysis_jsons, force=force, index=index)
     if step == "plan":
         return _plan_step(config, all_analysis_jsons, day_label=day_label, force=force)
     if step == "label":
@@ -141,6 +153,7 @@ def _analyze_step(
     source_videos: list[Path],
     *,
     force: bool,
+    index: ArtifactIndex,
 ) -> dict[str, Any]:
     source_names = {source.stem.lower(): source.name for source in source_videos}
     inputs = _resolvable_analysis_inputs(compressed_videos, source_names)
@@ -148,7 +161,7 @@ def _analyze_step(
     if force:
         return _step("analyze", total=total, will_run=total, will_skip=0)
 
-    skipped = sum(1 for compressed in inputs if _analysis_exists(config, compressed, source_names))
+    skipped = sum(1 for compressed in inputs if (g := index.lookup(compressed_stem=compressed.stem)) and g.texts)
     return _step("analyze", total=total, will_run=total - skipped, will_skip=skipped)
 
 
@@ -158,6 +171,7 @@ def _transcribe_step(
     source_videos: list[Path],
     *,
     force: bool,
+    index: ArtifactIndex,
 ) -> dict[str, Any]:
     source_names = {source.stem.lower(): source.name for source in source_videos}
     inputs = _resolvable_analysis_inputs(compressed_videos, source_names)
@@ -165,13 +179,13 @@ def _transcribe_step(
     if force:
         return _step("transcribe", total=total, will_run=total, will_skip=0)
 
-    skipped = sum(
-        1 for compressed in inputs if _valid_json_file(config.transcripts_dir / f"{compressed.stem}_transcript.json")
-    )
+    skipped = sum(1 for compressed in inputs if (g := index.lookup(compressed_stem=compressed.stem)) and g.transcript)
     return _step("transcribe", total=total, will_run=total - skipped, will_skip=skipped)
 
 
-def _voiceover_step(config: AppConfig, analysis_jsons: list[Path], *, force: bool) -> dict[str, Any]:
+def _voiceover_step(
+    config: AppConfig, analysis_jsons: list[Path], *, force: bool, index: ArtifactIndex
+) -> dict[str, Any]:
     total = len(analysis_jsons)
     if total == 0:
         return _warning_step("voiceover", "未找到分析 JSON，口播步骤可能没有输入。")
@@ -280,25 +294,6 @@ def _compressed_original_stems(compressed_dir: Path) -> set[str]:
         if prefix:
             stems.add(_original_stem_for_compressed_part(stem_part).lower())
     return stems
-
-
-def _analysis_exists(config: AppConfig, compressed: Path, source_names: dict[str, str]) -> bool:
-    prefix, stem_part = _indexed_stem_parts(compressed.stem)
-    if not prefix:
-        return False
-
-    original_stem = _original_stem_for_compressed_part(stem_part)
-    original_name = source_names.get(original_stem.lower())
-    if not original_name:
-        return False
-    for candidate in sorted(config.texts_dir.glob(f"{prefix}_*.json")):
-        try:
-            data = json.loads(candidate.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            continue
-        if isinstance(data, dict) and data.get("source_file") == original_name:
-            return True
-    return False
 
 
 def _resolvable_analysis_inputs(compressed_videos: list[Path], source_names: dict[str, str]) -> list[Path]:
