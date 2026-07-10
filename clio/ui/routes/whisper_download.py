@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys as _sys
 import threading
@@ -44,6 +45,20 @@ def _write_install_progress(path: Path, data: dict) -> None:
         tmp.unlink(missing_ok=True)
 
 
+_PIP_PROGRESS_RE = re.compile(r"([\d.]+)\s*/\s*[\d.]+\s*MB\s*([\d.]+)%")
+
+
+def _parse_pip_progress(line: str) -> int:
+    """Extract download percentage from a pip progress-bar line, or 0 if none."""
+    m = _PIP_PROGRESS_RE.search(line)
+    if m:
+        try:
+            return int(float(m.group(2)))
+        except ValueError:
+            return 0
+    return 0
+
+
 def _pip_install_streaming(
     packages: list[str],
     progress_path: Path,
@@ -52,9 +67,11 @@ def _pip_install_streaming(
     """Run pip install with streaming progress updates to the progress file.
 
     Returns (ok, stderr_tail). Unlike run_subprocess(capture_output=True),
-    this does not block silently — pip output is surfaced line by line.
+    this does not block silently — pip output is surfaced line by line, and an
+    elapsed-time counter keeps the UI moving during silent large downloads
+    (pip buffers its progress bar when stdout is a pipe, not a TTY).
     """
-    cmd = [_sys.executable, "-m", "pip", "install", "--no-input", "--progress-bar", "off", *packages]
+    cmd = [_sys.executable, "-m", "pip", "install", "--no-input", *packages]
     try:
         proc = subprocess.Popen(
             cmd,
@@ -63,26 +80,50 @@ def _pip_install_streaming(
             text=True,
             errors="replace",
             bufsize=1,
+            env={**os.environ, "PYTHONUNBUFFERED": "1"},
         )
     except OSError as e:
         return False, str(e)
     stderr_tail = []
     assert proc.stdout is not None
-    for line in proc.stdout:
-        line = line.strip()
-        if not line:
-            continue
-        stderr_tail.append(line)
-        if len(stderr_tail) > 5:
-            stderr_tail.pop(0)
-        _write_install_progress(
-            progress_path,
-            {
-                "status": "downloading",
-                "progress_pct": 0,
-                "message": f"{label}: {line[:80]}",
-            },
-        )
+    start = time.monotonic()
+    last_beat = 0.0
+    buf = ""
+    while True:
+        chunk = proc.stdout.read(4096)
+        if not chunk:
+            break
+        buf += chunk
+        while "\n" in buf:
+            line, buf = buf.split("\n", 1)
+            line = line.rstrip("\r")
+            if not line.strip():
+                continue
+            stderr_tail.append(line)
+            if len(stderr_tail) > 5:
+                stderr_tail.pop(0)
+            pct = _parse_pip_progress(line)
+            _write_install_progress(
+                progress_path,
+                {
+                    "status": "downloading",
+                    "progress_pct": pct,
+                    "message": f"{label}: {line[:80]}",
+                },
+            )
+            last_beat = time.monotonic()
+        now = time.monotonic()
+        if now - last_beat > 3.0:
+            last_beat = now
+            elapsed = int(now - start)
+            _write_install_progress(
+                progress_path,
+                {
+                    "status": "downloading",
+                    "progress_pct": 0,
+                    "message": f"{label}: 下载中... 已等待 {elapsed}s",
+                },
+            )
     proc.wait()
     return proc.returncode == 0, "\n".join(stderr_tail[-3:])
 

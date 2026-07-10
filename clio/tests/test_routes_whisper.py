@@ -26,8 +26,10 @@ class _FakePopen:
     """Minimal stand-in for subprocess.Popen used by _pip_install_streaming."""
 
     def __init__(self, cmd, **kwargs):
+        import io
+
         self.cmd = cmd
-        self.stdout = iter(["Downloading package...", "Installing..."])
+        self.stdout = io.StringIO("Downloading package...\nInstalling...\n")
         self.returncode = 0
 
     def wait(self) -> int:
