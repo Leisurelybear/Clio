@@ -22,6 +22,18 @@ from clio.ui.routes.whisper_routes import (
 )
 
 
+class _FakePopen:
+    """Minimal stand-in for subprocess.Popen used by _pip_install_streaming."""
+
+    def __init__(self, cmd, **kwargs):
+        self.cmd = cmd
+        self.stdout = iter(["Downloading package...", "Installing..."])
+        self.returncode = 0
+
+    def wait(self) -> int:
+        return self.returncode
+
+
 def _make_handler(proj_input: Path, proj_output: Path) -> MagicMock:
     """Build a mock handler that resolves project input/output correctly."""
     handler = MagicMock()
@@ -267,10 +279,7 @@ class TestRunWhisperInstall:
             patch.dict("sys.modules", {"huggingface_hub": fake_hub}),
             patch("clio.ui.routes.whisper_download._get_model_download_size", return_value=16),
             patch("clio.ui.routes.whisper_download._req.get", return_value=Response()) as mock_get,
-            patch(
-                "clio.ui.routes.whisper_download.run_subprocess",
-                return_value=types.SimpleNamespace(returncode=0, stderr=""),
-            ),
+            patch("clio.ui.routes.whisper_download.subprocess.Popen", _FakePopen),
         ):
             _run_install(handler, qs, progress_file)
 
@@ -319,10 +328,7 @@ class TestRunWhisperInstall:
             patch.dict("sys.modules", {"huggingface_hub": fake_hub}),
             patch("clio.ui.routes.whisper_download._get_model_download_size", return_value=8),
             patch("clio.ui.routes.whisper_download._req.get", return_value=Response()),
-            patch(
-                "clio.ui.routes.whisper_download.run_subprocess",
-                return_value=types.SimpleNamespace(returncode=0, stderr=""),
-            ),
+            patch("clio.ui.routes.whisper_download.subprocess.Popen", _FakePopen),
         ):
             _run_install(handler, qs, progress_file)
 

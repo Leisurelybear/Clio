@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys as _sys
 import threading
 import time
@@ -41,6 +42,49 @@ def _write_install_progress(path: Path, data: dict) -> None:
         tmp.replace(path)
     except OSError:
         tmp.unlink(missing_ok=True)
+
+
+def _pip_install_streaming(
+    packages: list[str],
+    progress_path: Path,
+    label: str,
+) -> tuple[bool, str]:
+    """Run pip install with streaming progress updates to the progress file.
+
+    Returns (ok, stderr_tail). Unlike run_subprocess(capture_output=True),
+    this does not block silently — pip output is surfaced line by line.
+    """
+    cmd = [_sys.executable, "-m", "pip", "install", "--no-input", "--progress-bar", "off", *packages]
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            errors="replace",
+            bufsize=1,
+        )
+    except OSError as e:
+        return False, str(e)
+    stderr_tail = []
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        line = line.strip()
+        if not line:
+            continue
+        stderr_tail.append(line)
+        if len(stderr_tail) > 5:
+            stderr_tail.pop(0)
+        _write_install_progress(
+            progress_path,
+            {
+                "status": "downloading",
+                "progress_pct": 0,
+                "message": f"{label}: {line[:80]}",
+            },
+        )
+    proc.wait()
+    return proc.returncode == 0, "\n".join(stderr_tail[-3:])
 
 
 def handle_get_whisper_install_status(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
@@ -193,18 +237,14 @@ def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Pa
     )
     req_txt = PROJECT_ROOT / "requirements-whisper.txt"
     if req_txt.is_file():
-        r = run_subprocess(
-            [_sys.executable, "-m", "pip", "install", "-r", str(req_txt), "-q"],
-            capture_output=True,
-            text=True,
-        )
-        if r.returncode != 0:
+        ok, err = _pip_install_streaming(["-r", str(req_txt)], progress_path, "安装 faster-whisper")
+        if not ok:
             _write_install_progress(
                 progress_path,
                 {
                     "status": "error",
                     "progress_pct": 0,
-                    "message": f"安装 faster-whisper 失败: {r.stderr[:200]}",
+                    "message": f"安装 faster-whisper 失败: {err[:200]}",
                 },
             )
             return
@@ -226,18 +266,14 @@ def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Pa
     except (ImportError, OSError):
         pass
     if cublas_pkgs:
-        r = run_subprocess(
-            [_sys.executable, "-m", "pip", "install", *cublas_pkgs, "-q"],
-            capture_output=True,
-            text=True,
-        )
-        if r.returncode != 0:
+        ok, err = _pip_install_streaming(cublas_pkgs, progress_path, "安装 cuBLAS")
+        if not ok:
             _write_install_progress(
                 progress_path,
                 {
                     "status": "downloading",
                     "progress_pct": 0,
-                    "message": f"cuBLAS 安装失败（{r.stderr[:100]}），继续下载模型...",
+                    "message": f"cuBLAS 安装失败（{err[:100]}），继续下载模型...",
                 },
             )
 
