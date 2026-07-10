@@ -12,7 +12,7 @@ from typing import Any
 
 import requests as _req
 
-from clio.transcribe import _resolve_cache_dir
+from clio.transcribe import PROJECT_ROOT, _resolve_cache_dir
 from clio.ui.handler_protocol import HandlerProtocol
 from clio.utils import run_subprocess
 from clio.whisper_cache import (
@@ -182,6 +182,64 @@ def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Pa
         )
         if r.returncode != 0:
             raise RuntimeError(f"安装 huggingface_hub 失败: {r.stderr}")
+
+    _write_install_progress(
+        progress_path,
+        {
+            "status": "downloading",
+            "progress_pct": 0,
+            "message": "安装 faster-whisper...",
+        },
+    )
+    req_txt = PROJECT_ROOT / "requirements-whisper.txt"
+    if req_txt.is_file():
+        r = run_subprocess(
+            [_sys.executable, "-m", "pip", "install", "-r", str(req_txt), "-q"],
+            capture_output=True,
+            text=True,
+        )
+        if r.returncode != 0:
+            _write_install_progress(
+                progress_path,
+                {
+                    "status": "error",
+                    "progress_pct": 0,
+                    "message": f"安装 faster-whisper 失败: {r.stderr[:200]}",
+                },
+            )
+            return
+
+    _write_install_progress(
+        progress_path,
+        {
+            "status": "downloading",
+            "progress_pct": 0,
+            "message": "安装 cuBLAS 库...",
+        },
+    )
+    cublas_pkgs = ["nvidia-cublas-cu12"]
+    try:
+        from ctranslate2 import get_cuda_device_count
+
+        if get_cuda_device_count() > 0:
+            cublas_pkgs.append("nvidia-cudnn-cu12")
+    except (ImportError, OSError):
+        pass
+    if cublas_pkgs:
+        r = run_subprocess(
+            [_sys.executable, "-m", "pip", "install", *cublas_pkgs, "-q"],
+            capture_output=True,
+            text=True,
+        )
+        if r.returncode != 0:
+            _write_install_progress(
+                progress_path,
+                {
+                    "status": "downloading",
+                    "progress_pct": 0,
+                    "message": f"cuBLAS 安装失败（{r.stderr[:100]}），继续下载模型...",
+                },
+            )
 
     _ENV_KEYS = {"HF_ENDPOINT", "HTTP_PROXY", "HTTPS_PROXY", "HF_HUB_DISABLE_PROGRESS_BARS"}
     _old_env = {k: os.environ.get(k) for k in _ENV_KEYS}

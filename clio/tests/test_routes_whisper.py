@@ -267,6 +267,10 @@ class TestRunWhisperInstall:
             patch.dict("sys.modules", {"huggingface_hub": fake_hub}),
             patch("clio.ui.routes.whisper_download._get_model_download_size", return_value=16),
             patch("clio.ui.routes.whisper_download._req.get", return_value=Response()) as mock_get,
+            patch(
+                "clio.ui.routes.whisper_download.run_subprocess",
+                return_value=types.SimpleNamespace(returncode=0, stderr=""),
+            ),
         ):
             _run_install(handler, qs, progress_file)
 
@@ -315,6 +319,10 @@ class TestRunWhisperInstall:
             patch.dict("sys.modules", {"huggingface_hub": fake_hub}),
             patch("clio.ui.routes.whisper_download._get_model_download_size", return_value=8),
             patch("clio.ui.routes.whisper_download._req.get", return_value=Response()),
+            patch(
+                "clio.ui.routes.whisper_download.run_subprocess",
+                return_value=types.SimpleNamespace(returncode=0, stderr=""),
+            ),
         ):
             _run_install(handler, qs, progress_file)
 
