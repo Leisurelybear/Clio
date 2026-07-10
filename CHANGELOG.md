@@ -20,6 +20,7 @@
 - `whisper_cache.py` — Whisper model cache management
 - `template/prompts/README.md` — prompt override documentation
 - Config semantic validation for provider/task compatibility (CR-002)
+- R-004e: Config section cards — collapsible layout with section labels + left accent bar (e7a93ef, af64f83)
 
 ### Fixed
 - Runner.js and editor-plan.js merge corruption repaired

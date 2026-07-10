@@ -60,7 +60,7 @@ python main.py serve --host 0.0.0.0     # 暴露到局域网（注意安全）
 └──────────┴──────────────────┴──────────────┘
 ```
 
-点 ⚙ 设置时，右栏渲染完整 config 嵌套表单（paths / ai / compress / analyze / script / plan 等全部字段）。
+点 ⚙ 设置时，右栏渲染完整 config 嵌套表单（paths / ai / compress / analyze / script / plan 等全部字段），每个配置分区包裹在可折叠的卡片中，左侧带 accent 色条标识层级。
 - 编辑**全局 config.yaml**（全局 tab）：保存后需重启服务生效。
 - 编辑**项目 project.yaml**（项目 tab）：保存后立即生效。
 - 编辑**项目专属 project.yaml**（通过 `?project=X` 切换）：保存后立即生效，下次流水线运行自动加载新配置。

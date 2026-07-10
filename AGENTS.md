@@ -14,7 +14,7 @@ An AI preprocessing pipeline: raw travel vlog footage -> ffmpeg compression -> G
 - google-genai (Gemini 2.5 Flash video File API)
 - httpx (DeepSeek / OpenAI compatible calls)
 - PyYAML (config parsing; split into `config.yaml` global + `project.yaml` per-project)
-- pytest (unit tests, auto-run in CI; 1010 test cases)
+- pytest (unit tests, auto-run in CI; 1111 test cases)
 
 Dependencies in `requirements.txt`; `setup.ps1`/`setup.sh` creates venv + installs ffmpeg + copies `.env` in one click.
 
@@ -54,7 +54,7 @@ vlog-video-analysis/
 ├── config.example.yaml / .env.example
 ├── requirements.txt / requirements-locked.txt
 ├── .github/workflows/test.yml
-└── clio/tests/                pytest unit tests (1010 cases)
+└── clio/tests/                pytest unit tests (1111 cases)
 ```
 
 > See `docs/superpowers/agents/directory-tree.md` for full tree with file-level annotations and test coverage details.
@@ -113,8 +113,10 @@ Provider management is a frontend-only experience - no new backend APIs needed:
 - `ProviderConfig.models: list[str]` stores model names per provider
 - API keys live in `.env` via `PUT /api/env`, never in `config.yaml`
 - `editor-config.js` renders:
+  - Config sections as collapsible cards with section labels (Global/Project tabs)
   - Provider list (Global tab): add/edit/delete, tag input for model names
   - Task binding (Project tab): dropdowns filtered by capability (`gemini` -> video tasks)
+  - Collapse state remembered per session (`_collapsedCards` Map)
 - Task binding mutations write to `project.yaml` via existing `PUT /api/config/project`
 - Default providers (`gemini`, `openai`, `deepseek`) cannot be deleted
 - Video tasks (`video_analyze`) only show gemini-type providers in dropdown
