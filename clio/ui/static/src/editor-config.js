@@ -161,7 +161,7 @@ export function _renderConfigForm(obj, path, descriptions = null) {
 }
 
 
-const _collapsedCards = new Set();
+const _collapsedCards = new Map(); // key -> boolean (explicit state) | undefined (unset)
 
 const _SECTION_LABELS = {
   proxy: '代理',
@@ -187,7 +187,7 @@ function _isSectionCollapsed(key, isGlobal) {
 function _renderSectionCard(key, val, descs, isGlobal) {
   const label = _SECTION_LABELS[key] || key;
   const sectionKey = (isGlobal ? 'global.' : 'project.') + key;
-  const wasCollapsed = _collapsedCards.has(sectionKey);
+  const wasCollapsed = _collapsedCards.get(sectionKey);
   const collapsed = wasCollapsed !== undefined ? wasCollapsed : _isSectionCollapsed(key, isGlobal);
   let fieldsHtml = '';
   if (typeof val === 'object' && val !== null && !Array.isArray(val)) {
@@ -1173,9 +1173,9 @@ export function renderConfig() {
           const sectionKey = card.dataset.sectionKey;
           if (sectionKey) {
             if (isNowCollapsed) {
-              _collapsedCards.add(sectionKey);
+              _collapsedCards.set(sectionKey, true);
             } else {
-              _collapsedCards.delete(sectionKey);
+              _collapsedCards.set(sectionKey, false);
             }
           }
         }
