@@ -36,6 +36,36 @@ def check_cublas() -> bool:
             return True
         except OSError:
             continue
+    # Fallback: locate DLL in nvidia site-packages (installed via pip)
+    for dll in ("cublas64_12.dll", "cublas64_11.dll"):
+        try:
+            import importlib.util
+
+            _spec = importlib.util.find_spec("nvidia.cublas")
+            if _spec and _spec.submodule_search_locations:
+                for _loc in _spec.submodule_search_locations:
+                    for subdir in ("lib", "bin", ""):
+                        dll_path = Path(_loc) / subdir / dll
+                        if dll_path.is_file():
+                            os.add_dll_directory(str(dll_path.parent))
+                            ctypes.CDLL(dll)
+                            return True
+        except (ImportError, AttributeError, OSError):
+            pass
+        # Broader fallback: glob search in site-packages
+        try:
+            import site as _site
+
+            for _sp in _site.getsitepackages():
+                for _nvidia_dir in Path(_sp).glob("nvidia/*/"):
+                    for subdir in ("lib", "bin", ""):
+                        dll_path = _nvidia_dir / subdir / dll
+                        if dll_path.is_file():
+                            os.add_dll_directory(str(dll_path.parent))
+                            ctypes.CDLL(dll)
+                            return True
+        except Exception:
+            pass
     return False
 
 

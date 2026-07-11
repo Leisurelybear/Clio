@@ -226,7 +226,7 @@ def _get_remote_file_size(repo_id: str, filename: str, cfg: Any) -> int:
     proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
     try:
         url = hf_hub_url(repo_id, filename=filename)
-        r = _req.head(url, proxies=proxies, timeout=15, allow_redirects=True)
+        r = _req.head(url, proxies=proxies, timeout=(15, 60), allow_redirects=True)
         r.raise_for_status()
         size = int(r.headers.get("Content-Length", 0))
         if size:
@@ -250,7 +250,7 @@ def _get_model_download_size(repo_id: str, cfg: Any) -> int:
 
 def _download_error_detail(e: Exception, cfg: Any) -> str:
     proxy_url = cfg.proxy.url if (cfg.proxy.enabled and cfg.proxy.url) else None
-    endpoint = cfg.whisper.hf_endpoint or "https://huggingface.co"
+    endpoint = cfg.whisper.hf_endpoint or "https://huggingface.co（未设置镜像）"
     msg = [f"模型下载失败: {e}"]
     msg.append(f"  Endpoint: {endpoint}")
     msg.append(f"  Proxy: {proxy_url or '无'}")
@@ -260,6 +260,16 @@ def _download_error_detail(e: Exception, cfg: Any) -> str:
         msg.append("    - 配置文件中 ai.proxy.url 是否正确设置")
         msg.append("    - 如果不需要镜像，删除 config.yaml 中的 ai.whisper.hf_endpoint")
         msg.append("    - 若需代理，在 config.yaml 中配置 proxy: { enabled: true, url: http://127.0.0.1:7890 }")
+    if "Read timed out" in str(e):
+        msg.append("  提示: 读取超时，常见原因:")
+        msg.append("    - 当前 endpoint 是 HuggingFace 官方地址，国内访问不稳定")
+        msg.append("    - 建议在 config.yaml 中设置:")
+        msg.append("      whisper:")
+        msg.append("        hf_endpoint: https://hf-mirror.com")
+        msg.append("    - 如果已设置镜像但仍超时，可尝试在 config.yaml 中配置代理:")
+        msg.append("      proxy:")
+        msg.append("        enabled: true")
+        msg.append("        url: http://127.0.0.1:7890")
     return "\n".join(msg)
 
 
@@ -439,7 +449,7 @@ def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Pa
             url = hf_hub_url(repo_id, filename=filename)
             tmp_path = target.with_name(target.name + ".tmp")
             try:
-                response = _req.get(url, stream=True, proxies=proxies, timeout=30, allow_redirects=True)
+                response = _req.get(url, stream=True, proxies=proxies, timeout=(30, 180), allow_redirects=True)
                 response.raise_for_status()
             except _req.exceptions.RequestException as e:
                 raise RuntimeError(_download_error_detail(e, cfg)) from e
