@@ -1311,12 +1311,16 @@ async function _loadModelMgmt() {
     }
   }, 10000);
   try {
-    const data = await api('GET', '/api/whisper/models');
+    const [data, check] = await Promise.all([
+      api('GET', '/api/whisper/models'),
+      api('GET', '/api/whisper/check').catch(() => ({ cublas: true })),
+    ]);
     if (!data.ok) { container.innerHTML = '<p class="err">加载模型列表失败</p>'; return; }
 
     const current = data.current_model || 'medium';
     const avail = data.available || [];
     const cached = data.cached || [];
+    const cublasOk = check.cublas !== false;
 
     let html = '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">';
 
@@ -1332,7 +1336,13 @@ async function _loadModelMgmt() {
 
     html += '<div>';
     const alreadyCached = cached.some(c => c.name === current && c.valid);
-    html += `<button id="btn-model-download" class="btn-primary" style="font-size:var(--text-sm)"${alreadyCached ? ' disabled' : ''}>${icon('download', 14)} ${alreadyCached ? '已下载' : '下载模型'}</button>`;
+    const needsReverify = alreadyCached && !cublasOk;
+    const btnText = needsReverify ? '重新验证' : alreadyCached ? '已下载' : '下载模型';
+    const btnDisabled = alreadyCached && !needsReverify ? ' disabled' : '';
+    html += `<button id="btn-model-download" class="btn-primary" style="font-size:var(--text-sm)"${btnDisabled}>${icon('download', 14)} ${btnText}</button>`;
+    if (needsReverify) {
+      html += '<p style="font-size:var(--text-xs);color:var(--warn,#b8860b);margin:4px 0 0">模型文件已缓存，但 cuBLAS 环境验证未通过。点击「重新验证」重试。</p>';
+    }
     html += '</div>';
 
     html += '<div style="font-size:var(--text-xs);color:var(--text-secondary);white-space:nowrap">';
@@ -1375,9 +1385,10 @@ async function _loadModelMgmt() {
         const newModel = sel.value;
         const dlBtn = $('btn-model-download');
         const isCached = cached.some(c => c.name === newModel && c.valid);
+        const needsReverify = isCached && !cublasOk;
         if (dlBtn) {
-          dlBtn.disabled = isCached;
-          dlBtn.innerHTML = isCached ? '已下载' : `${icon('download', 14)} 下载模型`;
+          dlBtn.disabled = isCached && !needsReverify;
+          dlBtn.innerHTML = isCached ? (needsReverify ? '重新验证' : '已下载') : `${icon('download', 14)} 下载模型`;
         }
         try {
           const r = await api('PUT', '/api/whisper/model', { model_size: newModel });
