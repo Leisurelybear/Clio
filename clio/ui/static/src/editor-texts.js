@@ -111,7 +111,26 @@ export function renderTranscript() {
   const t = state.transcript;
   const pane = $('tab-transcript');
   if (!t || !t.ok) {
-    pane.innerHTML = '<p class="muted">当前视频没有转录数据。</p><p class="hint">请先运行流水线中的「转录」步骤，或在 CLI 执行 <code>python main.py transcribe</code>。</p>';
+    pane.innerHTML = `
+      <p class="muted">当前视频没有转录数据。</p>
+      <button id="btn-create-transcript" class="btn-primary" style="margin-top:8px">${icon('plus', 14)} 创建手动转录</button>
+      <p class="hint" style="margin-top:8px">手动创建后，可自由添加、编辑和删除时间轴条目。也可先运行流水线中的「转录」步骤自动生成。</p>
+    `;
+    pane.querySelector('#btn-create-transcript').onclick = async () => {
+      const v = state.videos.find(x => x.file === state.currentVideo);
+      if (!v) { setStatus('找不到当前视频', 'err'); return; }
+      try {
+        const r = await api('POST', `/api/transcripts?video=${encodeURIComponent(v.file)}`, { create: true });
+        if (r.ok) {
+          state.transcript = await api('GET', `/api/transcripts?video=${encodeURIComponent(v.file)}`);
+          renderTranscript();
+        } else {
+          setStatus('创建失败: ' + (r.error || ''), 'err');
+        }
+      } catch (e) {
+        setStatus('创建失败: ' + e.message, 'err');
+      }
+    };
     renderWhisperInstallPrompt(pane);
     return;
   }

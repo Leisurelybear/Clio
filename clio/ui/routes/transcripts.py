@@ -26,7 +26,8 @@ def _resolve_stem(file: str) -> str | None:
     return stem
 
 
-def _transcript_path(handler: HandlerProtocol, qs: dict[str, Any], video: str) -> Path | None:
+def _intended_transcript_path(handler: HandlerProtocol, qs: dict[str, Any], video: str) -> Path | None:
+    """Return the intended transcript file path for the given video (may not exist yet)."""
     stem = _resolve_stem(video)
     if not stem:
         return None
@@ -36,12 +37,34 @@ def _transcript_path(handler: HandlerProtocol, qs: dict[str, Any], video: str) -
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
     transcripts_dir = proj_out / cfg.whisper.transcripts_subdir
-    # Try compressed stem first (e.g., "001_GX010682_transcript.json")
+    return transcripts_dir / f"{stem}_transcript.json"
+
+
+def _transcript_path(handler: HandlerProtocol, qs: dict[str, Any], video: str) -> Path | None:
+    safe = _is_safe_basename(video)
+    if not safe:
+        return None
+    name = video.rsplit(".", 1)[0]  # full name, preserving _segNN
+    stem = _SEG_SUFFIX_RE.sub("", name)  # _segNN stripped
+
+    proj_out = handler._get_project_output(qs)
+    if not proj_out:
+        return None
+    proj_input = handler._resolve_project_input(qs)
+    cfg = handler._get_config(proj_input)
+    transcripts_dir = proj_out / cfg.whisper.transcripts_subdir
+
+    # Try 1: exact match preserving _segNN (e.g., "001_GL010695_seg01" -> "001_GL010695_seg01_transcript.json")
+    full_path = transcripts_dir / f"{name}_transcript.json"
+    if full_path.is_file():
+        return full_path
+
+    # Try 2: stem with _segNN stripped (e.g., "001_GX010682" -> "001_GX010682_transcript.json")
     compressed_path = transcripts_dir / f"{stem}_transcript.json"
     if compressed_path.is_file():
         return compressed_path
-    # Fallback: try original stem (e.g., "GX010682_transcript.json")
-    # Strip index prefix if present (e.g., "001_" from "001_GX010682")
+
+    # Try 3: strip index prefix (e.g., "001_GX010682" -> "GX010682_transcript.json")
     orig_stem = stem
     if "_" in stem:
         _, orig_stem = stem.split("_", 1)
@@ -49,6 +72,25 @@ def _transcript_path(handler: HandlerProtocol, qs: dict[str, Any], video: str) -
         orig_path = transcripts_dir / f"{orig_stem}_transcript.json"
         if orig_path.is_file():
             return orig_path
+
+    # Reverse fallback: walk transcripts dir, first try exact
+    # stem match (index prefix + _segNN-aware), then broad
+    # orig_stem match for no-prefix videos.
+    if transcripts_dir.is_dir():
+        fallback = None
+        for p in transcripts_dir.iterdir():
+            if not (p.is_file() and p.name.endswith("_transcript.json")):
+                continue
+            base = p.stem[: -len("_transcript")]  # "001_GL010695_seg01"
+            base_clean = _SEG_SUFFIX_RE.sub("", base)  # "001_GL010695"
+            if base_clean == stem:
+                return p
+            if fallback is None and "_" in base_clean:
+                _, base_orig = base_clean.split("_", 1)
+                if base_orig == orig_stem:
+                    fallback = p
+        if fallback:
+            return fallback
     return None
 
 
@@ -109,10 +151,27 @@ def handle_put_transcripts(handler: HandlerProtocol, qs: dict[str, Any], obj: di
         handler._send_json({"ok": False, "error": str(e)}, 500)
 
 
+def _create_transcript_file(handler: HandlerProtocol, qs: dict[str, Any], video: str) -> Path | None:
+    """Create a new empty transcript file for the given video and return its path."""
+    tp = _intended_transcript_path(handler, qs, video)
+    if tp:
+        tp.parent.mkdir(parents=True, exist_ok=True)
+        skeleton = {"segments": []}
+        _save_atomic(tp, json.dumps(skeleton, ensure_ascii=False, indent=2).encode("utf-8"))
+    return tp
+
+
 def handle_post_transcripts(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     video = qs.get("video", [None])[0]
     if not video:
         return handler._send_json({"ok": False, "error": "missing video param"}, 400)
+
+    if obj.get("create"):
+        tp = _create_transcript_file(handler, qs, video)
+        if not tp:
+            return handler._send_json({"ok": False, "error": "cannot create transcript path"}, 500)
+        handler._send_json({"ok": True, "message": "transcript file created"})
+        return
 
     start = obj.get("start")
     end = obj.get("end")
