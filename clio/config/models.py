@@ -405,13 +405,19 @@ class AppConfig:
         *,
         global_cfg: GlobalConfig,
         project_cfg: ProjectConfig | None = None,
+        project_dir: Path | None = None,
     ) -> None:
         self._global_cfg = global_cfg
         self._project_cfg = project_cfg
+        self._project_dir = project_dir.resolve() if project_dir else None
         self._paths: CombinedPaths | None = None
         self._ai: CombinedAIConfig | None = None
         self._compress: CombinedCompressConfig | None = None
         self._whisper: CombinedWhisperConfig | None = None
+
+    @property
+    def project_dir(self) -> Path | None:
+        return self._project_dir
 
     # -- layer accessors --
 
