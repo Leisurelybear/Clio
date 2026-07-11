@@ -14,7 +14,14 @@ from typing import Any
 
 import requests as _req
 
-from clio.transcribe import PROJECT_ROOT, _resolve_cache_dir
+from clio.transcribe import (
+    PROJECT_ROOT,
+    _clear_model_cache,
+    _get_model,
+    _resolve_cache_dir,
+    check_cublas,
+    pip_mirror_for_config,
+)
 from clio.ui.handler_protocol import HandlerProtocol
 from clio.utils import run_subprocess
 from clio.whisper_cache import (
@@ -63,6 +70,7 @@ def _pip_install_streaming(
     packages: list[str],
     progress_path: Path,
     label: str,
+    pip_index: str | None = None,
 ) -> tuple[bool, str]:
     """Run pip install with streaming progress updates to the progress file.
 
@@ -71,7 +79,10 @@ def _pip_install_streaming(
     elapsed-time counter keeps the UI moving during silent large downloads
     (pip buffers its progress bar when stdout is a pipe, not a TTY).
     """
-    cmd = [_sys.executable, "-m", "pip", "install", "--no-input", *packages]
+    cmd = [_sys.executable, "-m", "pip", "install", "--no-input"]
+    if pip_index:
+        cmd += ["-i", pip_index]
+    cmd += [*packages]
     try:
         proc = subprocess.Popen(
             cmd,
@@ -90,6 +101,13 @@ def _pip_install_streaming(
     last_beat = 0.0
     buf = ""
     while True:
+        if _INSTALL_CANCEL.is_set():
+            proc.terminate()
+            try:
+                proc.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+            return False, "已取消"
         chunk = proc.stdout.read(4096)
         if not chunk:
             break
@@ -245,9 +263,59 @@ def _download_error_detail(e: Exception, cfg: Any) -> str:
     return "\n".join(msg)
 
 
+def _verify_install(cfg: Any, progress_path: Path, model_name: str) -> bool:
+    """Smoke-test the install: confirm cuBLAS is loadable and the model loads.
+
+    Returns True on success; on failure writes an error progress entry and
+    returns False so the caller can stop (the install is NOT "done").
+    """
+    _write_install_progress(
+        progress_path,
+        {
+            "status": "downloading",
+            "progress_pct": 100,
+            "message": "验证安装（加载模型以确认依赖完整）...",
+        },
+    )
+    if not check_cublas():
+        _write_install_progress(
+            progress_path,
+            {
+                "status": "error",
+                "progress_pct": 100,
+                "message": "cuBLAS 仍未就绪，转录将失败。请手动: pip install nvidia-cublas-cu12",
+            },
+        )
+        return False
+    try:
+        _get_model(cfg)
+    except Exception as e:
+        _write_install_progress(
+            progress_path,
+            {
+                "status": "error",
+                "progress_pct": 100,
+                "message": f"模型加载验证失败: {e}",
+            },
+        )
+        return False
+    finally:
+        _clear_model_cache()
+    _write_install_progress(
+        progress_path,
+        {
+            "status": "done",
+            "progress_pct": 100,
+            "message": f"模型 {model_name} 下载完成，验证通过 ✔",
+        },
+    )
+    return True
+
+
 def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Path) -> None:
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
+    pip_index = pip_mirror_for_config(cfg)
 
     _write_install_progress(
         progress_path,
@@ -278,7 +346,7 @@ def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Pa
     )
     req_txt = PROJECT_ROOT / "requirements-whisper.txt"
     if req_txt.is_file():
-        ok, err = _pip_install_streaming(["-r", str(req_txt)], progress_path, "安装 faster-whisper")
+        ok, err = _pip_install_streaming(["-r", str(req_txt)], progress_path, "安装 faster-whisper", pip_index)
         if not ok:
             _write_install_progress(
                 progress_path,
@@ -307,7 +375,7 @@ def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Pa
     except (ImportError, OSError):
         pass
     if cublas_pkgs:
-        ok, err = _pip_install_streaming(cublas_pkgs, progress_path, "安装 cuBLAS")
+        ok, err = _pip_install_streaming(cublas_pkgs, progress_path, "安装 cuBLAS", pip_index)
         if not ok:
             _write_install_progress(
                 progress_path,
@@ -334,14 +402,7 @@ def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Pa
         repo_id = f"Systran/faster-whisper-{model_name}"
 
         if is_model_cache_complete(cache_dir, model_name):
-            _write_install_progress(
-                progress_path,
-                {
-                    "status": "done",
-                    "progress_pct": 100,
-                    "message": f"模型 {model_name} 已下载",
-                },
-            )
+            _verify_install(cfg, progress_path, model_name)
             return
 
         total_size = _get_model_download_size(repo_id, cfg)
@@ -447,14 +508,7 @@ def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Pa
                 raise RuntimeError(_download_error_detail(e, cfg)) from e
 
         ensure_model_cache_refs(cache_dir, model_name)
-        _write_install_progress(
-            progress_path,
-            {
-                "status": "done",
-                "progress_pct": 100,
-                "message": f"模型 {model_name} 下载完成",
-            },
-        )
+        _verify_install(cfg, progress_path, model_name)
     finally:
         for k, v in _old_env.items():
             if v is None:

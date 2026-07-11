@@ -39,6 +39,21 @@ def check_cublas() -> bool:
     return False
 
 
+_CHINA_HF_HINTS = ("hf-mirror.com", "modelscope", "csdn.net", "tuweizhong", "bilibili", "aliyun")
+
+
+def pip_mirror_for_config(cfg: AppConfig) -> str | None:
+    """Pick a China pip mirror URL when the HF endpoint suggests a China mirror.
+
+    nvidia-cublas-cu12 is a large PyPI package; users already on a China HF
+    mirror benefit from a China pip mirror so the install actually completes.
+    """
+    ep = (getattr(cfg.whisper, "hf_endpoint", "") or "").lower()
+    if any(hint in ep for hint in _CHINA_HF_HINTS):
+        return "https://pypi.tuna.tsinghua.edu.cn/simple"
+    return None
+
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 try:

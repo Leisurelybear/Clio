@@ -12,8 +12,11 @@ from clio.progress import ProgressTracker
 
 @pytest.fixture(autouse=True)
 def _mock_whisper_deps():
-    """Patch faster_whisper so import inside run_transcribe_all works."""
-    with patch.dict("sys.modules", {"faster_whisper": MagicMock()}):
+    """Patch faster_whisper + check_whisper so import and guard inside run_transcribe_all work."""
+    with (
+        patch.dict("sys.modules", {"faster_whisper": MagicMock()}),
+        patch("clio.tasks.transcribe.check_whisper", return_value=True),
+    ):
         yield
 
 

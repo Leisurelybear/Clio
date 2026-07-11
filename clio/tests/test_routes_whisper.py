@@ -7,6 +7,7 @@ import types
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 import yaml
 
 from clio.ui.routes.whisper_download import (
@@ -32,8 +33,14 @@ class _FakePopen:
         self.stdout = io.StringIO("Downloading package...\nInstalling...\n")
         self.returncode = 0
 
-    def wait(self) -> int:
+    def wait(self, timeout: float | None = None) -> int:
         return self.returncode
+
+    def terminate(self) -> None:
+        pass
+
+    def kill(self) -> None:
+        pass
 
 
 def _make_handler(proj_input: Path, proj_output: Path) -> MagicMock:
@@ -254,6 +261,14 @@ class TestHandlePostWhisperInstallCancel:
 
 
 class TestRunWhisperInstall:
+    @pytest.fixture(autouse=True)
+    def _clear_cancel_event(self):
+        """Clear the module-level cancel event before each test to avoid cross-test pollution."""
+        import clio.ui.routes.whisper_download as wd
+
+        wd._INSTALL_CANCEL.clear()
+        yield
+
     def test_downloads_required_snapshot_files(self, tmp_path: Path) -> None:
         proj_input = tmp_path / "input"
         proj_input.mkdir()
@@ -282,6 +297,9 @@ class TestRunWhisperInstall:
             patch("clio.ui.routes.whisper_download._get_model_download_size", return_value=16),
             patch("clio.ui.routes.whisper_download._req.get", return_value=Response()) as mock_get,
             patch("clio.ui.routes.whisper_download.subprocess.Popen", _FakePopen),
+            patch("clio.ui.routes.whisper_download.check_cublas", return_value=True),
+            patch("clio.ui.routes.whisper_download._get_model"),
+            patch("clio.ui.routes.whisper_download._clear_model_cache"),
         ):
             _run_install(handler, qs, progress_file)
 
