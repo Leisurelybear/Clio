@@ -13,6 +13,8 @@ let _lastRunDay = 'day1';
 let _runActive = false;
 let _lastProgressSnapshot = null;
 let _lastRunSteps = [];
+let _expectDoneNavigation = false;
+let _seenNonTerminal = false;
 
 const STEPS_KEY = 'vlog_ui_run_steps';
 
@@ -39,6 +41,8 @@ function saveStepSelection(checks, useTranscripts) {
 }
 
 function renderRun() {
+  _expectDoneNavigation = false;
+  _seenNonTerminal = false;
   _lastRunDay = state.currentDay || 'day1';
   const pane = $('tab-run');
   const saved = loadStepSelection();
@@ -242,6 +246,7 @@ async function startRun() {
   }
   _lastRunDay = ($('run-day')?.value.trim() || state.currentDay);
   _lastRunSteps = checked.slice();
+  _expectDoneNavigation = true;
   _stopRunSSE();
   try {
     const body = {
@@ -370,6 +375,7 @@ async function _handleRunStatus(s) {
         `;
         renderProcessingState($('run-state-container'));
       } else {
+        _seenNonTerminal = true;
         if (btn) { btn.disabled = true; btn.textContent = '运行中...'; }
         const cancelBtn = $('btn-run-cancel');
         if (cancelBtn) { cancelBtn.style.display = ''; cancelBtn.disabled = false; }
@@ -441,11 +447,12 @@ async function _handleRunStatus(s) {
       try { state.plan = await api('GET', `/api/plan?day=${_lastRunDay}`); } catch {}
       await import('./sidebar.js').then(mod => mod.loadVideos());
       const completedSteps = Array.isArray(s.steps) ? s.steps : _lastRunSteps;
-      if (state.currentEntity === 'run') {
+      if (state.currentEntity === 'run' && (_expectDoneNavigation || _seenNonTerminal)) {
         await _showRunCompletionTarget(completedSteps);
       } else if (state.currentEntity === 'plan') {
         import('./sidebar.js').then(mod => mod.selectPlan());
       }
+      _expectDoneNavigation = false;
     } else if (s.status === 'cancelled') {
       _lastProgressSnapshot = null;
       _runActive = false;
