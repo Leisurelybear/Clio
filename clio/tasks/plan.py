@@ -83,8 +83,12 @@ def run_plan_vlog(
         identity = load_identity(data)
         if identity is not None:
             source_stem = identity.original_stem
+            match_stem = identity.compressed_stem
+            segment_offset = identity.segment_offset_sec or 0.0
         else:
             source_stem = Path(data.get("source_file", "")).stem or json_file.stem
+            match_stem = source_stem
+            segment_offset = 0.0
         clips.append(
             {
                 "index": format_index(idx, config.naming.index_width),
@@ -95,6 +99,8 @@ def run_plan_vlog(
                 "highlights": data.get("highlights", []),
                 "suggested_use": data.get("suggested_use", ""),
                 "source_stem": source_stem,
+                "match_stem": match_stem,
+                "segment_offset_sec": segment_offset,
             }
         )
 
@@ -110,7 +116,7 @@ def run_plan_vlog(
                 data = json.loads(tf.read_text(encoding="utf-8"))
                 identity = load_identity(data)
                 if identity is not None:
-                    stem = identity.original_stem
+                    stem = identity.compressed_stem
                 else:
                     stem = data.get("source_stem", "")
                     if "_" in stem:

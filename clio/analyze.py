@@ -281,14 +281,15 @@ def plan_daily_vlog(
     if transcripts_map and use_transcripts and config.whisper.enabled:
         transcript_info = []
         for clip in clips:
-            clip_stem = clip.get("source_stem", "")
+            clip_stem = clip.get("match_stem") or clip.get("source_stem", "")
             trans = transcripts_map.get(clip_stem.lower()) if clip_stem else None
             if trans is None:
                 continue
+            offset = clip.get("segment_offset_sec", 0.0) or 0.0
             matched = []
             for tl in clip.get("timeline", []):
-                tl_start = _parse_timestamp_sec(tl.get("start", "00:00"))
-                tl_end = _parse_timestamp_sec(tl.get("end", "00:00"))
+                tl_start = _parse_timestamp_sec(tl.get("start", "00:00")) + offset
+                tl_end = _parse_timestamp_sec(tl.get("end", "00:00")) + offset
                 for seg in trans.get("segments", []):
                     if seg["start"] >= tl_start and seg["end"] <= tl_end:
                         matched.append(seg)
