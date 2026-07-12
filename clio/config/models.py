@@ -138,9 +138,7 @@ class GlobalConfig:
 
 @dataclass
 class ProjectPathsConfig:
-    input_dir: Path = Path()
     output_dir: Path = Path("./output")
-    recursive: bool = False
 
 
 @dataclass
@@ -211,14 +209,6 @@ class CombinedPaths:
     @property
     def logs_dir(self) -> Path:
         return self._global.logs_dir
-
-    @property
-    def input_dir(self) -> Path:
-        return self._project.input_dir if self._project else Path()
-
-    @property
-    def recursive(self) -> bool:
-        return self._project.recursive if self._project else False
 
     @property
     def output_dir(self) -> Path:

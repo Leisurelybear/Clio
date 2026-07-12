@@ -2,10 +2,8 @@
 
 CONFIG_DESCRIPTIONS: dict[str, str] = {
     # paths
-    "paths.input_dir": "项目目录（已废弃，请使用 paths.project_dir）。原始视频所在目录，所有视频文件从此目录读取",
     "paths.project_dir": "项目目录，包含 videos.json 和 project.yaml 等配置",
     "paths.output_dir": "所有输出文件（压缩、转录、文案等）的根目录",
-    "paths.recursive": "是否递归扫描子文件夹内的所有视频",
     "paths.ffmpeg": "ffmpeg 可执行文件路径，留空则自动搜索",
     "paths.ffprobe": "ffprobe 可执行文件路径，留空则自动搜索",
     "paths.logs_dir": "日志目录，按小时切文件：YYYY-MM-DD-HH.log",
