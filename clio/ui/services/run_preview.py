@@ -34,7 +34,12 @@ def build_run_preview(
     selected = _selected_stems(files) if files is not None else None
 
     source_input_info, all_source_videos = _source_input_info(config)
-    all_recursive_source_videos = _video_files(config.paths.input_dir, recursive=True)
+    if config.project_dir:
+        from clio.tasks._video_loader import load_selected_videos
+
+        all_recursive_source_videos = list(load_selected_videos(config.project_dir))
+    else:
+        all_recursive_source_videos = _video_files(config.paths.input_dir, recursive=True)
     compressed_input_info, all_compressed_videos = _compressed_input_info(config)
     all_analysis_jsons = _analysis_jsons(config)
     index = ArtifactIndex(
@@ -94,6 +99,12 @@ def _source_input_info(config: AppConfig) -> tuple[dict[str, Any], list[Path]]:
     if project_input and project_input.is_file():
         videos = [project_input] if _is_video(project_input) else []
         return {"mode": "file", "path": str(project_input), "count": len(videos)}, videos
+
+    if config.project_dir:
+        from clio.tasks._video_loader import load_selected_videos
+
+        videos = load_selected_videos(config.project_dir)
+        return {"mode": "directory", "path": str(config.project_dir), "count": len(videos)}, videos
 
     input_dir = config.paths.input_dir
     videos = _video_files(input_dir, recursive=config.paths.recursive)

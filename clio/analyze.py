@@ -118,7 +118,7 @@ def _wrap_with_context(prompt: str, config: AppConfig, context_override: str | N
     """
     parts = []
     # 1. 默认模板
-    text = _read_trip_context(str(config.paths.input_dir))
+    text = _read_trip_context(str(config.project_dir or config.paths.input_dir))
     if text:
         parts.append(text)
     # 2. 用户配置的 context

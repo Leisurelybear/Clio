@@ -122,13 +122,20 @@ def run_cut_all(
                 if src.is_file():
                     return src
 
-            # 降级：regex 反解 + rglob（修复 B-06）
+            # 降级：regex 反解 + rglob / load_selected_videos（修复 B-06）
             suffix = compressed.stem.split("_", 1)[1].lower()
             m = _SEG_RE.match(suffix)
             orig_stem = m.group(1) if m else suffix
-            for p in find_videos(input_dir, recursive=True):
-                if p.stem.lower() == orig_stem:
-                    return p
+            if config.project_dir:
+                from clio.tasks._video_loader import load_selected_videos
+
+                for p in load_selected_videos(config.project_dir):
+                    if p.stem.lower() == orig_stem:
+                        return p
+            else:
+                for p in find_videos(input_dir, recursive=True):
+                    if p.stem.lower() == orig_stem:
+                        return p
             return None
 
     clips: list[dict] = []
