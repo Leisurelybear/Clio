@@ -14,7 +14,7 @@ from pathlib import Path
 from clio.config.models import CANVAS_PRESETS
 from clio.cut import parse_time_range
 from clio.identity import load_identity
-from clio.utils import find_videos, get_duration_sec
+from clio.utils import get_duration_sec
 
 logger = logging.getLogger("clio.export.jianying")
 
@@ -25,7 +25,7 @@ def _to_microseconds(seconds: float) -> int:
 
 def _resolve_video_by_prefix(
     index: str,
-    input_dir: Path,
+    videos: list[Path],
     ffprobe: str | None = None,
 ) -> tuple[Path, int] | None:
     """Fallback: find video by {index}_ prefix (e.g. '001' → '001_GL010683.mp4').
@@ -34,7 +34,6 @@ def _resolve_video_by_prefix(
     """
     if ffprobe is None:
         return None
-    videos = find_videos(input_dir, recursive=True)
     pattern = f"{index}_"
     for v in videos:
         if v.stem.startswith(pattern):
@@ -110,7 +109,7 @@ def _build_index_to_offset(texts_dir: Path) -> dict[str, float]:
 
 def _resolve_video(
     source_stem: str,
-    input_dir: Path,
+    videos: list[Path],
     ffprobe: str | None = None,
 ) -> tuple[Path, int] | None:
     """Find original video by source_stem (e.g. 'GL010695').
@@ -120,7 +119,6 @@ def _resolve_video(
     if ffprobe is None:
         print("  [跳过] ffprobe 未配置，无法读取视频时长")
         return None
-    videos = find_videos(input_dir, recursive=True)
     # Case-insensitive stem match
     target_lower = source_stem.lower()
     for v in videos:
@@ -135,7 +133,7 @@ def _resolve_video(
 
 def _build_materials(
     plan_data: dict,
-    input_dir: Path,
+    source_videos: list[Path],
     ffprobe: str | None = None,
     index_to_source: dict[str, str] | None = None,
 ) -> tuple[dict, dict[str, str], dict[int, str]]:
@@ -164,10 +162,10 @@ def _build_materials(
             seen_indices.add(idx)
             source_stem = index_to_source.get(idx)
             if source_stem:
-                resolved = _resolve_video(source_stem, input_dir, ffprobe)
+                resolved = _resolve_video(source_stem, source_videos, ffprobe)
             else:
                 # Fallback: try matching by {index}_ prefix (works for compressed files)
-                resolved = _resolve_video_by_prefix(idx, input_dir, ffprobe)
+                resolved = _resolve_video_by_prefix(idx, source_videos, ffprobe)
             if resolved is None:
                 print(f"  [跳过] 视频素材 [{idx}] 未找到，跳过相关片段")
                 continue
@@ -323,6 +321,8 @@ def export_plan_to_jianying(
     ffprobe: str | None = None,
     texts_dir: Path | None = None,
     canvas_ratio: str = "16:9",
+    *,
+    project_dir: Path | None = None,
 ) -> Path:
     """Generate JianYing draft from plan JSON.
 
@@ -344,7 +344,15 @@ def export_plan_to_jianying(
     logger.debug("texts_dir=%s, index_to_source=%s", texts_dir, index_to_source)
     if texts_dir:
         logger.debug("texts_dir exists=%s, files=%s", texts_dir.is_dir(), list(texts_dir.glob("*.json")))
-    materials, index_to_material_id, seq_text_ids = _build_materials(plan_data, input_dir, ffprobe, index_to_source)
+    if project_dir:
+        from clio.tasks._video_loader import load_selected_videos
+
+        videos = list(load_selected_videos(project_dir))
+    else:
+        from clio.utils import find_videos
+
+        videos = list(find_videos(input_dir, recursive=True))
+    materials, index_to_material_id, seq_text_ids = _build_materials(plan_data, videos, ffprobe, index_to_source)
     tracks = _build_tracks(plan_data, index_to_material_id, seq_text_ids, index_to_offset)
 
     total_duration_us = 0

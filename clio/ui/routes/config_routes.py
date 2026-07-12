@@ -54,7 +54,7 @@ def handle_get_config_raw(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/config/raw."""
 
     config_path = handler.config_path
-    input_dir = handler.input_dir
+    project_dir = handler.project_dir
 
     if not config_path or not config_path.is_file():
         return handler._send_json({"error": "config file not available"}, 500)
@@ -63,7 +63,7 @@ def handle_get_config_raw(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     proj_yaml = proj_input / "project.yaml"
     if not proj_yaml.is_file():
         # Non-default project without project.yaml => needs init
-        if proj_input != input_dir:
+        if proj_input != project_dir:
             return handler._send_json({"needs_init": True})
         proj_yaml = None
     # Return the merged effective config
@@ -86,7 +86,7 @@ def handle_get_config_raw(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
 def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle PUT /api/config/raw."""
     config_path = handler.config_path
-    input_dir = handler.input_dir
+    project_dir = handler.project_dir
 
     if not config_path:
         return handler._send_json({"ok": False, "error": "config_path not available"}, 500)
@@ -94,7 +94,7 @@ def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
     proj_input = handler._resolve_project_input(qs)
     # Determine target: project.yaml or config.yaml
     proj_yaml = proj_input / "project.yaml"
-    is_project_target = proj_yaml.is_file() or proj_input != input_dir
+    is_project_target = proj_yaml.is_file() or proj_input != project_dir
 
     # Layer validation: prevent API key leak
     if is_project_target:
@@ -153,10 +153,10 @@ def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
 def handle_post_config_init(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle POST /api/config/init."""
     config_path = handler.config_path
-    input_dir = handler.input_dir
+    project_dir = handler.project_dir
 
     proj_input = handler._resolve_project_input(qs)
-    if proj_input == input_dir:
+    if proj_input == project_dir:
         return handler._send_json(
             {"ok": False, "error": "default project already has config.yaml, no init needed"}, 400
         )
@@ -254,13 +254,13 @@ def handle_get_config_global(handler: HandlerProtocol, qs: dict[str, Any]) -> No
 def handle_get_config_project(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/config/project."""
     config_path = handler.config_path
-    input_dir = handler.input_dir
+    project_dir = handler.project_dir
     if not config_path:
         return handler._send_json({"error": "config file not available"}, 500)
     proj_input = handler._resolve_project_input(qs)
     proj_yaml = proj_input / "project.yaml"
     if not proj_yaml.is_file():
-        if proj_input != input_dir:
+        if proj_input != project_dir:
             return handler._send_json({"needs_init": True})
         return handler._send_json({})
 

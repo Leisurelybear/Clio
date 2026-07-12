@@ -48,7 +48,7 @@ class TestHandleGetProjects:
     def test_empty(self, tmp_path: Path):
         handler = MagicMock()
         handler.config_path = tmp_path / "config.yaml"
-        handler.input_dir = tmp_path / "input"
+        handler.project_dir = tmp_path / "input"
         handler._send_json = MagicMock()
         handler.__class__._config_cache = MagicMock()
 

@@ -38,7 +38,7 @@ class HandlerProtocol(Protocol):
 
     # -- Stable class-level attributes --
     config_path: Path | None
-    input_dir: Path
+    project_dir: Path
     output_dir: Path
     DEFAULT_PROJECT: dict[str, Any]
     _api_token: str | None

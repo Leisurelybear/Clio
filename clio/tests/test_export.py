@@ -34,7 +34,7 @@ class TestExportPlan:
         with patch("clio.export.FORMAT_REGISTRY", {"jianying": mock_fn}):
             result = export_plan("jianying", plan_path, output_dir, input_dir, "day1")
 
-        mock_fn.assert_called_once_with(plan_path, output_dir, input_dir, "day1")
+        mock_fn.assert_called_once_with(plan_path, output_dir, input_dir, "day1", project_dir=None)
         assert result == output_dir / "draft"
 
     def test_unknown_format_raises_value_error(self) -> None:
@@ -55,17 +55,15 @@ class TestToMicroseconds:
 
 class TestResolveVideoByPrefix:
     def test_no_ffprobe_returns_none(self) -> None:
-        assert _resolve_video_by_prefix("001", Path("/tmp"), None) is None
+        assert _resolve_video_by_prefix("001", [], None) is None
 
     def test_finds_video_by_prefix(self, tmp_path: Path) -> None:
         video = tmp_path / "001_GL010683.mp4"
         video.write_text("fake")
+        videos = [video]
 
-        with (
-            patch("clio.export.jianying.find_videos", return_value=[video]),
-            patch("clio.export.jianying.get_duration_sec", return_value=60.0),
-        ):
-            result = _resolve_video_by_prefix("001", tmp_path, "ffprobe")
+        with patch("clio.export.jianying.get_duration_sec", return_value=60.0):
+            result = _resolve_video_by_prefix("001", videos, "ffprobe")
 
         assert result is not None
         path, duration = result
@@ -73,10 +71,7 @@ class TestResolveVideoByPrefix:
         assert duration == 60_000_000
 
     def test_no_match_returns_none(self, tmp_path: Path) -> None:
-        with (
-            patch("clio.export.jianying.find_videos", return_value=[]),
-        ):
-            result = _resolve_video_by_prefix("001", tmp_path, "ffprobe")
+        result = _resolve_video_by_prefix("001", [], "ffprobe")
         assert result is None
 
 
@@ -113,17 +108,15 @@ class TestBuildIndexToSource:
 
 class TestResolveVideo:
     def test_no_ffprobe_returns_none(self) -> None:
-        assert _resolve_video("GL010683", Path("/tmp"), None) is None
+        assert _resolve_video("GL010683", [], None) is None
 
     def test_finds_by_stem_case_insensitive(self, tmp_path: Path) -> None:
         video = tmp_path / "GL010683.mp4"
         video.write_text("fake")
+        videos = [video]
 
-        with (
-            patch("clio.export.jianying.find_videos", return_value=[video]),
-            patch("clio.export.jianying.get_duration_sec", return_value=60.0),
-        ):
-            result = _resolve_video("gl010683", tmp_path, "ffprobe")
+        with patch("clio.export.jianying.get_duration_sec", return_value=60.0):
+            result = _resolve_video("gl010683", videos, "ffprobe")
 
         assert result is not None
         path, duration = result
@@ -131,20 +124,14 @@ class TestResolveVideo:
         assert duration == 60_000_000
 
     def test_no_match_returns_none(self, tmp_path: Path) -> None:
-        with (
-            patch("clio.export.jianying.find_videos", return_value=[]),
-        ):
-            result = _resolve_video("NONEXISTENT", tmp_path, "ffprobe")
+        result = _resolve_video("NONEXISTENT", [], "ffprobe")
         assert result is None
 
 
 class TestBuildMaterials:
     def test_empty_sequence(self, tmp_path: Path) -> None:
         plan_data = {"sequence": []}
-        input_dir = tmp_path / "input"
-        input_dir.mkdir()
-
-        materials, idx_map, text_ids = _build_materials(plan_data, input_dir, "ffprobe", {})
+        materials, idx_map, text_ids = _build_materials(plan_data, [], "ffprobe", {})
         assert len(materials["videos"]) == 0
         assert len(materials["texts"]) == 0
         assert idx_map == {}
@@ -156,15 +143,12 @@ class TestBuildMaterials:
                 {"index": "001", "voiceover_hint": "Hello world"},
             ]
         }
-        input_dir = tmp_path / "input"
-        input_dir.mkdir()
-
         index_to_source = {"001": "GL010683"}
 
         with patch("clio.export.jianying._resolve_video") as mock_resolve:
             mock_resolve.return_value = (tmp_path / "GL010683.mp4", 60_000_000)
 
-            materials, idx_map, text_ids = _build_materials(plan_data, input_dir, "ffprobe", index_to_source)
+            materials, idx_map, text_ids = _build_materials(plan_data, [], "ffprobe", index_to_source)
 
         assert len(materials["videos"]) == 1
         assert len(materials["texts"]) == 1
@@ -177,11 +161,9 @@ class TestBuildMaterials:
                 {"index": "001", "voiceover_hint": "Text only"},
             ]
         }
-        input_dir = tmp_path / "input"
-        input_dir.mkdir()
 
         with patch("clio.export.jianying._resolve_video", return_value=None):
-            materials, idx_map, text_ids = _build_materials(plan_data, input_dir, "ffprobe", {"001": "GL010683"})
+            materials, idx_map, text_ids = _build_materials(plan_data, [], "ffprobe", {"001": "GL010683"})
 
         assert len(materials["videos"]) == 0
         assert len(materials["texts"]) == 0
@@ -200,10 +182,10 @@ class TestBuildMaterials:
         with patch("clio.export.jianying._resolve_video_by_prefix") as mock_prefix:
             mock_prefix.return_value = (tmp_path / "001_GL010683.mp4", 60_000_000)
 
-            materials, idx_map, text_ids = _build_materials(plan_data, input_dir, "ffprobe", {})
+            materials, idx_map, text_ids = _build_materials(plan_data, [], "ffprobe", {})
 
         assert len(materials["videos"]) == 1
-        mock_prefix.assert_called_once_with("001", input_dir, "ffprobe")
+        mock_prefix.assert_called_once_with("001", [], "ffprobe")
 
 
 class TestBuildTracks:
@@ -290,7 +272,7 @@ class TestExportPlanToJianying:
         output_dir = tmp_path / "output"
 
         with (
-            patch("clio.export.jianying.find_videos", return_value=[video_path]),
+            patch("clio.utils.find_videos", return_value=[video_path]),
             patch("clio.export.jianying.get_duration_sec", return_value=60.0),
         ):
             result = export_plan_to_jianying(plan_path, output_dir, input_dir, "day1", "ffprobe", texts_dir)

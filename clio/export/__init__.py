@@ -16,6 +16,8 @@ def export_plan(
     output_dir: Path,
     input_dir: Path,
     day_label: str = "day1",
+    *,
+    project_dir: Path | None = None,
     **kwargs,
 ) -> Path:
     """Export plan to the specified format.
@@ -25,4 +27,4 @@ def export_plan(
     exporter = FORMAT_REGISTRY.get(format)
     if exporter is None:
         raise ValueError(f"Unknown export format: {format}. Available: {list(FORMAT_REGISTRY)}")
-    return exporter(plan_path, output_dir, input_dir, day_label, **kwargs)
+    return exporter(plan_path, output_dir, input_dir, day_label, project_dir=project_dir, **kwargs)
