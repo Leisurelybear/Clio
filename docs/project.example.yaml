@@ -4,16 +4,16 @@
 # 放在 <项目>/project.yaml 中。不存在时使用默认值。
 #
 # 属于项目级的配置项：
-#   paths: input_dir, output_dir, recursive
+#   paths: output_dir
 #   ai: tasks, context, context_file
 #   compress: target_size_mb, max_width, split_max_min, splits_subdir, reencode_split
 #   analyze, script, plan, export
 #   whisper: enabled, model_size, language, device, max_segments_per_clip, transcripts_subdir
 
 paths:
-  input_dir: "./videos"
+  # 注意：原始视频不再通过 input_dir 配置。
+  # 请在 Web UI 中打开项目 → "视频管理" → 内嵌文件浏览器勾选。
   output_dir: "./output"
-  recursive: false          # true = 扫描子文件夹内所有视频
 
 # AI 任务定义（provider 必须在全局 config.yaml 中声明）
 ai:

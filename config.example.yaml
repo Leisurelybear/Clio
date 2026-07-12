@@ -12,7 +12,7 @@
 #   whisper: cache_dir, hf_endpoint
 #
 # 项目级配置项（见 project.example.yaml）：
-#   paths: input_dir, output_dir, recursive
+#   paths: output_dir
 #   ai: tasks, context, context_file
 #   compress: target_size_mb, max_width, split_max_min, splits_subdir, reencode_split
 #   analyze, script, plan, export
