@@ -47,8 +47,7 @@ def mock_config(tmp_path):
     out_dir.mkdir()
     in_dir.mkdir()
     cfg.paths.output_dir = out_dir
-    cfg.paths.input_dir = in_dir
-    cfg.project_dir = None
+    cfg.project_dir = in_dir
     return cfg
 
 
@@ -86,7 +85,7 @@ class TestMakeHandler:
     def test_default_project_values(self, tmp_path, mock_config):
         in_dir = tmp_path / "my-trip"
         in_dir.mkdir()
-        mock_config.paths.input_dir = in_dir
+        mock_config.project_dir = in_dir
         with patch("clio.ui.server.ConfigCache"):
             hcls = make_handler(mock_config, None)
         dp = hcls.DEFAULT_PROJECT
@@ -122,8 +121,7 @@ class TestMigration:
 
         cfg = MagicMock()
         cfg.paths.output_dir = output_dir
-        cfg.paths.input_dir = input_dir
-        cfg.project_dir = None
+        cfg.project_dir = input_dir
         with patch("clio.ui.server.ConfigCache"):
             make_handler(cfg, None)
 
@@ -142,8 +140,7 @@ class TestMigration:
 
         cfg = MagicMock()
         cfg.paths.output_dir = output_dir
-        cfg.paths.input_dir = input_dir
-        cfg.project_dir = None
+        cfg.project_dir = input_dir
         with patch("clio.ui.server.ConfigCache"):
             make_handler(cfg, None)
 
@@ -156,8 +153,7 @@ class TestMigration:
         # output_dir does NOT have project.json — no copy attempted
         cfg = MagicMock()
         cfg.paths.output_dir = output_dir
-        cfg.paths.input_dir = input_dir
-        cfg.project_dir = None
+        cfg.project_dir = input_dir
         with patch("clio.ui.server.ConfigCache"):
             make_handler(cfg, None)
 
@@ -175,8 +171,7 @@ class TestMigration:
 
         cfg = MagicMock()
         cfg.paths.output_dir = output_dir
-        cfg.paths.input_dir = input_dir
-        cfg.project_dir = None
+        cfg.project_dir = input_dir
         with patch("clio.ui.server.ConfigCache"):
             make_handler(cfg, None)
 
@@ -192,8 +187,7 @@ class TestMigration:
 
         cfg = MagicMock()
         cfg.paths.output_dir = base
-        cfg.paths.input_dir = base
-        cfg.project_dir = None
+        cfg.project_dir = base
         with patch("clio.ui.server.ConfigCache"):
             make_handler(cfg, None)
 
@@ -208,8 +202,7 @@ class TestMigration:
 
         cfg = MagicMock()
         cfg.paths.output_dir = output_dir
-        cfg.paths.input_dir = input_dir
-        cfg.project_dir = None
+        cfg.project_dir = input_dir
         with patch("clio.ui.server.ConfigCache"):
             make_handler(cfg, None)
 

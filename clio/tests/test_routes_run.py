@@ -247,6 +247,77 @@ class TestHandlePostRerun:
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args[0][0]["ok"] is True
 
+    def test_rerun_with_external_original_returns_ok(self, tmp_path: Path, _handler):
+        """Rerun with compressed source: verify original_video captured by the rerun
+        thread closure is the correct external path (from .vmeta.source_path)."""
+        import json as _json
+
+        handler = _handler
+        proj_input = tmp_path / "input"
+        proj_input.mkdir()
+        proj_out = tmp_path / "output"
+        comp_dir = proj_out / "compressed"
+        comp_dir.mkdir(parents=True)
+
+        # External original (outside proj_input)
+        ext_root = tmp_path / "external"
+        ext_root.mkdir()
+        original = ext_root / "GL010695.MP4"
+        original.write_bytes(b"original data")
+
+        # Compressed file with .vmeta pointing to external original
+        compressed = comp_dir / "001_GL010695.mp4"
+        compressed.write_bytes(b"compressed")
+        from clio.vmeta import VideoMeta
+
+        meta = VideoMeta.build(
+            source=original,
+            target=compressed,
+            source_duration=10.0,
+            target_duration=5.0,
+        )
+        meta.write(compressed)
+
+        # videos.json with external path
+        (proj_input / "videos.json").write_text(_json.dumps([str(original.resolve())]))
+
+        handler._resolve_project_input.return_value = proj_input
+        cfg = MagicMock()
+        cfg.compressed_dir = comp_dir
+        cfg.paths = SimpleNamespace(ffprobe="", output_dir=proj_out, input_dir=proj_input)
+        cfg.analyze = SimpleNamespace(skip_existing=True)
+        cfg.compress = SimpleNamespace(split_max_min=0)
+        handler._get_config.return_value = cfg
+
+        # Capture the thread target's default arguments
+        # _no_thread can't be used here because we need to inspect the Thread call
+        captured_thread_args = {}
+
+        def _fake_thread(*a, **kw):
+            captured_thread_args["target"] = kw.get("target")
+            return MagicMock(start=lambda: None)
+
+        monkeypatch = pytest.MonkeyPatch()
+        monkeypatch.setattr("clio.ui.routes.run.threading.Thread", _fake_thread)
+
+        handle_post_rerun(handler, {}, {"video": "001_GL010695.mp4", "task": "compress"})
+
+        handler._send_json.assert_called_once()
+        payload = handler._send_json.call_args[0][0]
+        assert payload["ok"] is True, f"Expected ok=True, got {payload}"
+
+        target_fn = captured_thread_args.get("target")
+        assert target_fn is not None, "Thread was not created"
+        # _rerun_worker has defaults: cfg, task, video_basename, original_video, ...
+        defaults = target_fn.__defaults__
+        assert defaults is not None, "No defaults on _rerun_worker"
+        # defaults: (cfg, task, video_basename, original_video, texts_json, proj_out, cancel_event)
+        assert len(defaults) >= 4, f"Expected at least 4 defaults, got {len(defaults)}"
+        original_video_arg = defaults[3]  # 4th default is original_video
+        assert original_video_arg == original.resolve(), (
+            f"Wrong original_video: expected {original.resolve()}, got {original_video_arg}"
+        )
+
 
 class TestHandlePostRunCancel:
     def test_cancel_sets_event(self, _handler):

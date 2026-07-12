@@ -43,7 +43,7 @@ from clio.ui.routes.config_routes import (
 )
 from clio.ui.routes.env_routes import handle_get_env, handle_put_env
 from clio.ui.routes.export import handle_post_export
-from clio.ui.routes.fs import handle_get_fs_dirs
+from clio.ui.routes.fs import handle_get_fs_dirs, handle_get_fs_videos
 from clio.ui.routes.plan import (
     handle_get_plan,
     handle_get_plans,
@@ -82,7 +82,13 @@ from clio.ui.routes.transcripts import (
     handle_post_transcripts,
     handle_put_transcripts,
 )
-from clio.ui.routes.videos import handle_get_video, handle_get_videos, handle_get_vmeta
+from clio.ui.routes.videos import (
+    handle_get_video,
+    handle_get_videos,
+    handle_get_videos_selected,
+    handle_get_vmeta,
+    handle_put_videos_selected,
+)
 from clio.ui.routes.whisper_routes import (
     handle_get_whisper_check,
     handle_get_whisper_install_status,
@@ -129,7 +135,7 @@ def make_handler(
     config: AppConfig, config_path: Path | None = None, api_token: str = ""
 ) -> type[BaseHTTPRequestHandler]:
     output_dir = config.paths.output_dir
-    project_dir = config.project_dir or config.paths.input_dir
+    project_dir = config.project_dir or Path.cwd()
     static_dir = STATIC_DIR
     project_path = project_dir / "project.json"
 
@@ -238,6 +244,9 @@ def make_handler(
 
         def _resolve_project_input(self, qs: dict) -> Path:
             return resolve_project_input(qs, project_dir, config_path)
+
+        def _resolve_project_dir(self, qs: dict) -> Path:
+            return self._resolve_project_input(qs)
 
         def _get_project_output(self, qs_or_proj_dir: dict | Path) -> Path:
             if isinstance(qs_or_proj_dir, dict):
@@ -376,6 +385,8 @@ def make_handler(
             Route("GET", "/api/videos", "handle_get_videos"),
             Route("GET", "/api/video", "handle_get_video"),
             Route("GET", "/api/vmeta/{stem}", "handle_get_vmeta"),
+            Route("GET", "/api/videos/selected", "handle_get_videos_selected"),
+            Route("PUT", "/api/videos/selected", "handle_put_videos_selected"),
             Route("GET", "/api/texts", "handle_get_texts"),
             Route("GET", "/api/voiceover", "handle_get_voiceover"),
             Route("GET", "/api/plans", "handle_get_plans"),
@@ -384,6 +395,7 @@ def make_handler(
             Route("GET", "/api/plan", "handle_get_plan"),
             Route("GET", "/api/processing-state", "handle_get_processing_state"),
             Route("GET", "/api/fs/dirs", "handle_get_fs_dirs"),
+            Route("GET", "/api/fs/videos", "handle_get_fs_videos"),
             Route("GET", "/api/transcripts", "handle_get_transcripts"),
             Route("GET", "/api/whisper/check", "handle_get_whisper_check"),
             Route("GET", "/api/whisper/install/status", "handle_get_whisper_install_status"),
@@ -467,7 +479,7 @@ def run(
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
     print(f"  UI started: {url}")
-    print(f"  Project directory: {active_config.project_dir or active_config.paths.input_dir}")
+    print(f"  Project directory: {active_config.project_dir or '(none)'}")
     print(f"  Output directory: {active_config.paths.output_dir}")
     if not _is_local:
         if not TOKEN:

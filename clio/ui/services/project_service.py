@@ -152,10 +152,12 @@ def _add_to_registry(dir_path: str, config_path: Path | None) -> None:
     _save_atomic(registry_file, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
 
 
-def _save_last_project(name: str, config_path: Path | None, input_dir: str | None = None) -> None:
+def _save_last_project(
+    name: str, config_path: Path | None, input_dir: str | None = None, project_dir: str | None = None
+) -> None:
     """Persist the currently active project for auto-load on next startup.
 
-    Stores both name and input_dir so same-named projects can be disambiguated.
+    Stores both name and project_dir so same-named projects can be disambiguated.
     """
     registry_file = _registry_path(config_path)
     paths: list[str] = []
@@ -165,7 +167,10 @@ def _save_last_project(name: str, config_path: Path | None, input_dir: str | Non
             paths = reg.get("projects", [])
         except (json.JSONDecodeError, OSError):
             paths = []
-    last_project: str | dict[str, str] = {"name": name, "input_dir": input_dir} if input_dir else name
+    dir_value = project_dir or input_dir
+    last_project: str | dict[str, str] = (
+        {"name": name, "project_dir": dir_value, "input_dir": dir_value} if dir_value else name
+    )
     data: dict[str, Any] = {"projects": paths, "last_project": last_project}
     _save_atomic(registry_file, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
 
@@ -199,11 +204,13 @@ def _list_projects(
         except (json.JSONDecodeError, OSError):
             data = {}
         name = data.get("name") or p.name
+        version = data.get("version", 1)
         proj_out = _project_output_dir(p)
         seen_dirs.add(str(p.resolve()))
         projects.append(
             {
                 "name": name,
+                "project_dir": str(p),
                 "input_dir": str(p),
                 "output_dir": str(proj_out),
                 "currentDay": data.get("currentDay", "day1"),
@@ -216,6 +223,7 @@ def _list_projects(
                     if current_project_input_dir
                     else (name == current_project_name if current_project_name else p.resolve() == input_dir.resolve())
                 ),
+                "legacy": version < 2,
             }
         )
 
@@ -236,6 +244,7 @@ def _list_projects(
             projects.append(
                 {
                     "name": name,
+                    "project_dir": str(input_dir),
                     "input_dir": str(input_dir),
                     "output_dir": str(proj_out),
                     "currentDay": data.get("currentDay", "day1"),
@@ -248,6 +257,7 @@ def _list_projects(
                         if current_project_input_dir
                         else (name == current_project_name if current_project_name else True)
                     ),
+                    "legacy": True,
                 }
             )
 
@@ -267,13 +277,13 @@ def _read_project_name(p: Path) -> str | None:
 
 
 def resolve_project_input(qs: dict, input_dir: Path, config_path: Path | None) -> Path:
-    """Resolve project input directory from query params; default to current input_dir.
+    """Resolve project directory from query params; default to current project_dir.
 
     Priority:
-      1. input_dir query param (direct path, unambiguous)
+      1. project_dir / input_dir query param (direct path, unambiguous)
       2. project name query param (may be ambiguous)
     """
-    input_dir_raw = qs.get("input_dir", [None])[0]
+    input_dir_raw = qs.get("project_dir", [None])[0] or qs.get("input_dir", [None])[0]
     if input_dir_raw:
         candidate = Path(input_dir_raw).resolve()
         allowed_paths = {str(input_dir.resolve())}
@@ -357,9 +367,9 @@ def resolve_last_project_config(config: AppConfig, config_path: Path | None) -> 
         if not last_project:
             return config
 
-        # New format: dict with input_dir — resolve directly
+        # New format: dict with project_dir / input_dir — resolve directly
         if isinstance(last_project, dict):
-            input_dir_raw = last_project.get("input_dir")
+            input_dir_raw = last_project.get("project_dir") or last_project.get("input_dir")
             if input_dir_raw:
                 p = Path(input_dir_raw)
                 if p.is_dir():
@@ -380,3 +390,8 @@ def resolve_last_project_config(config: AppConfig, config_path: Path | None) -> 
         return config
     except Exception:
         return config
+
+
+def resolve_project_dir(qs: dict, project_dir: Path, config_path: Path | None) -> Path:
+    """Alias for resolve_project_input (project_dir naming)."""
+    return resolve_project_input(qs, project_dir, config_path)

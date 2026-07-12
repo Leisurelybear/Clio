@@ -417,7 +417,8 @@ class TestHandleGetConfigProject:
         handle_get_config_project(handler, {})
         handler._send_json.assert_called_once()
         payload = handler._send_json.call_args[0][0]
-        assert payload["paths"]["input_dir"] == "./in"
+        assert "input_dir" not in payload.get("paths", {})
+        assert "recursive" not in payload.get("paths", {})
         assert payload["paths"]["output_dir"] == "./out"
         assert payload["ai"]["tasks"]["analyze"]["provider"] == "gemini"
         assert payload["ai"]["context"] == "my trip"
