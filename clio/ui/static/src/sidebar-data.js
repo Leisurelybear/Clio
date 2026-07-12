@@ -7,16 +7,42 @@ import { updateRunFilesBadge } from './runner.js';
 
 // ── Video removal helper ──────────────────────────────────────
 
-export async function removeVideoFromProject(file) {
+export async function removeVideoFromProject(file, absPath = null) {
   try {
     const r = await api('GET', '/api/videos/selected');
     const videos = (r.videos || []).slice();
-    const idx = videos.findIndex(p => p.endsWith('/' + file) || p.endsWith('\\' + file) || p === file);
-    if (idx === -1) return;
+    const norm = (p) => String(p || '').replace(/\\/g, '/').toLowerCase();
+    const targetAbs = absPath ? norm(absPath) : '';
+    const display = String(file || '');
+    const baseName = display.replace(/^.*[\\/]/, '');
+    // "001_GL010695.MP4" → "GL010695.MP4"
+    const stripped = baseName.replace(/^\d+_/, '');
+
+    let idx = -1;
+    if (targetAbs) {
+      idx = videos.findIndex(p => norm(p) === targetAbs);
+    }
+    if (idx === -1) {
+      idx = videos.findIndex(p => {
+        const n = norm(p);
+        const leaf = n.split('/').pop() || '';
+        return (
+          leaf === baseName.toLowerCase()
+          || leaf === stripped.toLowerCase()
+          || n.endsWith('/' + baseName.toLowerCase())
+          || n.endsWith('/' + stripped.toLowerCase())
+          || n === display.toLowerCase()
+        );
+      });
+    }
+    if (idx === -1) {
+      setStatus('未在项目视频列表中找到该文件', 'err');
+      return;
+    }
     videos.splice(idx, 1);
     await api('PUT', '/api/videos/selected', { videos });
     await loadVideos();
-    setStatus(`已移除 ${file}`, 'ok');
+    setStatus(`已移除 ${stripped || baseName || file}`, 'ok');
   } catch (e) {
     setStatus('移除失败: ' + e.message, 'err');
   }
@@ -256,14 +282,18 @@ function renderVideoItem(v) {
         const file = v.file;
         if (task === 'remove') {
           if (confirm(`确定从项目中移除 ${file} 吗？`)) {
-            await removeVideoFromProject(file);
+            await removeVideoFromProject(file, v.abs_path || (v.match && v.match.abs_path) || null);
           }
           return;
         }
         setStatus(`正在重跑 ${task} (${file})...`, 'ok');
         try {
           const r = await api('POST', '/api/rerun', {
-            video: file, task: task, source: state.source, index: v.index || undefined,
+            video: file,
+            task: task,
+            source: state.source,
+            index: v.index || undefined,
+            abspath: v.abs_path || (v.match && v.match.abs_path) || undefined,
           });
           if (r.ok) {
             setStatus(r.message || `${task} 已启动`, 'ok');

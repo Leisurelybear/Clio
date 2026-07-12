@@ -188,3 +188,9 @@ class TestHandleGetFsVideos:
         handler = MagicMock()
         handle_get_fs_videos(handler, {"path": ["some/path"]})
         handler._send_json.assert_called_once_with({"error": "disk failure"}, 500)
+
+    def test_drive_subdir_win32_returns_true(self, monkeypatch):
+        """Any path on a Windows drive letter is allowed (not just drive root)."""
+        monkeypatch.setattr("sys.platform", "win32")
+        p = PureWindowsPath(r"D:\GoPro\trip1")
+        assert _is_allowed_path(p) is True

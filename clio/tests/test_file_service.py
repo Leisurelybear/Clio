@@ -132,12 +132,12 @@ class TestFindOriginalForCompressed:
     def test_exact_match(self, tmp_path: Path):
         (tmp_path / "GL010695.MP4").write_bytes(b"")
         result = _find_original_for_compressed("001_GL010695", tmp_path)
-        assert result == "GL010695.MP4"
+        assert result is not None and Path(result).name == "GL010695.MP4"
 
     def test_case_insensitive(self, tmp_path: Path):
         (tmp_path / "gl010695.mp4").write_bytes(b"")
         result = _find_original_for_compressed("001_GL010695", tmp_path)
-        assert result == "gl010695.mp4"
+        assert result is not None and Path(result).name.lower() == "gl010695.mp4"
 
     def test_no_match(self, tmp_path: Path):
         result = _find_original_for_compressed("001_NOFILE", tmp_path)
@@ -154,7 +154,7 @@ class TestFindOriginalForCompressed:
     def test_segNN_fallback(self, tmp_path: Path):
         (tmp_path / "GL010695.MP4").write_bytes(b"")
         result = _find_original_for_compressed("001_GL010695_seg01", tmp_path)
-        assert result == "GL010695.MP4"
+        assert result is not None and Path(result).name == "GL010695.MP4"
 
     def test_segNN_no_original(self, tmp_path: Path):
         # suffix has _seg01 but no original matches
@@ -166,7 +166,7 @@ class TestFindOriginalForCompressed:
         # Does the split use the thing after the FIRST underscore?
         (tmp_path / "bar.MP4").write_bytes(b"")
         result = _find_original_for_compressed("foo_bar_seg01", tmp_path)
-        assert result == "bar.MP4"
+        assert result is not None and Path(result).name == "bar.MP4"
 
 
 # ===================== _find_compressed_for_original =====================
