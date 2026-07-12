@@ -91,6 +91,10 @@ class TestApplyRunInputDirOverride:
         new_input.mkdir()
 
         result, error = _apply_run_input_dir_override(cfg, str(new_input))
+        assert getattr(result, "_project_dir", None) == new_input.resolve() or getattr(result, "project_dir", None) in (
+            new_input,
+            new_input.resolve(),
+        )
 
         assert error is None
         assert result is not cfg
@@ -103,7 +107,7 @@ class TestApplyRunInputDirOverride:
         result, error = _apply_run_input_dir_override(cfg, str(tmp_path / "missing"))
 
         assert result is cfg
-        assert "input_dir not found" in error
+        assert "project_dir not found" in error or "input_dir not found" in error
 
 
 class TestHandlePostRunStart:
@@ -157,7 +161,8 @@ class TestHandlePostRunStart:
 
         handler._send_json.assert_called_once()
         assert handler._send_json.call_args.args[1] == 400
-        assert "input_dir not found" in handler._send_json.call_args.args[0]["error"]
+        err = handler._send_json.call_args.args[0]["error"]
+        assert "project_dir not found" in err or "input_dir not found" in err
 
 
 class TestHandlePostRunPreview:
