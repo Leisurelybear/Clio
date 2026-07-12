@@ -38,17 +38,14 @@ def _prepare_config(config_path: Path, args: argparse.Namespace):
     raw_input = getattr(args, "input", None)
     project_dir = raw_input if (raw_input and raw_input.is_dir()) else Path.cwd()
     config = load_config(config_path, project_dir=project_dir)
-    input_override = getattr(args, "input", None)
     output_override = getattr(args, "output", None)
-    if input_override or output_override:
-        config = apply_run_paths(config, input_override, output_override)
+    if output_override:
+        config = apply_run_paths(config, output_override)
     return config
 
 
-def run_check(config_path: Path, input_dir: Path | None = None) -> int:
-    config = load_config(config_path)
-    if input_dir:
-        config = apply_run_paths(config, input_dir=input_dir, output_dir=None, output_by_input_name=False)
+def run_check(config_path: Path, project_dir: Path | None = None) -> int:
+    config = load_config(config_path, project_dir=project_dir)
 
     ok = True
 
@@ -74,7 +71,7 @@ def run_check(config_path: Path, input_dir: Path | None = None) -> int:
     status("ffmpeg", bool(ffmpeg), ffmpeg or f"未找到，运行 {setup_script}")
     status("ffprobe", bool(ffprobe), ffprobe or "未找到")
 
-    check_dir = input_dir or config.paths.input_dir
+    check_dir = config.paths.input_dir
     if check_dir.is_dir():
         videos = find_videos(check_dir, recursive=config.paths.recursive)
         print(f"  [OK] 素材目录 ({len(videos)} 个视频) - {check_dir}")
@@ -287,9 +284,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "transcribe":
         from clio.tasks.transcribe import run_transcribe_all
 
-        config = load_config(config_path)
-        if getattr(args, "input", None):
-            config = apply_run_paths(config, input_dir=args.input)
+        config = load_config(config_path, project_dir=getattr(args, "input", None))
         config.analyze.skip_existing = not getattr(args, "force", False)
         run_transcribe_all(config)
         return 0

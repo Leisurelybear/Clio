@@ -493,9 +493,7 @@ def load_project_config(
 
     return ProjectConfig(
         paths=ProjectPathsConfig(
-            input_dir=_path(paths_raw.get("input_dir", "."), project_base),
             output_dir=_path(paths_raw.get("output_dir", "./output"), project_base),
-            recursive=paths_raw.get("recursive", False),
         ),
         ai=ProjectAIConfig(
             tasks=_parse_tasks(ai_raw.get("tasks")),
@@ -550,24 +548,18 @@ def load_config(
         else None
     )
 
-    config = AppConfig(global_cfg=global_cfg, project_cfg=project_cfg)
+    config = AppConfig(global_cfg=global_cfg, project_cfg=project_cfg, project_dir=effective_project_dir)
     _validate_config(config)
     return config
 
 
 def apply_run_paths(
     config: AppConfig,
-    input_dir: Path | None = None,
     output_dir: Path | None = None,
-    output_by_input_name: bool = True,
 ) -> AppConfig:
     config = deepcopy(config)
     if config.project_cfg is None:
         return config
-    if input_dir:
-        config.project_cfg.paths.input_dir = input_dir.resolve()
     if output_dir:
         config.project_cfg.paths.output_dir = output_dir.resolve()
-    elif input_dir and output_by_input_name:
-        config.project_cfg.paths.output_dir = (config.project_cfg.paths.output_dir / input_dir.name).resolve()
     return config
