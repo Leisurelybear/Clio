@@ -73,7 +73,8 @@ def _create_project_yaml(proj_input: Path, config_path: Path | None, proj_out: P
         with open(config_path, encoding="utf-8") as f:
             raw = yaml.safe_load(f) or {}
         paths = raw.get("paths", {})
-        paths["input_dir"] = str(proj_input.resolve())
+        paths.pop("input_dir", None)
+        paths.pop("recursive", None)
         paths["output_dir"] = str(proj_out.resolve())
         raw["paths"] = paths
         raw.setdefault("ai", {})
@@ -161,7 +162,7 @@ def _find_original_for_compressed(
     stem: str, input_dir: Path, comp_dir: Path | None = None, project_dir: Path | None = None
 ) -> str | None:
     """For a compressed stem like '001_GL010695', find the matching original basename.
-    Prefers .vmeta for O(1) lookup; falls back to stem matching for legacy projects.
+    Prefers .vmeta for O(1) lookup; falls back to videos.json then stem matching.
     """
     # Try .vmeta first (O(1), supports any directory layout)
     if comp_dir is not None:
@@ -172,34 +173,38 @@ def _find_original_for_compressed(
             if meta is not None:
                 return Path(meta.source_path).name
 
-    # Project dir: use load_selected_videos
+    if "_" not in stem:
+        return None
+    suffix = stem.split("_", 1)[1].lower()
+
+    # Project dir: use load_selected_videos when videos.json is present
     if project_dir:
         from clio.tasks._video_loader import load_selected_videos
 
-        if "_" in stem:
-            suffix = stem.split("_", 1)[1].lower()
-            for p in load_selected_videos(project_dir):
+        selected = load_selected_videos(project_dir)
+        if selected:
+            for p in selected:
                 if p.stem.lower() == suffix:
                     return p.name
             m = re.match(r"^(.+)_seg\d+$", suffix)
             if m:
                 base = m.group(1)
-                for p in load_selected_videos(project_dir):
+                for p in selected:
                     if p.stem.lower() == base:
                         return p.name
-        return None
+            return None
 
-    # Legacy fallback: stem matching
-    if "_" not in stem or not input_dir.is_dir():
+    # Legacy fallback: stem matching under input_dir / project_dir
+    scan_dir = input_dir if input_dir.is_dir() else (project_dir if project_dir and project_dir.is_dir() else None)
+    if scan_dir is None:
         return None
-    suffix = stem.split("_", 1)[1].lower()
-    for p in sorted(input_dir.iterdir()):
+    for p in sorted(scan_dir.iterdir()):
         if p.is_file() and p.stem.lower() == suffix:
             return p.name
     m = re.match(r"^(.+)_seg\d+$", suffix)
     if m:
         base = m.group(1)
-        for p in sorted(input_dir.iterdir()):
+        for p in sorted(scan_dir.iterdir()):
             if p.is_file() and p.stem.lower() == base:
                 return p.name
     return None

@@ -15,7 +15,7 @@ from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
 from clio.split import split_video
 from clio.tasks._helpers import ClipRecord, _eta_line, _matches_selected_stem, _next_index, _selected_stems
-from clio.utils import find_videos, format_index, get_duration_sec, resolve_binary
+from clio.utils import format_index, get_duration_sec, resolve_binary
 from clio.vmeta import SegmentEntry, SplitInfo, VideoIndex, VideoMeta
 
 
@@ -105,12 +105,10 @@ def run_compress_all(
 
     if single_file:
         videos = [single_file]
-    elif config.project_dir:
-        from clio.tasks._video_loader import load_selected_videos
-
-        videos = load_selected_videos(config.project_dir)
     else:
-        videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
+        from clio.tasks._video_loader import source_videos
+
+        videos = source_videos(config)
     if files is not None:
         selected = _selected_stems(files)
         videos = [v for v in videos if _matches_selected_stem(v, selected)]

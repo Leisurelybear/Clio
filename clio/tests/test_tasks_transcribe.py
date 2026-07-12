@@ -25,7 +25,7 @@ def cfg(tmp_path):
     c = MagicMock()
     c.whisper = WhisperConfig(enabled=True, language="zh", model_size="small", device="cpu")
     c.paths.output_dir = tmp_path / "default_output"
-    c.paths.input_dir = tmp_path / "default_input"
+    c.project_dir = tmp_path / "default_input"
     c.analyze.skip_existing = True
     c.analyze.compressed_subdir = "compressed"
     c.analyze.max_analyze_duration_min = 30
@@ -40,6 +40,7 @@ class TestRunTranscribeAll:
     @patch("clio.tasks.transcribe.resolve_binary", return_value="ffmpeg")
     def test_dedup(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
         """同一原始视频只转录一次（有 split 段时）"""
+        from clio.tasks._video_loader import save_selected_videos
         from clio.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
@@ -48,7 +49,8 @@ class TestRunTranscribeAll:
         inp = tmp_path / "input"
         inp.mkdir()
         (inp / "GL010683.mp4").touch()
-        cfg.paths.input_dir = inp
+        save_selected_videos(inp, list(inp.glob("*.mp4")) + list(inp.glob("*.MP4")) + list(inp.glob("*.mov")))
+        cfg.project_dir = inp
         cfg.paths.output_dir = output
         cfg.transcripts_dir = output / "transcripts"
 
@@ -96,6 +98,7 @@ class TestRunTranscribeAll:
     @patch("clio.tasks.transcribe.resolve_binary", return_value="ffmpeg")
     def test_skip_existing(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
         """已有 transcript 文件时跳过"""
+        from clio.tasks._video_loader import save_selected_videos
         from clio.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
@@ -105,7 +108,8 @@ class TestRunTranscribeAll:
         inp = tmp_path / "input"
         inp.mkdir()
         (inp / "GL010683.mp4").touch()
-        cfg.paths.input_dir = inp
+        save_selected_videos(inp, list(inp.glob("*.mp4")) + list(inp.glob("*.MP4")) + list(inp.glob("*.mov")))
+        cfg.project_dir = inp
         cfg.paths.output_dir = output
         cfg.transcripts_dir = output / "transcripts"
 
@@ -125,6 +129,7 @@ class TestRunTranscribeAll:
     @patch("clio.tasks.transcribe.resolve_binary", return_value="ffmpeg")
     def test_audio_extracted(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
         """转录会提取音频并调用 Whisper（无 duration 限制）"""
+        from clio.tasks._video_loader import save_selected_videos
         from clio.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
@@ -134,7 +139,8 @@ class TestRunTranscribeAll:
         inp = tmp_path / "input"
         inp.mkdir()
         (inp / "GL010683.mp4").touch()
-        cfg.paths.input_dir = inp
+        save_selected_videos(inp, list(inp.glob("*.mp4")) + list(inp.glob("*.MP4")) + list(inp.glob("*.mov")))
+        cfg.project_dir = inp
         cfg.paths.output_dir = output
         cfg.transcripts_dir = output / "transcripts"
 
@@ -152,6 +158,7 @@ class TestRunTranscribeAll:
     @patch("clio.tasks.transcribe.transcribe_audio")
     def test_original_not_found(self, mock_transcribe, mock_extract, cfg, tmp_path):
         """压缩文件存在但找不到原始视频时跳过"""
+        from clio.tasks._video_loader import save_selected_videos
         from clio.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
@@ -160,7 +167,8 @@ class TestRunTranscribeAll:
         (compressed / "001_GL010683.mp4").touch()
         inp = tmp_path / "input"
         inp.mkdir()
-        cfg.paths.input_dir = inp
+        cfg.project_dir = inp
+        save_selected_videos(inp, list(inp.glob("*.*")))
         cfg.paths.output_dir = output
         cfg.transcripts_dir = output / "transcripts"
 
@@ -176,6 +184,7 @@ class TestRunTranscribeAll:
     @patch("clio.tasks.transcribe.resolve_binary", return_value="ffmpeg")
     def test_audio_extraction_failure(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
         """音频提取失败时跳过"""
+        from clio.tasks._video_loader import save_selected_videos
         from clio.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
@@ -185,7 +194,8 @@ class TestRunTranscribeAll:
         inp = tmp_path / "input"
         inp.mkdir()
         (inp / "GL010683.mp4").touch()
-        cfg.paths.input_dir = inp
+        save_selected_videos(inp, list(inp.glob("*.mp4")) + list(inp.glob("*.MP4")) + list(inp.glob("*.mov")))
+        cfg.project_dir = inp
         cfg.paths.output_dir = output
         cfg.transcripts_dir = output / "transcripts"
 
@@ -203,6 +213,7 @@ class TestRunTranscribeAll:
     @patch("clio.tasks.transcribe.resolve_binary", return_value="ffmpeg")
     def test_transcribe_error(self, mock_resolve, mock_transcribe, mock_extract, cfg, tmp_path):
         """Whisper 转录出错时记录错误状态并继续"""
+        from clio.tasks._video_loader import save_selected_videos
         from clio.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
@@ -212,7 +223,8 @@ class TestRunTranscribeAll:
         inp = tmp_path / "input"
         inp.mkdir()
         (inp / "GL010683.mp4").touch()
-        cfg.paths.input_dir = inp
+        save_selected_videos(inp, list(inp.glob("*.mp4")) + list(inp.glob("*.MP4")) + list(inp.glob("*.mov")))
+        cfg.project_dir = inp
         cfg.paths.output_dir = output
         cfg.transcripts_dir = output / "transcripts"
 
@@ -228,6 +240,7 @@ class TestRunTranscribeAll:
         assert result == 0
 
     def test_files_filter(self, cfg, tmp_path):
+        from clio.tasks._video_loader import save_selected_videos
         from clio.tasks.transcribe import run_transcribe_all
 
         output = tmp_path / "output"
@@ -238,8 +251,10 @@ class TestRunTranscribeAll:
         inp = tmp_path / "input"
         inp.mkdir()
         (inp / "GL010683.mp4").touch()
+        save_selected_videos(inp, list(inp.glob("*.mp4")) + list(inp.glob("*.MP4")) + list(inp.glob("*.mov")))
         (inp / "GL010684.mp4").touch()
-        cfg.paths.input_dir = inp
+        save_selected_videos(inp, list(inp.glob("*.mp4")) + list(inp.glob("*.MP4")) + list(inp.glob("*.mov")))
+        cfg.project_dir = inp
         cfg.paths.output_dir = output
         cfg.analyze.skip_existing = False
         cfg.transcripts_dir = output / "transcripts"

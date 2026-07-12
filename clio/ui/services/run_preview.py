@@ -34,17 +34,14 @@ def build_run_preview(
     selected = _selected_stems(files) if files is not None else None
 
     source_input_info, all_source_videos = _source_input_info(config)
-    if config.project_dir:
-        from clio.tasks._video_loader import load_selected_videos
+    from clio.tasks._video_loader import source_videos
 
-        all_recursive_source_videos = list(load_selected_videos(config.project_dir))
-    else:
-        all_recursive_source_videos = _video_files(config.paths.input_dir, recursive=True)
+    all_recursive_source_videos = list(source_videos(config))
     compressed_input_info, all_compressed_videos = _compressed_input_info(config)
     all_analysis_jsons = _analysis_jsons(config)
     index = ArtifactIndex(
         output_dir=config.paths.output_dir,
-        input_dir=config.paths.input_dir,
+        input_dir=config.project_dir or Path(),
         compressed_dir=config.compressed_dir,
         texts_dir=config.texts_dir,
         scripts_dir=config.scripts_dir,
@@ -100,15 +97,15 @@ def _source_input_info(config: AppConfig) -> tuple[dict[str, Any], list[Path]]:
         videos = [project_input] if _is_video(project_input) else []
         return {"mode": "file", "path": str(project_input), "count": len(videos)}, videos
 
-    if config.project_dir:
-        from clio.tasks._video_loader import load_selected_videos
+    from clio.tasks._video_loader import source_videos
 
-        videos = load_selected_videos(config.project_dir)
-        return {"mode": "directory", "path": str(config.project_dir), "count": len(videos)}, videos
-
-    input_dir = config.paths.input_dir
-    videos = _video_files(input_dir, recursive=config.paths.recursive)
-    return {"mode": "directory", "path": str(input_dir), "count": len(videos)}, videos
+    videos = source_videos(config)
+    project_dir = config.project_dir
+    return {
+        "mode": "videos",
+        "path": str(project_dir) if project_dir else "",
+        "count": len(videos),
+    }, videos
 
 
 def _compressed_input_info(config: AppConfig) -> tuple[dict[str, Any], list[Path]]:

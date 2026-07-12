@@ -38,7 +38,7 @@ def _config(tmp_path: Path, *, provider: ProviderConfig | None = None) -> AppCon
             ai=GlobalAIConfig(providers={provider.name: provider}),
         ),
         project_cfg=ProjectConfig(
-            paths=ProjectPathsConfig(input_dir=input_dir, output_dir=output_dir),
+            paths=ProjectPathsConfig(output_dir=output_dir),
             ai=ProjectAIConfig(tasks={"video_analyze": TaskConfig(provider=provider.name, model="m")}),
         ),
     )

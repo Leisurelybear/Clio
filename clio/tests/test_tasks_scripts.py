@@ -31,7 +31,6 @@ def cfg(tmp_path) -> AppConfig:
         ),
         project_cfg=ProjectConfig(
             paths=ProjectPathsConfig(
-                input_dir=tmp_path / "videos",
                 output_dir=tmp_path,
             ),
             analyze=AnalyzeConfig(

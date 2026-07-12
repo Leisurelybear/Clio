@@ -50,7 +50,10 @@ class TestWrapWithContext:
         ctx_file = templates / "trip_context.md"
         ctx_file.write_text("## Trip Context\n\nParis 2025", encoding="utf-8")
         cfg = _fake_config("")
-        cfg.paths.input_dir = tmp_path
+        cfg.project_dir = tmp_path
+        # Ensure property-style access works on SimpleNamespace/MagicMock fixtures
+        if not hasattr(cfg, "project_dir") or cfg.project_dir is None:
+            object.__setattr__(cfg, "project_dir", tmp_path)
 
         result = _wrap_with_context("hello", cfg)
 
@@ -104,7 +107,7 @@ def test_analyze_video_uses_prompt_override(tmp_path, monkeypatch):
     (prompt_dir / "video_analyze.md").write_text("override analyze prompt", encoding="utf-8")
 
     cfg = _fake_config()
-    cfg.paths.input_dir = tmp_path
+    cfg._project_dir = tmp_path
     cfg.script.template_file = template_file
     provider = MagicMock(provider_id="mock")
     provider.analyze_video.return_value = AIResponse('{"title":"x","summary":"y","timeline":[]}')

@@ -317,7 +317,6 @@ class TestRunTranscribeAll:
             global_cfg=GlobalConfig(),
             project_cfg=ProjectConfig(
                 paths=ProjectPathsConfig(
-                    input_dir=MagicMock(),
                     output_dir=MagicMock(),
                 ),
                 whisper=ProjectWhisperConfig(enabled=True, model_size="small", language="zh", device="cpu"),

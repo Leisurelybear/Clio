@@ -128,14 +128,26 @@ def collect_doctor_checks(
     items.append(_binary_check("ffmpeg", config.paths.ffmpeg, discover_binary))
     items.append(_binary_check("ffprobe", config.paths.ffprobe, discover_binary))
 
-    input_dir = config.project_dir or config.paths.input_dir
-    items.append(
-        DoctorItem(
-            "素材目录",
-            "OK" if input_dir.is_dir() else "FAIL",
-            str(input_dir),
+    from clio.tasks._video_loader import source_videos
+
+    project_dir = config.project_dir
+    videos = source_videos(config)
+    if project_dir and project_dir.is_dir():
+        items.append(
+            DoctorItem(
+                "项目视频",
+                "OK" if videos else "WARN",
+                f"{project_dir} ({len(videos)} 个视频)",
+            )
         )
-    )
+    else:
+        items.append(
+            DoctorItem(
+                "项目视频",
+                "WARN",
+                "未指定项目，使用 -p/--project 选择项目",
+            )
+        )
 
     output_dir = config.paths.output_dir
     items.append(

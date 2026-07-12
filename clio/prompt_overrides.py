@@ -29,8 +29,12 @@ class _PromptFormatError(ValueError):
 
 
 def _project_dir(config: AppConfig) -> Path:
-    if getattr(config, "project_dir", None) is not None:
-        return config.project_dir
+    try:
+        pd = config.project_dir
+    except Exception:
+        pd = None
+    if isinstance(pd, Path):
+        return pd
     template_file = getattr(getattr(config, "script", None), "template_file", None)
     if isinstance(template_file, Path) and template_file.parent.name == "templates":
         return template_file.parent.parent
@@ -85,7 +89,7 @@ def resolve_prompt_template(
                 return runtime
 
     override_path = prompt_override_dir(config) / f"{prompt_name}.md"
-    if override_path.is_file():
+    if isinstance(override_path, Path) and override_path.is_file():
         text = override_path.read_text(encoding="utf-8").strip()
         if text:
             return text

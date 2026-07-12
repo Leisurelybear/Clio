@@ -12,13 +12,11 @@ from clio.tasks.compress import run_compress_all
 def _cfg(tmp_path: Path, **overrides) -> SimpleNamespace:
     cfg = SimpleNamespace(
         paths=SimpleNamespace(
-            input_dir=tmp_path / "input",
             output_dir=tmp_path / "output",
             ffmpeg="ffmpeg",
             ffprobe="ffprobe",
-            recursive=False,
         ),
-        project_dir=None,
+        project_dir=tmp_path / "project",
         compressed_dir=tmp_path / "output" / "compressed",
         compress=SimpleNamespace(
             split_max_min=0,
@@ -34,11 +32,26 @@ def _cfg(tmp_path: Path, **overrides) -> SimpleNamespace:
         analyze=SimpleNamespace(skip_existing=False),
         naming=SimpleNamespace(index_width=3),
     )
-    cfg.paths.input_dir.mkdir(parents=True, exist_ok=True)
+    Path(cfg.project_dir).mkdir(parents=True, exist_ok=True)
     cfg.compressed_dir.mkdir(parents=True, exist_ok=True)
     for k, v in overrides.items():
         setattr(cfg, k, v)
     return cfg
+
+
+def _add_video(cfg, name: str, data: bytes = b"\x00" * 1000):
+    from clio.tasks._video_loader import load_selected_videos, save_selected_videos
+
+    if cfg.project_dir is None:
+        cfg.project_dir = cfg.paths.output_dir.parent / "project"
+    cfg.project_dir.mkdir(parents=True, exist_ok=True)
+    src = cfg.project_dir / name
+    src.write_bytes(data)
+    existing = load_selected_videos(cfg.project_dir)
+    if src.resolve() not in {p.resolve() for p in existing}:
+        existing.append(src)
+    save_selected_videos(cfg.project_dir, existing)
+    return src
 
 
 class TestRunCompressAll:
@@ -72,11 +85,9 @@ class TestRunCompressAll:
 
     def test_compress_single_file(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
-        src = cfg.paths.input_dir / "test.mp4"
-        src.write_bytes(b"\x00" * 1000)
+        _add_video(cfg, "test.mp4")
 
         monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
-        monkeypatch.setattr("clio.tasks.compress.find_videos", lambda *a, **kw: [src])
 
         def _mock_compress(inp, outp, c, **kw):
             outp.write_bytes(b"\x00" * 100)
@@ -93,11 +104,9 @@ class TestRunCompressAll:
     def test_skip_existing(self, monkeypatch, tmp_path: Path):
         """Compress once, then verify second call skips the existing file."""
         cfg = _cfg(tmp_path)
-        src = cfg.paths.input_dir / "test.mp4"
-        src.write_bytes(b"\x00" * 1000)
+        _add_video(cfg, "test.mp4")
 
         monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
-        monkeypatch.setattr("clio.tasks.compress.find_videos", lambda *a, **kw: [src])
 
         call_count = 0
 
@@ -126,11 +135,9 @@ class TestRunCompressAll:
     def test_skip_existing_split_fallback(self, monkeypatch, tmp_path: Path):
         """Compressed dir has _segNN files; items has original (no split) — should skip via fallback."""
         cfg = _cfg(tmp_path)
-        src = cfg.paths.input_dir / "test.mp4"
-        src.write_bytes(b"\x00" * 1000)
+        _add_video(cfg, "test.mp4")
 
         monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
-        monkeypatch.setattr("clio.tasks.compress.find_videos", lambda *a, **kw: [src])
 
         # Create compressed segment files (as if a previous split+compress ran)
         seg1 = cfg.compressed_dir / "001_test_seg01.mp4"
@@ -158,8 +165,7 @@ class TestRunCompressAll:
 
     def test_single_file_param(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
-        src = cfg.paths.input_dir / "custom.mp4"
-        src.write_bytes(b"\x00" * 1000)
+        src = _add_video(cfg, "custom.mp4")
 
         monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
 
@@ -176,10 +182,9 @@ class TestRunCompressAll:
     def test_files_filter(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
         for name in ("a.mp4", "b.mp4", "c.mp4"):
-            (cfg.paths.input_dir / name).write_bytes(b"\x00" * 1000)
+            _add_video(cfg, name)
 
         monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
-        monkeypatch.setattr("clio.tasks.compress.find_videos", lambda *a, **kw: list(cfg.paths.input_dir.iterdir()))
 
         compressed = []
 
@@ -199,11 +204,9 @@ class TestRunCompressAll:
         cfg = _cfg(tmp_path)
         cfg.compress.split_max_min = 15
         cfg.compress.splits_subdir = "split-staging"
-        src = cfg.paths.input_dir / "long.mp4"
-        src.write_bytes(b"\x00" * 1000)
+        _add_video(cfg, "long.mp4")
 
         monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
-        monkeypatch.setattr("clio.tasks.compress.find_videos", lambda *a, **kw: [src])
 
         split_calls = []
 

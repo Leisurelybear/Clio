@@ -29,7 +29,7 @@ def cfg(tmp_path) -> AppConfig:
             paths=GlobalPathsConfig(ffmpeg="", ffprobe=""),
         ),
         project_cfg=ProjectConfig(
-            paths=ProjectPathsConfig(input_dir=tmp_path / "videos", output_dir=tmp_path),
+            paths=ProjectPathsConfig(output_dir=tmp_path),
             analyze=AnalyzeConfig(
                 skip_existing=True,
                 texts_subdir="texts",

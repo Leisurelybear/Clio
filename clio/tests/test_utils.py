@@ -173,14 +173,14 @@ class TestFindVideos:
         sub.mkdir()
         (tmp_path / "root.mp4").write_text("fake")
         (sub / "nested.mov").write_text("fake")
-        result = find_videos(tmp_path, recursive=True)
+        result = find_videos(tmp_path)
         assert len(result) == 2
 
     def test_non_recursive_ignores_nested(self, tmp_path):
         sub = tmp_path / "subdir"
         sub.mkdir()
         (sub / "nested.mp4").write_text("fake")
-        assert find_videos(tmp_path, recursive=False) == []
+        assert find_videos(tmp_path) == []
 
     def test_nonexistent_directory_raises(self):
         with pytest.raises(NotADirectoryError):

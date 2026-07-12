@@ -25,7 +25,6 @@ def cfg(tmp_path) -> AppConfig:
     compressed.mkdir()
     project_cfg = ProjectConfig(
         paths=ProjectPathsConfig(
-            input_dir=tmp_path / "videos",
             output_dir=tmp_path,
         ),
         analyze=AnalyzeConfig(

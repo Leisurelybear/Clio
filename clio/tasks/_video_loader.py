@@ -3,10 +3,17 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from clio.config.models import AppConfig
 
 
-def load_selected_videos(project_dir: Path) -> list[Path]:
-    video_file = project_dir / "videos.json"
+def load_selected_videos(project_dir: Path | None) -> list[Path]:
+    """从 project_dir/videos.json 读取选中视频列表。"""
+    if project_dir is None:
+        return []
+    video_file = Path(project_dir) / "videos.json"
     if not video_file.is_file():
         return []
     try:
@@ -17,7 +24,8 @@ def load_selected_videos(project_dir: Path) -> list[Path]:
 
 
 def save_selected_videos(project_dir: Path, videos: list[Path]) -> None:
-    video_file = project_dir / "videos.json"
+    """保存选中视频列表到 project_dir/videos.json（原子写入）。"""
+    video_file = Path(project_dir) / "videos.json"
     video_file.parent.mkdir(parents=True, exist_ok=True)
     data = [str(p) for p in videos]
     suffix = os.urandom(4).hex()
@@ -28,3 +36,16 @@ def save_selected_videos(project_dir: Path, videos: list[Path]) -> None:
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
+
+
+def source_videos(config: AppConfig) -> list[Path]:
+    """项目原始视频列表：优先 videos.json，缺失时返回空列表。
+
+    调用方应始终通过 AppConfig.project_dir 使用本函数，不再扫描 input_dir。
+    """
+    return load_selected_videos(getattr(config, "project_dir", None))
+
+
+def stem_to_path_map(videos: list[Path]) -> dict[str, Path]:
+    """Build {stem_lower: path} from a video path list."""
+    return {p.stem.lower(): p for p in videos if p.suffix}

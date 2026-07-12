@@ -16,7 +16,7 @@ def handler(tmp_path: Path) -> MagicMock:
     cfg = MagicMock()
     cfg.plans_dir = tmp_path
     cfg.paths.output_dir = tmp_path / "output"
-    cfg.paths.input_dir = tmp_path / "input"
+    cfg._project_dir = tmp_path / "input"
     cfg.paths.ffprobe = "ffprobe"
     cfg.texts_dir = tmp_path / "texts"
     h._resolve_project_input.return_value = "default"

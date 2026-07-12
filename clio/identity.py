@@ -38,37 +38,57 @@ def _extract_original_stem(compressed_stem: str) -> str:
     return orig_stem
 
 
-def _find_original_by_stem(original_stem: str, input_dir: Path, project_dir: Path | None = None) -> Path | None:
-    """Find an original video file by stem, searching input_dir recursively."""
-    if project_dir:
-        from clio.tasks._video_loader import load_selected_videos
+def _find_original_by_stem(original_stem: str, project_dir: Path | None = None) -> Path | None:
+    """Find an original video file by stem from videos.json (or project_dir scan fallback)."""
+    from clio.tasks._video_loader import load_selected_videos
 
-        exts = (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv")
-        for p in load_selected_videos(project_dir):
-            if p.stem.lower() == original_stem.lower() and p.suffix.lower() in exts:
-                return p.resolve()
-        return None
     exts = (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv")
-    for ext in exts:
-        candidate = input_dir / f"{original_stem}{ext}"
-        if candidate.is_file():
-            return candidate.resolve()
-    for p in input_dir.rglob("*"):
-        if p.is_file() and p.suffix.lower() in exts and p.stem.lower() == original_stem.lower():
+    selected = load_selected_videos(project_dir)
+    for p in selected:
+        if p.stem.lower() == original_stem.lower() and p.suffix.lower() in exts:
             return p.resolve()
+    # Legacy collocated layout: original videos live in project_dir itself
+    if project_dir is not None and project_dir.is_dir() and not selected:
+        for ext in exts:
+            candidate = project_dir / f"{original_stem}{ext}"
+            if candidate.is_file():
+                return candidate.resolve()
+        try:
+            for p in project_dir.iterdir():
+                if p.is_file() and p.suffix.lower() in exts and p.stem.lower() == original_stem.lower():
+                    return p.resolve()
+        except OSError:
+            pass
     return None
 
 
 def resolve_identity(
-    compressed_path: Path, input_dir: Path, index: str, project_dir: Path | None = None
+    compressed_path: Path,
+    index_or_input: str | Path,
+    index: str | None = None,
+    project_dir: Path | None = None,
 ) -> MediaIdentity:
     """Build MediaIdentity from .vmeta sidecar first, fall back to filename parsing.
 
-    Priority:
-    1. .vmeta sidecar (most accurate, has SplitInfo with offset + duration)
-    2. .vindex for segment info
-    3. Filename parsing (works without sidecars)
+    New call style:
+        resolve_identity(compressed, "001", project_dir=proj)
+    Legacy call style (still accepted):
+        resolve_identity(compressed, input_dir, "001", project_dir=None)
     """
+    # Normalize dual signatures
+    if isinstance(index_or_input, Path):
+        # legacy: (compressed, input_dir, index, project_dir?)
+        legacy_input = index_or_input
+        idx = index if isinstance(index, str) else str(index or "")
+        proj = project_dir if project_dir is not None else legacy_input
+    elif index is None and isinstance(index_or_input, str):
+        # new: (compressed, index, project_dir=?)
+        idx = index_or_input
+        proj = project_dir
+    else:
+        idx = str(index_or_input)
+        proj = project_dir
+
     compressed_stem = compressed_path.stem
     compressed_resolved = compressed_path.resolve()
 
@@ -81,7 +101,7 @@ def resolve_identity(
             original_path=meta.source_path,
             compressed_stem=compressed_stem,
             compressed_path=str(compressed_resolved),
-            index=index,
+            index=idx,
             segment_index=si.segment_index if si else None,
             segment_offset_sec=si.offset_sec if si else 0.0,
             segment_duration_sec=si.segment_duration_sec if si else None,
@@ -107,14 +127,14 @@ def resolve_identity(
             original_path=vindex.source_path,
             compressed_stem=compressed_stem,
             compressed_path=str(compressed_resolved),
-            index=index,
+            index=idx,
             segment_index=seg_num,
             segment_offset_sec=offset_sec,
             segment_duration_sec=seg_dur,
         )
 
-    # Priority 3: Filename fallback
-    orig_path = _find_original_by_stem(original_stem, input_dir, project_dir)
+    # Priority 3: Filename fallback via videos.json / project_dir
+    orig_path = _find_original_by_stem(original_stem, proj)
     seg_num = None
     m = re.search(r"_seg(\d+)$", compressed_stem)
     if m:
@@ -124,7 +144,7 @@ def resolve_identity(
         original_path=str(orig_path) if orig_path else "",
         compressed_stem=compressed_stem,
         compressed_path=str(compressed_resolved),
-        index=index,
+        index=idx,
         segment_index=seg_num,
         segment_offset_sec=0.0,
         segment_duration_sec=None,
