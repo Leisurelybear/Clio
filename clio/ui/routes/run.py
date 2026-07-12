@@ -11,12 +11,15 @@ import traceback
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from clio._constants import VIDEO_EXTS
 from clio.pipeline import run_analyze_all, run_compress_all, run_generate_scripts, run_pipeline_steps
 from clio.progress import ProgressTracker
+from clio.tasks._video_loader import load_selected_videos
 from clio.tasks.transcribe import run_transcribe_one
 from clio.ui.services.file_service import _find_original_for_compressed, _find_texts_dirs, _is_safe_basename
 from clio.ui.services.project_service import _project_output_dir
 from clio.ui.services.run_preview import build_run_preview
+from clio.vmeta import VideoMeta
 
 if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
@@ -36,9 +39,6 @@ def _apply_run_input_dir_override(cfg, input_dir_raw: str | None) -> tuple[Any, 
         return cfg, f"input_dir not found: {input_dir_raw}"
     run_cfg = copy.deepcopy(cfg)
     run_cfg._project_dir = input_dir
-    project_paths = getattr(run_cfg.paths, "_project", None)
-    if project_paths is not None:
-        project_paths.input_dir = input_dir
     return run_cfg, None
 
 
@@ -228,23 +228,78 @@ def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -
 
     stem = Path(video_basename).stem
 
-    # Resolve original video path
+    # Resolve original video path (supports external paths via .vmeta / videos.json)
     source_view = obj.get("source", "compressed")
-    if source_view == "original":
-        original_video = proj_input / video_basename
-        if not original_video.is_file():
-            # Maybe frontend sent a compressed filename with source:original
-            # (e.g. from original view where v.file is actually compressed name).
-            # Try resolving via _find_original_for_compressed as fallback.
-            original_name = _find_original_for_compressed(stem, proj_input, cfg.compressed_dir)
+    abspath_raw = (obj.get("abspath") or "").strip()
+    original_video: Path | None = None
+
+    if abspath_raw:
+        candidate = Path(abspath_raw).resolve()
+        if candidate.is_file() and candidate.suffix.lower() in VIDEO_EXTS:
+            selected = {p.resolve() for p in load_selected_videos(proj_input)}
+            under_project = False
+            try:
+                candidate.relative_to(proj_input.resolve())
+                under_project = True
+            except ValueError:
+                under_project = False
+            if candidate in selected or under_project:
+                original_video = candidate
+
+    if original_video is None and source_view == "original":
+        candidate = (proj_input / video_basename).resolve()
+        if candidate.is_file():
+            original_video = candidate
+        else:
+            # Frontend may send compressed-style name in original view, or an
+            # external basename only present in videos.json / .vmeta.
+            for p in load_selected_videos(proj_input):
+                if p.name == video_basename or p.stem.lower() == stem.lower():
+                    if p.is_file():
+                        original_video = p.resolve()
+                        break
+            if original_video is None:
+                original_name = _find_original_for_compressed(
+                    stem, proj_input, cfg.compressed_dir, project_dir=proj_input
+                )
+                if original_name:
+                    # Prefer videos.json absolute match by basename
+                    for p in load_selected_videos(proj_input):
+                        if p.name == original_name and p.is_file():
+                            original_video = p.resolve()
+                            break
+                    if original_video is None:
+                        candidate = proj_input / original_name
+                        if candidate.is_file():
+                            original_video = candidate
+        if original_video is None:
+            return handler._send_json({"ok": False, "error": f"original video not found: {video_basename}"}, 404)
+    elif original_video is None:
+        # Compressed view: .vmeta.source_path is authoritative for external originals
+        comp_dir = cfg.compressed_dir
+        if comp_dir:
+            for _ext in VIDEO_EXTS:
+                cand = comp_dir / f"{stem}{_ext}"
+                if cand.is_file():
+                    meta = VideoMeta.read(cand)
+                    if meta is not None:
+                        sp = Path(meta.source_path)
+                        if sp.is_file():
+                            original_video = sp.resolve()
+                            break
+        if original_video is None:
+            original_name = _find_original_for_compressed(stem, proj_input, comp_dir, project_dir=proj_input)
             if not original_name:
-                return handler._send_json({"ok": False, "error": f"original video not found: {video_basename}"}, 404)
-            original_video = proj_input / original_name
-    else:
-        original_name = _find_original_for_compressed(stem, proj_input, cfg.compressed_dir)
-        if not original_name:
-            return handler._send_json({"ok": False, "error": f"no matching original video for {stem}"}, 404)
-        original_video = proj_input / original_name
+                return handler._send_json({"ok": False, "error": f"no matching original video for {stem}"}, 404)
+            for p in load_selected_videos(proj_input):
+                if p.name == original_name and p.is_file():
+                    original_video = p.resolve()
+                    break
+            if original_video is None:
+                candidate = proj_input / original_name
+                if not candidate.is_file():
+                    return handler._send_json({"ok": False, "error": f"no matching original video for {stem}"}, 404)
+                original_video = candidate
 
     # Resolve texts JSON path (for voiceover rerun)
     raw_index = obj.get("index") or ""

@@ -40,7 +40,8 @@ def handle_get_config(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     texts = _find_texts_dirs(proj_out)
     handler._send_json(
         {
-            "input_dir": str(proj_input),
+            "project_dir": str(proj_input),
+            "input_dir": str(proj_input),  # compat alias for older UI clients
             "output_dir": str(proj_out),
             "compressed_dir": str(comp),
             "texts_dirs": [str(d) for d in texts],
@@ -184,7 +185,7 @@ _SPLIT_GLOBAL: dict[str, set[str]] = {
     "whisper": {"cache_dir", "hf_endpoint"},
 }
 _SPLIT_PROJECT: dict[str, set[str]] = {
-    "paths": {"input_dir", "output_dir", "recursive"},
+    "paths": {"output_dir"},
     "compress": {"target_size_mb", "max_width", "split_max_min", "splits_subdir", "reencode_split"},
     "ai": {"tasks", "context", "context_file"},
     "whisper": {"enabled", "model_size", "language", "device", "max_segments_per_clip", "transcripts_subdir"},

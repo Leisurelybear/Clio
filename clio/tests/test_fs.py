@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path, PureWindowsPath
 from unittest.mock import MagicMock
 
-from clio.ui.routes.fs import _is_allowed_path, handle_get_fs_dirs
+from clio.ui.routes.fs import _is_allowed_path, handle_get_fs_dirs, handle_get_fs_videos
 
 
 class TestIsAllowedPath:
@@ -122,4 +122,69 @@ class TestHandleGetFsDirs:
         handler = MagicMock()
         handle_get_fs_dirs(handler, {"path": ["some/path"]})
 
+        handler._send_json.assert_called_once_with({"error": "disk failure"}, 500)
+
+
+class TestHandleGetFsVideos:
+    def test_requires_path(self):
+        handler = MagicMock()
+        handle_get_fs_videos(handler, {"path": [""]})
+        handler._send_json.assert_called_once_with({"error": "path is required"}, 400)
+
+    def test_access_denied(self, monkeypatch):
+        monkeypatch.setattr("clio.ui.routes.fs._is_allowed_path", lambda p: False)
+        handler = MagicMock()
+        handle_get_fs_videos(handler, {"path": ["C:\\Windows"]})
+        handler._send_json.assert_called_once_with({"error": "access denied"}, 403)
+
+    def test_non_directory_returns_400(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("clio.ui.routes.fs._is_allowed_path", lambda p: True)
+        f = tmp_path / "file.txt"
+        f.write_bytes(b"")
+        handler = MagicMock()
+        handle_get_fs_videos(handler, {"path": [str(f)]})
+        handler._send_json.assert_called_once_with({"error": "not a directory"}, 400)
+
+    def test_lists_video_files_only(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("clio.ui.routes.fs._is_allowed_path", lambda p: True)
+        (tmp_path / "a.mp4").write_bytes(b"")
+        (tmp_path / "b.mov").write_bytes(b"")
+        (tmp_path / "c.txt").write_bytes(b"")
+        (tmp_path / ".hidden.mp4").write_bytes(b"")
+
+        handler = MagicMock()
+        handle_get_fs_videos(handler, {"path": [str(tmp_path)]})
+
+        handler._send_json.assert_called_once()
+        payload = handler._send_json.call_args.args[0]
+        assert payload["path"] == str(tmp_path.resolve())
+        assert len(payload["files"]) == 2
+        assert [f["name"] for f in payload["files"]] == ["a.mp4", "b.mov"]
+        assert payload["parent"] == str(tmp_path.parent)
+
+    def test_includes_file_sizes(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("clio.ui.routes.fs._is_allowed_path", lambda p: True)
+        f = tmp_path / "v.mp4"
+        f.write_bytes(b"x" * 1234)
+        handler = MagicMock()
+        handle_get_fs_videos(handler, {"path": [str(tmp_path)]})
+        payload = handler._send_json.call_args.args[0]
+        assert payload["files"][0]["size"] == 1234
+
+    def test_permission_error_returns_403(self, monkeypatch):
+        def mock_is_allowed(resolved):
+            raise PermissionError("access denied")
+
+        monkeypatch.setattr("clio.ui.routes.fs._is_allowed_path", mock_is_allowed)
+        handler = MagicMock()
+        handle_get_fs_videos(handler, {"path": ["some/path"]})
+        handler._send_json.assert_called_once_with({"error": "access denied"}, 403)
+
+    def test_os_error_returns_500(self, monkeypatch):
+        def mock_resolve(self, strict=False):
+            raise OSError("disk failure")
+
+        monkeypatch.setattr("pathlib.Path.resolve", mock_resolve)
+        handler = MagicMock()
+        handle_get_fs_videos(handler, {"path": ["some/path"]})
         handler._send_json.assert_called_once_with({"error": "disk failure"}, 500)

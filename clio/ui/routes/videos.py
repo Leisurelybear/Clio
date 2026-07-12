@@ -1,4 +1,4 @@
-"""Route handlers: /api/videos, /api/video"""
+"""Route handlers: /api/videos, /api/video, /api/videos/selected"""
 
 from __future__ import annotations
 
@@ -11,13 +11,14 @@ from typing import TYPE_CHECKING, Any
 
 from clio._constants import VIDEO_EXTS
 from clio.index import ArtifactIndex
+from clio.tasks._video_loader import load_selected_videos, save_selected_videos
 from clio.ui.services.file_service import (
     _find_compressed_for_original,
     _find_original_for_compressed,
     _find_texts_dirs,
     _is_safe_basename,
 )
-from clio.utils import find_videos, get_duration_sec, resolve_binary
+from clio.utils import get_duration_sec, resolve_binary
 from clio.vmeta import VideoMeta
 
 if TYPE_CHECKING:
@@ -61,6 +62,14 @@ def _resolve_original_video_path(root: Path, requested: str) -> Path | None:
     return candidate
 
 
+def _load_videos_json_selection(proj_input: Path) -> set[Path] | None:
+    """Load videos.json and return a set of resolved paths, or None if empty/missing."""
+    selected = load_selected_videos(proj_input)
+    if not selected:
+        return None
+    return {p.resolve() for p in selected if p.exists()}
+
+
 def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/videos. Sends JSON response directly."""
 
@@ -72,13 +81,14 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     comp_dir = proj_out / "compressed"
     cfg = handler._get_config(proj_input)
     cache_key = (str(proj_input.resolve()), str(proj_out.resolve()), source)
+    selected_set = _load_videos_json_selection(proj_input)
     signature = _videos_cache_signature(proj_input, proj_out, comp_dir, cfg)
     with _VIDEOS_CACHE_LOCK:
         cached = _VIDEOS_CACHE.get(cache_key)
         if cached is not None and cached[0] == signature:
             return handler._send_json(deepcopy(cached[1]))
 
-    payload = _build_videos_payload(handler, proj_input, proj_out, comp_dir, source, cfg)
+    payload = _build_videos_payload(handler, proj_input, proj_out, comp_dir, source, cfg, selected_set=selected_set)
     with _VIDEOS_CACHE_LOCK:
         if len(_VIDEOS_CACHE) >= _VIDEOS_CACHE_MAX and cache_key not in _VIDEOS_CACHE:
             _VIDEOS_CACHE.pop(next(iter(_VIDEOS_CACHE)))
@@ -124,6 +134,8 @@ def _build_videos_payload(
     comp_dir: Path,
     source: str,
     cfg: Any,
+    *,
+    selected_set: set[Path] | None = None,
 ) -> dict[str, Any]:
     # -- Build artifact index ------------------------------------------------
     index = ArtifactIndex(
@@ -157,6 +169,17 @@ def _build_videos_payload(
                 group_key, seg_num = _parse_segment_info(stem)
                 group = index.lookup(compressed_stem=stem)
                 orig = _find_original_for_compressed(stem, proj_input, comp_dir)
+                if selected_set is not None:
+                    meta = VideoMeta.read(p)
+                    if meta is not None:
+                        if Path(meta.source_path).resolve() not in selected_set:
+                            continue
+                    elif orig:
+                        orig_resolved = (
+                            (proj_input / orig).resolve() if not Path(orig).is_absolute() else Path(orig).resolve()
+                        )
+                        if orig_resolved not in selected_set:
+                            continue
                 v: dict[str, Any] = {
                     "file": p.name,
                     "source": "compressed",
@@ -223,56 +246,76 @@ def _build_videos_payload(
                             v["duration_sec"] = durations.get(member_idx, 0.0)
                             break
     else:  # original
-        if proj_input.is_dir():
-            # resolve ffprobe once for segment offset computation
-            try:
-                cfg = handler._get_config(proj_input)
-                _ffprobe = resolve_binary(cfg.paths.ffprobe, "ffprobe")
-            except Exception:
-                _ffprobe = None
-            for p in find_videos(proj_input, recursive=cfg.paths.recursive):
+        # resolve ffprobe once for segment offset computation
+        try:
+            cfg = handler._get_config(proj_input)
+            _ffprobe = resolve_binary(cfg.paths.ffprobe, "ffprobe")
+        except Exception:
+            _ffprobe = None
+
+        if selected_set is not None:
+            video_paths = sorted(selected_set, key=lambda p: p.name.lower())
+        else:
+            # No videos.json selection → empty list (do not scan project_dir)
+            video_paths = []
+        for p in video_paths:
+            if p.is_dir() or p.suffix.lower() not in VIDEO_EXTS:
+                continue
+            if selected_set is not None:
+                abs_path = str(p.resolve())
+                rel_name = p.name
+                proj_input_abs = proj_input.resolve()
+                try:
+                    rel_name = p.relative_to(proj_input_abs).as_posix()
+                except ValueError:
+                    rel_name = p.name
+            else:
+                abs_path = None
                 rel_name = _original_rel_name(p, proj_input)
-                comp = _find_compressed_for_original(p.stem, comp_dir)
-                if not comp:
-                    orig_groups = index.lookup(original_stem=p.stem)
-                    has_transcript = any(g.transcript is not None for g in (orig_groups or []))
-                    videos.append(
-                        {
-                            "file": rel_name,
-                            "source": "original",
-                            "index": None,
-                            "match": None,
-                            "transcript_file": p.stem if has_transcript else None,
-                        }
-                    )
-                    continue
-                # Compute per-segment offsets
-                seg_offsets: dict[str, float] = {}
-                if len(comp) > 1 and _ffprobe:
-                    try:
-                        dur = get_duration_sec(p, _ffprobe)
-                        seg_dur = dur / len(comp)
-                        for i, (_, idx) in enumerate(comp):
-                            seg_offsets[idx] = round(i * seg_dur, 1)
-                    except Exception:
-                        pass
-                segment_matches = [{"source": "compressed", "file": cf, "index": ci} for cf, ci in comp]
-                for c_file, c_idx in comp:
-                    group = index.lookup(compressed_stem=Path(c_file).stem)
-                    seg_v: dict[str, Any] = {
-                        "file": f"{c_idx}_{rel_name}",
-                        "source": "original",
-                        "index": c_idx,
-                        "title": text_titles.get(c_idx, ""),
-                        "offset_sec": seg_offsets.get(c_idx, 0.0),
-                        "text_json": group.texts[0].path.name if group and group.texts else None,
-                        "script_json": group.script.path.name if group and group.script else None,
-                        "transcript_file": group.transcript.stem if group and group.transcript else None,
-                        "match": {"source": "compressed", "file": c_file, "index": c_idx},
-                    }
-                    if len(segment_matches) > 1:
-                        seg_v["segment_matches"] = segment_matches
-                    videos.append(seg_v)
+            comp = _find_compressed_for_original(p.stem, comp_dir)
+            if not comp:
+                orig_groups = index.lookup(original_stem=p.stem)
+                has_transcript = any(g.transcript is not None for g in (orig_groups or []))
+                v = {
+                    "file": rel_name,
+                    "source": "original",
+                    "index": None,
+                    "match": None,
+                    "transcript_file": p.stem if has_transcript else None,
+                }
+                if abs_path:
+                    v["abs_path"] = abs_path
+                videos.append(v)
+                continue
+            # Compute per-segment offsets
+            seg_offsets: dict[str, float] = {}
+            if len(comp) > 1 and _ffprobe:
+                try:
+                    dur = get_duration_sec(p, _ffprobe)
+                    seg_dur = dur / len(comp)
+                    for i, (_, idx) in enumerate(comp):
+                        seg_offsets[idx] = round(i * seg_dur, 1)
+                except Exception:
+                    pass
+            segment_matches = [{"source": "compressed", "file": cf, "index": ci} for cf, ci in comp]
+            for c_file, c_idx in comp:
+                group = index.lookup(compressed_stem=Path(c_file).stem)
+                seg_v: dict[str, Any] = {
+                    "file": f"{c_idx}_{rel_name}",
+                    "source": "original",
+                    "index": c_idx,
+                    "title": text_titles.get(c_idx, ""),
+                    "offset_sec": seg_offsets.get(c_idx, 0.0),
+                    "text_json": group.texts[0].path.name if group and group.texts else None,
+                    "script_json": group.script.path.name if group and group.script else None,
+                    "transcript_file": group.transcript.stem if group and group.transcript else None,
+                    "match": {"source": "compressed", "file": c_file, "index": c_idx},
+                }
+                if abs_path:
+                    seg_v["abs_path"] = abs_path
+                if len(segment_matches) > 1:
+                    seg_v["segment_matches"] = segment_matches
+                videos.append(seg_v)
     videos.sort(key=_video_sort_key)
     return {"videos": videos, "source": source, "groups": groups}
 
@@ -311,9 +354,18 @@ def handle_get_video(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     fname = qs.get("file", [""])[0]
     source = qs.get("source", ["compressed"])[0]
     if source == "original":
-        vp = _resolve_original_video_path(proj_input, fname)
-        if vp is None:
-            return handler.send_error(HTTPStatus.FORBIDDEN)
+        abspath = qs.get("abspath", [None])[0]
+        if abspath:
+            vp = Path(abspath).resolve()
+            if not vp.is_file() or vp.suffix.lower() not in VIDEO_EXTS:
+                return handler.send_error(HTTPStatus.NOT_FOUND)
+            selected = load_selected_videos(proj_input)
+            if vp not in {p.resolve() for p in selected}:
+                return handler.send_error(HTTPStatus.FORBIDDEN)
+        else:
+            vp = _resolve_original_video_path(proj_input, fname)
+            if vp is None:
+                return handler.send_error(HTTPStatus.FORBIDDEN)
     else:
         if not _is_safe_basename(fname):
             return handler.send_error(HTTPStatus.FORBIDDEN)
@@ -338,3 +390,22 @@ def handle_get_vmeta(handler: HandlerProtocol, qs: dict[str, Any], stem: str) ->
 
                 return handler._send_json(_meta_to_dict(meta))
     handler._send_json({"ok": False, "error": "not found"}, 404)
+
+
+def handle_get_videos_selected(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
+    """Handle GET /api/videos/selected — load videos.json."""
+    proj_input = handler._resolve_project_input(qs)
+    videos = load_selected_videos(proj_input)
+    data = [str(p) for p in videos]
+    handler._send_json({"videos": data})
+
+
+def handle_put_videos_selected(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
+    """Handle PUT /api/videos/selected — save to videos.json."""
+    proj_input = handler._resolve_project_input(qs)
+    raw = obj.get("videos", [])
+    if not isinstance(raw, list):
+        return handler._send_json({"ok": False, "error": "videos must be a list"}, 400)
+    paths = [Path(p) for p in raw]
+    save_selected_videos(proj_input, paths)
+    handler._send_json({"ok": True})

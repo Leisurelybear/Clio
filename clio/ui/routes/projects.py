@@ -97,15 +97,15 @@ def handle_post_project_create(handler: HandlerProtocol, obj: dict) -> None:
     config_path = handler.config_path
 
     name = (obj.get("name") or "").strip()
-    input_dir_raw = (obj.get("input_dir") or "").strip()
+    project_dir_raw = (obj.get("project_dir") or obj.get("input_dir") or "").strip()
     output_dir_raw = (obj.get("output_dir") or "").strip()
     if not name:
         return handler._send_json({"ok": False, "error": "name is required"}, 400)
-    if not input_dir_raw:
-        return handler._send_json({"ok": False, "error": "input_dir is required"}, 400)
-    input_path = Path(input_dir_raw)
+    if not project_dir_raw:
+        return handler._send_json({"ok": False, "error": "project_dir is required"}, 400)
+    input_path = Path(project_dir_raw)
     if not input_path.is_dir():
-        return handler._send_json({"ok": False, "error": f"input_dir not found: {input_dir_raw}"}, 400)
+        return handler._send_json({"ok": False, "error": f"project_dir not found: {project_dir_raw}"}, 400)
     if output_dir_raw:
         proj_out = Path(output_dir_raw)
     else:
@@ -113,6 +113,7 @@ def handle_post_project_create(handler: HandlerProtocol, obj: dict) -> None:
     now = datetime.datetime.now().isoformat(timespec="seconds")
     proj_data = {
         "name": name,
+        "version": 2,
         "output_dir": str(proj_out),
         "currentDay": "day1",
         "source": "compressed",
@@ -128,7 +129,7 @@ def handle_post_project_create(handler: HandlerProtocol, obj: dict) -> None:
     handler.__class__._config_cache.invalidate_key(str(input_path.resolve()))
     _add_to_registry(str(input_path), config_path)
     handler._send_json(
-        {"ok": True, "project": {"name": name, "input_dir": str(input_path), "output_dir": str(proj_out)}}
+        {"ok": True, "project": {"name": name, "project_dir": str(input_path), "output_dir": str(proj_out)}}
     )
 
 
@@ -136,12 +137,12 @@ def handle_post_project_add(handler: HandlerProtocol, obj: dict) -> None:
     """Handle POST /api/project/add."""
     config_path = handler.config_path
 
-    input_dir_raw = (obj.get("input_dir") or "").strip()
-    if not input_dir_raw:
-        return handler._send_json({"ok": False, "error": "input_dir is required"}, 400)
-    input_path = Path(input_dir_raw)
+    project_dir_raw = (obj.get("project_dir") or obj.get("input_dir") or "").strip()
+    if not project_dir_raw:
+        return handler._send_json({"ok": False, "error": "project_dir is required"}, 400)
+    input_path = Path(project_dir_raw)
     if not input_path.is_dir():
-        return handler._send_json({"ok": False, "error": f"目录不存在: {input_dir_raw}"}, 400)
+        return handler._send_json({"ok": False, "error": f"目录不存在: {project_dir_raw}"}, 400)
     proj_file = input_path / "project.json"
     if not proj_file.is_file():
         # Auto-create project.json + project.yaml (similar to create project)
@@ -149,6 +150,7 @@ def handle_post_project_add(handler: HandlerProtocol, obj: dict) -> None:
         now = datetime.datetime.now().isoformat(timespec="seconds")
         proj_data = {
             "name": input_path.name,
+            "version": 2,
             "output_dir": str(proj_out),
             "currentDay": "day1",
             "source": "compressed",
@@ -168,16 +170,16 @@ def handle_post_project_add(handler: HandlerProtocol, obj: dict) -> None:
         except (json.JSONDecodeError, OSError) as e:
             return handler._send_json({"ok": False, "error": f"无法读取 project.json: {e}"}, 400)
     _add_to_registry(str(input_path), config_path)
-    handler._send_json({"ok": True, "project": {"name": name, "input_dir": str(input_path)}})
+    handler._send_json({"ok": True, "project": {"name": name, "project_dir": str(input_path)}})
 
 
 def handle_post_project_remove(handler: HandlerProtocol, obj: dict) -> None:
     """Handle POST /api/project/remove."""
     config_path = handler.config_path
     project_name = (obj.get("name") or "").strip()
-    input_dir_raw = (obj.get("input_dir") or "").strip()
+    input_dir_raw = (obj.get("project_dir") or obj.get("input_dir") or "").strip()
     if not project_name and not input_dir_raw:
-        return handler._send_json({"ok": False, "error": "name or input_dir required"}, 400)
+        return handler._send_json({"ok": False, "error": "name or project_dir required"}, 400)
     if input_dir_raw:
         _remove_from_registry(input_dir_raw, config_path)
     elif project_name:

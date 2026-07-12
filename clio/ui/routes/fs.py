@@ -1,4 +1,4 @@
-"""Route handlers: /api/fs/dirs"""
+"""Route handlers: /api/fs/dirs, /api/fs/videos"""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
 
+from clio._constants import VIDEO_EXTS
 from clio.ui.services.file_service import _list_drives
 
 # ── security: restrict file-system browsing to known-safe roots ──
@@ -58,6 +59,51 @@ def handle_get_fs_dirs(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                 "dirs": dirs,
                 "parent": parent,
                 "is_drive_list": False,
+            }
+        )
+    except PermissionError:
+        return handler._send_json({"error": "access denied"}, 403)
+    except OSError as e:
+        return handler._send_json({"error": str(e)}, 500)
+
+
+def handle_get_fs_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
+    """Handle GET /api/fs/videos — list video files in a directory."""
+    dir_path = qs.get("path", [""])[0]
+    if not dir_path:
+        return handler._send_json({"error": "path is required"}, 400)
+    try:
+        resolved = Path(dir_path).resolve()
+        if not _is_allowed_path(resolved):
+            return handler._send_json({"error": "access denied"}, 403)
+        if not resolved.is_dir():
+            return handler._send_json({"error": "not a directory"}, 400)
+        files: list[dict[str, Any]] = []
+        try:
+            with os.scandir(resolved) as it:
+                for entry in it:
+                    if entry.is_dir() or entry.name.startswith("."):
+                        continue
+                    ext = Path(entry.name).suffix.lower()
+                    if ext not in VIDEO_EXTS:
+                        continue
+                    st = entry.stat()
+                    files.append(
+                        {
+                            "name": entry.name,
+                            "path": entry.path,
+                            "size": st.st_size,
+                        }
+                    )
+        except PermissionError:
+            pass
+        files.sort(key=lambda f: f["name"].lower())
+        parent = str(resolved.parent) if resolved.parent != resolved else None
+        return handler._send_json(
+            {
+                "path": str(resolved),
+                "files": files,
+                "parent": parent,
             }
         )
     except PermissionError:
