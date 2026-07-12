@@ -63,11 +63,15 @@ def _resolve_original_video_path(root: Path, requested: str) -> Path | None:
 
 
 def _load_videos_json_selection(proj_input: Path) -> set[Path] | None:
-    """Load videos.json and return a set of resolved paths, or None if empty/missing."""
-    selected = load_selected_videos(proj_input)
-    if not selected:
+    """Load videos.json selection.
+
+    Returns None only when videos.json is absent (legacy project).
+    Empty list / offline paths still yield a set so selection mode stays active.
+    """
+    if not (proj_input / "videos.json").is_file():
         return None
-    return {p.resolve() for p in selected if p.exists()}
+    selected = load_selected_videos(proj_input)
+    return {p.resolve() for p in selected}
 
 
 def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
@@ -441,7 +445,30 @@ def handle_put_videos_selected(handler: HandlerProtocol, qs: dict[str, Any], obj
     raw = obj.get("videos", [])
     if not isinstance(raw, list):
         return handler._send_json({"ok": False, "error": "videos must be a list"}, 400)
-    paths = [Path(p) for p in raw]
-    save_selected_videos(proj_input, paths)
+    paths: list[Path] = []
+    rejected: list[str] = []
+    for item in raw:
+        p = Path(str(item)).expanduser()
+        try:
+            resolved = p.resolve()
+        except OSError:
+            rejected.append(str(item))
+            continue
+        if not resolved.is_file() or resolved.suffix.lower() not in VIDEO_EXTS:
+            rejected.append(str(item))
+            continue
+        paths.append(resolved)
+    # Dedup while preserving order
+    seen: set[Path] = set()
+    unique: list[Path] = []
+    for p in paths:
+        if p not in seen:
+            seen.add(p)
+            unique.append(p)
+    save_selected_videos(proj_input, unique)
     _invalidate_videos_cache(proj_input)
-    handler._send_json({"ok": True})
+    payload: dict[str, Any] = {"ok": True, "count": len(unique)}
+    if rejected:
+        payload["rejected"] = rejected[:20]
+        payload["rejected_count"] = len(rejected)
+    handler._send_json(payload)
