@@ -17,6 +17,7 @@ def _fake_config(context: str = "", context_override: str | None = None) -> Simp
         plan=SimpleNamespace(max_clips_per_day=10, target_duration_sec=300),
         script=SimpleNamespace(target_words=150),
         paths=SimpleNamespace(input_dir=Path("/tmp")),
+        project_dir=None,
     )
 
 

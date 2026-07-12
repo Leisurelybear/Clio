@@ -146,7 +146,7 @@ class TestRunReindex:
             result = run_reindex(config)
 
         assert result == 1
-        mock_find.assert_called_once_with("GL010683", config.paths.input_dir)
+        mock_find.assert_called_once_with("GL010683", config.paths.input_dir, None)
 
     def test_strips_seg_suffix(self, config: AppConfig, compressed_dir: Path, input_dir: Path) -> None:
         (compressed_dir / "001_GL010683_seg01.mp4").write_text("fake")

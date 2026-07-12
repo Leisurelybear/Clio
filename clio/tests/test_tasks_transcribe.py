@@ -30,6 +30,7 @@ def cfg(tmp_path):
     c.analyze.compressed_subdir = "compressed"
     c.analyze.max_analyze_duration_min = 30
     c.transcripts_dir = c.paths.output_dir / c.whisper.transcripts_subdir
+    c.project_dir = None
     return c
 
 

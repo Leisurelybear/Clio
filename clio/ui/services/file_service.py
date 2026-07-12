@@ -157,7 +157,9 @@ def _list_drives() -> list[str]:
         return [f"{d}:\\" for d in string.ascii_uppercase if Path(f"{d}:\\").is_dir()]
 
 
-def _find_original_for_compressed(stem: str, input_dir: Path, comp_dir: Path | None = None) -> str | None:
+def _find_original_for_compressed(
+    stem: str, input_dir: Path, comp_dir: Path | None = None, project_dir: Path | None = None
+) -> str | None:
     """For a compressed stem like '001_GL010695', find the matching original basename.
     Prefers .vmeta for O(1) lookup; falls back to stem matching for legacy projects.
     """
@@ -169,6 +171,23 @@ def _find_original_for_compressed(stem: str, input_dir: Path, comp_dir: Path | N
             meta = VideoMeta.read(p)
             if meta is not None:
                 return Path(meta.source_path).name
+
+    # Project dir: use load_selected_videos
+    if project_dir:
+        from clio.tasks._video_loader import load_selected_videos
+
+        if "_" in stem:
+            suffix = stem.split("_", 1)[1].lower()
+            for p in load_selected_videos(project_dir):
+                if p.stem.lower() == suffix:
+                    return p.name
+            m = re.match(r"^(.+)_seg\d+$", suffix)
+            if m:
+                base = m.group(1)
+                for p in load_selected_videos(project_dir):
+                    if p.stem.lower() == base:
+                        return p.name
+        return None
 
     # Legacy fallback: stem matching
     if "_" not in stem or not input_dir.is_dir():

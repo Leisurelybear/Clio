@@ -38,8 +38,16 @@ def _extract_original_stem(compressed_stem: str) -> str:
     return orig_stem
 
 
-def _find_original_by_stem(original_stem: str, input_dir: Path) -> Path | None:
+def _find_original_by_stem(original_stem: str, input_dir: Path, project_dir: Path | None = None) -> Path | None:
     """Find an original video file by stem, searching input_dir recursively."""
+    if project_dir:
+        from clio.tasks._video_loader import load_selected_videos
+
+        exts = (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv")
+        for p in load_selected_videos(project_dir):
+            if p.stem.lower() == original_stem.lower() and p.suffix.lower() in exts:
+                return p.resolve()
+        return None
     exts = (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv")
     for ext in exts:
         candidate = input_dir / f"{original_stem}{ext}"
@@ -51,7 +59,9 @@ def _find_original_by_stem(original_stem: str, input_dir: Path) -> Path | None:
     return None
 
 
-def resolve_identity(compressed_path: Path, input_dir: Path, index: str) -> MediaIdentity:
+def resolve_identity(
+    compressed_path: Path, input_dir: Path, index: str, project_dir: Path | None = None
+) -> MediaIdentity:
     """Build MediaIdentity from .vmeta sidecar first, fall back to filename parsing.
 
     Priority:
@@ -104,7 +114,7 @@ def resolve_identity(compressed_path: Path, input_dir: Path, index: str) -> Medi
         )
 
     # Priority 3: Filename fallback
-    orig_path = _find_original_by_stem(original_stem, input_dir)
+    orig_path = _find_original_by_stem(original_stem, input_dir, project_dir)
     seg_num = None
     m = re.search(r"_seg(\d+)$", compressed_stem)
     if m:

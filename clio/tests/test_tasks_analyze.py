@@ -30,6 +30,7 @@ def _cfg(tmp_path: Path) -> SimpleNamespace:
         compress=SimpleNamespace(split_max_min=0, splits_subdir="splits"),
         plan=SimpleNamespace(max_clips_per_day=10, target_duration_sec=300),
         script=SimpleNamespace(target_words=150),
+        project_dir=None,
     )
     cfg.paths.input_dir.mkdir(parents=True, exist_ok=True)
     cfg.compressed_dir.mkdir(parents=True, exist_ok=True)

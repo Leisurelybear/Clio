@@ -33,13 +33,20 @@ from clio.utils import get_duration_sec, resolve_binary, write_json_atomic
 from clio.vmeta import VideoIndex
 
 
-def _build_stem_to_path(input_dir: Path) -> dict[str, Path]:
-    """Build a one-time {stem_lower: path} map from input_dir (recursive)."""
+def _build_stem_to_path(input_dir: Path, project_dir: Path | None = None) -> dict[str, Path]:
+    """Build a one-time {stem_lower: path} map from input_dir (recursive) or project_dir."""
     mapping: dict[str, Path] = {}
     exts = (".mp4", ".mov", ".mkv", ".avi", ".mts", ".m2ts", ".m4v", ".webm", ".lrv")
-    for p in input_dir.rglob("*"):
-        if p.is_file() and p.suffix.lower() in exts:
-            mapping[p.stem.lower()] = p
+    if project_dir:
+        from clio.tasks._video_loader import load_selected_videos
+
+        for p in load_selected_videos(project_dir):
+            if p.is_file() and p.suffix.lower() in exts:
+                mapping[p.stem.lower()] = p
+    else:
+        for p in input_dir.rglob("*"):
+            if p.is_file() and p.suffix.lower() in exts:
+                mapping[p.stem.lower()] = p
     return mapping
 
 
@@ -47,6 +54,7 @@ def _resolve_original(
     input_dir: Path,
     compressed_stem: str,
     stem_cache: dict[str, Path] | None = None,
+    project_dir: Path | None = None,
 ) -> Path | None:
     """Resolve original video path from a compressed file stem.
 
@@ -67,6 +75,13 @@ def _resolve_original(
         key = stem.lower()
         if stem_cache is not None:
             return stem_cache.get(key)
+        if project_dir:
+            from clio.tasks._video_loader import load_selected_videos
+
+            for p in load_selected_videos(project_dir):
+                if p.stem.lower() == key:
+                    return p
+            return None
         for ext in (
             ".mp4",
             ".mov",
@@ -155,9 +170,12 @@ def _process_video_item(
         state.mark(original.stem, "analyze", "skipped")
         print(f"[跳过分析] {compressed.name} (已存在: {json_path.name})")
         identity = (
-            resolve_identity(compressed, config.paths.input_dir, idx_str)
+            resolve_identity(compressed, config.paths.input_dir, idx_str, config.project_dir)
             if analysis is None
-            else (load_identity(analysis) or resolve_identity(compressed, config.paths.input_dir, idx_str))
+            else (
+                load_identity(analysis)
+                or resolve_identity(compressed, config.paths.input_dir, idx_str, config.project_dir)
+            )
         )
         return ClipRecord(
             index=idx_val,
@@ -211,7 +229,7 @@ def _process_video_item(
     analysis["index"] = idx_val
     analysis["source_file"] = original.name
     analysis["compressed_file"] = compressed.name  # stable lookup key for videos.py
-    identity = resolve_identity(compressed, config.paths.input_dir, idx_str)
+    identity = resolve_identity(compressed, config.paths.input_dir, idx_str, config.project_dir)
     add_schema_version(analysis)
     analysis["media_identity"] = _identity_to_dict(identity)
     attach_transcript_to_analysis(config, analysis)
@@ -263,7 +281,7 @@ def run_analyze_all(
     records: list[ClipRecord] = []
 
     # Build one-time stem→path cache to avoid per-video rglob
-    stem_cache = _build_stem_to_path(config.paths.input_dir)
+    stem_cache = _build_stem_to_path(config.paths.input_dir, config.project_dir)
 
     def _list_compressed(d: Path) -> list[Path]:
         return sorted(p for p in d.iterdir() if p.suffix.lower() in VIDEO_EXTS and p.is_file())
@@ -298,7 +316,7 @@ def run_analyze_all(
             parts = p.stem.split("_", 1)
             if len(parts) != 2 or not parts[0].isdigit():
                 continue
-            orig_path = _resolve_original(config.paths.input_dir, p.stem, stem_cache)
+            orig_path = _resolve_original(config.paths.input_dir, p.stem, stem_cache, config.project_dir)
             if orig_path is None:
                 print(f"[警告] 找不到 {p.name} 对应的原始视频，跳过")
                 continue

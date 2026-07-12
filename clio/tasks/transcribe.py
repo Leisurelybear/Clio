@@ -34,7 +34,11 @@ def _extract_orig_stem(compressed_stem: str) -> str:
     return re.sub(r"_seg\d+$", "", orig_stem)
 
 
-def _build_original_stem_map(input_dir: Path) -> dict[str, Path]:
+def _build_original_stem_map(input_dir: Path, project_dir: Path | None = None) -> dict[str, Path]:
+    if project_dir:
+        from clio.tasks._video_loader import load_selected_videos
+
+        return {p.stem.lower(): p for p in load_selected_videos(project_dir)}
     return {p.stem.lower(): p for p in find_videos(input_dir, recursive=True)}
 
 
@@ -164,7 +168,7 @@ def run_transcribe_all(
     if tracker:
         tracker.update(phase="transcribe", total=total, current=0, message="Whisper 语音转录...")
     state = ProcessingState(config.paths.output_dir)
-    original_cache = _build_original_stem_map(config.paths.input_dir)
+    original_cache = _build_original_stem_map(config.paths.input_dir, config.project_dir)
     error_count = 0
 
     start_time = time.time()
@@ -250,7 +254,7 @@ def run_transcribe_all(
                 "generated_at": datetime.now().isoformat(),
             }
             idx = compressed_stem.split("_", 1)[0] if "_" in compressed_stem else ""
-            transcript_identity = resolve_identity(compressed_video, config.paths.input_dir, idx)
+            transcript_identity = resolve_identity(compressed_video, config.paths.input_dir, idx, config.project_dir)
             add_schema_version(transcript)
             transcript["media_identity"] = _identity_to_dict(transcript_identity)
             write_json_atomic(out_path, transcript)
@@ -351,7 +355,7 @@ def run_transcribe_one(
             "generated_at": datetime.now().isoformat(),
         }
         idx = video_path.stem.split("_", 1)[0] if "_" in video_path.stem else ""
-        transcript_identity = resolve_identity(video_path, config.paths.input_dir, idx)
+        transcript_identity = resolve_identity(video_path, config.paths.input_dir, idx, config.project_dir)
         add_schema_version(transcript)
         transcript["media_identity"] = _identity_to_dict(transcript_identity)
         transcripts_dir = config.transcripts_dir
