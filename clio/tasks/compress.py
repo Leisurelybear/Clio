@@ -105,6 +105,10 @@ def run_compress_all(
 
     if single_file:
         videos = [single_file]
+    elif config.project_dir:
+        from clio.tasks._video_loader import load_selected_videos
+
+        videos = load_selected_videos(config.project_dir)
     else:
         videos = find_videos(config.paths.input_dir, recursive=config.paths.recursive)
     if files is not None:
