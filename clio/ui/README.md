@@ -165,7 +165,7 @@ header 右侧的 **`压缩` / `原视频`** 切换按钮决定侧栏列的是哪
 | 现象 | 排查 |
 | --- | --- |
 | 启动报 `Address already in use` | 换端口：`--port 9000`，或杀掉占用进程 |
-| 切到原视频视图后列表全空 | `config.yaml` 里 `paths.input_dir` 配错了；header 提示会显示 `当前视图没有视频 (original)` |
+| 切到原视频视图后列表全空 | 项目尚无 `videos.json` 或列表为空。点击侧栏「添加视频」勾选素材，或对旧项目运行 `python main.py migrate` |
 | 浏览器打开空白 | 看终端输出 + `logs/YYYY-MM-DD-HH.log` |
 | `texts` tab 一直说"没有 JSON" | 视频列表里该行 `texts` 状态是 `·` 灰色；说明 `output/texts*` 下没匹配文件 |
 | 保存后 clip 看到旧内容 | 按浏览器 `Ctrl+Shift+R` 强刷；服务器 `/api/videos` 走的是缓存头 `no-store`，但浏览器可能缓了 JSON |

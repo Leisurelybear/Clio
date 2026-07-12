@@ -34,9 +34,9 @@ def build_run_preview(
     selected = _selected_stems(files) if files is not None else None
 
     source_input_info, all_source_videos = _source_input_info(config)
-    from clio.tasks._video_loader import source_videos
+    from clio.tasks._video_loader import source_videos as _load_source_videos
 
-    all_recursive_source_videos = list(source_videos(config))
+    all_recursive_source_videos = list(_load_source_videos(config))
     compressed_input_info, all_compressed_videos = _compressed_input_info(config)
     all_analysis_jsons = _analysis_jsons(config)
     index = ArtifactIndex(
@@ -49,21 +49,21 @@ def build_run_preview(
     )
     index.build()
 
-    source_videos = _filter_stem_paths(all_source_videos, selected)
+    filtered_source_videos = _filter_stem_paths(all_source_videos, selected)
     compressed_videos = _filter_stem_paths(all_compressed_videos, selected)
     analysis_jsons = _filter_artifact_paths(all_analysis_jsons, selected)
 
     input_info = compressed_input_info if _starts_from_compressed(selected_steps) else source_input_info
     input_info = {
         **input_info,
-        "count": len(compressed_videos) if input_info["mode"] == "compressed" else len(source_videos),
+        "count": len(compressed_videos) if input_info["mode"] == "compressed" else len(filtered_source_videos),
     }
 
     preview_steps = [
         _step_preview(
             config,
             step,
-            source_videos=source_videos,
+            source_videos=filtered_source_videos,
             all_recursive_source_videos=all_recursive_source_videos,
             compressed_videos=compressed_videos,
             analysis_jsons=analysis_jsons,
@@ -75,6 +75,19 @@ def build_run_preview(
         )
         for step in selected_steps
     ]
+
+    # Surface empty selection so UI/CLI can prompt migrate / add-videos.
+    # Attach once on input, not per-step, so totals.warnings stays step-scoped.
+    empty_selection_note: str | None = None
+    if input_info.get("mode") == "videos" and input_info.get("count", 0) == 0 and config.project_dir is not None:
+        vjson = config.project_dir / "videos.json"
+        empty_selection_note = (
+            "videos.json 不存在，请运行 python main.py migrate 或在 UI 中添加视频"
+            if not vjson.is_file()
+            else "videos.json 为空，请在 UI「添加视频」选择素材"
+        )
+        input_info = {**input_info, "hint": empty_selection_note}
+
     return {
         "input": input_info,
         "steps": preview_steps,

@@ -95,10 +95,13 @@ async function init() {
       openList.innerHTML = allProjects.length
         ? allProjects.map(p => {
           const isLegacy = p.legacy;
+          const needsVideos = p.needs_videos;
           const cardClass = `project-card ${p.is_current ? 'active' : ''} ${isLegacy ? 'project-card-legacy' : ''}`;
-          const legacyBadge = isLegacy ? '<span class="legacy-badge">旧版项目</span>' : '';
+          const legacyBadge = isLegacy
+            ? '<span class="legacy-badge">需迁移</span>'
+            : (needsVideos ? '<span class="legacy-badge">无视频</span>' : '');
           return `
-          <div class="${cardClass}" data-name="${escapeHtml(p.name || '')}" data-project-dir="${escapeHtml(p.project_dir || p.input_dir || '')}" data-legacy="${isLegacy}">
+          <div class="${cardClass}" data-name="${escapeHtml(p.name || '')}" data-project-dir="${escapeHtml(p.project_dir || p.input_dir || '')}" data-legacy="${isLegacy}" data-needs-videos="${needsVideos}">
             <div class="project-card-header">
               <span class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(current)' : ''} ${legacyBadge}</span>
               <button class="project-card-remove" title="Remove from project list">✕</button>
@@ -137,7 +140,7 @@ async function init() {
           const projectDir = card.dataset.projectDir;
           const isLegacy = card.dataset.legacy === 'true';
           if (isLegacy) {
-            setStatus('旧版项目不支持直接打开，请新建项目', 'warn');
+            setStatus('该项目仍含 paths.input_dir，请先运行: python main.py migrate --from <项目目录>', 'warn');
             return;
           }
           _setupRemoveBtn(card, name, projectDir);
