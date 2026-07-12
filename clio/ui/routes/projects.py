@@ -48,7 +48,7 @@ def handle_get_projects(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     req_project = qs.get("project", [None])[0]
     req_input_dir = qs.get("input_dir", [None])[0]
     config_path = handler.config_path
-    input_dir = handler.input_dir
+    project_dir = handler.project_dir
     reg_file = _registry_path(config_path)
     last_project_name = None
     if reg_file.is_file():
@@ -61,7 +61,7 @@ def handle_get_projects(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                 last_project_name = last_project
         except (json.JSONDecodeError, OSError):
             pass
-    projects = _list_projects(config_path, input_dir, req_project, req_input_dir)
+    projects = _list_projects(config_path, project_dir, req_project, req_input_dir)
     # Prune stale _config_cache entries for projects that no longer exist
     cache = handler.__class__._config_cache
     valid_dirs = {str(Path(p["input_dir"]).resolve()) for p in projects}

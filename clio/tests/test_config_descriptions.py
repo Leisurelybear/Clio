@@ -21,6 +21,9 @@ from clio.config.models import (
 
 _KEY_PATTERN = re.compile(r"\{name\}")
 
+# Valid description keys that don't map to a specific dataclass field
+_EXTRA_DESCRIPTION_KEYS = {"paths.project_dir"}
+
 # Map of config field name → dataclass type (hardcoded to avoid annotation resolution issues)
 _CONFIG_DC_MAP: list[tuple[str, type]] = [
     ("paths", PathsConfig),
@@ -71,7 +74,7 @@ class TestSchemaCoverage:
             for name in field_names:
                 field_set.add(f"{prefix}.{name}")
         for key in flat:
-            assert key in field_set, f"Description key {key} does not match any field"
+            assert key in field_set or key in _EXTRA_DESCRIPTION_KEYS, f"Description key {key} does not match any field"
 
     def test_descriptions_non_empty(self):
         """All descriptions must have non-empty text content."""

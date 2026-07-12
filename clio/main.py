@@ -71,7 +71,7 @@ def run_check(config_path: Path, project_dir: Path | None = None) -> int:
     status("ffmpeg", bool(ffmpeg), ffmpeg or f"未找到，运行 {setup_script}")
     status("ffprobe", bool(ffprobe), ffprobe or "未找到")
 
-    check_dir = config.paths.input_dir
+    check_dir = config.project_dir or config.paths.input_dir
     if check_dir.is_dir():
         videos = find_videos(check_dir, recursive=config.paths.recursive)
         print(f"  [OK] 素材目录 ({len(videos)} 个视频) - {check_dir}")
@@ -410,7 +410,7 @@ def main(argv: list[str] | None = None) -> int:
                 source=args.source,
             )
         elif args.command == "migrate-config":
-            root = args.projects_root or config.paths.input_dir.parent
+            root = args.projects_root or (config.project_dir or config.paths.input_dir).parent
             updated, errors = _migrate_project_configs(root)
             print(f"已更新 {updated} 个 project.yaml")
             if errors:
@@ -439,7 +439,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.format,
                 plan_path,
                 out_dir,
-                config.paths.input_dir,
+                config.project_dir or config.paths.input_dir,
                 args.day,
                 ffprobe=config.paths.ffprobe,
                 texts_dir=config.texts_dir,

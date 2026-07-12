@@ -129,9 +129,9 @@ def make_handler(
     config: AppConfig, config_path: Path | None = None, api_token: str = ""
 ) -> type[BaseHTTPRequestHandler]:
     output_dir = config.paths.output_dir
-    input_dir = config.paths.input_dir
+    project_dir = config.project_dir or config.paths.input_dir
     static_dir = STATIC_DIR
-    project_path = input_dir / "project.json"
+    project_path = project_dir / "project.json"
 
     # Compatibility: migrate old location project.json
     old_project_path = output_dir / "project.json"
@@ -144,8 +144,8 @@ def make_handler(
     if project_path.is_file():
         try:
             cur = json.loads(project_path.read_text(encoding="utf-8"))
-            if cur.get("name") == output_dir.name and input_dir.name != output_dir.name:
-                cur["name"] = input_dir.name
+            if cur.get("name") == output_dir.name and project_dir.name != output_dir.name:
+                cur["name"] = project_dir.name
                 write_json_atomic(project_path, cur)
         except (json.JSONDecodeError, OSError):
             pass
@@ -153,7 +153,7 @@ def make_handler(
     DEFAULT_PROJECT = {
         "currentDay": "day1",
         "source": "compressed",
-        "name": input_dir.name,
+        "name": project_dir.name,
         "output_dir": str(output_dir.resolve()),
         "lastEntity": None,
         "lastVideo": None,
@@ -166,7 +166,7 @@ def make_handler(
         _project_states: dict[str, _ServerState]
         _config_cache: ClassVar[ConfigCache]
         DEFAULT_PROJECT: dict[str, Any] = {}
-        input_dir: Path
+        project_dir: Path
         output_dir: Path
         config_path: Path | None
         _api_token: str | None
@@ -237,7 +237,7 @@ def make_handler(
             return self.__class__._config_cache.get(project_input)
 
         def _resolve_project_input(self, qs: dict) -> Path:
-            return resolve_project_input(qs, input_dir, config_path)
+            return resolve_project_input(qs, project_dir, config_path)
 
         def _get_project_output(self, qs_or_proj_dir: dict | Path) -> Path:
             if isinstance(qs_or_proj_dir, dict):
@@ -433,7 +433,7 @@ def make_handler(
     Handler._config_cache = ConfigCache(config_path, on_load=auto_reindex_if_needed)
     Handler._api_token = api_token
     Handler.DEFAULT_PROJECT = DEFAULT_PROJECT
-    Handler.input_dir = input_dir
+    Handler.project_dir = project_dir
     Handler.output_dir = output_dir
     Handler.config_path = config_path
     return Handler
@@ -467,7 +467,7 @@ def run(
     server = ThreadingHTTPServer((host, port), handler)
     url = f"http://{host}:{port}/"
     print(f"  UI started: {url}")
-    print(f"  Project directory: {active_config.paths.input_dir}")
+    print(f"  Project directory: {active_config.project_dir or active_config.paths.input_dir}")
     print(f"  Output directory: {active_config.paths.output_dir}")
     if not _is_local:
         if not TOKEN:

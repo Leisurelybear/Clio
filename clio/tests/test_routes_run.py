@@ -94,8 +94,8 @@ class TestApplyRunInputDirOverride:
 
         assert error is None
         assert result is not cfg
-        assert result.paths.input_dir == new_input
-        assert cfg.paths.input_dir == tmp_path / "old"
+        assert result._project_dir == new_input
+        assert not hasattr(cfg, "_project_dir") or cfg._project_dir != new_input
 
     def test_missing_input_dir_returns_error(self, tmp_path: Path):
         cfg = SimpleNamespace(paths=SimpleNamespace(input_dir=tmp_path))

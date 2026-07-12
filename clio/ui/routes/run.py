@@ -35,13 +35,10 @@ def _apply_run_input_dir_override(cfg, input_dir_raw: str | None) -> tuple[Any, 
     if not input_dir.is_dir():
         return cfg, f"input_dir not found: {input_dir_raw}"
     run_cfg = copy.deepcopy(cfg)
-    try:
-        run_cfg.paths.input_dir = input_dir
-    except AttributeError:
-        if run_cfg.paths._project is not None:
-            run_cfg.paths._project.input_dir = input_dir
-        else:
-            return cfg, "project paths not available for input_dir override"
+    run_cfg._project_dir = input_dir
+    project_paths = getattr(run_cfg.paths, "_project", None)
+    if project_paths is not None:
+        project_paths.input_dir = input_dir
     return run_cfg, None
 
 

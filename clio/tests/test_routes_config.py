@@ -52,7 +52,7 @@ class TestHandleGetConfigRaw:
         default_input.mkdir()
 
         handler.config_path = cfg
-        handler.input_dir = default_input
+        handler.project_dir = default_input
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
 
@@ -68,7 +68,7 @@ class TestHandleGetConfigRaw:
         proj_input.mkdir()
 
         handler.config_path = cfg
-        handler.input_dir = proj_input
+        handler.project_dir = proj_input
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
 
@@ -91,7 +91,7 @@ class TestHandlePostConfigInit:
         proj_input = tmp_path / "input"
 
         handler.config_path = cfg
-        handler.input_dir = proj_input
+        handler.project_dir = proj_input
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
         handler.__class__._config_cache = MagicMock()
@@ -121,7 +121,7 @@ class TestHandlePutConfigRaw:
         proj_input.mkdir()
 
         handler.config_path = cfg
-        handler.input_dir = tmp_path
+        handler.project_dir = tmp_path
         handler._resolve_project_input.return_value = proj_input
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
@@ -151,7 +151,7 @@ class TestHandlePutConfigRaw:
         )
 
         handler.config_path = cfg
-        handler.input_dir = tmp_path
+        handler.project_dir = tmp_path
         handler._resolve_project_input.return_value = tmp_path
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
@@ -181,7 +181,7 @@ class TestHandlePutConfigRaw:
         )
 
         handler.config_path = cfg
-        handler.input_dir = tmp_path
+        handler.project_dir = tmp_path
         handler._resolve_project_input.return_value = tmp_path
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
@@ -206,7 +206,7 @@ class TestHandlePutConfigRaw:
         proj_input.mkdir()
 
         handler.config_path = cfg
-        handler.input_dir = proj_input
+        handler.project_dir = proj_input
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
 
@@ -230,7 +230,7 @@ class TestHandlePutConfigRaw:
         proj_input.mkdir()
 
         handler.config_path = cfg
-        handler.input_dir = tmp_path
+        handler.project_dir = tmp_path
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
         handler.__class__._config_cache = MagicMock()
@@ -254,7 +254,7 @@ class TestHandlePutConfigRaw:
         proj_input.mkdir()
 
         handler.config_path = cfg
-        handler.input_dir = proj_input
+        handler.project_dir = proj_input
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
         handler.__class__._config_cache = MagicMock()
@@ -357,7 +357,7 @@ class TestHandleGetConfigProject:
         proj_input = tmp_path / "custom"
         proj_input.mkdir()
         handler.config_path = cfg
-        handler.input_dir = tmp_path
+        handler.project_dir = tmp_path
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
         handle_get_config_project(handler, {})
@@ -368,7 +368,7 @@ class TestHandleGetConfigProject:
         cfg = tmp_path / "config.yaml"
         cfg.write_bytes(b"")
         handler.config_path = cfg
-        handler.input_dir = tmp_path
+        handler.project_dir = tmp_path
         handler._resolve_project_input.return_value = tmp_path
         handler._send_json = MagicMock()
         handle_get_config_project(handler, {})
@@ -411,7 +411,7 @@ class TestHandleGetConfigProject:
             encoding="utf-8",
         )
         handler.config_path = cfg
-        handler.input_dir = tmp_path
+        handler.project_dir = tmp_path
         handler._resolve_project_input.return_value = proj_input
         handler._send_json = MagicMock()
         handle_get_config_project(handler, {})
@@ -505,7 +505,7 @@ class TestHandlePutConfigProject:
         proj_input = tmp_path / "project"
         proj_input.mkdir()
         handler.config_path = cfg
-        handler.input_dir = tmp_path
+        handler.project_dir = tmp_path
         handler._resolve_project_input.return_value = proj_input
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
@@ -521,7 +521,7 @@ class TestHandlePutConfigProject:
         proj_input = tmp_path / "custom"
         proj_input.mkdir()
         handler.config_path = cfg
-        handler.input_dir = tmp_path
+        handler.project_dir = tmp_path
         handler._resolve_project_input.return_value = proj_input
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
@@ -543,7 +543,7 @@ class TestHandlePutConfigProject:
         proj_yaml = proj_input / "project.yaml"
         proj_yaml.write_text(yaml.dump({"compress": {"target_size_mb": 5}}), encoding="utf-8")
         handler.config_path = cfg
-        handler.input_dir = tmp_path
+        handler.project_dir = tmp_path
         handler._resolve_project_input.return_value = proj_input
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
