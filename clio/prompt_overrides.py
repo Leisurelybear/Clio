@@ -29,6 +29,8 @@ class _PromptFormatError(ValueError):
 
 
 def _project_dir(config: AppConfig) -> Path:
+    if getattr(config, "project_dir", None) is not None:
+        return config.project_dir
     template_file = getattr(getattr(config, "script", None), "template_file", None)
     if isinstance(template_file, Path) and template_file.parent.name == "templates":
         return template_file.parent.parent
