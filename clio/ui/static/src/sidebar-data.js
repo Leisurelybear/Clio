@@ -5,6 +5,23 @@ import {
 import { api, icon } from './api.js';
 import { updateRunFilesBadge } from './runner.js';
 
+// ── Video removal helper ──────────────────────────────────────
+
+export async function removeVideoFromProject(file) {
+  try {
+    const r = await api('GET', '/api/videos/selected');
+    const videos = (r.videos || []).slice();
+    const idx = videos.findIndex(p => p.endsWith('/' + file) || p.endsWith('\\' + file) || p === file);
+    if (idx === -1) return;
+    videos.splice(idx, 1);
+    await api('PUT', '/api/videos/selected', { videos });
+    await loadVideos();
+    setStatus(`已移除 ${file}`, 'ok');
+  } catch (e) {
+    setStatus('移除失败: ' + e.message, 'err');
+  }
+}
+
 // ── Data loading ───────────────────────────────────────────────
 
 export async function loadProjects() {
@@ -15,14 +32,14 @@ export async function loadProjects() {
     state.currentProject = state.projects.find(p => p.is_current) || null;
     if (state.currentProject) {
       if (!state.currentProjectName) state.currentProjectName = state.currentProject.name;
-      if (!state.currentProjectInputDir) state.currentProjectInputDir = state.currentProject.input_dir;
+      if (!state.currentProjectDir) state.currentProjectDir = state.currentProject.project_dir;
     }
     updateProjectSidebar();
   } catch (e) {
     state.projects = [];
     state.currentProject = null;
     state.currentProjectName = null;
-    state.currentProjectInputDir = null;
+    state.currentProjectDir = null;
     state.lastProject = null;
     updateProjectSidebar();
   }
@@ -32,10 +49,10 @@ export async function loadConfig() {
   try {
     state.config = await api('GET', '/api/config');
   } catch {
-    state.config = { input_dir: '(加载失败)', output_dir: '' };
+    state.config = { project_dir: '(加载失败)', output_dir: '' };
   }
-  $('proj-name').textContent = state.config.input_dir;
-  $('proj-name').title = `input: ${state.config.input_dir}\noutput: ${state.config.output_dir}`;
+  $('proj-name').textContent = state.config.project_dir || state.config.input_dir || '';
+  $('proj-name').title = `project: ${state.config.project_dir || state.config.input_dir || ''}\noutput: ${state.config.output_dir || ''}`;
 }
 
 export async function loadPlans() {
@@ -177,22 +194,24 @@ function renderVideoItem(v) {
       ${v.title ? `<div class="video-title">${escapeHtml(v.title)}</div>` : ''}
       <div class="video-match">${matchBadge}</div>
     </div>
-    <div class="video-actions">
-      <button class="menu-btn" title="操作">⋮</button>
-      <div class="menu-dropdown">
-        ${state.source === 'original'
-          ? `<button class="menu-item" data-action="compress" title="用 ffmpeg 将原视频压缩为 640p">压缩视频</button>
-             <button class="menu-item" data-action="transcribe" title="用 faster-whisper 提取音频转文字">Whisper 转录</button>
-             <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">AI分析视频</button>
-             <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑口播文案</button>
-             <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑全部</button>`
-          : `<button class="menu-item" data-action="compress" disabled style="opacity:0.4" title="视频已压缩">压缩视频</button>
-             <button class="menu-item" data-action="analyze" title="调用 AI 重新分析视频内容">AI分析视频</button>
-             <button class="menu-item" data-action="voiceover" title="基于分析结果，重新用 AI 生成口播解说文案">重跑口播文案</button>
-             <button class="menu-item" data-action="all" title="依次执行 AI 分析 + 口播文案">重跑全部</button>`
-        }
+      <div class="video-actions">
+        <button class="menu-btn" title="操作">⋮</button>
+        <div class="menu-dropdown">
+          ${state.source === 'original'
+            ? `<button class="menu-item" data-action="compress" title="用 ffmpeg 将原视频压缩为 640p">压缩视频</button>
+               <button class="menu-item" data-action="transcribe" title="用 faster-whisper 提取音频转文字">Whisper 转录</button>
+               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">AI分析视频</button>
+               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑口播文案</button>
+               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑全部</button>
+               <div class="menu-divider"></div>
+               <button class="menu-item menu-item-danger" data-action="remove" title="从项目中移除该视频">从项目移除</button>`
+            : `<button class="menu-item" data-action="compress" disabled style="opacity:0.4" title="视频已压缩">压缩视频</button>
+               <button class="menu-item" data-action="analyze" title="调用 AI 重新分析视频内容">AI分析视频</button>
+               <button class="menu-item" data-action="voiceover" title="基于分析结果，重新用 AI 生成口播解说文案">重跑口播文案</button>
+               <button class="menu-item" data-action="all" title="依次执行 AI 分析 + 口播文案">重跑全部</button>`
+          }
+        </div>
       </div>
-    </div>
   `;
 
   li.onclick = (e) => {
@@ -235,6 +254,12 @@ function renderVideoItem(v) {
         if (_portalCloseHandler) { document.removeEventListener('click', _portalCloseHandler); _portalCloseHandler = null; }
         const task = item.dataset.action;
         const file = v.file;
+        if (task === 'remove') {
+          if (confirm(`确定从项目中移除 ${file} 吗？`)) {
+            await removeVideoFromProject(file);
+          }
+          return;
+        }
         setStatus(`正在重跑 ${task} (${file})...`, 'ok');
         try {
           const r = await api('POST', '/api/rerun', {
@@ -311,7 +336,6 @@ export function renderVideoList() {
             <button class="sidebar-btn" onclick="switchToOriginalThenCompress()" style="background:var(--accent);color:#fff;border:none;padding:7px 14px;border-radius:var(--radius-sm);cursor:pointer;font:inherit;font-size:var(--text-sm)">${icon('folder', 14)} 切换到原视频</button>
             <button class="sidebar-btn" onclick="goToRunTab()" title="运行流水线中的压缩步骤" style="background:var(--bg-surface-2);color:var(--text-primary);border:1px solid var(--border);padding:7px 14px;border-radius:var(--radius-sm);cursor:pointer;font:inherit;font-size:var(--text-sm)">${icon('play', 14)} 去压缩视频</button>
           </p>
-          <p class="hint" style="margin-top:8px">素材目录: ${escapeHtml(state.config?.input_dir || '未知')}</p>
         </li>
       `;
     } else {
@@ -319,8 +343,7 @@ export function renderVideoList() {
         <li class="empty-state">
           ${icon('video', 36)}
           <h4>暂无视频素材</h4>
-          <p>请将视频文件（.mp4/.mov/.mkv等）放入素材目录</p>
-          <p class="hint">素材目录: ${escapeHtml(state.config?.input_dir || '未知')}</p>
+          <p>点击上方「添加视频」按钮选择视频文件</p>
         </li>
       `;
     }

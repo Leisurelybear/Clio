@@ -23,7 +23,7 @@ const state = {
   projects: [],
   currentProject: null,
   currentProjectName: null,
-  currentProjectInputDir: null,
+  currentProjectDir: null,
   lastProject: null,
   groups: {},
   expandedGroups: {},

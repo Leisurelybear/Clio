@@ -16,7 +16,7 @@
   </div>
   <div class="source-toggle">
     <button data-source="compressed" class="active" title="浏览 output/compressed/ 下的 640p 压缩视频">压缩</button>
-    <button data-source="original" title="浏览 input_dir 下的原始 4K 视频">原视频</button>
+    <button data-source="original" title="浏览项目视频列表中的原始 4K 视频">原视频</button>
   </div>
   <div class="actions">
     <span id="status" class="status"></span>
@@ -71,8 +71,12 @@
       </ul>
       <h3>视频 <span id="video-count" class="muted"></span></h3>
       <div class="video-list-actions">
+        <button id="btn-add-videos" class="sidebar-btn" title="从文件夹选择视频文件添加到项目">
+          <span class="icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+          添加视频
+        </button>
         <button id="btn-select-videos" class="sidebar-btn" style="display:none" title="选择部分视频运行">
-          <span class="icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>
+          <span class="icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span>
           选择视频
         </button>
       </div>
@@ -186,19 +190,22 @@
   </div>
 </div>
 
-<!-- Directory Browser Modal -->
-<div id="modal-browse-dir" class="modal" style="display:none;">
+<!-- Video Manager Modal -->
+<div id="modal-video-manage" class="modal" style="display:none;">
   <div class="modal-backdrop"></div>
   <div class="modal-dialog modal-dialog-wide">
-    <h3>选择目录</h3>
-    <div class="browse-path" id="browse-path">正在加载...</div>
-    <div class="browse-dir-list" id="browse-dir-list">
+    <h3>添加视频文件</h3>
+    <p class="hint">浏览目录，勾选视频文件后点击「添加选中」</p>
+    <div class="browse-path" id="vm-path">正在加载...</div>
+    <div class="browse-dir-list" id="vm-list">
       <p class="muted">正在加载...</p>
     </div>
+    <div id="vm-selected-count" class="vm-selected-count">已选 0 个文件</div>
     <div class="modal-actions" style="margin-top:12px;">
-      <button id="browse-up" class="btn-secondary">上级目录</button>
-      <button id="browse-select" class="btn-primary" disabled>选择当前目录</button>
-      <button id="browse-cancel" class="btn-secondary">取消</button>
+      <button id="vm-up" class="btn-secondary">上级目录</button>
+      <button id="vm-select-all" class="btn-secondary">全选</button>
+      <button id="vm-add" class="btn-primary" disabled>添加选中</button>
+      <button id="vm-cancel" class="btn-secondary">取消</button>
     </div>
   </div>
 </div>

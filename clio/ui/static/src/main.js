@@ -41,15 +41,15 @@ async function init() {
   initLayout();
   initTheme();
 
-  // 从 URL 读取 project + input_dir 参数
+  // 从 URL 读取 project + project_dir 参数
   const urlParams = new URLSearchParams(window.location.search);
   const urlProject = urlParams.get('project');
-  const urlInputDir = urlParams.get('input_dir');
+  const urlProjectDir = urlParams.get('project_dir');
   if (urlProject) {
     state.currentProjectName = urlProject;
   }
-  if (urlInputDir) {
-    state.currentProjectInputDir = urlInputDir;
+  if (urlProjectDir) {
+    state.currentProjectDir = urlProjectDir;
   }
 
   // Auto-capture token from URL
@@ -67,16 +67,16 @@ async function init() {
   newModal.querySelector('.modal-backdrop').onclick = () => { newModal.style.display = 'none'; };
   $('np-create').onclick = async () => {
     const name = $('np-name').value.trim();
-    const inputDir = $('np-input-dir').value.trim();
+    const projectDir = $('np-input-dir').value.trim();
     const outputDir = $('np-output-dir').value.trim();
-    if (!name || !inputDir) { setStatus('Please fill in name and input directory', 'warn'); return; }
+    if (!name || !projectDir) { setStatus('Please fill in name and project directory', 'warn'); return; }
     try {
-      const body = { name, input_dir: inputDir };
+      const body = { name, project_dir: projectDir };
       if (outputDir) body.output_dir = outputDir;
       const r = await api('POST', '/api/project/create', body);
       if (r.ok) {
         newModal.style.display = 'none';
-        window.location.search = `?project=${encodeURIComponent(name)}&input_dir=${encodeURIComponent(inputDir)}`;
+        window.location.search = `?project=${encodeURIComponent(name)}&project_dir=${encodeURIComponent(projectDir)}`;
       } else {
         setStatus('Create failed: ' + (r.error || 'unknown error'), 'err');
       }
@@ -93,47 +93,58 @@ async function init() {
       const allProjects = r.projects || [];
       const openList = $('project-list-modal');
       openList.innerHTML = allProjects.length
-        ? allProjects.map(p => `
-          <div class="project-card ${p.is_current ? 'active' : ''}" data-name="${escapeHtml(p.name)}" data-input-dir="${escapeHtml(p.input_dir)}">
+        ? allProjects.map(p => {
+          const isLegacy = p.legacy;
+          const cardClass = `project-card ${p.is_current ? 'active' : ''} ${isLegacy ? 'project-card-legacy' : ''}`;
+          const legacyBadge = isLegacy ? '<span class="legacy-badge">旧版项目</span>' : '';
+          return `
+          <div class="${cardClass}" data-name="${escapeHtml(p.name || '')}" data-project-dir="${escapeHtml(p.project_dir || p.input_dir || '')}" data-legacy="${isLegacy}">
             <div class="project-card-header">
-              <span class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(current)' : ''}</span>
+              <span class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(current)' : ''} ${legacyBadge}</span>
               <button class="project-card-remove" title="Remove from project list">✕</button>
             </div>
             <div class="project-card-meta">
-              Input: ${escapeHtml(p.input_dir)}<br>
-              Output: ${escapeHtml(p.output_dir)}<br>
+              Project: ${escapeHtml(p.project_dir || p.input_dir || '')}<br>
+              Output: ${escapeHtml(p.output_dir || '')}<br>
               Steps: ${[['compress','compress'],['analyze','analyze'],['scripts','scripts'],['plan','plan'],['label','label'],['cut','cut']]
                 .map(([k,l]) => p.steps?.[k] ? `<span class="step-dot done" title="${l} done">${l}</span>` : `<span class="step-dot" title="${l} pending">${l}</span>`)
                 .join(' ')}
             </div>
-          </div>
-        `).join('')
+          </div>`;
+        }).join('')
         : '<p class="muted">No projects yet. Create one first.</p>';
+      function _setupRemoveBtn(card, name, projectDir) {
+        const removeBtn = card.querySelector('.project-card-remove');
+        if (!removeBtn) return;
+        removeBtn.onclick = async (e) => {
+          e.stopPropagation();
+          if (!confirm(`Remove "${name}" from project list?`)) return;
+          const r2 = await api('POST', '/api/project/remove', { project_dir: projectDir });
+          if (r2.ok) {
+            if (name === state.currentProject?.name && projectDir === state.currentProjectDir) {
+              openModal.style.display = 'none';
+              window.location.search = '';
+            } else {
+              $('btn-open-project').click();
+            }
+          }
+        };
+      }
       openList.querySelectorAll('.project-card').forEach(card => {
         card.onclick = (e) => {
           if (e.target.closest('.project-card-remove')) return;
           const name = card.dataset.name;
-          const removeBtn = card.querySelector('.project-card-remove');
-          if (removeBtn) {
-            removeBtn.onclick = async (e) => {
-              e.stopPropagation();
-              if (!confirm(`Remove "${name}" from project list?`)) return;
-              const r2 = await api('POST', '/api/project/remove', { input_dir: card.dataset.inputDir });
-              if (r2.ok) {
-                if (name === state.currentProject?.name && inputDir === state.currentProjectInputDir) {
-                  openModal.style.display = 'none';
-                  window.location.search = '';
-                } else {
-                  $('btn-open-project').click();
-                }
-              }
-            };
+          const projectDir = card.dataset.projectDir;
+          const isLegacy = card.dataset.legacy === 'true';
+          if (isLegacy) {
+            setStatus('旧版项目不支持直接打开，请新建项目', 'warn');
+            return;
           }
-          const inputDir = card.dataset.inputDir;
-          if (inputDir === state.currentProjectInputDir) { openModal.style.display = 'none'; return; }
+          _setupRemoveBtn(card, name, projectDir);
+          if (projectDir === state.currentProjectDir) { openModal.style.display = 'none'; return; }
           if (state.dirty && !confirm('Switch project? Unsaved changes will be lost.')) return;
           openModal.style.display = 'none';
-          window.location.search = `?project=${encodeURIComponent(name)}&input_dir=${encodeURIComponent(inputDir)}`;
+          window.location.search = `?project=${encodeURIComponent(name)}&project_dir=${encodeURIComponent(projectDir)}`;
         };
       });
     } catch (e) {
@@ -146,11 +157,11 @@ async function init() {
     const path = $('op-custom-path').value.trim();
     if (!path) { setStatus('Please enter a project directory path', 'warn'); return; }
     try {
-      const r = await api('POST', '/api/project/add', { input_dir: path });
+      const r = await api('POST', '/api/project/add', { project_dir: path });
       if (r.ok) {
         openModal.style.display = 'none';
         const name = r.project?.name || path.split(/[\\/]/).pop();
-        window.location.search = `?project=${encodeURIComponent(name)}&input_dir=${encodeURIComponent(path)}`;
+        window.location.search = `?project=${encodeURIComponent(name)}&project_dir=${encodeURIComponent(path)}`;
       } else {
         setStatus('Open failed: ' + (r.error || 'unknown error'), 'err');
       }
@@ -219,6 +230,7 @@ async function init() {
   document.getElementById('btn-theme').onclick = toggleTheme;
   $('btn-save').onclick = save;
   document.getElementById('btn-select-videos').addEventListener('click', toggleSelection);
+  document.getElementById('btn-add-videos').addEventListener('click', () => import('./sidebar-video-manage.js').then(m => m.openVideoManager()));
   $$('.tab').forEach(t => t.onclick = () => { state.currentTab = t.dataset.tab; renderActiveTab(); });
   setupPlayer();
   document.addEventListener('keydown', (e) => {
@@ -253,6 +265,11 @@ async function init() {
 
   try {
     await loadProjects();
+    // 检查上次使用的项目是否为旧版
+    function _isLastProjectLegacy() {
+      if (!state.lastProject || !state.projects) return false;
+      return state.projects.some(p => p.name === state.lastProject && p.legacy);
+    }
     // 如果没有 URL 指定项目，也没有上次使用的项目，显示打开界面
     if (!urlProject && !state.lastProject && !state.currentProject) {
       $('proj-name').textContent = '—';
@@ -261,17 +278,35 @@ async function init() {
       setStatus('No project loaded. Select a project to begin.', 'warn');
       return;
     }
+    // 如果上次使用的项目是旧版，跳过自动跳转，让用户新建项目
+    if (!urlProject && !urlProjectDir && _isLastProjectLegacy()) {
+      state.lastProject = null;
+      $('proj-name').textContent = '—';
+      $('proj-name-sidebar').textContent = '—';
+      $('btn-open-project').click();
+      setStatus('上次使用的项目是旧版，请新建项目', 'warn');
+      return;
+    }
     // 如果 URL 没有指定项目，但有上次使用的项目，自动跳转
-    if (!urlProject && !urlInputDir && state.lastProject && state.lastProject !== state.currentProject?.name) {
-      // Include input_dir from currentProject if available, to avoid ambiguity
-      const inputDirParam = state.currentProjectInputDir ? `&input_dir=${encodeURIComponent(state.currentProjectInputDir)}` : '';
-      window.location.search = `?project=${encodeURIComponent(state.lastProject)}${inputDirParam}`;
+    if (!urlProject && !urlProjectDir && state.lastProject && state.lastProject !== state.currentProject?.name) {
+      const projectDirParam = state.currentProjectDir ? `&project_dir=${encodeURIComponent(state.currentProjectDir)}` : '';
+      window.location.search = `?project=${encodeURIComponent(state.lastProject)}${projectDirParam}`;
       return;
     }
     // 如果 URL 指定了项目，但当前不是该项目，需要重载
-    if (urlInputDir && (!state.currentProject || state.currentProjectInputDir !== urlInputDir)) {
+    const urlProjectObj = state.projects?.find(p => p.name === urlProject || p.project_dir === urlProjectDir);
+    if (urlProjectObj?.legacy) {
+      state.currentProjectName = null;
+      state.currentProjectDir = null;
+      $('proj-name').textContent = '—';
+      $('proj-name-sidebar').textContent = '—';
+      $('btn-open-project').click();
+      setStatus('URL 指向的是旧版项目，不支持打开，请新建项目', 'warn');
+      return;
+    }
+    if (urlProjectDir && (!state.currentProject || state.currentProjectDir !== urlProjectDir)) {
       state.currentProjectName = urlProject;
-      state.currentProjectInputDir = urlInputDir;
+      state.currentProjectDir = urlProjectDir;
     } else if (urlProject && (!state.currentProject || state.currentProject.name !== urlProject)) {
       state.currentProjectName = urlProject;
     }

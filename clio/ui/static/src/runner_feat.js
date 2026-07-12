@@ -78,14 +78,7 @@ function renderRun() {
   pane.innerHTML = `
     <h3>运行流水线</h3>
     <p class="hint">选择要执行的步骤后点击「运行选中步骤」</p>
-    <label class="run-option">
-      <span class="run-option-label">本次素材目录</span>
-      <span class="input-with-browse">
-        <input id="run-input-dir" class="run-option-input" value="${escapeHtml(state.config?.input_dir || state.currentProjectInputDir || '')}" placeholder="留空则使用当前项目的 input_dir">
-        <button class="browse-btn" data-target="run-input-dir" type="button">浏览</button>
-      </span>
-    </label>
-    <p class="hint" style="margin-top:-4px">仅影响本次运行，不会写入 project.yaml。未选择具体文件时，将处理该目录下的所有视频。</p>
+    <p class="hint">当前项目：${escapeHtml(state.currentProjectDir || state.config?.project_dir || '未设置')}</p>
     <div class="run-step-list">${stepChecks}</div>
     <details class="run-prompt-section" style="margin:12px 0">
       <summary style="cursor:pointer;font-size:var(--text-sm);color:var(--text-secondary);user-select:none">⌨ 高级提示词（可选）</summary>
@@ -193,10 +186,6 @@ async function startRun() {
       steps: checked,
       use_transcripts: $('run-use-transcripts').checked,
     };
-    const runInputDir = $('run-input-dir')?.value?.trim();
-    if (runInputDir) {
-      body.input_dir = runInputDir;
-    }
     if (state.selectionMode && state.selectedFiles.length > 0) {
       body.files = state.selectedFiles;
     }
@@ -257,8 +246,8 @@ function _startRunSSE() {
   if (state.currentProjectName) {
     addQuery('project', state.currentProjectName);
   }
-  if (state.currentProjectInputDir) {
-    addQuery('input_dir', state.currentProjectInputDir);
+  if (state.currentProjectDir) {
+    addQuery('project_dir', state.currentProjectDir);
   }
   addQuery('token', sessionStorage.getItem('api_token'));
   _runEventSource = new EventSource(url);
