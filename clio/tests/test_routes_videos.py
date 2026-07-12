@@ -7,7 +7,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from clio.ui.routes.videos import _VIDEOS_CACHE, _parse_segment_info, handle_get_video, handle_get_videos
+from clio.ui.routes.videos import (
+    _VIDEOS_CACHE,
+    _parse_segment_info,
+    handle_get_video,
+    handle_get_videos,
+    handle_put_videos_selected,
+)
 
 
 def _clear_videos_cache() -> None:
@@ -472,3 +478,44 @@ class TestHandleGetVideo:
 
         handle_get_video(handler, {"file": [""], "source": ["original"], "abspath": [str(tmp_path / "missing.mp4")]})
         handler.send_error.assert_called_once_with(HTTPStatus.NOT_FOUND)
+
+
+class TestVideosJsonCacheInvalidation:
+    def test_videos_json_change_invalidates_cache(self, tmp_path: Path):
+        """Adding videos via PUT must not serve a stale empty list from cache."""
+
+        _clear_videos_cache()
+        handler = MagicMock()
+        proj_input = tmp_path / "proj"
+        proj_input.mkdir()
+        proj_out = tmp_path / "out"
+        (proj_out / "compressed").mkdir(parents=True)
+        external = tmp_path / "ext"
+        external.mkdir()
+        video = external / "clip.mp4"
+        video.write_bytes(b"x")
+
+        handler._resolve_project_input.return_value = proj_input
+        handler._get_project_output.return_value = proj_out
+        handler._get_config.return_value = SimpleNamespace(
+            paths=SimpleNamespace(ffprobe=""),
+            whisper=SimpleNamespace(transcripts_subdir="transcripts"),
+        )
+        handler._send_json = MagicMock()
+
+        # 1) empty list (no videos.json) — cache empty payload
+        handle_get_videos(handler, {"source": ["original"]})
+        payload1 = handler._send_json.call_args[0][0]
+        assert payload1["videos"] == []
+
+        # 2) PUT selection
+        handler._send_json.reset_mock()
+        handle_put_videos_selected(handler, {}, {"videos": [str(video.resolve())]})
+        assert (proj_input / "videos.json").is_file()
+
+        # 3) GET again must reflect selection
+        handler._send_json.reset_mock()
+        handle_get_videos(handler, {"source": ["original"]})
+        payload2 = handler._send_json.call_args[0][0]
+        assert len(payload2["videos"]) == 1
+        assert payload2["videos"][0].get("abs_path")

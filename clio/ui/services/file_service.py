@@ -161,8 +161,10 @@ def _list_drives() -> list[str]:
 def _find_original_for_compressed(
     stem: str, input_dir: Path, comp_dir: Path | None = None, project_dir: Path | None = None
 ) -> str | None:
-    """For a compressed stem like '001_GL010695', find the matching original basename.
-    Prefers .vmeta for O(1) lookup; falls back to videos.json then stem matching.
+    """For a compressed stem like '001_GL010695', find the matching original path.
+
+    Returns an absolute path string when possible (external originals via .vmeta /
+    videos.json), otherwise a basename under input_dir/project_dir for legacy.
     """
     # Try .vmeta first (O(1), supports any directory layout)
     if comp_dir is not None:
@@ -171,28 +173,33 @@ def _find_original_for_compressed(
                 continue
             meta = VideoMeta.read(p)
             if meta is not None:
-                return Path(meta.source_path).name
+                sp = Path(meta.source_path)
+                return str(sp.resolve()) if sp.is_file() else str(sp)
 
     if "_" not in stem:
         return None
     suffix = stem.split("_", 1)[1].lower()
 
     # Project dir: use load_selected_videos when videos.json is present
-    if project_dir:
+    lookup_dir = project_dir or input_dir
+    if lookup_dir:
         from clio.tasks._video_loader import load_selected_videos
 
-        selected = load_selected_videos(project_dir)
+        selected = load_selected_videos(lookup_dir)
         if selected:
             for p in selected:
                 if p.stem.lower() == suffix:
-                    return p.name
+                    return str(p.resolve())
             m = re.match(r"^(.+)_seg\d+$", suffix)
             if m:
                 base = m.group(1)
                 for p in selected:
                     if p.stem.lower() == base:
-                        return p.name
-            return None
+                        return str(p.resolve())
+            # videos.json present but no match — do not fall through to dir scan
+            # of project_dir (would miss external-only selections intentionally)
+            if project_dir is not None:
+                return None
 
     # Legacy fallback: stem matching under input_dir / project_dir
     scan_dir = input_dir if input_dir.is_dir() else (project_dir if project_dir and project_dir.is_dir() else None)
@@ -200,13 +207,13 @@ def _find_original_for_compressed(
         return None
     for p in sorted(scan_dir.iterdir()):
         if p.is_file() and p.stem.lower() == suffix:
-            return p.name
+            return str(p.resolve())
     m = re.match(r"^(.+)_seg\d+$", suffix)
     if m:
         base = m.group(1)
         for p in sorted(scan_dir.iterdir()):
             if p.is_file() and p.stem.lower() == base:
-                return p.name
+                return str(p.resolve())
     return None
 
 

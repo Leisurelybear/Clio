@@ -96,9 +96,20 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     handler._send_json(payload)
 
 
+def _file_fingerprint(path: Path) -> tuple[Any, ...]:
+    """Fingerprint a single file (size, mtime) for cache invalidation."""
+    try:
+        st = path.stat()
+        return (st.st_size, st.st_mtime_ns)
+    except OSError:
+        return ()
+
+
 def _videos_cache_signature(proj_input: Path, proj_out: Path, comp_dir: Path, cfg: Any) -> tuple[Any, ...]:
     text_dirs = tuple(_find_texts_dirs(proj_out))
+    videos_json = proj_input / "videos.json"
     return (
+        _file_fingerprint(videos_json),  # must invalidate when selection changes
         _dir_fingerprint(proj_input, video_only=True),
         _dir_fingerprint(comp_dir),
         tuple((str(td), _dir_fingerprint(td, json_only=True)) for td in text_dirs),
@@ -107,6 +118,18 @@ def _videos_cache_signature(proj_input: Path, proj_out: Path, comp_dir: Path, cf
         cfg.whisper.transcripts_subdir,
         cfg.paths.ffprobe,
     )
+
+
+def _invalidate_videos_cache(proj_input: Path | None = None) -> None:
+    """Drop cached /api/videos payloads (all sources for a project, or entire cache)."""
+    with _VIDEOS_CACHE_LOCK:
+        if proj_input is None:
+            _VIDEOS_CACHE.clear()
+            return
+        key_prefix = str(proj_input.resolve())
+        for key in list(_VIDEOS_CACHE):
+            if key[0] == key_prefix:
+                _VIDEOS_CACHE.pop(key, None)
 
 
 def _dir_fingerprint(path: Path, *, video_only: bool = False, json_only: bool = False) -> tuple[Any, ...]:
@@ -168,18 +191,22 @@ def _build_videos_payload(
                 idx = stem.split("_", 1)[0] if "_" in stem else ""
                 group_key, seg_num = _parse_segment_info(stem)
                 group = index.lookup(compressed_stem=stem)
-                orig = _find_original_for_compressed(stem, proj_input, comp_dir)
+                orig = _find_original_for_compressed(stem, proj_input, comp_dir, project_dir=proj_input)
                 if selected_set is not None:
                     meta = VideoMeta.read(p)
                     if meta is not None:
                         if Path(meta.source_path).resolve() not in selected_set:
                             continue
                     elif orig:
-                        orig_resolved = (
-                            (proj_input / orig).resolve() if not Path(orig).is_absolute() else Path(orig).resolve()
-                        )
+                        op = Path(orig)
+                        orig_resolved = op.resolve() if op.is_absolute() else (proj_input / op).resolve()
                         if orig_resolved not in selected_set:
                             continue
+                match_file = None
+                if orig:
+                    op = Path(orig)
+                    match_file = op.name if not op.is_absolute() else op.name
+                    # Prefer absolute path for external originals so clients can pass abspath
                 v: dict[str, Any] = {
                     "file": p.name,
                     "source": "compressed",
@@ -188,7 +215,15 @@ def _build_videos_payload(
                     "text_json": group.texts[0].path.name if group and group.texts else None,
                     "script_json": group.script.path.name if group and group.script else None,
                     "transcript_file": group.transcript.stem if group and group.transcript else None,
-                    "match": ({"source": "original", "file": orig} if orig else None),
+                    "match": (
+                        {
+                            "source": "original",
+                            "file": match_file,
+                            "abs_path": str(Path(orig).resolve()) if orig and Path(orig).is_absolute() else None,
+                        }
+                        if orig
+                        else None
+                    ),
                     "group_key": group_key,
                     "segment_label": None,
                 }
@@ -408,4 +443,5 @@ def handle_put_videos_selected(handler: HandlerProtocol, qs: dict[str, Any], obj
         return handler._send_json({"ok": False, "error": "videos must be a list"}, 400)
     paths = [Path(p) for p in raw]
     save_selected_videos(proj_input, paths)
+    _invalidate_videos_cache(proj_input)
     handler._send_json({"ok": True})

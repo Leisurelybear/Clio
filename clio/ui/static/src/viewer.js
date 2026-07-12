@@ -17,7 +17,9 @@ function playVideoSegment(file, seekTo) {
     const projParam = state.currentProjectName ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
     const tokenParam = sessionStorage.getItem('api_token');
     const extraParam = tokenParam ? `&token=${encodeURIComponent(tokenParam)}` : '';
-    player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${projParam}${extraParam}`;
+    const v = (state.videos || []).find(x => x.file === file);
+    const absParam = v?.abs_path ? `&abspath=${encodeURIComponent(v.abs_path)}` : '';
+    player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${absParam}${projParam}${extraParam}`;
   }
 }
 

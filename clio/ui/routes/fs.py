@@ -17,14 +17,19 @@ from clio.ui.services.file_service import _list_drives
 
 
 def _is_allowed_path(resolved: Path) -> bool:
+    """Allow browsing under home, or anywhere on a Windows drive letter.
+
+    Local desktop tool: users need to pick originals on D:/E: etc. Restricting
+    to drive roots only made the video manager unusable for external media.
+    """
     try:
         if resolved.is_relative_to(Path.home()):
             return True
-    except ValueError:
+    except (ValueError, OSError):
         pass
     if sys.platform == "win32":
-        drive = resolved.drive
-        if drive and str(resolved) == drive + "\\":
+        # Any path with a drive letter (C:\..., D:\GoPro\..., UNC excluded)
+        if resolved.drive:
             return True
     return False
 
