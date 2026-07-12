@@ -1398,6 +1398,9 @@ button .icon { width: 12px; height: 12px; }
 .project-card-header { display: flex; justify-content: space-between; align-items: center; }
 .project-card-remove { background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 3px; line-height: 1; }
 .project-card-remove:hover { background: var(--bg-hover); color: var(--red); }
+.project-card-legacy { opacity: 0.65; cursor: not-allowed; border-color: var(--border); }
+.project-card-legacy:hover { border-color: var(--warn, #b8860b); background: var(--bg-surface-2); }
+.legacy-badge { display: inline-block; font-size: 0.7em; padding: 1px 6px; border-radius: 3px; background: var(--warn-bg, #2a2520); color: var(--warn, #b8860b); border: 1px solid var(--warn, #b8860b); margin-left: 6px; vertical-align: middle; }
 
 /* ── Rerun Overlay ─────────────────────────────────────────── */
 #rerun-overlay {
@@ -1463,6 +1466,11 @@ button .icon { width: 12px; height: 12px; }
 }
 .browse-item:last-child { border-bottom: none; }
 .browse-item:hover { background: var(--bg-active); color: #fff; }
+.browse-item.video-file { cursor: default; }
+.browse-item.video-file:hover { background: var(--bg-hover); color: var(--text-primary); }
+.browse-item input[type="checkbox"] { margin: 0; cursor: pointer; flex-shrink: 0; }
+.browse-item .file-size { margin-left: auto; font-size: var(--text-xs); color: var(--text-tertiary); }
+.vm-selected-count { font-size: var(--text-sm); color: var(--text-secondary); padding: 4px 0; }
 
 /* ── Video Menu Dropdown ───────────────────────────────────── */
 .video-actions { position: absolute; right: 6px; top: 6px; z-index: 10; }
@@ -1488,6 +1496,9 @@ button .icon { width: 12px; height: 12px; }
 }
 .menu-item:hover { background: var(--bg-active); }
 .menu-item:not(:last-child) { border-bottom: 1px solid var(--border); }
+.menu-item-danger { color: var(--red, #e53935); }
+.menu-item-danger:hover { background: rgba(229,57,53,0.12); }
+.menu-divider { height: 1px; background: var(--border); margin: 4px 0; }
 
 /* ── Transcript Tab ────────────────────────────── */
 .transcript-seg {

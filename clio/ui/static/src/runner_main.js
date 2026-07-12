@@ -297,8 +297,8 @@ function _startRunSSE() {
     url += sep + 'project=' + encodeURIComponent(state.currentProjectName);
     sep = '&';
   }
-  if (state.currentProjectInputDir) {
-    url += sep + 'input_dir=' + encodeURIComponent(state.currentProjectInputDir);
+  if (state.currentProjectDir) {
+    url += sep + 'project_dir=' + encodeURIComponent(state.currentProjectDir);
     sep = '&';
   }
   const token = sessionStorage.getItem('api_token');

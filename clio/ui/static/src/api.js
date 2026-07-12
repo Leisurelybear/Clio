@@ -12,14 +12,14 @@ async function api(method, url, body) {
     opts.headers['Content-Type'] = 'application/json';
     opts.body = JSON.stringify(body);
   }
-  // 自动附加 project + input_dir 查询参数
+  // 自动附加 project + project_dir 查询参数
   let sep = url.includes('?') ? '&' : '?';
   if (state.currentProjectName) {
     url += `${sep}project=${encodeURIComponent(state.currentProjectName)}`;
     sep = '&';
   }
-  if (state.currentProjectInputDir) {
-    url += `${sep}input_dir=${encodeURIComponent(state.currentProjectInputDir)}`;
+  if (state.currentProjectDir) {
+    url += `${sep}project_dir=${encodeURIComponent(state.currentProjectDir)}`;
   }
   const r = await fetch(url, opts);
   if (r.status === 401) {

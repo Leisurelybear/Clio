@@ -7,6 +7,7 @@ import { api } from './api.js';
 import { playVideoSegment, stopPreview } from './viewer.js';
 import { showRerunProgress, hideRerunProgress } from './sidebar-rerun.js';
 import { openBrowseDir, loadBrowseDir } from './sidebar-browse.js';
+import { openVideoManager } from './sidebar-video-manage.js';
 import {
   loadProjects, loadConfig, loadPlans, loadProject, loadVideos, saveProject,
   updateSelectBtnVisibility, renderSteps, renderVideoList,
@@ -35,7 +36,8 @@ async function selectVideo(file) {
   const projParam = state.currentProjectName ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
   const tokenParam = sessionStorage.getItem('api_token');
   const extraParam = tokenParam ? `&token=${encodeURIComponent(tokenParam)}` : '';
-  player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${projParam}${extraParam}`;
+  const absParam = v.abs_path ? `&abspath=${encodeURIComponent(v.abs_path)}` : '';
+  player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${absParam}${projParam}${extraParam}`;
   $('player-name').textContent = file;
 
   player.onloadedmetadata = () => {
