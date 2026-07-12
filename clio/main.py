@@ -21,22 +21,31 @@ PLACEHOLDER_KEYS = {"your_api_key_here", "YOUR_API_KEY", ""}
 
 def _add_io_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
+        "-p",
+        "--project",
+        type=Path,
+        help="项目目录（包含 project.yaml）",
+    )
+    parser.add_argument(
         "-i",
         "--input",
         type=Path,
-        help="素材文件夹（覆盖 config.yaml 中的 input_dir）",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "-o",
         "--output",
         type=Path,
-        help="输出文件夹（默认 output/<素材文件夹名>）",
+        help="输出文件夹覆盖",
     )
 
 
 def _prepare_config(config_path: Path, args: argparse.Namespace):
+    raw_project = getattr(args, "project", None)
     raw_input = getattr(args, "input", None)
-    project_dir = raw_input if (raw_input and raw_input.is_dir()) else Path.cwd()
+    project_dir = raw_project or raw_input
+    if not project_dir or not project_dir.is_dir():
+        project_dir = Path.cwd()
     config = load_config(config_path, project_dir=project_dir)
     output_override = getattr(args, "output", None)
     if output_override:
