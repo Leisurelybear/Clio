@@ -207,6 +207,10 @@ def _list_projects(
         version = data.get("version", 1)
         proj_out = _project_output_dir(p)
         seen_dirs.add(str(p.resolve()))
+        has_videos_json = (p / "videos.json").is_file()
+        yaml_has_input = _project_yaml_has_input_dir(p)
+        # True legacy: still has paths.input_dir → needs `python main.py migrate`
+        # Missing videos.json alone is needs_videos (openable, empty selection)
         projects.append(
             {
                 "name": name,
@@ -223,7 +227,9 @@ def _list_projects(
                     if current_project_input_dir
                     else (name == current_project_name if current_project_name else p.resolve() == input_dir.resolve())
                 ),
-                "legacy": version < 2,
+                "legacy": yaml_has_input,
+                "needs_videos": not has_videos_json,
+                "version": version if has_videos_json and not yaml_has_input else version,
             }
         )
 
@@ -241,6 +247,8 @@ def _list_projects(
                 data = {}
             name = data.get("name") or input_dir.name
             proj_out = _project_output_dir(input_dir)
+            has_videos_json = (input_dir / "videos.json").is_file()
+            yaml_has_input = _project_yaml_has_input_dir(input_dir)
             projects.append(
                 {
                     "name": name,
@@ -257,7 +265,9 @@ def _list_projects(
                         if current_project_input_dir
                         else (name == current_project_name if current_project_name else True)
                     ),
-                    "legacy": True,
+                    "legacy": yaml_has_input,
+                    "needs_videos": not has_videos_json,
+                    "version": data.get("version", 1),
                 }
             )
 
@@ -274,6 +284,19 @@ def _read_project_name(p: Path) -> str | None:
         return data.get("name")
     except (json.JSONDecodeError, OSError):
         return None
+
+
+def _project_yaml_has_input_dir(project_dir: Path) -> bool:
+    """True when project.yaml still declares the removed paths.input_dir field."""
+    proj_yaml = project_dir / "project.yaml"
+    if not proj_yaml.is_file():
+        return False
+    try:
+        data = yaml.safe_load(proj_yaml.read_text(encoding="utf-8")) or {}
+        paths = data.get("paths") or {}
+        return bool(paths.get("input_dir"))
+    except (OSError, yaml.YAMLError, AttributeError):
+        return False
 
 
 def resolve_project_input(qs: dict, input_dir: Path, config_path: Path | None) -> Path:

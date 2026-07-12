@@ -64,30 +64,34 @@ def _find_original_by_stem(original_stem: str, project_dir: Path | None = None) 
 
 def resolve_identity(
     compressed_path: Path,
-    index_or_input: str | Path,
-    index: str | None = None,
-    project_dir: Path | None = None,
+    index: str | Path,
+    project_dir: Path | str | None = None,
 ) -> MediaIdentity:
     """Build MediaIdentity from .vmeta sidecar first, fall back to filename parsing.
 
-    New call style:
+    Preferred:
         resolve_identity(compressed, "001", project_dir=proj)
-    Legacy call style (still accepted):
-        resolve_identity(compressed, input_dir, "001", project_dir=None)
+
+    Legacy (still accepted for older call sites/tests):
+        resolve_identity(compressed, input_dir_path, "001")
     """
-    # Normalize dual signatures
-    if isinstance(index_or_input, Path):
-        # legacy: (compressed, input_dir, index, project_dir?)
-        legacy_input = index_or_input
-        idx = index if isinstance(index, str) else str(index or "")
-        proj = project_dir if project_dir is not None else legacy_input
-    elif index is None and isinstance(index_or_input, str):
-        # new: (compressed, index, project_dir=?)
-        idx = index_or_input
-        proj = project_dir
+    if isinstance(index, Path):
+        # legacy: (compressed, input_dir, index_string_as_third_positional)
+        proj: Path | None = index
+        idx = project_dir if isinstance(project_dir, str) else str(project_dir or "")
     else:
-        idx = str(index_or_input)
-        proj = project_dir
+        idx = str(index)
+        if isinstance(project_dir, Path):
+            proj = project_dir
+        elif isinstance(project_dir, str) and project_dir:
+            # unlikely: project_dir passed as string path
+            try:
+                cand = Path(project_dir)
+                proj = cand if cand.is_dir() else None
+            except Exception:
+                proj = None
+        else:
+            proj = None
 
     compressed_stem = compressed_path.stem
     compressed_resolved = compressed_path.resolve()
