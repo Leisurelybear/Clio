@@ -129,14 +129,14 @@ def test_transcribe_default(mock_run, cli_runner, config_path):
     assert cfg_arg.analyze.skip_existing is True
 
 
-@patch("clio.main.apply_run_paths")
+@patch("clio.main.load_config")
 @patch("clio.tasks.transcribe.run_transcribe_all")
-def test_transcribe_with_input(mock_run, mock_apply, cli_runner, config_path, tmp_path):
-    """-i 参数应传递给 apply_run_paths"""
+def test_transcribe_with_input(mock_run, mock_load, cli_runner, config_path, tmp_path):
+    """-i 参数应传递给 load_config 作为 project_dir"""
     inp = tmp_path / "my_videos"
     inp.mkdir()
     cli_runner(["--config", str(config_path), "transcribe", "-i", str(inp)])
-    mock_apply.assert_called_once()
+    mock_load.assert_any_call(config_path, project_dir=inp)
 
 
 @patch("clio.pipeline.run_plan_vlog")

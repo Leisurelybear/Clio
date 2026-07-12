@@ -167,7 +167,7 @@ class TestV1ToV2Migration:
         (project_dir / "project.yaml").write_text(
             yaml.dump(
                 {
-                    "paths": {"input_dir": "./videos", "output_dir": "./output"},
+                    "paths": {"output_dir": "./output"},
                     "ai": {"tasks": {"voiceover": {"provider": "deepseek", "model": "deepseek-chat"}}},
                     "script": {"template_file": "./templates/vlog_template.md"},
                 }
@@ -177,7 +177,6 @@ class TestV1ToV2Migration:
 
         cfg = load_config(cfg_path, project_dir=project_dir)
 
-        assert cfg.paths.input_dir == (project_dir / "videos").resolve()
         assert cfg.paths.output_dir == (project_dir / "output").resolve()
         assert cfg.script.template_file == (project_dir / "templates" / "vlog_template.md").resolve()
 
@@ -201,19 +200,17 @@ class TestV1ToV2Migration:
 class TestCombinedWrappers:
     def test_combined_paths_global_fields(self):
         g = GlobalPathsConfig(ffmpeg="/usr/bin/ffmpeg", ffprobe="/usr/bin/ffprobe", logs_dir=Path("./my_logs"))
-        p = ProjectPathsConfig(input_dir=Path("./videos"), output_dir=Path("./out"))
+        p = ProjectPathsConfig(output_dir=Path("./out"))
         c = CombinedPaths(g, p)
         assert c.ffmpeg == "/usr/bin/ffmpeg"
         assert c.ffprobe == "/usr/bin/ffprobe"
         assert c.logs_dir == Path("./my_logs")
-        assert c.input_dir == Path("./videos")
         assert c.output_dir == Path("./out")
 
     def test_combined_paths_no_project(self):
         g = GlobalPathsConfig(ffmpeg="ffmpeg")
         c = CombinedPaths(g, None)
         assert c.ffmpeg == "ffmpeg"
-        assert c.input_dir == Path()
 
     def test_combined_ai_delegation(self):
         g = GlobalAIConfig(
@@ -281,13 +278,13 @@ class TestCombinedWrappers:
                 ai=GlobalAIConfig(providers={"g": ProviderConfig(name="g", type="gemini", api_key="k")}),
             ),
             project_cfg=ProjectConfig(
-                paths=ProjectPathsConfig(input_dir=Path("./videos")),
+                paths=ProjectPathsConfig(output_dir=Path("./out")),
                 compress=ProjectCompressConfig(target_size_mb=99),
                 ai=ProjectAIConfig(tasks={"t": TaskConfig(provider="g", model="m")}),
             ),
         )
         assert cfg.paths.ffmpeg == "ffmpeg"
-        assert cfg.paths.input_dir == Path("./videos")
+        assert cfg.paths.output_dir == Path("./out")
         assert cfg.compress.fps == 30
         assert cfg.compress.target_size_mb == 99
         assert "g" in cfg.ai.providers
@@ -297,7 +294,6 @@ class TestCombinedWrappers:
         cfg = AppConfig(global_cfg=GlobalConfig())
         assert cfg.compress.fps == 15
         assert cfg.compress.target_size_mb == 5
-        assert cfg.paths.input_dir == Path()
 
     def test_global_only_fields_not_affected_by_project(self):
         cfg = AppConfig(
@@ -393,36 +389,6 @@ class TestProhibitedFields:
 
 
 class TestApplyRunPaths:
-    def test_mutates_project_paths(self):
-        cfg = AppConfig(
-            global_cfg=GlobalConfig(paths=GlobalPathsConfig(ffmpeg="ffmpeg")),
-            project_cfg=ProjectConfig(paths=ProjectPathsConfig(input_dir=Path("in"), output_dir=Path("out"))),
-        )
-        new_input = (Path.cwd() / "new_input").resolve()
-        result = apply_run_paths(cfg, input_dir=new_input, output_by_input_name=False)
-        assert result.project_cfg.paths.input_dir == new_input
-        assert result.project_cfg.paths.output_dir == Path("out")
-
-    def test_does_not_mutate_global(self):
-        cfg = AppConfig(
-            global_cfg=GlobalConfig(paths=GlobalPathsConfig(ffmpeg="ffmpeg")),
-            project_cfg=ProjectConfig(paths=ProjectPathsConfig(input_dir=Path("in"))),
-        )
-        new_input = (Path.cwd() / "new_input").resolve()
-        result = apply_run_paths(cfg, input_dir=new_input, output_by_input_name=False)
-        assert result.global_cfg.paths.ffmpeg == "ffmpeg"
-
-    def test_returns_deep_copy(self):
-        cfg = AppConfig(
-            global_cfg=GlobalConfig(),
-            project_cfg=ProjectConfig(paths=ProjectPathsConfig(input_dir=Path("in"))),
-        )
-        new_input = (Path.cwd() / "new_input").resolve()
-        result = apply_run_paths(cfg, input_dir=new_input, output_by_input_name=False)
-        assert result is not cfg
-        assert result.project_cfg is not cfg.project_cfg
-        assert result.project_cfg.paths is not cfg.project_cfg.paths
-
     def test_output_dir_set_explicitly(self):
         cfg = AppConfig(
             global_cfg=GlobalConfig(),
@@ -432,17 +398,17 @@ class TestApplyRunPaths:
         result = apply_run_paths(cfg, output_dir=new_output)
         assert result.project_cfg.paths.output_dir == new_output
 
-    def test_output_by_input_name(self):
-        base = (Path.cwd() / "base_output").resolve()
-        cfg = AppConfig(
-            global_cfg=GlobalConfig(),
-            project_cfg=ProjectConfig(paths=ProjectPathsConfig(output_dir=base)),
-        )
-        new_input = (Path.cwd() / "source" / "custom_name").resolve()
-        result = apply_run_paths(cfg, input_dir=new_input, output_by_input_name=True)
-        assert result.project_cfg.paths.output_dir == base / "custom_name"
-
     def test_no_project_cfg_returns_unchanged(self):
         cfg = AppConfig(global_cfg=GlobalConfig())
-        result = apply_run_paths(cfg, input_dir=Path("/in"))
+        result = apply_run_paths(cfg)
         assert result.project_cfg is None
+
+    def test_returns_deep_copy(self):
+        cfg = AppConfig(
+            global_cfg=GlobalConfig(),
+            project_cfg=ProjectConfig(paths=ProjectPathsConfig(output_dir=Path("out"))),
+        )
+        result = apply_run_paths(cfg, output_dir=Path("/custom_output"))
+        assert result is not cfg
+        assert result.project_cfg is not cfg.project_cfg
+        assert result.project_cfg.paths is not cfg.project_cfg.paths

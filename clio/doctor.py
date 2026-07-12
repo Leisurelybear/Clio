@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePath, PureWindowsPath
 from typing import Literal
 
-from clio.config import AppConfig, apply_run_paths, load_config
+from clio.config import AppConfig, load_config
 from clio.utils import discover_ffmpeg_bin
 
 DoctorStatus = Literal["OK", "WARN", "FAIL"]
@@ -175,7 +175,7 @@ def run_doctor(config_path: Path, input_dir: Path | None = None) -> int:
     try:
         config = load_config(config_path)
         if input_dir is not None:
-            config = apply_run_paths(config, input_dir=input_dir, output_dir=None, output_by_input_name=False)
+            config = load_config(config_path, project_dir=input_dir)
         items.append(DoctorItem("配置文件", "OK", str(config_path)))
     except Exception as exc:
         items.append(DoctorItem("配置文件", "FAIL", str(exc)))
