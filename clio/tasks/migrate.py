@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from clio.tasks._video_loader import save_selected_videos
+from clio.tasks._video_loader import load_selected_videos, save_selected_videos
 from clio.utils import find_videos
 
 
@@ -81,13 +81,34 @@ def run_migrate(config_path: Path, from_path: Path | None = None) -> tuple[int, 
     return updated, errors
 
 
+def _resolve_output_dir(old_dir: Path, paths_raw: dict[str, Any], project_json: Path) -> Path:
+    """Resolve the absolute output directory for a legacy project."""
+    out_raw = paths_raw.get("output_dir")
+    if out_raw:
+        out_path = Path(str(out_raw))
+        if not out_path.is_absolute():
+            out_path = (old_dir / out_path).resolve()
+        return out_path
+    if project_json.is_file():
+        try:
+            data = json.loads(project_json.read_text(encoding="utf-8"))
+            out_raw = data.get("output_dir")
+            if out_raw:
+                out_path = Path(str(out_raw))
+                if not out_path.is_absolute():
+                    out_path = (old_dir / out_path).resolve()
+                return out_path
+        except (json.JSONDecodeError, OSError):
+            pass
+    return (old_dir / "output").resolve()
+
+
 def _migrate_one(old_dir: Path, config_path: Path, registry_file: Path) -> tuple[bool, str]:
     """Migrate a single project directory. Returns (ok, message)."""
     old_yaml = old_dir / "project.yaml"
     if not old_yaml.is_file():
         return False, f"{old_dir}: 无 project.yaml"
 
-    # Skip if already migrated (has videos.json and no paths.input_dir)
     videos_json = old_dir / "videos.json"
     try:
         with old_yaml.open(encoding="utf-8") as f:
@@ -95,7 +116,7 @@ def _migrate_one(old_dir: Path, config_path: Path, registry_file: Path) -> tuple
     except Exception as e:
         return False, f"{old_dir}: 读取 project.yaml 失败: {e}"
 
-    paths_raw = old_raw.get("paths") or {}
+    paths_raw = dict(old_raw.get("paths") or {})
     has_input = bool(paths_raw.get("input_dir"))
     if videos_json.is_file() and not has_input:
         return False, f"{old_dir}: 已是新结构，跳过"
@@ -109,9 +130,14 @@ def _migrate_one(old_dir: Path, config_path: Path, registry_file: Path) -> tuple
         old_input_path = candidate if candidate.is_absolute() else (old_dir / candidate).resolve()
 
     name = old_raw.get("name") or old_dir.name
-    # In-place migration when project already lives at old_dir and videos are there;
-    # otherwise create <config_dir>/projects/<name>/.
-    if old_input_path.resolve() == old_dir.resolve() or videos_json.is_file():
+    old_json = old_dir / "project.json"
+    abs_output = _resolve_output_dir(old_dir, paths_raw, old_json)
+
+    # Prefer in-place: keep project at old_dir, only write videos.json + strip yaml.
+    # Non-in-place only when videos live outside old_dir AND we want a clean config home.
+    # Even then we preserve absolute output_dir so existing artifacts stay reachable.
+    if old_input_path.resolve() == old_dir.resolve() or videos_json.is_file() or abs_output.exists():
+        # Stay in place whenever output already has work, or videos are collocated
         new_dir = old_dir
         in_place = True
     else:
@@ -134,9 +160,8 @@ def _migrate_one(old_dir: Path, config_path: Path, registry_file: Path) -> tuple
     new_paths = dict(paths_raw)
     new_paths.pop("input_dir", None)
     new_paths.pop("recursive", None)
-    # Keep output_dir; default to ./output if missing
-    if "output_dir" not in new_paths or not new_paths["output_dir"]:
-        new_paths["output_dir"] = "./output"
+    # Always store absolute output_dir so non-in-place moves keep artifacts
+    new_paths["output_dir"] = str(abs_output)
     new_raw["paths"] = new_paths
     try:
         (new_dir / "project.yaml").write_text(
@@ -146,60 +171,47 @@ def _migrate_one(old_dir: Path, config_path: Path, registry_file: Path) -> tuple
     except Exception as e:
         return False, f"{old_dir}: 写入 project.yaml 失败: {e}"
 
-    # 3. Copy project.json if present and different location
-    old_json = old_dir / "project.json"
+    # 3. project.json
     new_json = new_dir / "project.json"
-    if old_json.is_file() and old_json.resolve() != new_json.resolve():
+    data: dict[str, Any] = {}
+    if old_json.is_file():
         try:
             data = json.loads(old_json.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):
             data = {}
-        data["version"] = 2
-        if "name" not in data:
-            data["name"] = name
-        try:
-            new_json.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        except OSError as e:
-            return False, f"{old_dir}: 写入 project.json 失败: {e}"
-    elif old_json.is_file() and in_place:
-        try:
-            data = json.loads(old_json.read_text(encoding="utf-8"))
-            data["version"] = 2
-            old_json.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        except (json.JSONDecodeError, OSError):
-            pass
-    elif not new_json.is_file():
-        # Minimal project.json
-        try:
-            new_json.write_text(
-                json.dumps(
-                    {
-                        "name": name,
-                        "version": 2,
-                        "output_dir": str((new_dir / "output").resolve()),
-                        "currentDay": "day1",
-                        "source": "compressed",
-                    },
-                    ensure_ascii=False,
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-        except OSError as e:
-            return False, f"{old_dir}: 创建 project.json 失败: {e}"
+    data["version"] = 2
+    data.setdefault("name", name)
+    data["output_dir"] = str(abs_output)
+    data.setdefault("currentDay", "day1")
+    data.setdefault("source", "compressed")
+    try:
+        new_json.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError as e:
+        return False, f"{old_dir}: 写入 project.json 失败: {e}"
 
-    # 4. Scan old input for videos → videos.json
-    if old_input_path.is_dir():
-        videos = find_videos(old_input_path, recursive=True)
+    # 4. videos.json — preserve curated list if already present and non-empty
+    existing = load_selected_videos(new_dir)
+    if not existing and old_dir.resolve() != new_dir.resolve():
+        existing = load_selected_videos(old_dir)
+    if existing:
+        videos = existing
+        save_selected_videos(new_dir, videos)
+        print(f"  保留已有 videos.json ({len(videos)} 个视频)")
     else:
-        videos = []
-    save_selected_videos(new_dir, videos)
-    print(f"  发现 {len(videos)} 个视频")
+        if old_input_path.is_dir():
+            videos = find_videos(old_input_path, recursive=True)
+            # Drop anything under the project's output tree (compressed artifacts)
+            out_resolved = abs_output.resolve()
+            videos = [v for v in videos if out_resolved not in v.resolve().parents and v.resolve() != out_resolved]
+        else:
+            videos = []
+        save_selected_videos(new_dir, videos)
+        print(f"  发现 {len(videos)} 个视频")
 
-    # 5. Update registry: replace old path with new
+    # 5. Update registry
     _update_registry(registry_file, old_dir, new_dir, name)
 
-    # 6. For non-in-place migration, leave a bak marker at old location
+    # 6. Non-in-place: retire old project.yaml (keep bak)
     if not in_place and old_yaml.is_file() and old_yaml.resolve() != (new_dir / "project.yaml").resolve():
         try:
             if not bak_yaml.is_file():
@@ -209,7 +221,7 @@ def _migrate_one(old_dir: Path, config_path: Path, registry_file: Path) -> tuple
         except OSError:
             pass
 
-    return True, f"已迁移 {name}: {new_dir} ({len(videos)} 视频)"
+    return True, f"已迁移 {name}: {new_dir} ({len(videos)} 视频, output={abs_output})"
 
 
 def _update_registry(registry_file: Path, old_dir: Path, new_dir: Path, name: str) -> None:
@@ -240,7 +252,6 @@ def _update_registry(registry_file: Path, old_dir: Path, new_dir: Path, name: st
         resolved = _resolve_entry(entry)
         if not resolved or resolved in (old_s, new_s):
             continue
-        # Keep plain path strings in registry
         if isinstance(entry, dict):
             projects.append(entry.get("project_dir") or entry.get("input_dir") or resolved)
         else:
@@ -248,19 +259,33 @@ def _update_registry(registry_file: Path, old_dir: Path, new_dir: Path, name: st
 
     if new_s not in {_resolve_entry(p) for p in projects}:
         projects.append(new_s)
-
     projects = [p for p in projects if p]
 
     last = reg.get("last_project")
+    should_update_last = False
     if isinstance(last, dict):
         last_dir = last.get("project_dir") or last.get("input_dir")
-        if last_dir and str(Path(last_dir).resolve()) == old_s:
-            last = {"name": name, "project_dir": new_s, "input_dir": new_s}
-    elif isinstance(last, str) and last == name:
+        if last_dir:
+            try:
+                if str(Path(last_dir).resolve()) == old_s:
+                    should_update_last = True
+            except Exception:
+                pass
+        if last.get("name") == name:
+            should_update_last = True
+    elif isinstance(last, str):
+        if last == name:
+            should_update_last = True
+        else:
+            try:
+                if str(Path(last).resolve()) == old_s:
+                    should_update_last = True
+            except Exception:
+                pass
+
+    if should_update_last or last is None:
         last = {"name": name, "project_dir": new_s, "input_dir": new_s}
 
-    out = {"projects": projects}
-    if last:
-        out["last_project"] = last
+    out: dict[str, Any] = {"projects": projects, "last_project": last}
     registry_file.parent.mkdir(parents=True, exist_ok=True)
     registry_file.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding="utf-8")

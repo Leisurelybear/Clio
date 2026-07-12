@@ -109,6 +109,16 @@ export async function loadVideos() {
   $('video-count').textContent = `(${state.videos.length})`;
   updateSelectBtnVisibility();
   renderVideoList();
+  // Hint when project has no selected originals yet
+  if (state.source === 'original' && state.videos.length === 0) {
+    try {
+      const sel = await api('GET', '/api/videos/selected');
+      const n = (sel.videos || []).length;
+      if (n === 0) {
+        setStatus('项目尚无视频，点击「添加视频」从磁盘选择素材（或运行 python main.py migrate）', 'ok');
+      }
+    } catch (_) { /* ignore */ }
+  }
 }
 
 export async function loadProject() {
