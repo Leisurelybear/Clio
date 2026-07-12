@@ -203,14 +203,29 @@ def _build_videos_payload(
                             continue
                     elif orig:
                         op = Path(orig)
-                        orig_resolved = op.resolve() if op.is_absolute() else (proj_input / op).resolve()
-                        if orig_resolved not in selected_set:
+                        try:
+                            orig_resolved = (
+                                op.resolve() if op.is_file() or op.is_absolute() else (proj_input / op).resolve()
+                            )
+                        except OSError:
                             continue
+                        if orig_resolved not in selected_set:
+                            # also try basename membership for offline paths stored differently
+                            if not any(s.name == Path(orig).name for s in selected_set):
+                                continue
+                    else:
+                        # selection active but cannot link this compressed file → hide
+                        continue
                 match_file = None
+                abs_match = None
                 if orig:
                     op = Path(orig)
-                    match_file = op.name if not op.is_absolute() else op.name
-                    # Prefer absolute path for external originals so clients can pass abspath
+                    match_file = op.name
+                    if op.is_absolute() or op.is_file():
+                        try:
+                            abs_match = str(op.resolve())
+                        except OSError:
+                            abs_match = str(op)
                 v: dict[str, Any] = {
                     "file": p.name,
                     "source": "compressed",
@@ -223,7 +238,7 @@ def _build_videos_payload(
                         {
                             "source": "original",
                             "file": match_file,
-                            "abs_path": str(Path(orig).resolve()) if orig and Path(orig).is_absolute() else None,
+                            "abs_path": abs_match,
                         }
                         if orig
                         else None

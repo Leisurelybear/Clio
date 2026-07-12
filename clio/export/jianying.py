@@ -348,10 +348,17 @@ def export_plan_to_jianying(
         from clio.tasks._video_loader import load_selected_videos
 
         videos = list(load_selected_videos(project_dir))
+        if not videos:
+            print(
+                f"  [警告] 项目 videos.json 为空或不存在: {project_dir / 'videos.json'}。"
+                f" 请先在 UI「添加视频」或运行 python main.py migrate"
+            )
     else:
         from clio.utils import find_videos
 
-        videos = list(find_videos(input_dir, recursive=True))
+        videos = list(find_videos(input_dir, recursive=True)) if input_dir else []
+        if not videos:
+            print("  [警告] 未找到源视频（未设置 project_dir 且 input 扫描为空）")
     materials, index_to_material_id, seq_text_ids = _build_materials(plan_data, videos, ffprobe, index_to_source)
     tracks = _build_tracks(plan_data, index_to_material_id, seq_text_ids, index_to_offset)
 

@@ -25,21 +25,49 @@ if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
 
 
-def _apply_run_input_dir_override(cfg, input_dir_raw: str | None) -> tuple[Any, str | None]:
-    """Return a run-local config copy when the request overrides input_dir."""
-    if input_dir_raw is None:
+def _apply_run_project_dir_override(cfg, project_dir_raw: str | None) -> tuple[Any, str | None]:
+    """Return a run-local config copy when the request overrides project_dir.
+
+    Accepts body.project_dir or legacy body.input_dir. The path must be a project
+    directory containing videos.json (or empty selection = no work).
+    """
+    if project_dir_raw is None:
         return cfg, None
-    if not isinstance(input_dir_raw, str):
-        return cfg, "input_dir must be a string"
-    input_dir_raw = input_dir_raw.strip()
-    if not input_dir_raw:
+    if not isinstance(project_dir_raw, str):
+        return cfg, "project_dir must be a string"
+    project_dir_raw = project_dir_raw.strip()
+    if not project_dir_raw:
         return cfg, None
-    input_dir = Path(input_dir_raw).expanduser()
-    if not input_dir.is_dir():
-        return cfg, f"input_dir not found: {input_dir_raw}"
+    project_dir = Path(project_dir_raw).expanduser()
+    if not project_dir.is_dir():
+        return cfg, f"project_dir not found: {project_dir_raw}"
     run_cfg = copy.deepcopy(cfg)
-    run_cfg._project_dir = input_dir
+    run_cfg._project_dir = project_dir.resolve()
     return run_cfg, None
+
+
+# Backward-compatible alias used by tests
+def _apply_run_input_dir_override(cfg, input_dir_raw: str | None) -> tuple[Any, str | None]:
+    return _apply_run_project_dir_override(cfg, input_dir_raw)
+
+
+def _resolve_found_original(orig: str | None, proj_dir: Path) -> Path | None:
+    """Turn _find_original_for_compressed result (abs path or basename) into a Path."""
+    if not orig:
+        return None
+    p = Path(orig)
+    if p.is_file():
+        return p.resolve()
+    if not p.is_absolute():
+        cand = (proj_dir / p).resolve()
+        if cand.is_file():
+            return cand
+    # Match by basename against videos.json
+    name = p.name
+    for sel in load_selected_videos(proj_dir):
+        if sel.name == name and sel.is_file():
+            return sel.resolve()
+    return None
 
 
 def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
@@ -124,7 +152,9 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
     steps = obj.get("steps")
     proj_input = handler._resolve_project_input(qs)
     cfg = handler._get_config(proj_input)
-    cfg, cfg_error = _apply_run_input_dir_override(cfg, obj.get("input_dir"))
+    cfg, cfg_error = _apply_run_project_dir_override(
+        cfg, obj.get("project_dir") if obj.get("project_dir") is not None else obj.get("input_dir")
+    )
     if cfg_error:
         return handler._send_json({"ok": False, "error": cfg_error}, 400)
     state = handler._get_state(str(proj_input.resolve()))
@@ -259,19 +289,10 @@ def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -
                         original_video = p.resolve()
                         break
             if original_video is None:
-                original_name = _find_original_for_compressed(
-                    stem, proj_input, cfg.compressed_dir, project_dir=proj_input
+                original_video = _resolve_found_original(
+                    _find_original_for_compressed(stem, proj_input, cfg.compressed_dir, project_dir=proj_input),
+                    proj_input,
                 )
-                if original_name:
-                    # Prefer videos.json absolute match by basename
-                    for p in load_selected_videos(proj_input):
-                        if p.name == original_name and p.is_file():
-                            original_video = p.resolve()
-                            break
-                    if original_video is None:
-                        candidate = proj_input / original_name
-                        if candidate.is_file():
-                            original_video = candidate
         if original_video is None:
             return handler._send_json({"ok": False, "error": f"original video not found: {video_basename}"}, 404)
     elif original_video is None:
@@ -288,18 +309,12 @@ def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -
                             original_video = sp.resolve()
                             break
         if original_video is None:
-            original_name = _find_original_for_compressed(stem, proj_input, comp_dir, project_dir=proj_input)
-            if not original_name:
-                return handler._send_json({"ok": False, "error": f"no matching original video for {stem}"}, 404)
-            for p in load_selected_videos(proj_input):
-                if p.name == original_name and p.is_file():
-                    original_video = p.resolve()
-                    break
+            original_video = _resolve_found_original(
+                _find_original_for_compressed(stem, proj_input, comp_dir, project_dir=proj_input),
+                proj_input,
+            )
             if original_video is None:
-                candidate = proj_input / original_name
-                if not candidate.is_file():
-                    return handler._send_json({"ok": False, "error": f"no matching original video for {stem}"}, 404)
-                original_video = candidate
+                return handler._send_json({"ok": False, "error": f"no matching original video for {stem}"}, 404)
 
     # Resolve texts JSON path (for voiceover rerun)
     raw_index = obj.get("index") or ""
