@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -17,6 +18,7 @@ def _cfg(tmp_path: Path, **overrides) -> SimpleNamespace:
             ffprobe="ffprobe",
             recursive=False,
         ),
+        project_dir=None,
         compressed_dir=tmp_path / "output" / "compressed",
         compress=SimpleNamespace(
             split_max_min=0,
@@ -40,6 +42,34 @@ def _cfg(tmp_path: Path, **overrides) -> SimpleNamespace:
 
 
 class TestRunCompressAll:
+    def test_uses_videos_json_when_project_dir_set(self, monkeypatch, tmp_path: Path):
+        """Must use load_selected_videos (not find_videos) when project_dir is set."""
+        cfg = _cfg(tmp_path)
+        cfg.project_dir = tmp_path / "input"
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir(parents=True, exist_ok=True)
+
+        video_dir = tmp_path / "external_sources"
+        video_dir.mkdir(parents=True, exist_ok=True)
+        video_path = video_dir / "gopro_clip.mp4"
+        video_path.write_bytes(b"\x00" * 1000)
+
+        videos_json = proj_dir / "videos.json"
+        videos_json.write_text(json.dumps([str(video_path)]), encoding="utf-8")
+
+        monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
+
+        def _mock_compress(inp, outp, c, **kw):
+            outp.write_bytes(b"\x00" * 300)
+            return outp
+
+        monkeypatch.setattr("clio.tasks.compress.compress_video", _mock_compress)
+        monkeypatch.setattr("clio.tasks.compress.split_video", lambda *a, **kw: [a[0]])
+
+        records = run_compress_all(cfg)
+        assert len(records) == 1
+        assert records[0].stem == "001_gopro_clip"
+
     def test_compress_single_file(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
         src = cfg.paths.input_dir / "test.mp4"
