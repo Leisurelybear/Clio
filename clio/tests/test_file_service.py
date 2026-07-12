@@ -354,7 +354,8 @@ class TestCreateProjectYaml:
         assert result is not None
         assert result == proj_input / "project.yaml"
         data = yaml.safe_load(result.read_text(encoding="utf-8"))
-        assert data["paths"]["input_dir"] == str(proj_input.resolve())
+        assert "input_dir" not in data.get("paths", {})
+        assert "recursive" not in data.get("paths", {})
         assert data["paths"]["output_dir"] == str(proj_out.resolve())
         assert data["compress"]["target_size_mb"] == 5
 
@@ -411,8 +412,9 @@ class TestCreateProjectYaml:
         proj_input.mkdir()
         result = _create_project_yaml(proj_input, config, tmp_path / "output")
         data = yaml.safe_load(result.read_text(encoding="utf-8"))
-        # Project fields should survive
-        assert data["paths"]["input_dir"] == str(proj_input.resolve())
+        # Project fields should survive; input_dir is no longer written
+        assert "input_dir" not in data.get("paths", {})
+        assert "recursive" not in data.get("paths", {})
         assert data["compress"]["target_size_mb"] == 10
         assert data["ai"]["context"] == "test context"
         # Global-only fields should be stripped

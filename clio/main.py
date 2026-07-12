@@ -14,7 +14,7 @@ from clio.log import setup_logging
 from clio.shutdown import before_stop, install_hooks
 from clio.ui import run as run_ui
 from clio.ui.services.file_service import _migrate_project_configs
-from clio.utils import discover_ffmpeg_bin, find_videos
+from clio.utils import discover_ffmpeg_bin
 
 PLACEHOLDER_KEYS = {"your_api_key_here", "YOUR_API_KEY", ""}
 
@@ -80,13 +80,14 @@ def run_check(config_path: Path, project_dir: Path | None = None) -> int:
     status("ffmpeg", bool(ffmpeg), ffmpeg or f"未找到，运行 {setup_script}")
     status("ffprobe", bool(ffprobe), ffprobe or "未找到")
 
-    check_dir = config.project_dir or config.paths.input_dir
-    if check_dir.is_dir():
-        videos = find_videos(check_dir, recursive=config.paths.recursive)
-        print(f"  [OK] 素材目录 ({len(videos)} 个视频) - {check_dir}")
+    from clio.tasks._video_loader import source_videos
+
+    project_dir = config.project_dir
+    videos = source_videos(config)
+    if project_dir and project_dir.is_dir():
+        print(f"  [OK] 项目 '{project_dir.name}' ({len(videos)} 个视频) - {project_dir}")
     else:
-        print("  [WARN] 素材目录未设置，使用 -i/--input 指定目录")
-        print(f"         config.yaml 默认: {check_dir}")
+        print("  [WARN] 未指定项目，使用 -p/--project 选择项目目录")
 
     print("\nAI 任务配置:")
     for task_name, task_cfg in config.ai.tasks.items():
@@ -104,11 +105,11 @@ def run_check(config_path: Path, project_dir: Path | None = None) -> int:
         config.proxy.url if config.proxy.enabled else "未启用",
     )
 
-    if not check_dir.is_dir():
+    if not project_dir or not project_dir.is_dir():
         print()
-        print("用法: python main.py <命令> -i <素材目录>")
-        example_path = "G:\\素材\\巴黎行" if os.name == "nt" else "/path/to/videos"
-        print(f"      例如: python main.py run -i {example_path}")
+        print("用法: python main.py <命令> -p <项目目录>")
+        example_path = "G:\\vlog-projects\\巴黎行" if os.name == "nt" else "/path/to/project"
+        print(f"      例如: python main.py run -p {example_path}")
     print(f"\ndone (exit code: {0 if ok else 1})")
     return 0 if ok else 1
 
@@ -240,6 +241,18 @@ def main(argv: list[str] | None = None) -> int:
 
     p_migrate = sub.add_parser("migrate-config", help="扫描已有项目的 project.yaml，补充缺失的 provider 配置字段")
     p_migrate.add_argument("--projects-root", type=Path, default=None, help="项目根目录（扫描子目录中的 project.yaml）")
+
+    p_migrate_projects = sub.add_parser(
+        "migrate",
+        help="将旧项目迁移到新结构（独立 project_dir + videos.json）",
+    )
+    p_migrate_projects.add_argument(
+        "--from",
+        type=Path,
+        default=None,
+        dest="from_path",
+        help="指定要迁移的项目路径（默认扫描注册表）",
+    )
 
     p_serve = sub.add_parser("serve", help="启动本地 web UI（浏览器里可视化编辑 AI 输出）")
     p_serve.add_argument("--host", default="127.0.0.1", help="监听地址（默认 127.0.0.1，不暴露到局域网）")
@@ -419,7 +432,7 @@ def main(argv: list[str] | None = None) -> int:
                 source=args.source,
             )
         elif args.command == "migrate-config":
-            root = args.projects_root or (config.project_dir or config.paths.input_dir).parent
+            root = args.projects_root or (config.project_dir or config_path.parent)
             updated, errors = _migrate_project_configs(root)
             print(f"已更新 {updated} 个 project.yaml")
             if errors:
@@ -427,6 +440,14 @@ def main(argv: list[str] | None = None) -> int:
                 for err in errors:
                     print(f"  - {err}")
             return 0
+        elif args.command == "migrate":
+            from clio.tasks.migrate import run_migrate
+
+            updated, errors = run_migrate(config_path, getattr(args, "from_path", None))
+            print(f"已迁移 {updated} 个项目")
+            for err in errors:
+                print(f"  错误: {err}")
+            return 0 if not errors or updated else 1
         elif args.command == "serve":
             return run_ui(
                 config,
@@ -448,8 +469,9 @@ def main(argv: list[str] | None = None) -> int:
                 args.format,
                 plan_path,
                 out_dir,
-                config.project_dir or config.paths.input_dir,
+                config.project_dir or Path(),
                 args.day,
+                project_dir=config.project_dir,
                 ffprobe=config.paths.ffprobe,
                 texts_dir=config.texts_dir,
             )

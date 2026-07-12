@@ -13,7 +13,7 @@ def _mock_config(tmp_path: Path):
     """Create a minimal AppConfig-like object."""
     cfg = MagicMock()
     cfg.paths.output_dir = tmp_path
-    cfg.paths.input_dir = tmp_path
+    cfg._project_dir = tmp_path
     cfg.analyze.skip_existing = False
     cfg.ai.providers = {}
     cfg.ai.tasks = {}

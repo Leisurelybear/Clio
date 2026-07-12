@@ -12,22 +12,25 @@ from clio.utils import get_duration_sec, resolve_binary
 from clio.vmeta import SegmentEntry, VideoIndex, VideoMeta
 
 
-def _find_original_for_stem(stem: str, input_dir: Path, project_dir: Path | None = None) -> Path | None:
-    """Try to find original video by stem (without index prefix)."""
-    if project_dir:
-        from clio.tasks._video_loader import load_selected_videos
+def _find_original_for_stem(stem: str, project_dir: Path | None = None) -> Path | None:
+    """Try to find original video by stem via videos.json (or project_dir scan)."""
+    from clio.tasks._video_loader import load_selected_videos
 
-        for p in load_selected_videos(project_dir):
-            if p.stem.lower() == stem.lower() and p.suffix.lower() in VIDEO_EXTS:
-                return p
-        return None
-    for ext in VIDEO_EXTS:
-        candidate = input_dir / f"{stem}{ext}"
-        if candidate.is_file():
-            return candidate
-    for p in input_dir.rglob("*"):
-        if p.is_file() and p.suffix.lower() in VIDEO_EXTS and p.stem.lower() == stem.lower():
+    selected = load_selected_videos(project_dir)
+    for p in selected:
+        if p.stem.lower() == stem.lower() and p.suffix.lower() in VIDEO_EXTS:
             return p
+    if project_dir is not None and project_dir.is_dir() and not selected:
+        for ext in VIDEO_EXTS:
+            candidate = project_dir / f"{stem}{ext}"
+            if candidate.is_file():
+                return candidate
+        try:
+            for p in project_dir.rglob("*"):
+                if p.is_file() and p.suffix.lower() in VIDEO_EXTS and p.stem.lower() == stem.lower():
+                    return p
+        except OSError:
+            pass
     return None
 
 
@@ -124,7 +127,7 @@ def run_reindex(config: AppConfig, ffprobe: str | None = None) -> int:
                     break
 
         if source_path is None:
-            source_path = _find_original_for_stem(orig_stem, config.paths.input_dir, config.project_dir)
+            source_path = _find_original_for_stem(orig_stem, config.project_dir)
 
         if source_path is None:
             print(f"  [跳过] {orig_stem}: 找不到原始视频")

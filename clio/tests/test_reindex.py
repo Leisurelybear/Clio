@@ -43,12 +43,10 @@ def config(compressed_dir: Path, input_dir: Path) -> AppConfig:
             paths=GlobalPathsConfig(ffprobe="ffprobe"),
         ),
         project_cfg=ProjectConfig(
-            paths=ProjectPathsConfig(
-                input_dir=input_dir,
-                output_dir=compressed_dir.parent,
-            ),
+            paths=ProjectPathsConfig(output_dir=compressed_dir.parent),
             analyze=AnalyzeConfig(compressed_subdir=compressed_dir.name),
         ),
+        project_dir=input_dir,
     )
 
 
@@ -74,10 +72,7 @@ class TestAutoReindexIfNeeded:
         cfg = AppConfig(
             global_cfg=GlobalConfig(),
             project_cfg=ProjectConfig(
-                paths=ProjectPathsConfig(
-                    input_dir=tmp_path,
-                    output_dir=tmp_path / "nonexistent",
-                ),
+                paths=ProjectPathsConfig(output_dir=tmp_path / "nonexistent"),
             ),
         )
         assert auto_reindex_if_needed(cfg) is False
@@ -146,7 +141,7 @@ class TestRunReindex:
             result = run_reindex(config)
 
         assert result == 1
-        mock_find.assert_called_once_with("GL010683", config.paths.input_dir, None)
+        mock_find.assert_called_once_with("GL010683", config.project_dir)
 
     def test_strips_seg_suffix(self, config: AppConfig, compressed_dir: Path, input_dir: Path) -> None:
         (compressed_dir / "001_GL010683_seg01.mp4").write_text("fake")

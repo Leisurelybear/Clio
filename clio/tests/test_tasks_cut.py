@@ -18,6 +18,7 @@ from clio.config.models import (
     ProjectPathsConfig,
     ScriptConfig,
 )
+from clio.tasks._video_loader import save_selected_videos
 from clio.vmeta import VideoMeta
 
 
@@ -33,7 +34,7 @@ def cfg(tmp_path) -> AppConfig:
             naming=NamingConfig(index_width=3),
         ),
         project_cfg=ProjectConfig(
-            paths=ProjectPathsConfig(input_dir=tmp_path / "videos", output_dir=tmp_path),
+            paths=ProjectPathsConfig(output_dir=tmp_path),
             analyze=AnalyzeConfig(
                 skip_existing=True,
                 texts_subdir="texts",
@@ -42,6 +43,7 @@ def cfg(tmp_path) -> AppConfig:
             script=ScriptConfig(scripts_subdir="scripts"),
             plan=PlanConfig(plans_subdir="plans"),
         ),
+        project_dir=tmp_path / "videos",
     )
 
 
@@ -85,8 +87,9 @@ class TestResolveVideoPath:
         """When .vmeta exists, _resolve_video_path returns the original path from vmeta."""
         compressed = cfg.compressed_dir / "001_src.mp4"
         compressed.write_bytes(b"\x00" * 100)
-        original = cfg.paths.input_dir / "src.mp4"
+        original = cfg.project_dir / "src.mp4"
         original.write_bytes(b"\x00" * 1000)
+        save_selected_videos(cfg.project_dir, [original])
         meta = VideoMeta.build(source=original, target=compressed, source_duration=10, target_duration=10)
         meta.write(compressed)
 
@@ -104,8 +107,9 @@ class TestResolveVideoPath:
         """Without .vmeta, _resolve_video_path falls back to rglob matching."""
         compressed = cfg.compressed_dir / "001_src.mp4"
         compressed.write_bytes(b"\x00" * 100)
-        original = cfg.paths.input_dir / "src.mp4"
+        original = cfg.project_dir / "src.mp4"
         original.write_bytes(b"\x00" * 1000)
+        save_selected_videos(cfg.project_dir, [original])
 
         seq = [{"index": "001", "title": "A", "use_timeline": "00:00-00:10"}]
         _write_plan(cfg, seq=seq)
@@ -257,7 +261,8 @@ class TestRunCutAll:
         _write_plan(cfg, seq=seq)
         (cfg.compressed_dir / "001_src_seg1.mp4").write_bytes(b"\x00")
         (cfg.compressed_dir / "001_src_seg2.mp4").write_bytes(b"\x00")
-        (cfg.paths.input_dir / "src.mp4").write_bytes(b"\x00")
+        (cfg.project_dir / "src.mp4").write_bytes(b"\x00")
+        save_selected_videos(cfg.project_dir, [cfg.project_dir / "src.mp4"])
         mock_resolve.return_value = "ffmpeg"
         with patch("clio.tasks.cut.get_duration_sec", return_value=120.0):
             from clio.tasks.cut import run_cut_all

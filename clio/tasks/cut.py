@@ -16,7 +16,6 @@ from clio.log import format_duration, timed
 from clio.processing_state import ProcessingState
 from clio.tasks._helpers import _eta_line
 from clio.utils import (
-    find_videos,
     get_duration_sec,
     resolve_binary,
     sanitize_name,
@@ -90,11 +89,11 @@ def run_cut_all(
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
     ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
     comp_dir = config.compressed_dir
-    input_dir = config.paths.input_dir
+    source_label = str(comp_dir if source == "compressed" else (config.project_dir or ""))
 
     print(f"[cut] 计划: {plan_path.name} ({len(seq)} 段)")
     print(f"[cut] 输出: {out_root}")
-    print(f"[cut] 视频来源: {source} ({comp_dir if source == 'compressed' else input_dir})")
+    print(f"[cut] 视频来源: {source} ({source_label})")
 
     state = ProcessingState(config.paths.output_dir)
 
@@ -122,20 +121,15 @@ def run_cut_all(
                 if src.is_file():
                     return src
 
-            # 降级：regex 反解 + rglob / load_selected_videos（修复 B-06）
+            # 降级：regex 反解 + videos.json
             suffix = compressed.stem.split("_", 1)[1].lower()
             m = _SEG_RE.match(suffix)
             orig_stem = m.group(1) if m else suffix
-            if config.project_dir:
-                from clio.tasks._video_loader import load_selected_videos
+            from clio.tasks._video_loader import source_videos
 
-                for p in load_selected_videos(config.project_dir):
-                    if p.stem.lower() == orig_stem:
-                        return p
-            else:
-                for p in find_videos(input_dir, recursive=True):
-                    if p.stem.lower() == orig_stem:
-                        return p
+            for p in source_videos(config):
+                if p.stem.lower() == orig_stem:
+                    return p
             return None
 
     clips: list[dict] = []

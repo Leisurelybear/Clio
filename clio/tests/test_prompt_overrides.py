@@ -23,7 +23,7 @@ def _config(project_dir: Path) -> AppConfig:
     return AppConfig(
         global_cfg=GlobalConfig(ai=GlobalAIConfig()),
         project_cfg=ProjectConfig(
-            paths=ProjectPathsConfig(input_dir=project_dir / "videos", output_dir=project_dir / "output"),
+            paths=ProjectPathsConfig(output_dir=project_dir / "output"),
             script=ScriptConfig(template_file=template),
         ),
     )
