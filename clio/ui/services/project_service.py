@@ -175,9 +175,9 @@ def _save_last_project(
 
 def _list_projects(
     config_path: Path | None,
-    input_dir: Path,
+    project_dir: Path,
     current_project_name: str | None = None,
-    current_project_input_dir: str | None = None,
+    current_project_dir: str | None = None,
 ) -> list[dict[str, Any]]:
     """List all available projects."""
     projects: list[dict[str, Any]] = []
@@ -220,9 +220,11 @@ def _list_projects(
                 "createdAt": data.get("createdAt"),
                 "updatedAt": data.get("updatedAt"),
                 "is_current": (
-                    str(p.resolve()) == current_project_input_dir
-                    if current_project_input_dir
-                    else (name == current_project_name if current_project_name else p.resolve() == input_dir.resolve())
+                    str(p.resolve()) == current_project_dir
+                    if current_project_dir
+                    else (
+                        name == current_project_name if current_project_name else p.resolve() == project_dir.resolve()
+                    )
                 ),
                 "legacy": yaml_has_input,
                 "needs_videos": not has_videos_json,
@@ -230,11 +232,11 @@ def _list_projects(
             }
         )
 
-    # 2. Include current input_dir fallback only when an explicit project was requested
+    # 2. Include current project_dir fallback only when an explicit project was requested
     if current_project_name:
-        cur_resolved = str(input_dir.resolve())
+        cur_resolved = str(project_dir.resolve())
         if cur_resolved not in seen_dirs:
-            proj_file = input_dir / "project.json"
+            proj_file = project_dir / "project.json"
             if proj_file.is_file():
                 try:
                     data = json.loads(proj_file.read_text(encoding="utf-8"))
@@ -242,14 +244,14 @@ def _list_projects(
                     data = {}
             else:
                 data = {}
-            name = data.get("name") or input_dir.name
-            proj_out = _project_output_dir(input_dir)
-            has_videos_json = (input_dir / "videos.json").is_file()
-            yaml_has_input = _project_yaml_has_input_dir(input_dir)
+            name = data.get("name") or project_dir.name
+            proj_out = _project_output_dir(project_dir)
+            has_videos_json = (project_dir / "videos.json").is_file()
+            yaml_has_input = _project_yaml_has_input_dir(project_dir)
             projects.append(
                 {
                     "name": name,
-                    "project_dir": str(input_dir),
+                    "project_dir": str(project_dir),
                     "output_dir": str(proj_out),
                     "currentDay": data.get("currentDay", "day1"),
                     "source": data.get("source", "compressed"),
@@ -257,8 +259,8 @@ def _list_projects(
                     "createdAt": data.get("createdAt"),
                     "updatedAt": data.get("updatedAt"),
                     "is_current": (
-                        str(input_dir.resolve()) == current_project_input_dir
-                        if current_project_input_dir
+                        str(project_dir.resolve()) == current_project_dir
+                        if current_project_dir
                         else (name == current_project_name if current_project_name else True)
                     ),
                     "legacy": yaml_has_input,
