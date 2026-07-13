@@ -36,7 +36,7 @@ def handle_get_project(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     qs_project = qs.get("project", [None])[0]
     config_path = handler.config_path
     if qs_project:
-        _save_last_project(qs_project, config_path, input_dir=str(proj_dir))
+        _save_last_project(qs_project, config_path, project_dir=str(proj_dir))
     merged = {**handler.DEFAULT_PROJECT, **data}
     proj_out = _project_output_dir(proj_dir)
     merged["steps"] = _detect_steps(proj_out)
@@ -88,7 +88,7 @@ def handle_put_project(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) 
     proj_dir.mkdir(parents=True, exist_ok=True)
     _save_atomic(proj_file, json.dumps(merged, ensure_ascii=False, indent=2).encode("utf-8"))
     config_path = handler.config_path
-    _save_last_project(merged.get("name") or proj_dir.name, config_path, input_dir=str(proj_dir))
+    _save_last_project(merged.get("name") or proj_dir.name, config_path, project_dir=str(proj_dir))
     handler._send_json({"ok": True})
 
 

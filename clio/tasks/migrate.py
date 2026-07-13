@@ -284,7 +284,7 @@ def _update_registry(registry_file: Path, old_dir: Path, new_dir: Path, name: st
                 pass
 
     if should_update_last or last is None:
-        last = {"name": name, "project_dir": new_s, "input_dir": new_s}
+        last = {"name": name, "project_dir": new_s}
 
     out: dict[str, Any] = {"projects": projects, "last_project": last}
     registry_file.parent.mkdir(parents=True, exist_ok=True)

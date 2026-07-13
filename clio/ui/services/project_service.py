@@ -157,7 +157,7 @@ def _save_last_project(
 ) -> None:
     """Persist the currently active project for auto-load on next startup.
 
-    Stores both name and project_dir so same-named projects can be disambiguated.
+    Stores name + project_dir. `input_dir` remains a keyword alias for callers.
     """
     registry_file = _registry_path(config_path)
     paths: list[str] = []
@@ -168,9 +168,7 @@ def _save_last_project(
         except (json.JSONDecodeError, OSError):
             paths = []
     dir_value = project_dir or input_dir
-    last_project: str | dict[str, str] = (
-        {"name": name, "project_dir": dir_value, "input_dir": dir_value} if dir_value else name
-    )
+    last_project: str | dict[str, str] = {"name": name, "project_dir": dir_value} if dir_value else name
     data: dict[str, Any] = {"projects": paths, "last_project": last_project}
     _save_atomic(registry_file, json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8"))
 
@@ -215,7 +213,6 @@ def _list_projects(
             {
                 "name": name,
                 "project_dir": str(p),
-                "input_dir": str(p),
                 "output_dir": str(proj_out),
                 "currentDay": data.get("currentDay", "day1"),
                 "source": data.get("source", "compressed"),
@@ -253,7 +250,6 @@ def _list_projects(
                 {
                     "name": name,
                     "project_dir": str(input_dir),
-                    "input_dir": str(input_dir),
                     "output_dir": str(proj_out),
                     "currentDay": data.get("currentDay", "day1"),
                     "source": data.get("source", "compressed"),
