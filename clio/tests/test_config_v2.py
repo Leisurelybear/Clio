@@ -69,7 +69,9 @@ class TestV1ToV2Migration:
         proj_path = tmp_path / "project.yaml"
         assert proj_path.is_file()
         proj_raw = yaml.safe_load(proj_path.read_text(encoding="utf-8"))
-        assert proj_raw["paths"]["input_dir"] == "./in"
+        # input_dir/recursive are no longer project config fields
+        assert "input_dir" not in proj_raw.get("paths", {})
+        assert "recursive" not in proj_raw.get("paths", {})
         assert proj_raw["paths"]["output_dir"] == "./out"
         assert proj_raw["ai"]["tasks"]["t"]["provider"] == "g"
         assert proj_raw["ai"]["context"] == "hello"

@@ -216,7 +216,7 @@ _GLOBAL_ONLY_SECTIONS = {"proxy", "server", "naming"}
 
 # Split-section keys belonging to project
 _SPLIT_PROJECT_KEYS: dict[str, set[str]] = {
-    "paths": {"input_dir", "output_dir", "recursive"},
+    "paths": {"output_dir"},
     "compress": {"target_size_mb", "max_width", "split_max_min", "splits_subdir", "reencode_split"},
     "ai": {"tasks", "context", "context_file"},
     "whisper": {"enabled", "model_size", "language", "device", "max_segments_per_clip", "transcripts_subdir"},

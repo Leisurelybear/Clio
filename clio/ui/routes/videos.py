@@ -196,7 +196,9 @@ def _build_videos_payload(
                 group_key, seg_num = _parse_segment_info(stem)
                 group = index.lookup(compressed_stem=stem)
                 orig = _find_original_for_compressed(stem, proj_dir, comp_dir, project_dir=proj_dir)
-                if selected_set is not None:
+                # Only filter when selection is non-empty. Empty videos.json still
+                # allows browsing existing compressed artifacts.
+                if selected_set:
                     meta = VideoMeta.read(p)
                     if meta is not None:
                         if Path(meta.source_path).resolve() not in selected_set:
@@ -210,7 +212,6 @@ def _build_videos_payload(
                         except OSError:
                             continue
                         if orig_resolved not in selected_set:
-                            # also try basename membership for offline paths stored differently
                             if not any(s.name == Path(orig).name for s in selected_set):
                                 continue
                     else:
@@ -308,24 +309,33 @@ def _build_videos_payload(
             _ffprobe = None
 
         if selected_set is not None:
+            # May be empty (new project). Offline/missing paths still listed so UI can show them.
             video_paths = sorted(selected_set, key=lambda p: p.name.lower())
         else:
-            # No videos.json selection → empty list (do not scan project_dir)
+            # No videos.json → empty list (do not scan project_dir)
             video_paths = []
         for p in video_paths:
             if p.is_dir() or p.suffix.lower() not in VIDEO_EXTS:
+                # Keep non-existing paths in list so user sees offline media
+                if not p.exists():
+                    videos.append(
+                        {
+                            "file": p.name,
+                            "source": "original",
+                            "index": None,
+                            "match": None,
+                            "abs_path": str(p),
+                            "missing": True,
+                        }
+                    )
                 continue
-            if selected_set is not None:
-                abs_path = str(p.resolve())
+            abs_path = str(p.resolve())
+            rel_name = p.name
+            proj_abs = proj_dir.resolve()
+            try:
+                rel_name = p.relative_to(proj_abs).as_posix()
+            except ValueError:
                 rel_name = p.name
-                proj_input_abs = proj_dir.resolve()
-                try:
-                    rel_name = p.relative_to(proj_input_abs).as_posix()
-                except ValueError:
-                    rel_name = p.name
-            else:
-                abs_path = None
-                rel_name = _original_rel_name(p, proj_dir)
             comp = _find_compressed_for_original(p.stem, comp_dir)
             if not comp:
                 orig_groups = index.lookup(original_stem=p.stem)

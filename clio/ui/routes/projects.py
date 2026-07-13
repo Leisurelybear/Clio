@@ -46,7 +46,7 @@ def handle_get_project(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
 def handle_get_projects(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/projects."""
     req_project = qs.get("project", [None])[0]
-    req_input_dir = qs.get("input_dir", [None])[0]
+    req_project_dir = qs.get("project_dir", [None])[0] or qs.get("input_dir", [None])[0]
     config_path = handler.config_path
     project_dir = handler.project_dir
     reg_file = _registry_path(config_path)
@@ -61,10 +61,10 @@ def handle_get_projects(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                 last_project_name = last_project
         except (json.JSONDecodeError, OSError):
             pass
-    projects = _list_projects(config_path, project_dir, req_project, req_input_dir)
+    projects = _list_projects(config_path, project_dir, req_project, req_project_dir)
     # Prune stale _config_cache entries for projects that no longer exist
     cache = handler.__class__._config_cache
-    valid_dirs = {str(Path(p["input_dir"]).resolve()) for p in projects}
+    valid_dirs = {str(Path(p["project_dir"]).resolve()) for p in projects}
     for k in cache.keys():
         if k not in valid_dirs:
             cache.invalidate_key(k)
@@ -126,6 +126,11 @@ def handle_post_project_create(handler: HandlerProtocol, obj: dict) -> None:
     _save_atomic(proj_file, json.dumps(proj_data, ensure_ascii=False, indent=2).encode("utf-8"))
     # Auto-create project.yaml (silent failure is fine)
     _create_project_yaml(input_path, config_path, proj_out)
+    # New projects start with an empty selection (videos.json)
+    from clio.tasks._video_loader import save_selected_videos
+
+    if not (input_path / "videos.json").is_file():
+        save_selected_videos(input_path, [])
     handler.__class__._config_cache.invalidate_key(str(input_path.resolve()))
     _add_to_registry(str(input_path), config_path)
     handler._send_json(
@@ -161,6 +166,10 @@ def handle_post_project_add(handler: HandlerProtocol, obj: dict) -> None:
         }
         _save_atomic(proj_file, json.dumps(proj_data, ensure_ascii=False, indent=2).encode("utf-8"))
         _create_project_yaml(input_path, config_path, proj_out)
+        from clio.tasks._video_loader import save_selected_videos
+
+        if not (input_path / "videos.json").is_file():
+            save_selected_videos(input_path, [])
         handler.__class__._config_cache.invalidate_key(str(input_path.resolve()))
         name = input_path.name
     else:
@@ -169,6 +178,11 @@ def handle_post_project_add(handler: HandlerProtocol, obj: dict) -> None:
             name = data.get("name") or input_path.name
         except (json.JSONDecodeError, OSError) as e:
             return handler._send_json({"ok": False, "error": f"无法读取 project.json: {e}"}, 400)
+        # Opening an existing dir: ensure videos.json exists so project is non-legacy
+        from clio.tasks._video_loader import save_selected_videos
+
+        if not (input_path / "videos.json").is_file():
+            save_selected_videos(input_path, [])
     _add_to_registry(str(input_path), config_path)
     handler._send_json({"ok": True, "project": {"name": name, "project_dir": str(input_path)}})
 

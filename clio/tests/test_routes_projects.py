@@ -201,3 +201,23 @@ class TestHandlePostProjectMigrate:
         assert payload["ok"] is True
         assert payload.get("migrated") is True
         assert (proj / "videos.json").is_file()
+
+
+class TestProjectCreateVideosJson:
+    def test_create_writes_videos_json(self, tmp_path: Path):
+        import json
+
+        from clio.ui.routes.projects import handle_post_project_create
+
+        handler = MagicMock()
+        proj = tmp_path / "newproj"
+        proj.mkdir()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("paths: {}" + chr(10), encoding="utf-8")
+        handler.config_path = cfg
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+        handle_post_project_create(handler, {"name": "newproj", "project_dir": str(proj)})
+        assert handler._send_json.call_args[0][0]["ok"] is True
+        assert (proj / "videos.json").is_file()
+        assert json.loads((proj / "videos.json").read_text(encoding="utf-8")) == []
