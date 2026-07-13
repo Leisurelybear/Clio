@@ -346,11 +346,9 @@ class AIConfig:
 
 @dataclass
 class PathsConfig:
-    input_dir: Path = Path()
     output_dir: Path = Path("./output")
     ffmpeg: str = ""
     ffprobe: str = ""
-    recursive: bool = False
     logs_dir: Path = Path("./logs")
 
 
