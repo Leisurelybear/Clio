@@ -44,8 +44,8 @@ def handle_post_refine(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) 
     if not fname or ftype not in ("texts", "scripts"):
         return handler._send_json({"ok": False, "error": "missing or invalid file/type"}, 400)
 
-    proj_input = handler._resolve_project_input(qs)
-    proj_out = handler._get_project_output(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    proj_out = handler._get_project_output(proj_dir)
     if ftype == "texts":
         p = handler._resolve_texts(fname, proj_out)
     else:
@@ -63,7 +63,7 @@ def handle_post_refine(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) 
     except (json.JSONDecodeError, OSError) as e:
         return handler._send_json({"ok": False, "error": f"failed to read file: {e}"}, 500)
 
-    config = handler._get_config(proj_input)
+    config = handler._get_config(proj_dir)
 
     token_store = FileTokenUsageStore(str(proj_out))
 

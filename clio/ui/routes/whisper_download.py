@@ -323,8 +323,8 @@ def _verify_install(cfg: Any, progress_path: Path, model_name: str) -> bool:
 
 
 def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Path) -> None:
-    proj_input = handler._resolve_project_input(qs)
-    cfg = handler._get_config(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
     pip_index = pip_mirror_for_config(cfg)
 
     _write_install_progress(

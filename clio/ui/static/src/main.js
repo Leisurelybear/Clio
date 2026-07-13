@@ -100,11 +100,17 @@ async function init() {
           const legacyBadge = isLegacy
             ? '<span class="legacy-badge">需迁移</span>'
             : (needsVideos ? '<span class="legacy-badge">无视频</span>' : '');
+          const migrateBtn = isLegacy
+            ? '<button class="project-card-migrate" title="迁移到新结构 (videos.json)">迁移</button>'
+            : '';
           return `
           <div class="${cardClass}" data-name="${escapeHtml(p.name || '')}" data-project-dir="${escapeHtml(p.project_dir || p.input_dir || '')}" data-legacy="${isLegacy}" data-needs-videos="${needsVideos}">
             <div class="project-card-header">
               <span class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(current)' : ''} ${legacyBadge}</span>
-              <button class="project-card-remove" title="Remove from project list">✕</button>
+              <span class="project-card-actions">
+                ${migrateBtn}
+                <button class="project-card-remove" title="Remove from project list">✕</button>
+              </span>
             </div>
             <div class="project-card-meta">
               Project: ${escapeHtml(p.project_dir || p.input_dir || '')}<br>
@@ -133,17 +139,44 @@ async function init() {
           }
         };
       }
+      function _setupMigrateBtn(card, name, projectDir) {
+        const btn = card.querySelector('.project-card-migrate');
+        if (!btn) return;
+        btn.onclick = async (e) => {
+          e.stopPropagation();
+          if (!confirm(`迁移项目 "${name}" 到新结构？\n将生成 videos.json 并移除 paths.input_dir。`)) return;
+          btn.disabled = true;
+          btn.textContent = '迁移中...';
+          try {
+            const r = await api('POST', '/api/project/migrate', { project_dir: projectDir });
+            if (r.ok) {
+              setStatus(r.migrated ? `已迁移: ${name}` : (r.message || '已是新结构'), 'ok');
+              // reload project list
+              $('btn-open-project').click();
+            } else {
+              setStatus('迁移失败: ' + (r.error || 'unknown'), 'err');
+              btn.disabled = false;
+              btn.textContent = '迁移';
+            }
+          } catch (err) {
+            setStatus('迁移失败: ' + err.message, 'err');
+            btn.disabled = false;
+            btn.textContent = '迁移';
+          }
+        };
+      }
       openList.querySelectorAll('.project-card').forEach(card => {
+        const name = card.dataset.name;
+        const projectDir = card.dataset.projectDir;
+        _setupRemoveBtn(card, name, projectDir);
+        _setupMigrateBtn(card, name, projectDir);
         card.onclick = (e) => {
-          if (e.target.closest('.project-card-remove')) return;
-          const name = card.dataset.name;
-          const projectDir = card.dataset.projectDir;
+          if (e.target.closest('.project-card-remove') || e.target.closest('.project-card-migrate')) return;
           const isLegacy = card.dataset.legacy === 'true';
           if (isLegacy) {
-            setStatus('该项目仍含 paths.input_dir，请先运行: python main.py migrate --from <项目目录>', 'warn');
+            setStatus('该项目仍含 paths.input_dir，请先点击「迁移」或运行 python main.py migrate', 'warn');
             return;
           }
-          _setupRemoveBtn(card, name, projectDir);
           if (projectDir === state.currentProjectDir) { openModal.style.display = 'none'; return; }
           if (state.dirty && !confirm('Switch project? Unsaved changes will be lost.')) return;
           openModal.style.display = 'none';

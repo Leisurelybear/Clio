@@ -72,8 +72,8 @@ def _resolve_found_original(orig: str | None, proj_dir: Path) -> Path | None:
 
 def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """GET /api/run/stream — SSE endpoint for real-time run status."""
-    proj_input = handler._resolve_project_input(qs)
-    state = handler._get_state(str(proj_input.resolve()))
+    proj_dir = handler._resolve_project_dir(qs)
+    state = handler._get_state(str(proj_dir.resolve()))
     progress_file = handler._get_project_output(qs) / ".progress.json"
 
     handler.send_response(200)
@@ -123,8 +123,8 @@ def handle_get_run_stream(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
 
 def handle_get_run_status(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/run/status."""
-    proj_input = handler._resolve_project_input(qs)
-    state = handler._get_state(str(proj_input.resolve()))
+    proj_dir = handler._resolve_project_dir(qs)
+    state = handler._get_state(str(proj_dir.resolve()))
     progress_file = handler._get_project_output(qs) / ".progress.json"
     if progress_file.is_file():
         try:
@@ -150,14 +150,14 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
     """Handle POST /api/run/start."""
     day_label = obj.get("day_label", "day1")
     steps = obj.get("steps")
-    proj_input = handler._resolve_project_input(qs)
-    cfg = handler._get_config(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
     cfg, cfg_error = _apply_run_project_dir_override(
         cfg, obj.get("project_dir") if obj.get("project_dir") is not None else obj.get("input_dir")
     )
     if cfg_error:
         return handler._send_json({"ok": False, "error": cfg_error}, 400)
-    state = handler._get_state(str(proj_input.resolve()))
+    state = handler._get_state(str(proj_dir.resolve()))
     if "use_transcripts" in obj:
         cfg.plan.use_transcripts = obj["use_transcripts"]
     files_list = obj.get("files")
@@ -212,8 +212,8 @@ def handle_post_run_preview(handler: HandlerProtocol, qs: dict[str, Any], obj: d
     if files_list is not None and not isinstance(files_list, list):
         return handler._send_json({"ok": False, "error": "files must be a list of video names"}, 400)
 
-    proj_input = handler._resolve_project_input(qs)
-    cfg = handler._get_config(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
     preview = build_run_preview(
         cfg,
         steps or [],
@@ -227,18 +227,18 @@ def handle_post_run_preview(handler: HandlerProtocol, qs: dict[str, Any], obj: d
 
 def handle_post_run_cancel(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle POST /api/run/cancel."""
-    proj_input = handler._resolve_project_input(qs)
-    state = handler._get_state(str(proj_input.resolve()))
+    proj_dir = handler._resolve_project_dir(qs)
+    state = handler._get_state(str(proj_dir.resolve()))
     state.cancel_event.set()
     handler._send_json({"ok": True, "message": "取消请求已发送"})
 
 
 def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle POST /api/rerun."""
-    proj_input = handler._resolve_project_input(qs)
-    cfg = handler._get_config(proj_input)
-    state = handler._get_state(str(proj_input.resolve()))
-    proj_out = _project_output_dir(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
+    state = handler._get_state(str(proj_dir.resolve()))
+    proj_out = _project_output_dir(proj_dir)
 
     video_basename = (obj.get("video") or "").strip()
     task = (obj.get("task") or "").strip()
@@ -266,10 +266,10 @@ def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -
     if abspath_raw:
         candidate = Path(abspath_raw).resolve()
         if candidate.is_file() and candidate.suffix.lower() in VIDEO_EXTS:
-            selected = {p.resolve() for p in load_selected_videos(proj_input)}
+            selected = {p.resolve() for p in load_selected_videos(proj_dir)}
             under_project = False
             try:
-                candidate.relative_to(proj_input.resolve())
+                candidate.relative_to(proj_dir.resolve())
                 under_project = True
             except ValueError:
                 under_project = False
@@ -277,21 +277,21 @@ def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -
                 original_video = candidate
 
     if original_video is None and source_view == "original":
-        candidate = (proj_input / video_basename).resolve()
+        candidate = (proj_dir / video_basename).resolve()
         if candidate.is_file():
             original_video = candidate
         else:
             # Frontend may send compressed-style name in original view, or an
             # external basename only present in videos.json / .vmeta.
-            for p in load_selected_videos(proj_input):
+            for p in load_selected_videos(proj_dir):
                 if p.name == video_basename or p.stem.lower() == stem.lower():
                     if p.is_file():
                         original_video = p.resolve()
                         break
             if original_video is None:
                 original_video = _resolve_found_original(
-                    _find_original_for_compressed(stem, proj_input, cfg.compressed_dir, project_dir=proj_input),
-                    proj_input,
+                    _find_original_for_compressed(stem, proj_dir, cfg.compressed_dir, project_dir=proj_dir),
+                    proj_dir,
                 )
         if original_video is None:
             return handler._send_json({"ok": False, "error": f"original video not found: {video_basename}"}, 404)
@@ -310,8 +310,8 @@ def handle_post_rerun(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -
                             break
         if original_video is None:
             original_video = _resolve_found_original(
-                _find_original_for_compressed(stem, proj_input, comp_dir, project_dir=proj_input),
-                proj_input,
+                _find_original_for_compressed(stem, proj_dir, comp_dir, project_dir=proj_dir),
+                proj_dir,
             )
             if original_video is None:
                 return handler._send_json({"ok": False, "error": f"no matching original video for {stem}"}, 404)

@@ -25,29 +25,29 @@ def _normalize_prompt_name(name: str) -> str | None:
 
 
 def _project_prompt_path(handler: HandlerProtocol, qs: dict[str, Any], name: str):
-    proj_input = handler._resolve_project_input(qs)
-    return prompt_override_dir(proj_input) / f"{name}.md"
+    proj_dir = handler._resolve_project_dir(qs)
+    return prompt_override_dir(proj_dir) / f"{name}.md"
 
 
 def handle_get_prompts(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/prompts."""
-    proj_input = handler._resolve_project_input(qs)
+    proj_dir = handler._resolve_project_dir(qs)
     prompts = []
     for name, default in PROMPT_DEFAULTS.items():
-        override = find_prompt_override(name, proj_input)
+        override = find_prompt_override(name, proj_dir)
         save_path = _project_prompt_path(handler, qs, name)
         prompts.append(
             {
                 "name": name,
                 "default": default,
-                "content": load_prompt(name, default, proj_input),
+                "content": load_prompt(name, default, proj_dir),
                 "override": override.content if override else None,
                 "has_override": override is not None,
                 "override_path": str(save_path),
                 "source_path": str(override.path) if override else None,
             }
         )
-    handler._send_json({"prompts": prompts, "override_dir": str(prompt_override_dir(proj_input))})
+    handler._send_json({"prompts": prompts, "override_dir": str(prompt_override_dir(proj_dir))})
 
 
 def handle_put_prompt(handler: HandlerProtocol, qs: dict[str, Any], obj: dict, name: str) -> None:
@@ -74,10 +74,10 @@ def handle_delete_prompt(handler: HandlerProtocol, qs: dict[str, Any], name: str
     if prompt_name is None:
         return handler._send_json({"ok": False, "error": "unknown prompt"}, 404)
 
-    proj_input = handler._resolve_project_input(qs)
+    proj_dir = handler._resolve_project_dir(qs)
     deleted: list[str] = []
     seen: set = set()
-    for candidate in prompt_override_candidates(prompt_name, proj_input):
+    for candidate in prompt_override_candidates(prompt_name, proj_dir):
         resolved = candidate.resolve()
         if resolved in seen:
             continue

@@ -25,7 +25,7 @@ def _handler_with_config(tmp_path: Path, transcripts_subdir: str = "transcripts"
     handler = MagicMock()
     handler.config_path = str(tmp_path / "config.yaml")
     handler._get_project_output.return_value = tmp_path
-    handler._resolve_project_input.return_value = tmp_path
+    handler._resolve_project_dir.return_value = tmp_path
     cfg = MagicMock()
     cfg.whisper.transcripts_subdir = transcripts_subdir
     handler._get_config.return_value = cfg
@@ -228,7 +228,7 @@ class TestHandlePostWhisperInstall:
     def _make_handler(self, tmp_path):
         handler = MagicMock()
         handler._get_project_output.return_value = tmp_path
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
         cfg = MagicMock()
         cfg.whisper.model_size = "small"
         cfg.whisper.hf_endpoint = ""
@@ -273,7 +273,7 @@ def _write_complete_whisper_snapshot(snapshots: Path) -> None:
 class TestHandleGetWhisperModels:
     def test_returns_available_models(self, tmp_path: Path):
         handler = MagicMock()
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
         cfg = MagicMock()
         cfg.whisper.model_size = "small"
         handler._get_config.return_value = cfg
@@ -300,7 +300,7 @@ class TestHandleGetWhisperModels:
 
     def test_with_cached_model(self, tmp_path: Path):
         handler = MagicMock()
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
         cfg = MagicMock()
         cfg.whisper.model_size = "medium"
         handler._get_config.return_value = cfg
@@ -336,7 +336,7 @@ class TestHandlePostWhisperModelDelete:
 
     def test_deletes_model(self, tmp_path: Path):
         handler = MagicMock()
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
         cfg = MagicMock()
         handler._get_config.return_value = cfg
         cache_dir = tmp_path / "models"
@@ -355,7 +355,7 @@ class TestHandlePostWhisperModelDelete:
 
     def test_returns_false_if_not_found(self, tmp_path: Path):
         handler = MagicMock()
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
         cfg = MagicMock()
         handler._get_config.return_value = cfg
         cache_dir = tmp_path / "models"
@@ -387,7 +387,7 @@ class TestHandlePutWhisperModel:
 
     def test_writes_to_project_yaml(self, tmp_path: Path):
         handler = MagicMock()
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
         cfg = MagicMock()
         handler._get_config.return_value = cfg
         handler._send_json = MagicMock()

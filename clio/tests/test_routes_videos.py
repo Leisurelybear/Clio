@@ -84,15 +84,15 @@ class TestHandleGetVideos:
 
     def test_source_compressed(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
         comp_dir = proj_out / "compressed"
         comp_dir.mkdir()
         (comp_dir / "001_GL010695.mp4").write_bytes(b"")
 
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._send_json = MagicMock()
 
@@ -110,18 +110,18 @@ class TestHandleGetVideos:
         import json
 
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
-        original = proj_input / "GL010695.MP4"
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
+        original = proj_dir / "GL010695.MP4"
         original.write_bytes(b"")
-        (proj_input / "videos.json").write_text(json.dumps([str(original.resolve())]), encoding="utf-8")
+        (proj_dir / "videos.json").write_text(json.dumps([str(original.resolve())]), encoding="utf-8")
         proj_out = tmp_path / "output"
         proj_out.mkdir()
         comp_dir = proj_out / "compressed"
         comp_dir.mkdir()
         (comp_dir / "001_GL010695.mp4").write_bytes(b"")
 
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._send_json = MagicMock()
 
@@ -138,17 +138,17 @@ class TestHandleGetVideos:
         import json
 
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        nested = proj_input / "day1"
+        proj_dir = tmp_path / "input"
+        nested = proj_dir / "day1"
         nested.mkdir(parents=True)
         original = nested / "GL010695.MP4"
         original.write_bytes(b"")
-        (proj_input / "videos.json").write_text(json.dumps([str(original.resolve())]), encoding="utf-8")
+        (proj_dir / "videos.json").write_text(json.dumps([str(original.resolve())]), encoding="utf-8")
         proj_out = tmp_path / "output"
         proj_out.mkdir()
         (proj_out / "compressed").mkdir()
 
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._get_config.return_value = SimpleNamespace(
             paths=SimpleNamespace(ffprobe=""),
@@ -173,9 +173,9 @@ class TestHandleGetVideos:
 
     def test_groups_populated_for_segments(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
-        (proj_input / "GL010695.MP4").write_bytes(b"")
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
+        (proj_dir / "GL010695.MP4").write_bytes(b"")
         proj_out = tmp_path / "output"
         proj_out.mkdir()
         comp_dir = proj_out / "compressed"
@@ -183,7 +183,7 @@ class TestHandleGetVideos:
         (comp_dir / "001_GL010695_seg01.mp4").write_bytes(b"")
         (comp_dir / "002_GL010695_seg02.mp4").write_bytes(b"")
 
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._send_json = MagicMock()
 
@@ -203,15 +203,15 @@ class TestHandleGetVideos:
 
     def test_repeated_request_uses_cache(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
         comp_dir = proj_out / "compressed"
         comp_dir.mkdir()
         (comp_dir / "001_GL010695.mp4").write_bytes(b"")
 
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._send_json = MagicMock()
 
@@ -227,16 +227,16 @@ class TestHandleGetVideos:
 
     def test_selected_set_includes_video_with_vmeta(self, tmp_path: Path):
         """Compressed view + selected_set: include video whose .vmeta.source_path
-        matches a path in videos.json (original outside proj_input)."""
+        matches a path in videos.json (original outside proj_dir)."""
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
         comp_dir = proj_out / "compressed"
         comp_dir.mkdir()
 
-        # Original video at a path OUTSIDE proj_input (simulates videos.json)
+        # Original video at a path OUTSIDE proj_dir (simulates videos.json)
         orig_root = tmp_path / "external"
         orig_root.mkdir()
         orig_video = orig_root / "GL010695.MP4"
@@ -258,9 +258,9 @@ class TestHandleGetVideos:
         # videos.json with the external path
         import json
 
-        (proj_input / "videos.json").write_text(json.dumps([str(orig_video.resolve())]))
+        (proj_dir / "videos.json").write_text(json.dumps([str(orig_video.resolve())]))
 
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._get_config.return_value = SimpleNamespace(
             paths=SimpleNamespace(ffprobe=""),
@@ -280,8 +280,8 @@ class TestHandleGetVideos:
         """Compressed view + selected_set: exclude video whose .vmeta.source_path
         is NOT in selected_set."""
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
         comp_dir = proj_out / "compressed"
@@ -313,9 +313,9 @@ class TestHandleGetVideos:
         # videos.json only contains selected_orig
         import json
 
-        (proj_input / "videos.json").write_text(json.dumps([str(selected_orig.resolve())]))
+        (proj_dir / "videos.json").write_text(json.dumps([str(selected_orig.resolve())]))
 
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._get_config.return_value = SimpleNamespace(
             paths=SimpleNamespace(ffprobe=""),
@@ -331,8 +331,8 @@ class TestHandleGetVideos:
 
     def test_sidecar_change_invalidates_cache(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
         comp_dir = proj_out / "compressed"
@@ -341,7 +341,7 @@ class TestHandleGetVideos:
         texts_dir.mkdir()
         (comp_dir / "001_GL010695.mp4").write_bytes(b"")
 
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._send_json = MagicMock()
 
@@ -362,14 +362,14 @@ class TestHandleGetVideos:
 class TestHandleGetVideo:
     def test_sends_video(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
         comp_dir = proj_out / "compressed"
         comp_dir.mkdir()
         (comp_dir / "001_test.mp4").write_bytes(b"video data")
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._send_video_range = MagicMock()
 
@@ -379,14 +379,14 @@ class TestHandleGetVideo:
 
     def test_sends_nested_original_video(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        nested = proj_input / "day1"
+        proj_dir = tmp_path / "input"
+        nested = proj_dir / "day1"
         nested.mkdir(parents=True)
         video = nested / "clip.mp4"
         video.write_bytes(b"video data")
         proj_out = tmp_path / "output"
         proj_out.mkdir()
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._send_video_range = MagicMock()
 
@@ -404,11 +404,11 @@ class TestHandleGetVideo:
 
     def test_forbidden_original_relative_traversal(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler.send_error = MagicMock()
 
@@ -418,12 +418,12 @@ class TestHandleGetVideo:
 
     def test_not_found(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
         (proj_out / "compressed").mkdir()
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler.send_error = MagicMock()
 
@@ -433,11 +433,11 @@ class TestHandleGetVideo:
 
     def test_abspath_not_in_selected_set_returns_forbidden(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler.send_error = MagicMock()
 
@@ -450,29 +450,29 @@ class TestHandleGetVideo:
         import json
 
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._send_video_range = MagicMock()
 
         video = tmp_path / "external" / "GL010695.MP4"
         video.parent.mkdir()
         video.write_bytes(b"video data")
-        (proj_input / "videos.json").write_text(json.dumps([str(video.resolve())]), encoding="utf-8")
+        (proj_dir / "videos.json").write_text(json.dumps([str(video.resolve())]), encoding="utf-8")
 
         handle_get_video(handler, {"file": ["GL010695.MP4"], "source": ["original"], "abspath": [str(video)]})
         handler._send_video_range.assert_called_once_with(video)
 
     def test_abspath_nonexistent_returns_not_found(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler.send_error = MagicMock()
 
@@ -486,8 +486,8 @@ class TestVideosJsonCacheInvalidation:
 
         _clear_videos_cache()
         handler = MagicMock()
-        proj_input = tmp_path / "proj"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "proj"
+        proj_dir.mkdir()
         proj_out = tmp_path / "out"
         (proj_out / "compressed").mkdir(parents=True)
         external = tmp_path / "ext"
@@ -495,7 +495,7 @@ class TestVideosJsonCacheInvalidation:
         video = external / "clip.mp4"
         video.write_bytes(b"x")
 
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._get_config.return_value = SimpleNamespace(
             paths=SimpleNamespace(ffprobe=""),
@@ -511,7 +511,7 @@ class TestVideosJsonCacheInvalidation:
         # 2) PUT selection
         handler._send_json.reset_mock()
         handle_put_videos_selected(handler, {}, {"videos": [str(video.resolve())]})
-        assert (proj_input / "videos.json").is_file()
+        assert (proj_dir / "videos.json").is_file()
 
         # 3) GET again must reflect selection
         handler._send_json.reset_mock()

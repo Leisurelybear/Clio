@@ -46,8 +46,8 @@ def handle_post_export(
     day = obj.get("day", "day1")
     fmt = obj.get("format", "jianying")
 
-    proj_input = handler._resolve_project_input(qs)
-    cfg = handler._get_config(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
 
     plan_path = cfg.plans_dir / f"{day}_plan.json"
     if not plan_path.is_file():
@@ -62,7 +62,7 @@ def handle_post_export(
             out_dir,
             cfg.project_dir or Path(),
             day,
-            project_dir=cfg.project_dir or proj_input,
+            project_dir=cfg.project_dir or proj_dir,
             ffprobe=cfg.paths.ffprobe,
             texts_dir=cfg.texts_dir,
             canvas_ratio=cfg.export.canvas_ratio,

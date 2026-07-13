@@ -48,7 +48,7 @@ def _no_thread(monkeypatch):
 class TestHandleGetRunStatus:
     def test_idle_when_no_progress_file(self, _handler):
         handler = _handler
-        handler._resolve_project_input.return_value = Path("/nonexistent")
+        handler._resolve_project_dir.return_value = Path("/nonexistent")
         handler._get_project_output.return_value = Path("/nonexistent")
 
         handle_get_run_status(handler, {})
@@ -57,12 +57,12 @@ class TestHandleGetRunStatus:
 
     def test_reads_progress_file(self, tmp_path: Path, _handler):
         handler = _handler
-        proj_input = tmp_path / "input"
+        proj_dir = tmp_path / "input"
         proj_out = tmp_path / "output"
         proj_out.mkdir(parents=True)
         progress = proj_out / ".progress.json"
         progress.write_text(json.dumps({"status": "running", "phase": "compress"}), encoding="utf-8")
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler.__class__._fake_state.run_thread = MagicMock()
         handler.__class__._fake_state.run_thread.is_alive.return_value = True
@@ -113,7 +113,7 @@ class TestApplyRunInputDirOverride:
 class TestHandlePostRunStart:
     def test_already_running(self, _handler):
         handler = _handler
-        handler._resolve_project_input.return_value = Path("/input")
+        handler._resolve_project_dir.return_value = Path("/input")
         handler.__class__._fake_state.run_thread = MagicMock()
         handler.__class__._fake_state.run_thread.is_alive.return_value = True
 
@@ -124,7 +124,7 @@ class TestHandlePostRunStart:
     def test_already_running_does_not_clobber_progress(self, tmp_path, _handler):
         """Duplicate run request must NOT overwrite existing progress file."""
         handler = _handler
-        handler._resolve_project_input.return_value = Path("/input")
+        handler._resolve_project_dir.return_value = Path("/input")
         out_dir = tmp_path / "output"
         out_dir.mkdir()
         progress = out_dir / ".progress.json"
@@ -143,7 +143,7 @@ class TestHandlePostRunStart:
 
     def test_starts_thread(self, tmp_path: Path, _no_thread, _handler):
         handler = _handler
-        handler._resolve_project_input.return_value = tmp_path / "input"
+        handler._resolve_project_dir.return_value = tmp_path / "input"
         handler._get_config.return_value = MagicMock()
 
         handle_post_run_start(handler, {}, {"steps": ["compress", "analyze"]})
@@ -153,7 +153,7 @@ class TestHandlePostRunStart:
 
     def test_rejects_missing_input_dir_override(self, tmp_path: Path, _handler):
         handler = _handler
-        handler._resolve_project_input.return_value = tmp_path / "input"
+        handler._resolve_project_dir.return_value = tmp_path / "input"
         cfg = SimpleNamespace(paths=SimpleNamespace(input_dir=tmp_path / "input", output_dir=tmp_path / "output"))
         handler._get_config.return_value = cfg
 
@@ -168,9 +168,9 @@ class TestHandlePostRunStart:
 class TestHandlePostRunPreview:
     def test_builds_preview_from_request(self, tmp_path: Path, _handler, monkeypatch):
         handler = _handler
-        proj_input = tmp_path / "input"
+        proj_dir = tmp_path / "input"
         cfg = MagicMock()
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_config.return_value = cfg
         expected = {"input": {}, "steps": [], "totals": {}}
         build = MagicMock(return_value=expected)
@@ -200,7 +200,7 @@ class TestHandlePostRunPreview:
 
     def test_rejects_non_list_files(self, tmp_path: Path, _handler):
         handler = _handler
-        handler._resolve_project_input.return_value = tmp_path / "input"
+        handler._resolve_project_dir.return_value = tmp_path / "input"
         handler._get_config.return_value = MagicMock()
 
         handle_post_run_preview(handler, {}, {"files": "A.mp4"})
@@ -211,7 +211,7 @@ class TestHandlePostRunPreview:
 class TestHandlePostRerun:
     def test_missing_params(self, tmp_path: Path, _handler):
         handler = _handler
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
 
         handle_post_rerun(handler, {}, {})
 
@@ -220,7 +220,7 @@ class TestHandlePostRerun:
 
     def test_invalid_task(self, tmp_path: Path, _handler):
         handler = _handler
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
 
         handle_post_rerun(handler, {}, {"video": "test.mp4", "task": "invalid"})
 
@@ -230,10 +230,10 @@ class TestHandlePostRerun:
     def test_transcribe_valid_task(self, tmp_path: Path, _no_thread, _handler):
         """transcribe 应作为有效 task 被接受"""
         handler = _handler
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
-        (proj_input / "GL010695.MP4").write_bytes(b"")
-        handler._resolve_project_input.return_value = proj_input
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
+        (proj_dir / "GL010695.MP4").write_bytes(b"")
+        handler._resolve_project_dir.return_value = proj_dir
 
         handle_post_rerun(handler, {}, {"video": "GL010695.MP4", "task": "transcribe", "source": "original"})
 
@@ -242,10 +242,10 @@ class TestHandlePostRerun:
 
     def test_starts_rerun(self, tmp_path: Path, _no_thread, _handler):
         handler = _handler
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
-        (proj_input / "GL010695.MP4").write_bytes(b"")
-        handler._resolve_project_input.return_value = proj_input
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
+        (proj_dir / "GL010695.MP4").write_bytes(b"")
+        handler._resolve_project_dir.return_value = proj_dir
 
         handle_post_rerun(handler, {}, {"video": "001_GL010695.mp4", "task": "compress"})
 
@@ -258,13 +258,13 @@ class TestHandlePostRerun:
         import json as _json
 
         handler = _handler
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         comp_dir = proj_out / "compressed"
         comp_dir.mkdir(parents=True)
 
-        # External original (outside proj_input)
+        # External original (outside proj_dir)
         ext_root = tmp_path / "external"
         ext_root.mkdir()
         original = ext_root / "GL010695.MP4"
@@ -284,12 +284,12 @@ class TestHandlePostRerun:
         meta.write(compressed)
 
         # videos.json with external path
-        (proj_input / "videos.json").write_text(_json.dumps([str(original.resolve())]))
+        (proj_dir / "videos.json").write_text(_json.dumps([str(original.resolve())]))
 
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         cfg = MagicMock()
         cfg.compressed_dir = comp_dir
-        cfg.paths = SimpleNamespace(ffprobe="", output_dir=proj_out, input_dir=proj_input)
+        cfg.paths = SimpleNamespace(ffprobe="", output_dir=proj_out, input_dir=proj_dir)
         cfg.analyze = SimpleNamespace(skip_existing=True)
         cfg.compress = SimpleNamespace(split_max_min=0)
         handler._get_config.return_value = cfg
@@ -327,7 +327,7 @@ class TestHandlePostRerun:
 class TestHandlePostRunCancel:
     def test_cancel_sets_event(self, _handler):
         handler = _handler
-        handler._resolve_project_input.return_value = Path("/input")
+        handler._resolve_project_dir.return_value = Path("/input")
         assert not handler.__class__._fake_state.cancel_event.is_set()
 
         handle_post_run_cancel(handler, {}, {})

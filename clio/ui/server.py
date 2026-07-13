@@ -56,6 +56,7 @@ from clio.ui.routes.projects import (
     handle_get_projects,
     handle_post_project_add,
     handle_post_project_create,
+    handle_post_project_migrate,
     handle_post_project_remove,
     handle_put_project,
 )
@@ -242,18 +243,19 @@ def make_handler(
         def _get_config(self, project_input: Path | None = None) -> AppConfig:
             return self.__class__._config_cache.get(project_input)
 
-        def _resolve_project_input(self, qs: dict) -> Path:
+        def _resolve_project_dir(self, qs: dict) -> Path:
             return resolve_project_input(qs, project_dir, config_path)
 
-        def _resolve_project_dir(self, qs: dict) -> Path:
-            return self._resolve_project_input(qs)
+        def _resolve_project_input(self, qs: dict) -> Path:
+            """Compat alias for _resolve_project_dir."""
+            return self._resolve_project_dir(qs)
 
         def _get_project_output(self, qs_or_proj_dir: dict | Path) -> Path:
             if isinstance(qs_or_proj_dir, dict):
-                proj_input = self._resolve_project_input(qs_or_proj_dir)
+                proj_dir = self._resolve_project_dir(qs_or_proj_dir)
             else:
-                proj_input = qs_or_proj_dir
-            return _project_output_dir(proj_input)
+                proj_dir = qs_or_proj_dir
+            return _project_output_dir(proj_dir)
 
         def _send_video_range(self, path: Path) -> None:
             send_video_range(self, path)
@@ -370,6 +372,7 @@ def make_handler(
         "handle_post_project_create": {"obj"},
         "handle_post_project_add": {"obj"},
         "handle_post_project_remove": {"obj"},
+        "handle_post_project_migrate": {"obj"},
     }
 
     router = Router(resolver=_resolve_handler)
@@ -429,6 +432,7 @@ def make_handler(
             Route("POST", "/api/project/create", "handle_post_project_create"),
             Route("POST", "/api/project/add", "handle_post_project_add"),
             Route("POST", "/api/project/remove", "handle_post_project_remove"),
+            Route("POST", "/api/project/migrate", "handle_post_project_migrate"),
             Route("POST", "/api/rerun", "handle_post_rerun"),
             Route("POST", "/api/transcripts", "handle_post_transcripts"),
             Route("POST", "/api/whisper/install", "handle_post_whisper_install"),

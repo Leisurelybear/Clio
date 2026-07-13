@@ -1396,9 +1396,13 @@ button .icon { width: 12px; height: 12px; }
 .step-dot { display: inline-block; margin-right: 3px; font-size: var(--text-xs); }
 .step-dot.done { color: var(--success); }
 .project-card-header { display: flex; justify-content: space-between; align-items: center; }
+.project-card-actions { display: flex; align-items: center; gap: 4px; }
 .project-card-remove { background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 3px; line-height: 1; }
 .project-card-remove:hover { background: var(--bg-hover); color: var(--red); }
-.project-card-legacy { opacity: 0.65; cursor: not-allowed; border-color: var(--border); }
+.project-card-migrate { background: none; border: 1px solid var(--warn, #b8860b); color: var(--warn, #b8860b); cursor: pointer; font-size: 12px; padding: 1px 8px; border-radius: 3px; line-height: 1.4; }
+.project-card-migrate:hover { background: var(--warn-bg, #2a2520); }
+.project-card-migrate:disabled { opacity: 0.6; cursor: wait; }
+.project-card-legacy { opacity: 0.85; border-color: var(--warn, #b8860b); }
 .project-card-legacy:hover { border-color: var(--warn, #b8860b); background: var(--bg-surface-2); }
 .legacy-badge { display: inline-block; font-size: 0.7em; padding: 1px 6px; border-radius: 3px; background: var(--warn-bg, #2a2520); color: var(--warn, #b8860b); border: 1px solid var(--warn, #b8860b); margin-left: 6px; vertical-align: middle; }
 

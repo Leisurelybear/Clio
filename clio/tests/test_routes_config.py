@@ -22,11 +22,11 @@ from clio.ui.routes.config_routes import (
 class TestHandleGetConfig:
     def test_basic(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_out = tmp_path / "output"
         proj_out.mkdir()
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._get_project_output.return_value = proj_out
         handler._send_json = MagicMock()
 
@@ -46,14 +46,14 @@ class TestHandleGetConfigRaw:
         cfg = tmp_path / "config.yaml"
         cfg.write_bytes(b"key: val\n")
         # Without project.yaml in a non-default project dir
-        proj_input = tmp_path / "custom_project"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "custom_project"
+        proj_dir.mkdir()
         default_input = tmp_path / "input"
         default_input.mkdir()
 
         handler.config_path = cfg
         handler.project_dir = default_input
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._send_json = MagicMock()
 
         handle_get_config_raw(handler, {})
@@ -64,12 +64,12 @@ class TestHandleGetConfigRaw:
         handler = MagicMock()
         cfg = tmp_path / "config.yaml"
         cfg.write_text(yaml.dump({"compress": {"target_size_mb": 5, "max_width": 640}}), encoding="utf-8")
-        proj_input = tmp_path / "default"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "default"
+        proj_dir.mkdir()
 
         handler.config_path = cfg
-        handler.project_dir = proj_input
-        handler._resolve_project_input.return_value = proj_input
+        handler.project_dir = proj_dir
+        handler._resolve_project_dir.return_value = proj_dir
         handler._send_json = MagicMock()
 
         handle_get_config_raw(handler, {})
@@ -88,11 +88,11 @@ class TestHandlePostConfigInit:
         handler = MagicMock()
         cfg = tmp_path / "config.yaml"
         cfg.write_bytes(b"")
-        proj_input = tmp_path / "input"
+        proj_dir = tmp_path / "input"
 
         handler.config_path = cfg
-        handler.project_dir = proj_input
-        handler._resolve_project_input.return_value = proj_input
+        handler.project_dir = proj_dir
+        handler._resolve_project_dir.return_value = proj_dir
         handler._send_json = MagicMock()
         handler.__class__._config_cache = MagicMock()
 
@@ -117,12 +117,12 @@ class TestHandlePutConfigRaw:
         cfg = tmp_path / "config.yaml"
         cfg.parent.mkdir(exist_ok=True)
         cfg.write_text(yaml.dump({"paths": {"input_dir": "./input", "output_dir": "./output"}}), encoding="utf-8")
-        proj_input = tmp_path / "custom"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "custom"
+        proj_dir.mkdir()
 
         handler.config_path = cfg
         handler.project_dir = tmp_path
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
 
@@ -131,7 +131,7 @@ class TestHandlePutConfigRaw:
         handler._send_json.assert_called_once()
         args = handler._send_json.call_args
         assert args[0][0]["ok"] is True
-        proj_yaml = proj_input / "project.yaml"
+        proj_yaml = proj_dir / "project.yaml"
         assert proj_yaml.is_file()
         data = yaml.safe_load(proj_yaml.read_text(encoding="utf-8"))
         assert data["compress"]["target_size_mb"] == 10
@@ -152,7 +152,7 @@ class TestHandlePutConfigRaw:
 
         handler.config_path = cfg
         handler.project_dir = tmp_path
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
 
@@ -182,7 +182,7 @@ class TestHandlePutConfigRaw:
 
         handler.config_path = cfg
         handler.project_dir = tmp_path
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
 
@@ -202,12 +202,12 @@ class TestHandlePutConfigRaw:
         handler = MagicMock()
         cfg = tmp_path / "config.yaml"
         cfg.write_text(yaml.dump({"compress": {"target_size_mb": 5}}), encoding="utf-8")
-        proj_input = tmp_path / "default"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "default"
+        proj_dir.mkdir()
 
         handler.config_path = cfg
-        handler.project_dir = proj_input
-        handler._resolve_project_input.return_value = proj_input
+        handler.project_dir = proj_dir
+        handler._resolve_project_dir.return_value = proj_dir
         handler._send_json = MagicMock()
 
         handle_get_config_raw(handler, {})
@@ -226,12 +226,12 @@ class TestHandlePutConfigRaw:
             yaml.dump({"paths": {"input_dir": "./input", "output_dir": "./output"}, "compress": {"target_size_mb": 5}}),
             encoding="utf-8",
         )
-        proj_input = tmp_path / "custom"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "custom"
+        proj_dir.mkdir()
 
         handler.config_path = cfg
         handler.project_dir = tmp_path
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._send_json = MagicMock()
         handler.__class__._config_cache = MagicMock()
 
@@ -240,7 +240,7 @@ class TestHandlePutConfigRaw:
         handler._send_json.assert_called_once()
         args = handler._send_json.call_args
         assert args[0][0]["ok"] is True
-        proj_yaml = proj_input / "project.yaml"
+        proj_yaml = proj_dir / "project.yaml"
         assert proj_yaml.is_file()
         data = yaml.safe_load(proj_yaml.read_text(encoding="utf-8"))
         assert data["compress"]["target_size_mb"] == 5
@@ -250,12 +250,12 @@ class TestHandlePutConfigRaw:
         handler = MagicMock()
         cfg = tmp_path / "config.yaml"
         cfg.write_bytes(b"")
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
 
         handler.config_path = cfg
-        handler.project_dir = proj_input
-        handler._resolve_project_input.return_value = proj_input
+        handler.project_dir = proj_dir
+        handler._resolve_project_dir.return_value = proj_dir
         handler._send_json = MagicMock()
         handler.__class__._config_cache = MagicMock()
 
@@ -354,11 +354,11 @@ class TestHandleGetConfigProject:
         handler = MagicMock()
         cfg = tmp_path / "config.yaml"
         cfg.write_bytes(b"")
-        proj_input = tmp_path / "custom"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "custom"
+        proj_dir.mkdir()
         handler.config_path = cfg
         handler.project_dir = tmp_path
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._send_json = MagicMock()
         handle_get_config_project(handler, {})
         handler._send_json.assert_called_once_with({"needs_init": True})
@@ -369,7 +369,7 @@ class TestHandleGetConfigProject:
         cfg.write_bytes(b"")
         handler.config_path = cfg
         handler.project_dir = tmp_path
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
         handler._send_json = MagicMock()
         handle_get_config_project(handler, {})
         handler._send_json.assert_called_once_with({})
@@ -378,9 +378,9 @@ class TestHandleGetConfigProject:
         handler = MagicMock()
         cfg = tmp_path / "config.yaml"
         cfg.write_bytes(b"")
-        proj_input = tmp_path / "project"
-        proj_input.mkdir()
-        proj_yaml = proj_input / "project.yaml"
+        proj_dir = tmp_path / "project"
+        proj_dir.mkdir()
+        proj_yaml = proj_dir / "project.yaml"
         proj_yaml.write_text(
             yaml.dump(
                 {
@@ -412,7 +412,7 @@ class TestHandleGetConfigProject:
         )
         handler.config_path = cfg
         handler.project_dir = tmp_path
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler._send_json = MagicMock()
         handle_get_config_project(handler, {})
         handler._send_json.assert_called_once()
@@ -503,11 +503,11 @@ class TestHandlePutConfigProject:
         handler = MagicMock()
         cfg = tmp_path / "config.yaml"
         cfg.write_bytes(b"")
-        proj_input = tmp_path / "project"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "project"
+        proj_dir.mkdir()
         handler.config_path = cfg
         handler.project_dir = tmp_path
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
         handle_put_config_project(handler, {}, {"paths": {"input_dir": "./in"}, "proxy": {"enabled": True}})
@@ -519,18 +519,18 @@ class TestHandlePutConfigProject:
         handler = MagicMock()
         cfg = tmp_path / "config.yaml"
         cfg.write_text(yaml.dump({"paths": {"input_dir": "./in", "output_dir": "./out"}}), encoding="utf-8")
-        proj_input = tmp_path / "custom"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "custom"
+        proj_dir.mkdir()
         handler.config_path = cfg
         handler.project_dir = tmp_path
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
         handle_put_config_project(handler, {}, {"compress": {"target_size_mb": 10}})
         handler._send_json.assert_called_once()
         args = handler._send_json.call_args
         assert args[0][0]["ok"] is True
-        proj_yaml = proj_input / "project.yaml"
+        proj_yaml = proj_dir / "project.yaml"
         assert proj_yaml.is_file()
         data = yaml.safe_load(proj_yaml.read_text(encoding="utf-8"))
         assert data["compress"]["target_size_mb"] == 10
@@ -539,13 +539,13 @@ class TestHandlePutConfigProject:
         handler = MagicMock()
         cfg = tmp_path / "config.yaml"
         cfg.write_text(yaml.dump({"paths": {"input_dir": "./in", "output_dir": "./out"}}), encoding="utf-8")
-        proj_input = tmp_path / "project2"
-        proj_input.mkdir()
-        proj_yaml = proj_input / "project.yaml"
+        proj_dir = tmp_path / "project2"
+        proj_dir.mkdir()
+        proj_yaml = proj_dir / "project.yaml"
         proj_yaml.write_text(yaml.dump({"compress": {"target_size_mb": 5}}), encoding="utf-8")
         handler.config_path = cfg
         handler.project_dir = tmp_path
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
         handle_put_config_project(handler, {}, {"compress": {"max_width": 1920}})

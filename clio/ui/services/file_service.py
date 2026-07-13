@@ -59,14 +59,14 @@ def _save_atomic(path: Path, data: bytes) -> None:
     os.replace(tmp, path)
 
 
-def _create_project_yaml(proj_input: Path, config_path: Path | None, proj_out: Path) -> Path | None:
+def _create_project_yaml(proj_dir: Path, config_path: Path | None, proj_out: Path) -> Path | None:
     """Create project.yaml from global config template, with paths adjusted to the project.
 
     Returns the project.yaml path, or None if no global config is available.
     """
     if not config_path or not config_path.is_file():
         return None
-    target = proj_input / "project.yaml"
+    target = proj_dir / "project.yaml"
     if target.is_file():
         return target  # already exists
     try:

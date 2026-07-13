@@ -62,37 +62,37 @@ def _resolve_original_video_path(root: Path, requested: str) -> Path | None:
     return candidate
 
 
-def _load_videos_json_selection(proj_input: Path) -> set[Path] | None:
+def _load_videos_json_selection(proj_dir: Path) -> set[Path] | None:
     """Load videos.json selection.
 
     Returns None only when videos.json is absent (legacy project).
     Empty list / offline paths still yield a set so selection mode stays active.
     """
-    if not (proj_input / "videos.json").is_file():
+    if not (proj_dir / "videos.json").is_file():
         return None
-    selected = load_selected_videos(proj_input)
+    selected = load_selected_videos(proj_dir)
     return {p.resolve() for p in selected}
 
 
 def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/videos. Sends JSON response directly."""
 
-    proj_input = handler._resolve_project_input(qs)
-    proj_out = handler._get_project_output(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    proj_out = handler._get_project_output(proj_dir)
     source = qs.get("source", ["compressed"])[0]
     if source not in ("compressed", "original"):
         return handler._send_json({"ok": False, "error": "source must be compressed|original"}, 400)
     comp_dir = proj_out / "compressed"
-    cfg = handler._get_config(proj_input)
-    cache_key = (str(proj_input.resolve()), str(proj_out.resolve()), source)
-    selected_set = _load_videos_json_selection(proj_input)
-    signature = _videos_cache_signature(proj_input, proj_out, comp_dir, cfg)
+    cfg = handler._get_config(proj_dir)
+    cache_key = (str(proj_dir.resolve()), str(proj_out.resolve()), source)
+    selected_set = _load_videos_json_selection(proj_dir)
+    signature = _videos_cache_signature(proj_dir, proj_out, comp_dir, cfg)
     with _VIDEOS_CACHE_LOCK:
         cached = _VIDEOS_CACHE.get(cache_key)
         if cached is not None and cached[0] == signature:
             return handler._send_json(deepcopy(cached[1]))
 
-    payload = _build_videos_payload(handler, proj_input, proj_out, comp_dir, source, cfg, selected_set=selected_set)
+    payload = _build_videos_payload(handler, proj_dir, proj_out, comp_dir, source, cfg, selected_set=selected_set)
     with _VIDEOS_CACHE_LOCK:
         if len(_VIDEOS_CACHE) >= _VIDEOS_CACHE_MAX and cache_key not in _VIDEOS_CACHE:
             _VIDEOS_CACHE.pop(next(iter(_VIDEOS_CACHE)))
@@ -109,12 +109,12 @@ def _file_fingerprint(path: Path) -> tuple[Any, ...]:
         return ()
 
 
-def _videos_cache_signature(proj_input: Path, proj_out: Path, comp_dir: Path, cfg: Any) -> tuple[Any, ...]:
+def _videos_cache_signature(proj_dir: Path, proj_out: Path, comp_dir: Path, cfg: Any) -> tuple[Any, ...]:
     text_dirs = tuple(_find_texts_dirs(proj_out))
-    videos_json = proj_input / "videos.json"
+    videos_json = proj_dir / "videos.json"
     return (
         _file_fingerprint(videos_json),  # must invalidate when selection changes
-        _dir_fingerprint(proj_input, video_only=True),
+        _dir_fingerprint(proj_dir, video_only=True),
         _dir_fingerprint(comp_dir),
         tuple((str(td), _dir_fingerprint(td, json_only=True)) for td in text_dirs),
         _dir_fingerprint(proj_out / "scripts", json_only=True),
@@ -124,13 +124,13 @@ def _videos_cache_signature(proj_input: Path, proj_out: Path, comp_dir: Path, cf
     )
 
 
-def _invalidate_videos_cache(proj_input: Path | None = None) -> None:
+def _invalidate_videos_cache(proj_dir: Path | None = None) -> None:
     """Drop cached /api/videos payloads (all sources for a project, or entire cache)."""
     with _VIDEOS_CACHE_LOCK:
-        if proj_input is None:
+        if proj_dir is None:
             _VIDEOS_CACHE.clear()
             return
-        key_prefix = str(proj_input.resolve())
+        key_prefix = str(proj_dir.resolve())
         for key in list(_VIDEOS_CACHE):
             if key[0] == key_prefix:
                 _VIDEOS_CACHE.pop(key, None)
@@ -156,7 +156,7 @@ def _dir_fingerprint(path: Path, *, video_only: bool = False, json_only: bool = 
 
 def _build_videos_payload(
     handler: HandlerProtocol,
-    proj_input: Path,
+    proj_dir: Path,
     proj_out: Path,
     comp_dir: Path,
     source: str,
@@ -167,7 +167,7 @@ def _build_videos_payload(
     # -- Build artifact index ------------------------------------------------
     index = ArtifactIndex(
         output_dir=proj_out,
-        input_dir=proj_input,
+        input_dir=proj_dir,
         compressed_dir=comp_dir,
         texts_dir=proj_out / "texts",
         scripts_dir=proj_out / "scripts",
@@ -195,7 +195,7 @@ def _build_videos_payload(
                 idx = stem.split("_", 1)[0] if "_" in stem else ""
                 group_key, seg_num = _parse_segment_info(stem)
                 group = index.lookup(compressed_stem=stem)
-                orig = _find_original_for_compressed(stem, proj_input, comp_dir, project_dir=proj_input)
+                orig = _find_original_for_compressed(stem, proj_dir, comp_dir, project_dir=proj_dir)
                 if selected_set is not None:
                     meta = VideoMeta.read(p)
                     if meta is not None:
@@ -205,7 +205,7 @@ def _build_videos_payload(
                         op = Path(orig)
                         try:
                             orig_resolved = (
-                                op.resolve() if op.is_file() or op.is_absolute() else (proj_input / op).resolve()
+                                op.resolve() if op.is_file() or op.is_absolute() else (proj_dir / op).resolve()
                             )
                         except OSError:
                             continue
@@ -279,7 +279,7 @@ def _build_videos_payload(
                 if missing and total > 1 and _ffprobe:
                     orig_video: Path | None = None
                     for ext in VIDEO_EXTS:
-                        candidate = proj_input / f"{gk}{ext}"
+                        candidate = proj_dir / f"{gk}{ext}"
                         if candidate.is_file():
                             orig_video = candidate
                             break
@@ -302,7 +302,7 @@ def _build_videos_payload(
     else:  # original
         # resolve ffprobe once for segment offset computation
         try:
-            cfg = handler._get_config(proj_input)
+            cfg = handler._get_config(proj_dir)
             _ffprobe = resolve_binary(cfg.paths.ffprobe, "ffprobe")
         except Exception:
             _ffprobe = None
@@ -318,14 +318,14 @@ def _build_videos_payload(
             if selected_set is not None:
                 abs_path = str(p.resolve())
                 rel_name = p.name
-                proj_input_abs = proj_input.resolve()
+                proj_input_abs = proj_dir.resolve()
                 try:
                     rel_name = p.relative_to(proj_input_abs).as_posix()
                 except ValueError:
                     rel_name = p.name
             else:
                 abs_path = None
-                rel_name = _original_rel_name(p, proj_input)
+                rel_name = _original_rel_name(p, proj_dir)
             comp = _find_compressed_for_original(p.stem, comp_dir)
             if not comp:
                 orig_groups = index.lookup(original_stem=p.stem)
@@ -403,8 +403,8 @@ def _video_sort_key(video: dict[str, Any]) -> tuple[str, int, int, str]:
 def handle_get_video(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/video. Sends video range response directly."""
 
-    proj_input = handler._resolve_project_input(qs)
-    proj_out = handler._get_project_output(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    proj_out = handler._get_project_output(proj_dir)
     fname = qs.get("file", [""])[0]
     source = qs.get("source", ["compressed"])[0]
     if source == "original":
@@ -413,11 +413,11 @@ def handle_get_video(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
             vp = Path(abspath).resolve()
             if not vp.is_file() or vp.suffix.lower() not in VIDEO_EXTS:
                 return handler.send_error(HTTPStatus.NOT_FOUND)
-            selected = load_selected_videos(proj_input)
+            selected = load_selected_videos(proj_dir)
             if vp not in {p.resolve() for p in selected}:
                 return handler.send_error(HTTPStatus.FORBIDDEN)
         else:
-            vp = _resolve_original_video_path(proj_input, fname)
+            vp = _resolve_original_video_path(proj_dir, fname)
             if vp is None:
                 return handler.send_error(HTTPStatus.FORBIDDEN)
     else:
@@ -433,8 +433,8 @@ def handle_get_vmeta(handler: HandlerProtocol, qs: dict[str, Any], stem: str) ->
     """Handle GET /api/vmeta/{stem} → .vmeta JSON content."""
     if not stem:
         return handler._send_json({"ok": False, "error": "missing stem"}, 400)
-    proj_input = handler._resolve_project_input(qs)
-    proj_out = handler._get_project_output(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    proj_out = handler._get_project_output(proj_dir)
     comp_dir = proj_out / "compressed"
     for p in comp_dir.glob(f"{stem}.*"):
         if p.suffix.lower() in VIDEO_EXTS:
@@ -448,15 +448,15 @@ def handle_get_vmeta(handler: HandlerProtocol, qs: dict[str, Any], stem: str) ->
 
 def handle_get_videos_selected(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/videos/selected — load videos.json."""
-    proj_input = handler._resolve_project_input(qs)
-    videos = load_selected_videos(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    videos = load_selected_videos(proj_dir)
     data = [str(p) for p in videos]
     handler._send_json({"videos": data})
 
 
 def handle_put_videos_selected(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle PUT /api/videos/selected — save to videos.json."""
-    proj_input = handler._resolve_project_input(qs)
+    proj_dir = handler._resolve_project_dir(qs)
     raw = obj.get("videos", [])
     if not isinstance(raw, list):
         return handler._send_json({"ok": False, "error": "videos must be a list"}, 400)
@@ -480,8 +480,8 @@ def handle_put_videos_selected(handler: HandlerProtocol, qs: dict[str, Any], obj
         if p not in seen:
             seen.add(p)
             unique.append(p)
-    save_selected_videos(proj_input, unique)
-    _invalidate_videos_cache(proj_input)
+    save_selected_videos(proj_dir, unique)
+    _invalidate_videos_cache(proj_dir)
     payload: dict[str, Any] = {"ok": True, "count": len(unique)}
     if rejected:
         payload["rejected"] = rejected[:20]

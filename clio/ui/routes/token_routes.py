@@ -11,8 +11,8 @@ from clio.ui.services.project_service import _project_output_dir
 
 
 def handle_get_token_usage(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
-    proj_input = Path(handler._resolve_project_input(qs))
-    proj_out = _project_output_dir(proj_input)
+    proj_dir = Path(handler._resolve_project_dir(qs))
+    proj_out = _project_output_dir(proj_dir)
     if proj_out is None:
         return handler._send_json({"ok": False, "error": "no project"})
     store = FileTokenUsageStore(str(proj_out))

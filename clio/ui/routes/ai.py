@@ -25,7 +25,7 @@ def handle_post_ai_test(handler: HandlerProtocol, qs: dict[str, Any], obj: dict[
     else:
         return handler._send_json({"ok": False, "error": "model must be a string"}, 400)
 
-    proj_input = handler._resolve_project_input(qs)
-    cfg = handler._get_config(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
     result = test_provider_connection(cfg, provider_name=provider, model=model)
     return handler._send_json(result)

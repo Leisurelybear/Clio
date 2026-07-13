@@ -34,8 +34,8 @@ def _intended_transcript_path(handler: HandlerProtocol, qs: dict[str, Any], vide
     proj_out = handler._get_project_output(qs)
     if not proj_out:
         return None
-    proj_input = handler._resolve_project_input(qs)
-    cfg = handler._get_config(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
     transcripts_dir = proj_out / cfg.whisper.transcripts_subdir
     return transcripts_dir / f"{stem}_transcript.json"
 
@@ -50,8 +50,8 @@ def _transcript_path(handler: HandlerProtocol, qs: dict[str, Any], video: str) -
     proj_out = handler._get_project_output(qs)
     if not proj_out:
         return None
-    proj_input = handler._resolve_project_input(qs)
-    cfg = handler._get_config(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
     transcripts_dir = proj_out / cfg.whisper.transcripts_subdir
 
     # Try 1: exact match preserving _segNN (e.g., "001_GL010695_seg01" -> "001_GL010695_seg01_transcript.json")

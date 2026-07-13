@@ -347,12 +347,12 @@ class TestCreateProjectYaml:
             ),
             encoding="utf-8",
         )
-        proj_input = tmp_path / "project"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "project"
+        proj_dir.mkdir()
         proj_out = tmp_path / "project_output"
-        result = _create_project_yaml(proj_input, config, proj_out)
+        result = _create_project_yaml(proj_dir, config, proj_out)
         assert result is not None
-        assert result == proj_input / "project.yaml"
+        assert result == proj_dir / "project.yaml"
         data = yaml.safe_load(result.read_text(encoding="utf-8"))
         assert "input_dir" not in data.get("paths", {})
         assert "recursive" not in data.get("paths", {})
@@ -365,11 +365,11 @@ class TestCreateProjectYaml:
             yaml.dump({"paths": {"input_dir": "/fake/input", "output_dir": "/fake/output"}}),
             encoding="utf-8",
         )
-        proj_input = tmp_path / "project"
-        proj_input.mkdir()
-        existing = proj_input / "project.yaml"
+        proj_dir = tmp_path / "project"
+        proj_dir.mkdir()
+        existing = proj_dir / "project.yaml"
         existing.write_text("existing: true", encoding="utf-8")
-        result = _create_project_yaml(proj_input, config, tmp_path / "output")
+        result = _create_project_yaml(proj_dir, config, tmp_path / "output")
         assert result == existing
         assert yaml.safe_load(existing.read_text(encoding="utf-8")) == {"existing": True}
 
@@ -379,9 +379,9 @@ class TestCreateProjectYaml:
             yaml.dump({"paths": {"input_dir": "/fake/input", "output_dir": "/fake/output"}}),
             encoding="utf-8",
         )
-        proj_input = tmp_path / "project"
-        proj_input.mkdir()
-        result = _create_project_yaml(proj_input, config, tmp_path / "output")
+        proj_dir = tmp_path / "project"
+        proj_dir.mkdir()
+        result = _create_project_yaml(proj_dir, config, tmp_path / "output")
         data = yaml.safe_load(result.read_text(encoding="utf-8"))
         assert data.get("ai", {}).get("context") == ""
 
@@ -408,9 +408,9 @@ class TestCreateProjectYaml:
             ),
             encoding="utf-8",
         )
-        proj_input = tmp_path / "project2"
-        proj_input.mkdir()
-        result = _create_project_yaml(proj_input, config, tmp_path / "output")
+        proj_dir = tmp_path / "project2"
+        proj_dir.mkdir()
+        result = _create_project_yaml(proj_dir, config, tmp_path / "output")
         data = yaml.safe_load(result.read_text(encoding="utf-8"))
         # Project fields should survive; input_dir is no longer written
         assert "input_dir" not in data.get("paths", {})

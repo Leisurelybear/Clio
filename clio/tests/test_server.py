@@ -332,7 +332,7 @@ class TestDelegation:
     def test_resolve_project_input(self, mock_rpi, handler_cls):
         mock_rpi.return_value = Path("/resolved")
         handler = _build_handler(handler_cls)
-        result = handler._resolve_project_input({"input_dir": ["/path"]})
+        result = handler._resolve_project_dir({"input_dir": ["/path"]})
         assert result == Path("/resolved")
         mock_rpi.assert_called_once()
 

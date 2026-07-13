@@ -9,7 +9,7 @@ from clio.ui.routes.processing_state_routes import handle_get_processing_state
 class TestHandleGetProcessingState:
     def test_returns_state(self):
         handler = MagicMock()
-        handler._resolve_project_input.return_value = Path("/some/input")
+        handler._resolve_project_dir.return_value = Path("/some/input")
         handler._get_project_output.return_value = Path("/some/output")
         handler._send_json = MagicMock()
 

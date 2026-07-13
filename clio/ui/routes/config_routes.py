@@ -34,14 +34,14 @@ def _provider_name_error(name: str) -> str | None:
 
 def handle_get_config(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/config."""
-    proj_input = handler._resolve_project_input(qs)
-    proj_out = handler._get_project_output(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    proj_out = handler._get_project_output(proj_dir)
     comp = proj_out / "compressed"
     texts = _find_texts_dirs(proj_out)
     handler._send_json(
         {
-            "project_dir": str(proj_input),
-            "input_dir": str(proj_input),  # compat alias for older UI clients
+            "project_dir": str(proj_dir),
+            "input_dir": str(proj_dir),  # compat alias for older UI clients
             "output_dir": str(proj_out),
             "compressed_dir": str(comp),
             "texts_dirs": [str(d) for d in texts],
@@ -59,12 +59,12 @@ def handle_get_config_raw(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
 
     if not config_path or not config_path.is_file():
         return handler._send_json({"error": "config file not available"}, 500)
-    proj_input = handler._resolve_project_input(qs)
-    # Always try to load project.yaml if it exists (proj_input may equal default dir)
-    proj_yaml = proj_input / "project.yaml"
+    proj_dir = handler._resolve_project_dir(qs)
+    # Always try to load project.yaml if it exists (proj_dir may equal default dir)
+    proj_yaml = proj_dir / "project.yaml"
     if not proj_yaml.is_file():
         # Non-default project without project.yaml => needs init
-        if proj_input != project_dir:
+        if proj_dir != project_dir:
             return handler._send_json({"needs_init": True})
         proj_yaml = None
     # Return the merged effective config
@@ -92,10 +92,10 @@ def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
     if not config_path:
         return handler._send_json({"ok": False, "error": "config_path not available"}, 500)
     # Support ?project=X writing project-specific config
-    proj_input = handler._resolve_project_input(qs)
+    proj_dir = handler._resolve_project_dir(qs)
     # Determine target: project.yaml or config.yaml
-    proj_yaml = proj_input / "project.yaml"
-    is_project_target = proj_yaml.is_file() or proj_input != project_dir
+    proj_yaml = proj_dir / "project.yaml"
+    is_project_target = proj_yaml.is_file() or proj_dir != project_dir
 
     # Layer validation: prevent API key leak
     if is_project_target:
@@ -114,14 +114,14 @@ def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
         orig_backup = target_path.read_bytes() if target_path.is_file() else None
         try:
             _save_atomic(target_path, yml.encode("utf-8"))
-            load_config(config_path, project_dir=proj_input)
+            load_config(config_path, project_dir=proj_dir)
         except Exception as e:
             if orig_backup is not None:
                 target_path.write_bytes(orig_backup)
             else:
                 target_path.unlink(missing_ok=True)
             return handler._send_json({"ok": False, "error": f"config validation failed: {e}"}, 400)
-        handler.__class__._config_cache.invalidate_key(str(proj_input.resolve()))
+        handler.__class__._config_cache.invalidate_key(str(proj_dir.resolve()))
         return handler._send_json({"ok": True, "path": str(target_path)})
     # Global config.yaml write (original logic)
     try:
@@ -156,18 +156,18 @@ def handle_post_config_init(handler: HandlerProtocol, qs: dict[str, Any], obj: d
     config_path = handler.config_path
     project_dir = handler.project_dir
 
-    proj_input = handler._resolve_project_input(qs)
-    if proj_input == project_dir:
+    proj_dir = handler._resolve_project_dir(qs)
+    if proj_dir == project_dir:
         return handler._send_json(
             {"ok": False, "error": "default project already has config.yaml, no init needed"}, 400
         )
-    proj_out = _project_output_dir(proj_input)
-    result = _create_project_yaml(proj_input, config_path, proj_out)
+    proj_out = _project_output_dir(proj_dir)
+    result = _create_project_yaml(proj_dir, config_path, proj_out)
     if result is None:
         return handler._send_json(
             {"ok": False, "error": "failed to create project.yaml (global config.yaml not available)"}, 500
         )
-    handler.__class__._config_cache.invalidate_key(str(proj_input.resolve()))
+    handler.__class__._config_cache.invalidate_key(str(proj_dir.resolve()))
     handler._send_json({"ok": True, "path": str(result)})
 
 
@@ -258,10 +258,10 @@ def handle_get_config_project(handler: HandlerProtocol, qs: dict[str, Any]) -> N
     project_dir = handler.project_dir
     if not config_path:
         return handler._send_json({"error": "config file not available"}, 500)
-    proj_input = handler._resolve_project_input(qs)
-    proj_yaml = proj_input / "project.yaml"
+    proj_dir = handler._resolve_project_dir(qs)
+    proj_yaml = proj_dir / "project.yaml"
     if not proj_yaml.is_file():
-        if proj_input != project_dir:
+        if proj_dir != project_dir:
             return handler._send_json({"needs_init": True})
         return handler._send_json({})
 
@@ -326,8 +326,8 @@ def handle_put_config_project(handler: HandlerProtocol, qs: dict[str, Any], obj:
     config_path = handler.config_path
     if not config_path:
         return handler._send_json({"ok": False, "error": "config_path not available"}, 500)
-    proj_input = handler._resolve_project_input(qs)
-    proj_yaml = proj_input / "project.yaml"
+    proj_dir = handler._resolve_project_dir(qs)
+    proj_yaml = proj_dir / "project.yaml"
 
     err = _validate_no_foreign_fields(obj, "project")
     if err:
@@ -340,14 +340,14 @@ def handle_put_config_project(handler: HandlerProtocol, qs: dict[str, Any], obj:
     orig_backup = proj_yaml.read_bytes() if proj_yaml.is_file() else None
     try:
         _save_atomic(proj_yaml, yml.encode("utf-8"))
-        load_config(config_path, project_dir=proj_input)
+        load_config(config_path, project_dir=proj_dir)
     except Exception as e:
         if orig_backup is not None:
             proj_yaml.write_bytes(orig_backup)
         else:
             proj_yaml.unlink()
         return handler._send_json({"ok": False, "error": f"config validation failed: {e}"}, 400)
-    handler.__class__._config_cache.invalidate_key(str(proj_input.resolve()))
+    handler.__class__._config_cache.invalidate_key(str(proj_dir.resolve()))
     handler._send_json({"ok": True, "path": str(proj_yaml)})
 
 
