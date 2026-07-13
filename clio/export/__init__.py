@@ -14,17 +14,30 @@ def export_plan(
     format: str,
     plan_path: Path,
     output_dir: Path,
-    input_dir: Path,
+    media_dir: Path | None = None,
     day_label: str = "day1",
     *,
     project_dir: Path | None = None,
+    input_dir: Path | None = None,
     **kwargs,
 ) -> Path:
     """Export plan to the specified format.
+
+    Preferred: pass project_dir= (reads videos.json).
+    Legacy: 4th positional / input_dir= is a media directory scanned with find_videos
+    when project_dir is not set.
 
     Returns path to the output draft directory.
     """
     exporter = FORMAT_REGISTRY.get(format)
     if exporter is None:
         raise ValueError(f"Unknown export format: {format}. Available: {list(FORMAT_REGISTRY)}")
-    return exporter(plan_path, output_dir, input_dir, day_label, project_dir=project_dir, **kwargs)
+    legacy_media = input_dir if input_dir is not None else media_dir
+    return exporter(
+        plan_path,
+        output_dir,
+        legacy_media,
+        day_label,
+        project_dir=project_dir,
+        **kwargs,
+    )

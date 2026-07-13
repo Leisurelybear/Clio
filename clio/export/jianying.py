@@ -316,18 +316,22 @@ def _build_tracks(
 def export_plan_to_jianying(
     plan_path: Path,
     output_dir: Path,
-    input_dir: Path,
+    media_dir: Path | None = None,
     day_label: str = "day1",
     ffprobe: str | None = None,
     texts_dir: Path | None = None,
     canvas_ratio: str = "16:9",
     *,
     project_dir: Path | None = None,
+    input_dir: Path | None = None,
 ) -> Path:
     """Generate JianYing draft from plan JSON.
 
     texts_dir is used to resolve plan index → source_file → original video.
     Falls back to {index}_ prefix matching if not provided.
+
+    Preferred media source: project_dir/videos.json.
+    Legacy: media_dir / input_dir scanned with find_videos when project_dir is unset.
 
     Returns path to the output draft directory.
     """
@@ -344,6 +348,8 @@ def export_plan_to_jianying(
     logger.debug("texts_dir=%s, index_to_source=%s", texts_dir, index_to_source)
     if texts_dir:
         logger.debug("texts_dir exists=%s, files=%s", texts_dir.is_dir(), list(texts_dir.glob("*.json")))
+
+    legacy_media = input_dir if input_dir is not None else media_dir
     if project_dir:
         from clio.tasks._video_loader import load_selected_videos
 
@@ -356,9 +362,9 @@ def export_plan_to_jianying(
     else:
         from clio.utils import find_videos
 
-        videos = list(find_videos(input_dir, recursive=True)) if input_dir else []
+        videos = list(find_videos(legacy_media, recursive=True)) if legacy_media else []
         if not videos:
-            print("  [警告] 未找到源视频（未设置 project_dir 且 input 扫描为空）")
+            print("  [警告] 未找到源视频（未设置 project_dir 且 media 扫描为空）")
     materials, index_to_material_id, seq_text_ids = _build_materials(plan_data, videos, ffprobe, index_to_source)
     tracks = _build_tracks(plan_data, index_to_material_id, seq_text_ids, index_to_offset)
 
