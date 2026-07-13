@@ -209,7 +209,9 @@ function renderVideoItem(v) {
   const counterpartLabel = state.source === 'compressed' ? '原' : '压';
   let matchBadge;
   if (v.match) {
-    if (v.segment_matches && v.segment_matches.length > 1) {
+    if (v.match.missing) {
+      matchBadge = `<span class="match-badge miss" title="${escapeHtml(v.match.abs_path || v.match.file || '')}">→ ${counterpartLabel}: 离线</span>`;
+    } else if (v.segment_matches && v.segment_matches.length > 1) {
       const segList = v.segment_matches.map(m => m.file).join(', ');
       matchBadge = `<button type="button" class="match-badge match-jump" title="${escapeHtml(segList)}">→ ${counterpartLabel}: ${escapeHtml(v.index || '')}/${v.segment_matches.length} 段</button>`;
     } else {

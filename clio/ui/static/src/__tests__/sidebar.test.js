@@ -30,4 +30,19 @@ describe('_findSourceSwitchTarget', () => {
 
     expect(_findSourceSwitchTarget(oldVideo, videos).file).toBe('new.mp4');
   });
+
+  it('matches external original by abs_path', () => {
+    const oldVideo = {
+      file: '001_A.mp4',
+      match: { file: 'A.MP4', abs_path: 'D:/GoPro/A.MP4' },
+      index: '001',
+    };
+    const videos = [
+      { file: 'A.MP4', abs_path: 'D:\GoPro\A.MP4', index: '001' },
+      { file: 'B.MP4', abs_path: 'D:/other/B.MP4', index: '002' },
+    ];
+    expect(
+      _findSourceSwitchTarget(oldVideo, videos, oldVideo.match.file, oldVideo.match.abs_path).file
+    ).toBe('A.MP4');
+  });
 });

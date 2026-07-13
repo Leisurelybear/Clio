@@ -204,6 +204,7 @@ async function setSource(source, options = {}) {
   if (state.previewActive) stopPreview();
   const oldVideo = options.fromVideo || state.videos.find(x => x.file === state.currentVideo);
   const oldMatchFile = options.matchFile ?? oldVideo?.match?.file;
+  const oldMatchAbsPath = options.matchAbsPath ?? oldVideo?.match?.abs_path ?? null;
   const wasPlanView = state.currentEntity === 'plan';
   if (!wasPlanView) {
     $('player-pane').classList.remove('plan-mode');
@@ -218,35 +219,50 @@ async function setSource(source, options = {}) {
   saveProject();
   try {
     await loadVideos();
-    const target = _findSourceSwitchTarget(oldVideo, state.videos, oldMatchFile);
+    const target = _findSourceSwitchTarget(oldVideo, state.videos, oldMatchFile, oldMatchAbsPath);
     if (state.videos.length) {
       if (state.currentEntity === 'plan') {
         import('./editor.js').then(mod => mod.renderActiveTab());
         if (target) {
-          playVideoSegment(target.file, target.offset_sec || 0);
-          setStatus(`?????${source} ???`, 'ok');
+          if (target.missing) {
+            $('player').removeAttribute('src');
+            $('player-name').textContent = '对应原视频当前离线';
+            setStatus(`已切换到${source}视图（对应原视频离线）`, 'warn');
+          } else {
+            playVideoSegment(target.file, target.offset_sec || 0);
+            setStatus(`已切换到${source}视图`, 'ok');
+          }
         } else {
           $('player').removeAttribute('src');
-          $('player-name').textContent = '???????????????????';
-          setStatus(`?????${source} ???????????????`, 'ok');
+          $('player-name').textContent = '当前规划段在此源无对应视频';
+          setStatus(`已切换到${source}视图（无对应视频）`, 'ok');
         }
       } else {
-        await selectVideo(target ? target.file : state.videos[0].file);
+        if (target?.missing) {
+          setStatus('对应原视频当前离线，已切换视图', 'warn');
+          state.currentVideo = target.file;
+          renderVideoList();
+        } else {
+          await selectVideo(target ? target.file : state.videos[0].file);
+        }
       }
     } else {
       $('player').removeAttribute('src');
-      $('player-name').textContent = '???????????';
-      setStatus(`???????????? (${source})`, 'warn');
+      $('player-name').textContent = '当前视图没有视频';
+      setStatus(`当前视图没有视频 (${source})`, 'warn');
     }
   } catch (e) {
-    setStatus('???????? ' + e.message, 'err');
+    setStatus('切换源失败: ' + e.message, 'err');
   }
 }
 
-function _findSourceSwitchTarget(oldVideo, videos, oldMatchFile = null) {
+function _findSourceSwitchTarget(oldVideo, videos, oldMatchFile = null, oldMatchAbsPath = null) {
   if (!oldVideo) return null;
+  const norm = (p) => String(p || '').replace(/\\/g, '/').toLowerCase();
+  const abs = oldMatchAbsPath ? norm(oldMatchAbsPath) : '';
   return videos.find(v =>
-    v.file === oldMatchFile
+    (abs && norm(v.abs_path) === abs)
+    || v.file === oldMatchFile
     || v.match?.file === oldVideo.file
     || (oldVideo.index && v.index === oldVideo.index)
   ) || null;
@@ -254,11 +270,19 @@ function _findSourceSwitchTarget(oldVideo, videos, oldMatchFile = null) {
 
 async function jumpToCounterpart(video) {
   if (!video?.match?.source) return;
+  if (video.match.missing) {
+    setStatus('对应原视频当前离线或不存在', 'warn');
+    return;
+  }
   if (video.match.source === state.source) {
     await selectVideo(video.match.file);
     return;
   }
-  await setSource(video.match.source, { fromVideo: video, matchFile: video.match.file });
+  await setSource(video.match.source, {
+    fromVideo: video,
+    matchFile: video.match.file,
+    matchAbsPath: video.match.abs_path || null,
+  });
 }
 
 async function switchToOriginalThenCompress() {

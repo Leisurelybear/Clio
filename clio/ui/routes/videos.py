@@ -219,14 +219,22 @@ def _build_videos_payload(
                         continue
                 match_file = None
                 abs_match = None
+                match_missing = False
                 if orig:
                     op = Path(orig)
                     match_file = op.name
-                    if op.is_absolute() or op.is_file():
-                        try:
-                            abs_match = str(op.resolve())
-                        except OSError:
-                            abs_match = str(op)
+                    try:
+                        if op.is_absolute() or op.is_file():
+                            resolved = op.resolve() if op.exists() else op
+                            abs_match = str(resolved)
+                            match_missing = not op.exists() and not Path(abs_match).exists()
+                        else:
+                            cand = (proj_dir / op).resolve()
+                            abs_match = str(cand)
+                            match_missing = not cand.exists()
+                    except OSError:
+                        abs_match = str(op)
+                        match_missing = True
                 v: dict[str, Any] = {
                     "file": p.name,
                     "source": "compressed",
@@ -240,6 +248,7 @@ def _build_videos_payload(
                             "source": "original",
                             "file": match_file,
                             "abs_path": abs_match,
+                            "missing": match_missing,
                         }
                         if orig
                         else None
