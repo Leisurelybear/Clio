@@ -24,8 +24,8 @@ if TYPE_CHECKING:
 
 def handle_get_project(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     """Handle GET /api/project."""
-    proj_input = handler._resolve_project_input(qs)
-    proj_file = proj_input / "project.json"
+    proj_dir = handler._resolve_project_dir(qs)
+    proj_file = proj_dir / "project.json"
     data = {}
     if proj_file.is_file():
         try:
@@ -36,9 +36,9 @@ def handle_get_project(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     qs_project = qs.get("project", [None])[0]
     config_path = handler.config_path
     if qs_project:
-        _save_last_project(qs_project, config_path, input_dir=str(proj_input))
+        _save_last_project(qs_project, config_path, input_dir=str(proj_dir))
     merged = {**handler.DEFAULT_PROJECT, **data}
-    proj_out = _project_output_dir(proj_input)
+    proj_out = _project_output_dir(proj_dir)
     merged["steps"] = _detect_steps(proj_out)
     handler._send_json(merged)
 
@@ -73,8 +73,8 @@ def handle_get_projects(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
 
 def handle_put_project(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle PUT /api/project."""
-    proj_input = handler._resolve_project_input(qs)
-    proj_file = proj_input / "project.json"
+    proj_dir = handler._resolve_project_dir(qs)
+    proj_file = proj_dir / "project.json"
     data = {}
     if proj_file.is_file():
         try:
@@ -85,10 +85,10 @@ def handle_put_project(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) 
     merged["updatedAt"] = datetime.datetime.now().isoformat(timespec="seconds")
     if not proj_file.is_file():
         merged["createdAt"] = merged["updatedAt"]
-    proj_input.mkdir(parents=True, exist_ok=True)
+    proj_dir.mkdir(parents=True, exist_ok=True)
     _save_atomic(proj_file, json.dumps(merged, ensure_ascii=False, indent=2).encode("utf-8"))
     config_path = handler.config_path
-    _save_last_project(merged.get("name") or proj_input.name, config_path, input_dir=str(proj_input))
+    _save_last_project(merged.get("name") or proj_dir.name, config_path, input_dir=str(proj_dir))
     handler._send_json({"ok": True})
 
 
@@ -201,3 +201,45 @@ def handle_post_project_remove(handler: HandlerProtocol, obj: dict) -> None:
                     except (json.JSONDecodeError, OSError):
                         continue
     handler._send_json({"ok": True})
+
+
+def handle_post_project_migrate(handler: HandlerProtocol, obj: dict) -> None:
+    """Handle POST /api/project/migrate — migrate one legacy project to videos.json."""
+    from clio.tasks.migrate import run_migrate
+
+    config_path = handler.config_path
+    if not config_path:
+        return handler._send_json({"ok": False, "error": "config_path not available"}, 500)
+
+    project_dir_raw = (obj.get("project_dir") or obj.get("input_dir") or "").strip()
+    if not project_dir_raw:
+        return handler._send_json({"ok": False, "error": "project_dir is required"}, 400)
+    project_path = Path(project_dir_raw)
+    if not project_path.is_dir():
+        return handler._send_json({"ok": False, "error": f"project_dir not found: {project_dir_raw}"}, 400)
+    if not (project_path / "project.yaml").is_file():
+        return handler._send_json({"ok": False, "error": "project.yaml not found"}, 400)
+
+    updated, errors = run_migrate(Path(config_path), from_path=project_path)
+    if updated <= 0:
+        if any("已是新结构" in e for e in errors):
+            return handler._send_json(
+                {
+                    "ok": True,
+                    "migrated": False,
+                    "project_dir": str(project_path.resolve()),
+                    "message": "项目已是新结构",
+                }
+            )
+        msg = errors[0] if errors else "nothing to migrate"
+        return handler._send_json({"ok": False, "error": msg, "errors": errors}, 400)
+
+    handler.__class__._config_cache.invalidate_key(str(project_path.resolve()))
+    handler._send_json(
+        {
+            "ok": True,
+            "migrated": True,
+            "project_dir": str(project_path.resolve()),
+            "errors": errors,
+        }
+    )

@@ -18,7 +18,7 @@ from clio.ui.routes.projects import (
 class TestHandleGetProject:
     def test_returns_defaults_when_no_project_json(self):
         handler = MagicMock()
-        handler._resolve_project_input.return_value = Path("/nonexistent")
+        handler._resolve_project_dir.return_value = Path("/nonexistent")
         handler.DEFAULT_PROJECT = {"name": "Unnamed", "currentDay": "day1", "source": "compressed"}
         handler._send_json = MagicMock()
 
@@ -31,10 +31,10 @@ class TestHandleGetProject:
 
     def test_reads_project_json(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "project"
-        proj_input.mkdir()
-        (proj_input / "project.json").write_text(json.dumps({"name": "Tokyo", "currentDay": "day3"}), encoding="utf-8")
-        handler._resolve_project_input.return_value = proj_input
+        proj_dir = tmp_path / "project"
+        proj_dir.mkdir()
+        (proj_dir / "project.json").write_text(json.dumps({"name": "Tokyo", "currentDay": "day3"}), encoding="utf-8")
+        handler._resolve_project_dir.return_value = proj_dir
         handler.DEFAULT_PROJECT = {"name": "Unnamed", "currentDay": "day1", "source": "compressed"}
         handler._send_json = MagicMock()
 
@@ -62,11 +62,11 @@ class TestHandleGetProjects:
 class TestHandlePutProject:
     def test_updates_project_json(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "project"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "project"
+        proj_dir.mkdir()
         cfg = tmp_path / "config.yaml"
         cfg.write_bytes(b"")
-        handler._resolve_project_input.return_value = proj_input
+        handler._resolve_project_dir.return_value = proj_dir
         handler.config_path = cfg
         handler.DEFAULT_PROJECT = {"name": "Unnamed", "currentDay": "day1", "source": "compressed"}
         handler._send_json = MagicMock()
@@ -74,7 +74,7 @@ class TestHandlePutProject:
         handle_put_project(handler, {}, {"name": "Updated", "currentDay": "day2"})
 
         handler._send_json.assert_called_once_with({"ok": True})
-        proj_file = proj_input / "project.json"
+        proj_file = proj_dir / "project.json"
         assert proj_file.is_file()
         data = json.loads(proj_file.read_text(encoding="utf-8"))
         assert data["name"] == "Updated"
@@ -109,16 +109,16 @@ class TestHandlePostProjectCreate:
 
     def test_creates_project(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "new_project"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "new_project"
+        proj_dir.mkdir()
         handler.config_path = tmp_path / "config.yaml"
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
 
-        handle_post_project_create(handler, {"name": "Paris", "input_dir": str(proj_input)})
+        handle_post_project_create(handler, {"name": "Paris", "input_dir": str(proj_dir)})
 
         assert handler._send_json.call_args[0][0]["ok"] is True
-        proj_file = proj_input / "project.json"
+        proj_file = proj_dir / "project.json"
         assert proj_file.is_file()
         data = json.loads(proj_file.read_text(encoding="utf-8"))
         assert data["name"] == "Paris"
@@ -136,27 +136,68 @@ class TestHandlePostProjectAdd:
 
     def test_adds_existing_project(self, tmp_path: Path):
         handler = MagicMock()
-        proj_input = tmp_path / "existing"
-        proj_input.mkdir()
-        (proj_input / "project.json").write_text(json.dumps({"name": "Existing Project"}), encoding="utf-8")
+        proj_dir = tmp_path / "existing"
+        proj_dir.mkdir()
+        (proj_dir / "project.json").write_text(json.dumps({"name": "Existing Project"}), encoding="utf-8")
         handler.config_path = tmp_path / "config.yaml"
         handler._send_json = MagicMock()
 
-        handle_post_project_add(handler, {"input_dir": str(proj_input)})
+        handle_post_project_add(handler, {"input_dir": str(proj_dir)})
 
         assert handler._send_json.call_args[0][0]["ok"] is True
 
     def test_auto_creates_project_json(self, tmp_path: Path):
         """Adding a dir without project.json should auto-create it."""
         handler = MagicMock()
-        proj_input = tmp_path / "new_dir"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "new_dir"
+        proj_dir.mkdir()
         handler.config_path = tmp_path / "config.yaml"
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
 
-        handle_post_project_add(handler, {"input_dir": str(proj_input)})
+        handle_post_project_add(handler, {"input_dir": str(proj_dir)})
 
         assert handler._send_json.call_args[0][0]["ok"] is True
-        proj_file = proj_input / "project.json"
+        proj_file = proj_dir / "project.json"
         assert proj_file.is_file()
+
+
+class TestHandlePostProjectMigrate:
+    def test_requires_project_dir(self, tmp_path: Path):
+        from clio.ui.routes.projects import handle_post_project_migrate
+
+        handler = MagicMock()
+        handler.config_path = tmp_path / "config.yaml"
+        handler.config_path.write_text("paths: {}\n", encoding="utf-8")
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+        handle_post_project_migrate(handler, {})
+        assert handler._send_json.call_args[0][1] == 400
+
+    def test_migrates_legacy_project(self, tmp_path: Path):
+        import json
+
+        import yaml
+
+        from clio.ui.routes.projects import handle_post_project_migrate
+
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("paths: {}\n", encoding="utf-8")
+        proj = tmp_path / "legacy"
+        proj.mkdir()
+        (proj / "A.mp4").write_bytes(b"x")
+        (proj / "project.yaml").write_text(
+            yaml.dump({"paths": {"input_dir": ".", "output_dir": "./output"}}, allow_unicode=True),
+            encoding="utf-8",
+        )
+        (proj / "project.json").write_text(json.dumps({"name": "legacy"}), encoding="utf-8")
+
+        handler = MagicMock()
+        handler.config_path = cfg
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+        handle_post_project_migrate(handler, {"project_dir": str(proj)})
+        payload = handler._send_json.call_args[0][0]
+        assert payload["ok"] is True
+        assert payload.get("migrated") is True
+        assert (proj / "videos.json").is_file()

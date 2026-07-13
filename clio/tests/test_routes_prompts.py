@@ -9,7 +9,7 @@ from clio.ui.routes.prompts import handle_delete_prompt, handle_get_prompts, han
 
 def test_handle_get_prompts_lists_defaults(tmp_path: Path):
     handler = MagicMock()
-    handler._resolve_project_input.return_value = tmp_path
+    handler._resolve_project_dir.return_value = tmp_path
 
     handle_get_prompts(handler, {})
 
@@ -24,7 +24,7 @@ def test_handle_get_prompts_uses_project_override(tmp_path: Path):
     prompt_dir.mkdir(parents=True)
     (prompt_dir / "ANALYZE_PROMPT.md").write_text("project prompt", encoding="utf-8")
     handler = MagicMock()
-    handler._resolve_project_input.return_value = tmp_path
+    handler._resolve_project_dir.return_value = tmp_path
 
     handle_get_prompts(handler, {})
 
@@ -41,7 +41,7 @@ def test_handle_get_prompts_uses_project_txt_override(tmp_path: Path):
     prompt_dir.mkdir(parents=True)
     (prompt_dir / "ANALYZE_PROMPT.txt").write_text("project txt prompt", encoding="utf-8")
     handler = MagicMock()
-    handler._resolve_project_input.return_value = tmp_path
+    handler._resolve_project_dir.return_value = tmp_path
 
     handle_get_prompts(handler, {})
 
@@ -60,7 +60,7 @@ def test_handle_get_prompts_reports_repo_override(tmp_path: Path, monkeypatch):
     (prompt_dir / "ANALYZE_PROMPT").write_text("repo prompt", encoding="utf-8")
     monkeypatch.setattr(clio.prompts, "__file__", str(repo_root / "clio" / "prompts.py"))
     handler = MagicMock()
-    handler._resolve_project_input.return_value = tmp_path / "project"
+    handler._resolve_project_dir.return_value = tmp_path / "project"
 
     handle_get_prompts(handler, {})
 
@@ -74,7 +74,7 @@ def test_handle_get_prompts_reports_repo_override(tmp_path: Path, monkeypatch):
 
 def test_handle_put_prompt_saves_project_override(tmp_path: Path):
     handler = MagicMock()
-    handler._resolve_project_input.return_value = tmp_path
+    handler._resolve_project_dir.return_value = tmp_path
 
     handle_put_prompt(handler, {}, {"content": "custom prompt"}, "analyze_prompt")
 
@@ -88,7 +88,7 @@ def test_handle_put_prompt_saves_project_override(tmp_path: Path):
 
 def test_handle_put_prompt_rejects_unknown_name(tmp_path: Path):
     handler = MagicMock()
-    handler._resolve_project_input.return_value = tmp_path
+    handler._resolve_project_dir.return_value = tmp_path
 
     handle_put_prompt(handler, {}, {"content": "x"}, "../secret")
 
@@ -97,7 +97,7 @@ def test_handle_put_prompt_rejects_unknown_name(tmp_path: Path):
 
 def test_handle_put_prompt_rejects_empty_content(tmp_path: Path):
     handler = MagicMock()
-    handler._resolve_project_input.return_value = tmp_path
+    handler._resolve_project_dir.return_value = tmp_path
 
     handle_put_prompt(handler, {}, {"content": "  "}, "ANALYZE_PROMPT")
 
@@ -115,7 +115,7 @@ def test_handle_delete_prompt_removes_project_overrides(tmp_path: Path):
     for f in files:
         f.write_text("override", encoding="utf-8")
     handler = MagicMock()
-    handler._resolve_project_input.return_value = tmp_path
+    handler._resolve_project_dir.return_value = tmp_path
 
     handle_delete_prompt(handler, {}, "ANALYZE_PROMPT")
 
@@ -129,7 +129,7 @@ def test_handle_delete_prompt_removes_project_overrides(tmp_path: Path):
 
 def test_handle_delete_prompt_rejects_unknown_name(tmp_path: Path):
     handler = MagicMock()
-    handler._resolve_project_input.return_value = tmp_path
+    handler._resolve_project_dir.return_value = tmp_path
 
     handle_delete_prompt(handler, {}, "../secret")
 

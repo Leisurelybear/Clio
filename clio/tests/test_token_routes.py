@@ -9,7 +9,7 @@ from clio.ui.routes.token_routes import handle_get_token_usage
 class TestHandleGetTokenUsage:
     def test_returns_stats(self, tmp_path):
         handler = MagicMock()
-        handler._resolve_project_input.return_value = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
         handler._send_json = MagicMock()
 
         handle_get_token_usage(handler, {})
@@ -24,7 +24,7 @@ class TestHandleGetTokenUsage:
 
     def test_project_output_is_none_returns_error(self):
         handler = MagicMock()
-        handler._resolve_project_input.return_value = Path("/some/project")
+        handler._resolve_project_dir.return_value = Path("/some/project")
         handler._send_json = MagicMock()
 
         with patch("clio.ui.routes.token_routes._project_output_dir", return_value=None):

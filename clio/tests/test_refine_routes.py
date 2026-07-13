@@ -31,7 +31,7 @@ def _mock_path(resolved: str = "/resolved/path.json", content: str | None = None
 def _make_handler(p=None, with_config=True):
     """Build a minimal magicmock handler for refine tests."""
     handler = MagicMock()
-    handler._resolve_project_input.return_value = Path("/proj")
+    handler._resolve_project_dir.return_value = Path("/proj")
     handler._get_project_output.return_value = Path("/proj_out")
     handler._resolve_texts.return_value = p
     handler._resolve_in.return_value = p
@@ -134,7 +134,7 @@ class TestHandlePostRefineBusy:
 
         try:
             handler = MagicMock()
-            handler._resolve_project_input.return_value = Path("/proj")
+            handler._resolve_project_dir.return_value = Path("/proj")
             handler._get_project_output.return_value = Path("/proj_out")
             handler._resolve_texts.return_value = p
             handle_post_refine(handler, {}, {"file": "test.json", "type": "texts"})
@@ -152,7 +152,7 @@ class TestHandlePostRefineBusy:
 
         try:
             handler = MagicMock()
-            handler._resolve_project_input.return_value = Path("/proj")
+            handler._resolve_project_dir.return_value = Path("/proj")
             handler._get_project_output.return_value = Path("/proj_out")
             handler._resolve_in.return_value = p
             handle_post_refine(handler, {}, {"file": "test.json", "type": "scripts"})

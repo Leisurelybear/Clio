@@ -16,8 +16,8 @@ from clio.whisper_cache import REQUIRED_MODEL_FILES, is_model_cache_complete
 
 
 def _get_cache_dir(handler: HandlerProtocol, qs: dict[str, Any]) -> Path:
-    proj_input = handler._resolve_project_input(qs)
-    cfg = handler._get_config(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
     return _resolve_cache_dir(cfg)
 
 
@@ -75,8 +75,8 @@ def handle_get_whisper_models(handler: HandlerProtocol, qs: dict[str, Any]) -> N
     cache_dir = _get_cache_dir(handler, qs)
     cached = _list_cached_models(cache_dir)
     available = list(WhisperModelSize)
-    proj_input = handler._resolve_project_input(qs)
-    cfg = handler._get_config(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
     current_model = cfg.whisper.model_size
     free_bytes = 0
     try:
@@ -136,8 +136,8 @@ def handle_put_whisper_model(handler: HandlerProtocol, qs: dict[str, Any], obj: 
             400,
         )
         return
-    proj_input = handler._resolve_project_input(qs)
-    proj_yaml = proj_input / "project.yaml"
+    proj_dir = handler._resolve_project_dir(qs)
+    proj_yaml = proj_dir / "project.yaml"
     if not proj_yaml.is_file():
         proj_yaml.parent.mkdir(parents=True, exist_ok=True)
         raw: dict[str, Any] = {}
@@ -154,5 +154,5 @@ def handle_put_whisper_model(handler: HandlerProtocol, qs: dict[str, Any], obj: 
         tmp.unlink(missing_ok=True)
         handler._send_json({"ok": False, "error": "写入配置文件失败"}, 500)
         return
-    handler.__class__._config_cache.invalidate_key(str(proj_input.resolve()))
+    handler.__class__._config_cache.invalidate_key(str(proj_dir.resolve()))
     handler._send_json({"ok": True, "model_size": model_name})

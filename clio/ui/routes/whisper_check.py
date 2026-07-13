@@ -23,8 +23,8 @@ def handle_get_whisper_check(handler: HandlerProtocol, qs: dict[str, Any]) -> No
     cache_path = None
     model_cached = False
     try:
-        proj_input = handler._resolve_project_input(qs)
-        cfg = handler._get_config(proj_input)
+        proj_dir = handler._resolve_project_dir(qs)
+        cfg = handler._get_config(proj_dir)
         cache_dir = _resolve_cache_dir(cfg)
         if cache_dir.is_dir():
             cache_path = str(cache_dir)

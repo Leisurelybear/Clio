@@ -43,15 +43,15 @@ class _FakePopen:
         pass
 
 
-def _make_handler(proj_input: Path, proj_output: Path) -> MagicMock:
+def _make_handler(proj_dir: Path, proj_output: Path) -> MagicMock:
     """Build a mock handler that resolves project input/output correctly."""
     handler = MagicMock()
 
     def _resolve_qs(qs: dict) -> Path:
-        # If qs has "project", return a subdirectory; otherwise return proj_input
-        return proj_input
+        # If qs has "project", return a subdirectory; otherwise return proj_dir
+        return proj_dir
 
-    handler._resolve_project_input.side_effect = _resolve_qs
+    handler._resolve_project_dir.side_effect = _resolve_qs
     handler._get_project_output.return_value = proj_output
 
     cfg = MagicMock()
@@ -72,43 +72,43 @@ class TestProjectQueryConsistency:
 
     def test_get_whisper_check_uses_qs(self, tmp_path: Path) -> None:
         """handle_get_whisper_check should pass qs to _resolve_project_input."""
-        proj_input = tmp_path / "project_a"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "project_a"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output_a"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "project_a"}
 
         with patch("clio.ui.routes.whisper_check.check_whisper", return_value=False):
             handle_get_whisper_check(handler, qs)
 
-        handler._resolve_project_input.assert_called_with(qs)
-        handler._get_config.assert_called_once_with(proj_input)
+        handler._resolve_project_dir.assert_called_with(qs)
+        handler._get_config.assert_called_once_with(proj_dir)
 
     def test_get_whisper_models_uses_qs(self, tmp_path: Path) -> None:
         """handle_get_whisper_models should pass qs to _resolve_project_input."""
-        proj_input = tmp_path / "project_b"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "project_b"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output_b"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "project_b"}
 
         handle_get_whisper_models(handler, qs)
 
         # _resolve_project_input should be called with qs (at least once, possibly twice)
-        call_args_list = handler._resolve_project_input.call_args_list
+        call_args_list = handler._resolve_project_dir.call_args_list
         assert all(call.args[0] is qs for call in call_args_list), (
             f"Expected all calls with qs={qs}, got: {call_args_list}"
         )
 
     def test_install_progress_path_uses_qs(self, tmp_path: Path) -> None:
         """_install_progress_path should resolve output from qs, not from empty dict."""
-        proj_input = tmp_path / "project_c"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "project_c"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output_c"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "project_c"}
 
         path = _install_progress_path(handler, qs)
@@ -118,16 +118,16 @@ class TestProjectQueryConsistency:
 
     def test_get_cache_dir_uses_qs(self, tmp_path: Path) -> None:
         """_get_cache_dir should pass qs to _resolve_project_input."""
-        proj_input = tmp_path / "project_d"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "project_d"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output_d"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "project_d"}
 
         _get_cache_dir(handler, qs)
 
-        handler._resolve_project_input.assert_called_with(qs)
+        handler._resolve_project_dir.assert_called_with(qs)
 
 
 class TestPutWhisperModelPersistence:
@@ -135,39 +135,39 @@ class TestPutWhisperModelPersistence:
 
     def test_creates_project_yaml_when_missing(self, tmp_path: Path) -> None:
         """If project.yaml doesn't exist, it should be created with whisper config."""
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "test"}
 
-        assert not (proj_input / "project.yaml").exists()
+        assert not (proj_dir / "project.yaml").exists()
 
         handle_put_whisper_model(handler, qs, {"model_size": "medium"})
 
         # project.yaml should now exist with the model_size
-        proj_yaml = proj_input / "project.yaml"
+        proj_yaml = proj_dir / "project.yaml"
         assert proj_yaml.is_file()
         raw = yaml.safe_load(proj_yaml.read_text(encoding="utf-8"))
         assert raw["whisper"]["model_size"] == "medium"
-        handler.__class__._config_cache.invalidate_key.assert_called_with(str(proj_input.resolve()))
+        handler.__class__._config_cache.invalidate_key.assert_called_with(str(proj_dir.resolve()))
 
     def test_updates_existing_project_yaml(self, tmp_path: Path) -> None:
         """If project.yaml exists, it should be updated with the new model_size."""
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output"
         proj_output.mkdir()
 
         # Create existing project.yaml with other config
-        proj_yaml = proj_input / "project.yaml"
+        proj_yaml = proj_dir / "project.yaml"
         proj_yaml.write_text(
             yaml.dump({"whisper": {"model_size": "small", "language": "en"}, "other": "data"}),
             encoding="utf-8",
         )
 
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "test"}
 
         handle_put_whisper_model(handler, qs, {"model_size": "medium"})
@@ -179,11 +179,11 @@ class TestPutWhisperModelPersistence:
 
     def test_rejects_invalid_model_size(self, tmp_path: Path) -> None:
         """Invalid model_size should return 400 error."""
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "test"}
 
         handle_put_whisper_model(handler, qs, {"model_size": "gigantic"})
@@ -195,11 +195,11 @@ class TestPutWhisperModelPersistence:
 
     def test_rejects_empty_model_size(self, tmp_path: Path) -> None:
         """Empty model_size should return 400 error."""
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "test"}
 
         handle_put_whisper_model(handler, qs, {"model_size": ""})
@@ -210,16 +210,16 @@ class TestPutWhisperModelPersistence:
 
     def test_does_not_create_file_on_validation_failure(self, tmp_path: Path) -> None:
         """project.yaml should not be created if validation fails."""
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "test"}
 
         handle_put_whisper_model(handler, qs, {"model_size": "invalid"})
 
-        assert not (proj_input / "project.yaml").exists()
+        assert not (proj_dir / "project.yaml").exists()
 
 
 class TestHandlePostWhisperInstallCancel:
@@ -227,11 +227,11 @@ class TestHandlePostWhisperInstallCancel:
 
     def test_cancel_updates_progress_file(self, tmp_path: Path) -> None:
         """Cancel should reset progress file status to idle."""
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "test"}
 
         progress_file = _install_progress_path(handler, qs)
@@ -248,11 +248,11 @@ class TestHandlePostWhisperInstallCancel:
 
     def test_cancel_without_progress_file(self, tmp_path: Path) -> None:
         """Cancel should succeed even if no progress file exists."""
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "test"}
 
         handle_post_whisper_install_cancel(handler, qs)
@@ -270,11 +270,11 @@ class TestRunWhisperInstall:
         yield
 
     def test_downloads_required_snapshot_files(self, tmp_path: Path) -> None:
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         cache_dir = tmp_path / "models"
         handler._get_config.return_value.whisper.cache_dir = str(cache_dir)
         handler._get_config.return_value.whisper.model_size = "small"
@@ -319,11 +319,11 @@ class TestRunWhisperInstall:
     def test_download_cancel_removes_tmp_file(self, tmp_path: Path) -> None:
         from clio.ui.routes import whisper_download
 
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         cache_dir = tmp_path / "models"
         handler._get_config.return_value.whisper.cache_dir = str(cache_dir)
         handler._get_config.return_value.whisper.model_size = "small"
@@ -363,11 +363,11 @@ class TestRunWhisperInstall:
 
     def test_cancel_with_corrupted_progress_file(self, tmp_path: Path) -> None:
         """Cancel should not crash on corrupted progress file."""
-        proj_input = tmp_path / "input"
-        proj_input.mkdir()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
         proj_output = tmp_path / "output"
         proj_output.mkdir()
-        handler = _make_handler(proj_input, proj_output)
+        handler = _make_handler(proj_dir, proj_output)
         qs = {"project": "test"}
 
         progress_file = _install_progress_path(handler, qs)

@@ -63,8 +63,8 @@ def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dic
         return handler._send_json({"ok": False, "error": "source must be compressed|original"}, 400)
 
     out_path = Path(out_dir_raw) if out_dir_raw else None
-    proj_input = handler._resolve_project_input(qs)
-    cfg = handler._get_config(proj_input)
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
 
     try:
         run_cut_all(
