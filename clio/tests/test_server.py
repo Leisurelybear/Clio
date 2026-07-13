@@ -328,15 +328,15 @@ class TestDelegation:
         handler._get_config(Path("/some/proj"))
         handler_cls._config_cache.get.assert_called_once_with(Path("/some/proj"))
 
-    @patch("clio.ui.server.resolve_project_input")
-    def test_resolve_project_input(self, mock_rpi, handler_cls):
+    @patch("clio.ui.server.resolve_project_dir")
+    def test_resolve_project_dir(self, mock_rpi, handler_cls):
         mock_rpi.return_value = Path("/resolved")
         handler = _build_handler(handler_cls)
         result = handler._resolve_project_dir({"input_dir": ["/path"]})
         assert result == Path("/resolved")
         mock_rpi.assert_called_once()
 
-    @patch("clio.ui.server.resolve_project_input")
+    @patch("clio.ui.server.resolve_project_dir")
     @patch("clio.ui.server._project_output_dir")
     def test_get_project_output_from_dict(self, mock_pod, mock_rpi, handler_cls):
         mock_rpi.return_value = Path("/resolved/input")

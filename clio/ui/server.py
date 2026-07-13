@@ -108,6 +108,7 @@ from clio.ui.services.file_service import (
 from clio.ui.services.project_service import (
     _project_output_dir,
     resolve_last_project_config,
+    resolve_project_dir,
     resolve_project_input,
 )
 from clio.utils import write_json_atomic
@@ -244,7 +245,7 @@ def make_handler(
             return self.__class__._config_cache.get(project_input)
 
         def _resolve_project_dir(self, qs: dict) -> Path:
-            return resolve_project_input(qs, project_dir, config_path)
+            return resolve_project_dir(qs, project_dir, config_path)
 
         def _resolve_project_input(self, qs: dict) -> Path:
             """Compat alias for _resolve_project_dir."""

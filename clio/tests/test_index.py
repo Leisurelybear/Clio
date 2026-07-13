@@ -69,7 +69,7 @@ class TestArtifactIndexBuild:
         covers_dir = kwargs.pop("covers_dir", tmp_path / "covers")
         return ArtifactIndex(
             output_dir=tmp_path,
-            input_dir=tmp_path,
+            project_dir=tmp_path,
             compressed_dir=compressed_dir or tmp_path / "compressed",
             texts_dir=texts_dir or tmp_path / "texts",
             scripts_dir=scripts_dir or tmp_path / "scripts",
@@ -118,7 +118,7 @@ class TestArtifactIndexBuild:
 
         index = ArtifactIndex(
             output_dir=tmp_path,
-            input_dir=tmp_path,
+            project_dir=tmp_path,
             compressed_dir=compressed_dir,
             texts_dir=texts_dir,
             scripts_dir=scripts_dir,

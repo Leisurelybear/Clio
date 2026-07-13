@@ -91,7 +91,7 @@ class ArtifactIndex:
     """Scan artifact directories once, then provide lookup queries.
 
     Usage::
-        index = ArtifactIndex(output_dir=..., input_dir=..., ...)
+        index = ArtifactIndex(output_dir=..., project_dir=..., ...)
         index.build()
         group = index.lookup(compressed_stem="001_GL010683")
     """
@@ -99,15 +99,18 @@ class ArtifactIndex:
     def __init__(
         self,
         output_dir: Path,
-        input_dir: Path,
+        project_dir: Path | None = None,
         compressed_dir: Path | None = None,
         texts_dir: Path | None = None,
         scripts_dir: Path | None = None,
         transcripts_dir: Path | None = None,
         covers_dir: Path | None = None,
+        *,
+        input_dir: Path | None = None,
     ):
         self._output_dir = output_dir
-        self._input_dir = input_dir
+        # project_dir kept for API clarity; directory scans use output artifacts only
+        self._project_dir = project_dir if project_dir is not None else input_dir
         self._compressed_dir = compressed_dir or output_dir / "compressed"
         self._texts_dir = texts_dir or output_dir / "texts"
         self._scripts_dir = scripts_dir or output_dir / "scripts"
