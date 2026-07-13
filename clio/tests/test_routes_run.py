@@ -305,17 +305,20 @@ class TestHandlePostRerun:
         monkeypatch = pytest.MonkeyPatch()
         monkeypatch.setattr("clio.ui.routes.run.threading.Thread", _fake_thread)
 
-        handle_post_rerun(handler, {}, {"video": "001_GL010695.mp4", "task": "compress"})
+        try:
+            handle_post_rerun(handler, {}, {"video": "001_GL010695.mp4", "task": "compress"})
 
-        handler._send_json.assert_called_once()
-        payload = handler._send_json.call_args[0][0]
-        assert payload["ok"] is True, f"Expected ok=True, got {payload}"
+            handler._send_json.assert_called_once()
+            payload = handler._send_json.call_args[0][0]
+            assert payload["ok"] is True, f"Expected ok=True, got {payload}"
 
-        target_fn = captured_thread_args.get("target")
-        assert target_fn is not None, "Thread was not created"
-        # _rerun_worker has defaults: cfg, task, video_basename, original_video, ...
-        defaults = target_fn.__defaults__
-        assert defaults is not None, "No defaults on _rerun_worker"
+            target_fn = captured_thread_args.get("target")
+            assert target_fn is not None, "Thread was not created"
+            # _rerun_worker has defaults: cfg, task, video_basename, original_video, ...
+            defaults = target_fn.__defaults__
+            assert defaults is not None, "No defaults on _rerun_worker"
+        finally:
+            monkeypatch.undo()
         # defaults: (cfg, task, video_basename, original_video, texts_json, proj_out, cancel_event)
         assert len(defaults) >= 4, f"Expected at least 4 defaults, got {len(defaults)}"
         original_video_arg = defaults[3]  # 4th default is original_video
