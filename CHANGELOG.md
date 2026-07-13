@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-14
+
+### Added
+- feat(ui): "新建文件夹" button in both video manager and browse directory modals
+- feat(ui): drag-and-drop video selection in video manager (filename matching + `DataTransferItem` API)
+- feat(ui): cancel buttons styled in red (`button[id$="-cancel"]`)
+- docs: route registry design plan (A-007)
+
+### Fixed
+- fix(config): remove dead `input_dir`/`recursive` from `PathsConfig` dataclass
+- fix(ui): register `handle_post_fs_mkdir` in `_POST_HANDLER_PARAMS` (fixes TypeError from unwanted `qs` argument)
+- fix(ui): add path traversal validation in mkdir endpoint (reject `/`, `\\`, `..` in name; validate `new_dir.resolve()`)
+- fix(ui): backdrop click no longer closes file-management modals (video manager, browse dir, new project, open project)
+
+### Changed
+- chore(gitignore): ignore `project.json`, `videos.json`, `*.migrate-bak`
+
 ## 2026-07-10
 
 ### Added (merged from feat/ui-redesign, PR #17/#18)
