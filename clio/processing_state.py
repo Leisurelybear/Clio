@@ -93,22 +93,22 @@ class ProcessingState:
     def _schedule_flush_locked(self) -> None:
         if self._flush_interval_sec <= 0 or self._flush_timer is not None:
             return
-        timer = threading.Timer(self._flush_interval_sec, self._flush_from_timer)
-        timer.daemon = True
-        self._flush_timer = timer
-        timer.start()
+        t = threading.Thread(target=self._flush_sleeper, daemon=True)
+        self._flush_timer = t
+        t.start()
 
-    def _flush_from_timer(self) -> None:
+    def _flush_sleeper(self) -> None:
+        time.sleep(self._flush_interval_sec)
         with self._lock:
+            if self._flush_timer is None:
+                return
             self._flush_timer = None
             if self._dirty:
                 self._flush_locked()
 
     def flush(self) -> None:
         with self._lock:
-            if self._flush_timer is not None:
-                self._flush_timer.cancel()
-                self._flush_timer = None
+            self._flush_timer = None
             if self._dirty:
                 self._flush_locked()
 
@@ -121,9 +121,7 @@ class ProcessingState:
             self._dirty = True
             self._pending_flushes += 1
             if self._should_flush_now_locked():
-                if self._flush_timer is not None:
-                    self._flush_timer.cancel()
-                    self._flush_timer = None
+                self._flush_timer = None
                 self._flush_locked()
             else:
                 self._schedule_flush_locked()
