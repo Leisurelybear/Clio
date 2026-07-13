@@ -18,7 +18,7 @@ from clio.config import AppConfig, load_config
 class ConfigCache:
     """Thread-safe LRU cache for project-specific AppConfig instances.
 
-    - Keyed by project input_dir (or '__global__' for no project).
+    - Keyed by project_dir (or '__global__' for no project).
     - mtime-aware: re-reads config files when they change on disk.
     - LRU eviction at maxsize (default 20).
     - Returns deep copies to prevent caller mutation.
@@ -32,12 +32,12 @@ class ConfigCache:
         self._meta: dict[str, tuple[float | None, float | None]] = {}
         self._lock = threading.Lock()
 
-    def get(self, project_input: Path | None = None) -> AppConfig:
+    def get(self, project_dir: Path | None = None) -> AppConfig:
         _GLOBAL_KEY = "__global__"
-        key = _GLOBAL_KEY if project_input is None else str(project_input.resolve())
+        key = _GLOBAL_KEY if project_dir is None else str(project_dir.resolve())
 
         cfg_mtime = self._read_mtime(self._config_path)
-        proj_mtime = self._read_mtime(None if project_input is None else project_input / "project.yaml")
+        proj_mtime = self._read_mtime(None if project_dir is None else project_dir / "project.yaml")
 
         with self._lock:
             if key in self._cache:
@@ -47,7 +47,7 @@ class ConfigCache:
                 del self._cache[key]
                 self._meta.pop(key, None)
 
-            new_config = load_config(self._config_path or "config.yaml", project_dir=project_input)
+            new_config = load_config(self._config_path or "config.yaml", project_dir=project_dir)
 
             if len(self._cache) >= self._maxsize:
                 oldest_key = next(iter(self._cache))

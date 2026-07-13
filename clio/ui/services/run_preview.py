@@ -41,7 +41,7 @@ def build_run_preview(
     all_analysis_jsons = _analysis_jsons(config)
     index = ArtifactIndex(
         output_dir=config.paths.output_dir,
-        input_dir=config.project_dir or Path(),
+        project_dir=config.project_dir or Path(),
         compressed_dir=config.compressed_dir,
         texts_dir=config.texts_dir,
         scripts_dir=config.scripts_dir,

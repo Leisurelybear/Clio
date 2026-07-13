@@ -25,33 +25,33 @@ from clio.config import AppConfig, load_config
 from clio.ui.services.file_service import _save_atomic
 
 
-def _resolve_project_output_path(proj_input_dir: Path, value: str | Path | None) -> Path | None:
+def _resolve_project_output_path(project_dir: Path, value: str | Path | None) -> Path | None:
     if value is None or str(value).strip() == "":
         return None
     out_path = Path(value)
     if not out_path.is_absolute():
-        out_path = (proj_input_dir / out_path).resolve()
+        out_path = (project_dir / out_path).resolve()
     return out_path
 
 
-def _project_output_dir(proj_input_dir: Path) -> Path:
+def _project_output_dir(project_dir: Path) -> Path:
     """Return the project's output directory.
 
     project.yaml is authoritative for configuration. project.json output_dir is
     kept as a legacy fallback for projects created before the config split.
     """
-    proj_yaml = proj_input_dir / "project.yaml"
+    proj_yaml = project_dir / "project.yaml"
     if proj_yaml.is_file():
         try:
             data = yaml.safe_load(proj_yaml.read_text(encoding="utf-8")) or {}
             out = data.get("paths", {}).get("output_dir")
-            resolved = _resolve_project_output_path(proj_input_dir, out)
+            resolved = _resolve_project_output_path(project_dir, out)
             if resolved is not None:
                 return resolved
         except (AttributeError, OSError, yaml.YAMLError):
             pass
 
-    proj_file = proj_input_dir / "project.json"
+    proj_file = project_dir / "project.json"
     if proj_file.is_file():
         try:
             data = json.loads(proj_file.read_text(encoding="utf-8"))
@@ -60,7 +60,7 @@ def _project_output_dir(proj_input_dir: Path) -> Path:
             out = "output"
     else:
         out = "output"
-    return _resolve_project_output_path(proj_input_dir, out) or (proj_input_dir / "output").resolve()
+    return _resolve_project_output_path(project_dir, out) or (project_dir / "output").resolve()
 
 
 def _detect_steps(proj_output_dir: Path) -> dict[str, bool]:

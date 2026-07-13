@@ -159,12 +159,12 @@ def _list_drives() -> list[str]:
 
 
 def _find_original_for_compressed(
-    stem: str, input_dir: Path, comp_dir: Path | None = None, project_dir: Path | None = None
+    stem: str, fallback_dir: Path, comp_dir: Path | None = None, project_dir: Path | None = None
 ) -> str | None:
     """For a compressed stem like '001_GL010695', find the matching original path.
 
     Returns an absolute path string when possible (external originals via .vmeta /
-    videos.json), otherwise a basename under input_dir/project_dir for legacy.
+    videos.json), otherwise a basename under fallback_dir/project_dir for legacy.
     """
     # Try .vmeta first (O(1), supports any directory layout)
     if comp_dir is not None:
@@ -181,7 +181,7 @@ def _find_original_for_compressed(
     suffix = stem.split("_", 1)[1].lower()
 
     # Project dir: use load_selected_videos when videos.json is present
-    lookup_dir = project_dir or input_dir
+    lookup_dir = project_dir or fallback_dir
     if lookup_dir:
         from clio.tasks._video_loader import load_selected_videos
 
@@ -201,8 +201,10 @@ def _find_original_for_compressed(
             if project_dir is not None:
                 return None
 
-    # Legacy fallback: stem matching under input_dir / project_dir
-    scan_dir = input_dir if input_dir.is_dir() else (project_dir if project_dir and project_dir.is_dir() else None)
+    # Legacy fallback: stem matching under fallback_dir / project_dir
+    scan_dir = (
+        fallback_dir if fallback_dir.is_dir() else (project_dir if project_dir and project_dir.is_dir() else None)
+    )
     if scan_dir is None:
         return None
     for p in sorted(scan_dir.iterdir()):

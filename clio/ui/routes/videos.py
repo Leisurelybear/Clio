@@ -167,7 +167,7 @@ def _build_videos_payload(
     # -- Build artifact index ------------------------------------------------
     index = ArtifactIndex(
         output_dir=proj_out,
-        input_dir=proj_dir,
+        project_dir=proj_dir,
         compressed_dir=comp_dir,
         texts_dir=proj_out / "texts",
         scripts_dir=proj_out / "scripts",
