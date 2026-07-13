@@ -64,7 +64,7 @@ async function init() {
   const newModal = $('modal-new-project');
   $('btn-new-project').onclick = () => { newModal.style.display = 'flex'; };
   $('np-cancel').onclick = () => { newModal.style.display = 'none'; };
-  newModal.querySelector('.modal-backdrop').onclick = () => { newModal.style.display = 'none'; };
+  newModal.querySelector('.modal-backdrop').onclick = null;
   $('np-create').onclick = async () => {
     const name = $('np-name').value.trim();
     const projectDir = $('np-input-dir').value.trim();
@@ -193,7 +193,7 @@ async function init() {
     }
   };
   $('op-cancel').onclick = () => { openModal.style.display = 'none'; };
-  openModal.querySelector('.modal-backdrop').onclick = () => { openModal.style.display = 'none'; };
+  openModal.querySelector('.modal-backdrop').onclick = null;
   $('op-open-path').onclick = async () => {
     const path = $('op-custom-path').value.trim();
     if (!path) { setStatus('Please enter a project directory path', 'warn'); return; }
@@ -292,8 +292,7 @@ async function init() {
   });
   const browseModal = $('modal-browse-dir');
   if (browseModal) {
-    const backdrop = browseModal.querySelector('.modal-backdrop');
-    if (backdrop) backdrop.onclick = () => { window._browseResolve = null; browseModal.style.display = 'none'; };
+    // backdrop intentionally does NOT close — only Cancel button closes
   }
   const rerunClose = $('rerun-close');
   if (rerunClose) rerunClose.onclick = hideRerunProgress;
