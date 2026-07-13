@@ -9,48 +9,55 @@ from clio.tasks.analyze import _resolve_original
 
 class TestResolveOriginal:
     def test_direct_match_mp4(self, tmp_path: Path):
-        (tmp_path / "GL010683.mp4").write_bytes(b"")
-        result = _resolve_original(tmp_path, "001_GL010683")
-        assert result == tmp_path / "GL010683.mp4"
+        video = tmp_path / "GL010683.mp4"
+        video.write_bytes(b"")
+        result = _resolve_original("001_GL010683", stem_cache={"gl010683": video})
+        assert result == video
 
     def test_direct_match_mov(self, tmp_path: Path):
-        (tmp_path / "GL010683.mov").write_bytes(b"")
-        result = _resolve_original(tmp_path, "001_GL010683")
-        assert result == tmp_path / "GL010683.mov"
+        video = tmp_path / "GL010683.mov"
+        video.write_bytes(b"")
+        result = _resolve_original("001_GL010683", stem_cache={"gl010683": video})
+        assert result == video
 
     def test_direct_match_mkv(self, tmp_path: Path):
-        (tmp_path / "GL010683.mkv").write_bytes(b"")
-        result = _resolve_original(tmp_path, "001_GL010683")
-        assert result == tmp_path / "GL010683.mkv"
+        video = tmp_path / "GL010683.mkv"
+        video.write_bytes(b"")
+        result = _resolve_original("001_GL010683", stem_cache={"gl010683": video})
+        assert result == video
 
     def test_direct_match_mts(self, tmp_path: Path):
-        (tmp_path / "GL010683.mts").write_bytes(b"")
-        result = _resolve_original(tmp_path, "001_GL010683")
-        assert result == tmp_path / "GL010683.mts"
+        video = tmp_path / "GL010683.mts"
+        video.write_bytes(b"")
+        result = _resolve_original("001_GL010683", stem_cache={"gl010683": video})
+        assert result == video
 
     def test_direct_match_m2ts(self, tmp_path: Path):
-        (tmp_path / "GL010683.m2ts").write_bytes(b"")
-        result = _resolve_original(tmp_path, "001_GL010683")
-        assert result == tmp_path / "GL010683.m2ts"
+        video = tmp_path / "GL010683.m2ts"
+        video.write_bytes(b"")
+        result = _resolve_original("001_GL010683", stem_cache={"gl010683": video})
+        assert result == video
 
     def test_no_match(self, tmp_path: Path):
-        result = _resolve_original(tmp_path, "001_NOFILE")
+        result = _resolve_original("001_NOFILE", stem_cache={})
         assert result is None
 
     def test_segment_match(self, tmp_path: Path):
-        (tmp_path / "GL010683.mp4").write_bytes(b"")
-        result = _resolve_original(tmp_path, "001_GL010683_seg01")
-        assert result == tmp_path / "GL010683.mp4"
+        video = tmp_path / "GL010683.mp4"
+        video.write_bytes(b"")
+        result = _resolve_original("001_GL010683_seg01", stem_cache={"gl010683": video})
+        assert result == video
 
     def test_segment_match_mov(self, tmp_path: Path):
-        (tmp_path / "GL010683.mov").write_bytes(b"")
-        result = _resolve_original(tmp_path, "001_GL010683_seg02")
-        assert result == tmp_path / "GL010683.mov"
+        video = tmp_path / "GL010683.mov"
+        video.write_bytes(b"")
+        result = _resolve_original("001_GL010683_seg02", stem_cache={"gl010683": video})
+        assert result == video
 
     def test_segment_no_original(self, tmp_path: Path):
-        result = _resolve_original(tmp_path, "001_GL010683_seg01")
+        result = _resolve_original("001_GL010683_seg01", stem_cache={})
         assert result is None
 
     def test_empty_dir(self, tmp_path: Path):
-        result = _resolve_original(tmp_path, "001_GL010683")
+        result = _resolve_original("001_GL010683", stem_cache={})
         assert result is None
