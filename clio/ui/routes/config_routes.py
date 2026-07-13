@@ -41,7 +41,6 @@ def handle_get_config(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     handler._send_json(
         {
             "project_dir": str(proj_dir),
-            "input_dir": str(proj_dir),  # compat alias for older UI clients
             "output_dir": str(proj_out),
             "compressed_dir": str(comp),
             "texts_dirs": [str(d) for d in texts],

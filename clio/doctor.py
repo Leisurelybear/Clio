@@ -182,12 +182,12 @@ def collect_doctor_checks(
     return items
 
 
-def run_doctor(config_path: Path, input_dir: Path | None = None) -> int:
+def run_doctor(config_path: Path, project_dir: Path | None = None) -> int:
     items: list[DoctorItem] = []
     try:
         config = load_config(config_path)
-        if input_dir is not None:
-            config = load_config(config_path, project_dir=input_dir)
+        if project_dir is not None:
+            config = load_config(config_path, project_dir=project_dir)
         items.append(DoctorItem("配置文件", "OK", str(config_path)))
     except Exception as exc:
         items.append(DoctorItem("配置文件", "FAIL", str(exc)))

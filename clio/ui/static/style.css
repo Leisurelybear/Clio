@@ -544,6 +544,8 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
 .video-item.active { background: var(--bg-active); }
 .video-item.active .video-name { color: var(--accent); }
 .video-item.no-match { opacity: 0.5; }
+.video-item.missing { opacity: 0.55; border-left: 2px solid var(--warn, #b8860b); }
+.video-item.missing .video-name { color: var(--warn, #b8860b); }
 
 .video-thumb {
   width: 32px; height: 20px;

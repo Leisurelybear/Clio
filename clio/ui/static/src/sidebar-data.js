@@ -77,8 +77,8 @@ export async function loadConfig() {
   } catch {
     state.config = { project_dir: '(加载失败)', output_dir: '' };
   }
-  $('proj-name').textContent = state.config.project_dir || state.config.input_dir || '';
-  $('proj-name').title = `project: ${state.config.project_dir || state.config.input_dir || ''}\noutput: ${state.config.output_dir || ''}`;
+  $('proj-name').textContent = state.config.project_dir || '';
+  $('proj-name').title = `project: ${state.config.project_dir || ''}\noutput: ${state.config.output_dir || ''}`;
 }
 
 export async function loadPlans() {
@@ -190,10 +190,14 @@ function renderVideoItem(v) {
   li.className = 'video-item' + selectedClass;
   if (state.currentVideo === v.file) li.classList.add('active');
   if (!v.match) li.classList.add('no-match');
+  if (v.missing) li.classList.add('missing');
 
   let display = v.file.replace(/^\d+_/, '');
   if (v.segment_label) {
     display = display.replace(/_seg\d+$/i, '') + ` [seg ${v.segment_label}]`;
+  }
+  if (v.missing) {
+    display = display + ' (离线)';
   }
 
   const tCls = v.text_json ? 'has' : 'miss';
@@ -234,13 +238,18 @@ function renderVideoItem(v) {
         <button class="menu-btn" title="操作">⋮</button>
         <div class="menu-dropdown">
           ${state.source === 'original'
-            ? `<button class="menu-item" data-action="compress" title="用 ffmpeg 将原视频压缩为 640p">压缩视频</button>
+            ? (v.missing
+               ? `<button class="menu-item" disabled style="opacity:0.4" title="文件离线">压缩视频</button>
+               <button class="menu-item" disabled style="opacity:0.4" title="文件离线">Whisper 转录</button>
+               <div class="menu-divider"></div>
+               <button class="menu-item menu-item-danger" data-action="remove" title="从项目中移除该视频">从项目移除</button>`
+               : `<button class="menu-item" data-action="compress" title="用 ffmpeg 将原视频压缩为 640p">压缩视频</button>
                <button class="menu-item" data-action="transcribe" title="用 faster-whisper 提取音频转文字">Whisper 转录</button>
                <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">AI分析视频</button>
                <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑口播文案</button>
                <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑全部</button>
                <div class="menu-divider"></div>
-               <button class="menu-item menu-item-danger" data-action="remove" title="从项目中移除该视频">从项目移除</button>`
+               <button class="menu-item menu-item-danger" data-action="remove" title="从项目中移除该视频">从项目移除</button>`)
             : `<button class="menu-item" data-action="compress" disabled style="opacity:0.4" title="视频已压缩">压缩视频</button>
                <button class="menu-item" data-action="analyze" title="调用 AI 重新分析视频内容">AI分析视频</button>
                <button class="menu-item" data-action="voiceover" title="基于分析结果，重新用 AI 生成口播解说文案">重跑口播文案</button>
@@ -253,6 +262,10 @@ function renderVideoItem(v) {
   li.onclick = (e) => {
     if (e.target.closest('.match-jump')) return;
     if (e.target.closest('.video-actions')) return;
+    if (v.missing) {
+      setStatus('该视频文件当前不可用（路径离线或不存在）', 'warn');
+      return;
+    }
     if (state.selectionMode) {
       if (e.target.closest('.video-checkbox')) return;
       const cb = li.querySelector('.video-checkbox');
@@ -383,9 +396,19 @@ export function renderVideoList() {
         <li class="empty-state">
           ${icon('video', 36)}
           <h4>暂无视频素材</h4>
-          <p>点击上方「添加视频」按钮选择视频文件</p>
+          <p>项目 <code>videos.json</code> 中还没有选中的原始视频</p>
+          <p class="hint">点击上方「添加视频」从磁盘勾选素材；旧项目可运行 <code>python main.py migrate</code></p>
+          <p style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="sidebar-btn" id="empty-add-videos" style="background:var(--accent);color:#fff;border:none;padding:7px 14px;border-radius:var(--radius-sm);cursor:pointer;font:inherit;font-size:var(--text-sm)">${icon('plus', 14)} 添加视频</button>
+          </p>
         </li>
       `;
+      const addBtn = ul.querySelector('#empty-add-videos');
+      if (addBtn) {
+        addBtn.onclick = () => {
+          import('./sidebar-video-manage.js').then(m => m.openVideoManager());
+        };
+      }
     }
     return;
   }

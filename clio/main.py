@@ -156,10 +156,12 @@ def main(argv: list[str] | None = None) -> int:
     _add_io_args(p_label)
 
     p_check = sub.add_parser("check", help="检查环境配置是否就绪")
-    p_check.add_argument("-i", "--input", type=Path, help="检查指定素材文件夹")
+    p_check.add_argument("-p", "--project", type=Path, help="检查指定项目目录")
+    p_check.add_argument("-i", "--input", type=Path, help=argparse.SUPPRESS)
 
     p_doctor = sub.add_parser("doctor", help="诊断本机环境、依赖、配置和常见运行风险")
-    p_doctor.add_argument("-i", "--input", type=Path, help="诊断指定素材文件夹")
+    p_doctor.add_argument("-p", "--project", type=Path, help="诊断指定项目目录")
+    p_doctor.add_argument("-i", "--input", type=Path, help=argparse.SUPPRESS)
 
     p_plan = sub.add_parser("plan", help="生成单日 vlog 剪辑规划")
     _add_io_args(p_plan)
@@ -294,14 +296,16 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     if args.command == "doctor":
-        return run_doctor(config_path, getattr(args, "input", None))
+        project = getattr(args, "project", None) or getattr(args, "input", None)
+        return run_doctor(config_path, project)
 
     base_config = load_config(config_path)
     setup_logging(base_config.paths.logs_dir)
     install_hooks()
 
     if args.command == "check":
-        return run_check(config_path, getattr(args, "input", None))
+        project = getattr(args, "project", None) or getattr(args, "input", None)
+        return run_check(config_path, project)
 
     elif args.command == "transcribe":
         from clio.tasks.transcribe import run_transcribe_all

@@ -35,7 +35,8 @@ class TestHandleGetConfig:
         handler._send_json.assert_called_once()
         args = handler._send_json.call_args
         payload = args[0][0]
-        assert "input_dir" in payload
+        assert "project_dir" in payload
+        assert "input_dir" not in payload
         assert "output_dir" in payload
         assert "compressed_dir" in payload
 
