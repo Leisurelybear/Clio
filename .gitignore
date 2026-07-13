@@ -9,6 +9,7 @@ __pycache__/
 *.bak
 projects.json
 projects.json.bak
+*.migrate-bak
 .opencode/
 opencode_session_import.json
 .claude/
@@ -41,5 +42,7 @@ MagicMock/
 *.swo
 *~
 project.yaml
+project.json
+videos.json
 **/.vmeta/
 **/.vindex
