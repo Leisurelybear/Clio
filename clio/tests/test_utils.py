@@ -173,7 +173,7 @@ class TestFindVideos:
         sub.mkdir()
         (tmp_path / "root.mp4").write_text("fake")
         (sub / "nested.mov").write_text("fake")
-        result = find_videos(tmp_path)
+        result = find_videos(tmp_path, recursive=True)
         assert len(result) == 2
 
     def test_non_recursive_ignores_nested(self, tmp_path):

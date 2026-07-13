@@ -333,6 +333,7 @@ class TestRunTranscribeAll:
         with (
             patch("clio.tasks.transcribe.check_whisper", return_value=True),
             patch("clio.tasks.transcribe.find_videos", return_value=[Path("test.mp4")]),
+            patch("clio.tasks.transcribe._build_original_stem_map", return_value={"test": Path("test.mp4")}),
             patch("clio.tasks.transcribe._extract_audio", _extract_and_cancel),
             patch("clio.tasks.transcribe.ProcessingState", return_value=mock_state),
             patch("clio.tasks.transcribe.resolve_binary", return_value="ffmpeg"),
