@@ -158,8 +158,8 @@
   <div class="modal-dialog">
     <h3>新建项目</h3>
     <label>项目名称 <input id="np-name" type="text" placeholder="如：2025国庆巴黎行"></label>
-    <label>素材目录 <span class="input-with-browse"><input id="np-input-dir" type="text" placeholder="如：E:\Videos\Paris2025"><button class="browse-btn" data-target="np-input-dir" type="button">浏览</button></span></label>
-    <p class="hint">素材目录需包含视频文件（.mp4/.mov/.mkv 等）</p>
+    <label>项目目录 <span class="input-with-browse"><input id="np-input-dir" type="text" placeholder="如：E:\Videos\Paris2025"><button class="browse-btn" data-target="np-input-dir" type="button">浏览</button></span></label>
+    <p class="hint">项目配置（project.json / project.yaml / videos.json）存放的目录</p>
     <label>输出目录（可选） <span class="input-with-browse"><input id="np-output-dir" type="text" placeholder="留空则自动创建到当前配置文件同级目录下"><button class="browse-btn" data-target="np-output-dir" type="button">浏览</button></span></label>
     <p class="hint">指定存放压缩、分析结果等中间文件的目录路径</p>
     <div class="modal-actions">
@@ -190,6 +190,24 @@
   </div>
 </div>
 
+<!-- Browse Directory Modal -->
+<div id="modal-browse-dir" class="modal" style="display:none;">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog modal-dialog-wide">
+    <h3>选择目录</h3>
+    <div class="browse-path" id="browse-path">正在加载...</div>
+    <div class="browse-dir-list" id="browse-dir-list">
+      <p class="muted">正在加载...</p>
+    </div>
+    <div class="modal-actions" style="margin-top:12px;">
+      <button id="browse-up" class="btn-secondary">上级目录</button>
+      <button id="browse-mkdir" class="btn-secondary">新建文件夹</button>
+      <button id="browse-select" class="btn-primary">选择此目录</button>
+      <button id="browse-cancel" class="btn-secondary">取消</button>
+    </div>
+  </div>
+</div>
+
 <!-- Video Manager Modal -->
 <div id="modal-video-manage" class="modal" style="display:none;">
   <div class="modal-backdrop"></div>
@@ -203,6 +221,7 @@
     <div id="vm-selected-count" class="vm-selected-count">已选 0 个文件</div>
     <div class="modal-actions" style="margin-top:12px;">
       <button id="vm-up" class="btn-secondary">上级目录</button>
+      <button id="vm-mkdir" class="btn-secondary">新建文件夹</button>
       <button id="vm-select-all" class="btn-secondary">全选</button>
       <button id="vm-add" class="btn-primary" disabled>添加选中</button>
       <button id="vm-cancel" class="btn-secondary">取消</button>

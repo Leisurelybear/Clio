@@ -88,9 +88,7 @@ async function _vmLoadDir(path) {
     }
 
     listEl.innerHTML = html;
-    if (!isDriveList) {
-      _bindListEvents(listEl);
-    }
+    _bindListEvents(listEl);
     _vmUpdateSelectedCount();
   } catch (e) {
     pathEl.textContent = '加载失败: ' + e.message;
@@ -160,12 +158,143 @@ async function _vmAddSelected() {
   }
 }
 
+const _VIDEO_EXTS_DND = new Set(['.mp4', '.mov', '.mkv', '.mts', '.m2ts', '.avi', '.wmv', '.flv', '.webm', '.3gp', '.mpg', '.mpeg']);
+
+function _vmDropNames(dt) {
+  const names = [];
+  // Try items first (more reliable across browsers)
+  if (dt.items) {
+    for (let i = 0; i < dt.items.length; i++) {
+      const item = dt.items[i];
+      if (item.kind !== 'file') continue;
+      const f = item.getAsFile();
+      if (!f || !f.name) continue;
+      const dot = f.name.lastIndexOf('.');
+      if (dot > 0 && _VIDEO_EXTS_DND.has(f.name.slice(dot).toLowerCase())) {
+        names.push(f.name);
+      }
+    }
+    return names;
+  }
+  // Fallback to dt.files
+  const files = dt.files;
+  if (files) {
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (!f || !f.name) continue;
+      const dot = f.name.lastIndexOf('.');
+      if (dot > 0 && _VIDEO_EXTS_DND.has(f.name.slice(dot).toLowerCase())) {
+        names.push(f.name);
+      }
+    }
+  }
+  return names;
+}
+
+function _vmDropAbsolutePaths(dt) {
+  const paths = [];
+  // Chrome/Edge on Windows: file.path gives full path
+  const files = dt.files;
+  if (files) {
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if (f && f.path && typeof f.path === 'string') {
+        paths.push(f.path);
+      }
+    }
+  }
+  // URI list fallback
+  try {
+    const uris = dt.getData('text/uri-list');
+    if (uris) {
+      for (const line of uris.split('\n')) {
+        const uri = line.trim();
+        if (uri.startsWith('file:///')) {
+          let p = decodeURIComponent(uri.slice(8));
+          if (p.match(/^[a-zA-Z]:/)) p = p[0].toUpperCase() + p.slice(1);
+          paths.push(p);
+        }
+      }
+    }
+  } catch {}
+  return paths;
+}
+
+function _vmInitDragDrop() {
+  const listEl = $('vm-list');
+  if (!listEl) return;
+  listEl.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    listEl.classList.add('drop-zone-active');
+  });
+  listEl.addEventListener('dragleave', () => {
+    listEl.classList.remove('drop-zone-active');
+  });
+  listEl.addEventListener('drop', (e) => {
+    e.preventDefault();
+    listEl.classList.remove('drop-zone-active');
+    try {
+      const dt = e.dataTransfer;
+      if (!dt) return;
+      // Strategy 1: absolute paths (Chrome/Edge Windows)
+      const absPaths = _vmDropAbsolutePaths(dt);
+      if (absPaths.length > 0) {
+        let added = 0;
+        for (const p of absPaths) {
+          if (!_selectedFiles.has(p)) { _selectedFiles.add(p); added++; }
+        }
+        if (added > 0) {
+          _vmRenderEntries($('vm-list'), [...document.querySelectorAll('#vm-list .browse-item[data-path]')].map(el => el.dataset.path), [..._allVideoFiles]);
+          _vmUpdateSelectedCount();
+        }
+        return;
+      }
+      // Strategy 2: match filenames against current directory listing
+      if (_allVideoFiles.length === 0) return;
+      const names = _vmDropNames(dt);
+      if (names.length === 0) return;
+      let matched = 0;
+      for (const f of _allVideoFiles) {
+        const fname = f.name.replace(/^.*[\\/]/, '');
+        if (names.includes(fname) && !_selectedFiles.has(f.path)) {
+          _selectedFiles.add(f.path);
+          matched++;
+        }
+      }
+      if (matched > 0) {
+        _vmRenderEntries($('vm-list'), [...document.querySelectorAll('#vm-list .browse-item[data-path]')].map(el => el.dataset.path), [..._allVideoFiles]);
+        _vmUpdateSelectedCount();
+      }
+    } catch (err) {
+      console.warn('video-manage drop error:', err);
+    }
+  });
+}
+
+async function _vmHandleMkdir() {
+  const name = prompt('输入新文件夹名称：');
+  if (!name || !name.trim()) return;
+  try {
+    const r = await api('POST', '/api/fs/mkdir', { parent: _currentPath, name: name.trim() });
+    if (r.ok) {
+      _vmLoadDir(_currentPath);
+    } else {
+      alert('创建失败: ' + (r.error || '未知错误'));
+    }
+  } catch (e) {
+    alert('创建失败: ' + e.message);
+  }
+}
+
 function _vmInit() {
   const modal = $('modal-video-manage');
   if (!modal) return;
-  modal.querySelector('.modal-backdrop').onclick = closeVideoManager;
+  // backdrop intentionally does NOT close — only Cancel button closes
   $('vm-cancel').onclick = closeVideoManager;
   $('vm-add').onclick = _vmAddSelected;
+  $('vm-mkdir').onclick = _vmHandleMkdir;
+  _vmInitDragDrop();
 }
 
 if (document.readyState === 'loading') {
@@ -174,4 +303,3 @@ if (document.readyState === 'loading') {
   _vmInit();
 }
 
-export { openVideoManager, closeVideoManager };

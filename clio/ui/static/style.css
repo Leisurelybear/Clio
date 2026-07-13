@@ -1378,6 +1378,8 @@ button .icon { width: 12px; height: 12px; }
 .btn-secondary { background: transparent; color: var(--text-secondary); border: 1px solid var(--border); padding: 8px 16px; border-radius: var(--radius-md); font: inherit; font-size: var(--text-sm); cursor: pointer; transition: all var(--transition-fast); display: inline-flex; align-items: center; gap: 6px; }
 .btn-secondary:hover { background: var(--bg-hover); color: var(--text-primary); border-color: var(--border-light); }
 .btn-secondary:focus-visible { outline: 2px solid var(--border-focus); outline-offset: 2px; }
+button[id$="-cancel"] { color: var(--red); border-color: var(--red); }
+button[id$="-cancel"]:hover { background: var(--red-bg); color: var(--red); }
 
 /* ── Empty State ───────────────────────────────────────────── */
 .empty-state { padding: var(--space-8) var(--space-4); text-align: center; color: var(--text-muted); }
@@ -1477,6 +1479,12 @@ button .icon { width: 12px; height: 12px; }
 .browse-item input[type="checkbox"] { margin: 0; cursor: pointer; flex-shrink: 0; }
 .browse-item .file-size { margin-left: auto; font-size: var(--text-xs); color: var(--text-tertiary); }
 .vm-selected-count { font-size: var(--text-sm); color: var(--text-secondary); padding: 4px 0; }
+.browse-dir-list.drop-zone-active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  outline: 2px dashed var(--accent);
+  outline-offset: -4px;
+}
 
 /* ── Video Menu Dropdown ───────────────────────────────────── */
 .video-actions { position: absolute; right: 6px; top: 6px; z-index: 10; }
