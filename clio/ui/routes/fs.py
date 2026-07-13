@@ -1,4 +1,4 @@
-"""Route handlers: /api/fs/dirs, /api/fs/videos"""
+"""Route handlers: /api/fs/dirs, /api/fs/videos, /api/fs/mkdir"""
 
 from __future__ import annotations
 
@@ -70,6 +70,27 @@ def handle_get_fs_dirs(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
         return handler._send_json({"error": "access denied"}, 403)
     except OSError as e:
         return handler._send_json({"error": str(e)}, 500)
+
+
+def handle_post_fs_mkdir(handler: HandlerProtocol, obj: dict) -> None:
+    """Handle POST /api/fs/mkdir — create a new directory."""
+    parent_raw = (obj.get("parent") or "").strip()
+    name = (obj.get("name") or "").strip()
+    if not parent_raw or not name:
+        return handler._send_json({"ok": False, "error": "parent and name required"}, 400)
+    if "/" in name or "\\" in name or ".." in name:
+        return handler._send_json({"ok": False, "error": "invalid name"}, 400)
+    try:
+        resolved = Path(parent_raw).resolve()
+        if not _is_allowed_path(resolved):
+            return handler._send_json({"ok": False, "error": "access denied"}, 403)
+        new_dir = resolved / name
+        if not _is_allowed_path(new_dir.resolve()):
+            return handler._send_json({"ok": False, "error": "access denied"}, 403)
+        new_dir.mkdir(parents=True, exist_ok=True)
+        return handler._send_json({"ok": True, "path": str(new_dir)})
+    except OSError as e:
+        return handler._send_json({"ok": False, "error": str(e)}, 500)
 
 
 def handle_get_fs_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:

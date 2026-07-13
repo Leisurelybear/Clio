@@ -43,7 +43,7 @@ from clio.ui.routes.config_routes import (
 )
 from clio.ui.routes.env_routes import handle_get_env, handle_put_env
 from clio.ui.routes.export import handle_post_export
-from clio.ui.routes.fs import handle_get_fs_dirs, handle_get_fs_videos
+from clio.ui.routes.fs import handle_get_fs_dirs, handle_get_fs_videos, handle_post_fs_mkdir
 from clio.ui.routes.plan import (
     handle_get_plan,
     handle_get_plans,
@@ -374,6 +374,7 @@ def make_handler(
         "handle_post_project_add": {"obj"},
         "handle_post_project_remove": {"obj"},
         "handle_post_project_migrate": {"obj"},
+        "handle_post_fs_mkdir": {"obj"},
     }
 
     router = Router(resolver=_resolve_handler)
@@ -400,6 +401,7 @@ def make_handler(
             Route("GET", "/api/processing-state", "handle_get_processing_state"),
             Route("GET", "/api/fs/dirs", "handle_get_fs_dirs"),
             Route("GET", "/api/fs/videos", "handle_get_fs_videos"),
+            Route("POST", "/api/fs/mkdir", "handle_post_fs_mkdir"),
             Route("GET", "/api/transcripts", "handle_get_transcripts"),
             Route("GET", "/api/whisper/check", "handle_get_whisper_check"),
             Route("GET", "/api/whisper/install/status", "handle_get_whisper_install_status"),
