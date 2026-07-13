@@ -99,7 +99,7 @@ UI 只读 / 写 `config.yaml` 里 `paths.output_dir` 下的文件：
 header 右侧的 **`压缩` / `原视频`** 切换按钮决定侧栏列的是哪一边：
 
 - **压缩**：列 `output/compressed/` 下的 640p 视频（默认）。适合看 AI 标注的时间码在压缩版上对不对。
-- **原视频**：列 `input_dir` 下的 4K 原始素材。适合看真实细节 / 选镜头。
+- **原视频**：列项目 `videos.json` 中选中的 4K 原始素材（可来自任意磁盘路径）。适合看真实细节 / 选镜头。
 
 每个视频条目都带一个 match 角标，标出对应的另一边文件名：
 
@@ -114,7 +114,7 @@ header 右侧的 **`压缩` / `原视频`** 切换按钮决定侧栏列的是哪
 
 **匹配规则**（大小写不敏感）：
 
-- 压缩 → 原：剥掉 `001_` 之类的前缀，在 `input_dir` 里找同 stem 的文件
+- 压缩 → 原：剥掉 `001_` 之类的前缀，在 `videos.json` / `.vmeta.source_path` 里找同 stem 的文件
 - 原 → 压：在 `output/compressed/` 里找 `*_<原 stem>.mp4`（必须带 `_<index>_` 前缀）
 
 **边角情况**：
@@ -177,7 +177,7 @@ header 右侧的 **`压缩` / `原视频`** 切换按钮决定侧栏列的是哪
 Settings includes a `Prompts` sub-tab for editing AI prompt templates from the browser.
 
 - The list shows every built-in prompt and whether the current project has an override.
-- Saving writes a project-level file under `<input_dir>/templates/prompts/{PROMPT_NAME}.md`.
+- Saving writes a project-level file under `<project_dir>/templates/prompts/{PROMPT_NAME}.md`.
 - Restore deletes project-level overrides for that prompt; repo-level overrides, if present, still apply.
 - The next AI call uses the updated prompt automatically.
 

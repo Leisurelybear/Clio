@@ -151,7 +151,12 @@ async function init() {
             const r = await api('POST', '/api/project/migrate', { project_dir: projectDir });
             if (r.ok) {
               setStatus(r.migrated ? `已迁移: ${name}` : (r.message || '已是新结构'), 'ok');
-              // reload project list
+              const dest = r.project_dir || projectDir;
+              if (confirm(`迁移完成。是否立即打开项目「${name}」？`)) {
+                openModal.style.display = 'none';
+                window.location.search = `?project=${encodeURIComponent(name)}&project_dir=${encodeURIComponent(dest)}`;
+                return;
+              }
               $('btn-open-project').click();
             } else {
               setStatus('迁移失败: ' + (r.error || 'unknown'), 'err');
