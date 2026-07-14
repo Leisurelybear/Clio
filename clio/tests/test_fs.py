@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path, PureWindowsPath
 from unittest.mock import MagicMock
 
-from clio.ui.routes.fs import _is_allowed_path, handle_get_fs_dirs, handle_get_fs_videos
+from clio.ui.routes.fs import _is_allowed_path, handle_get_fs_dirs, handle_get_fs_videos, handle_post_fs_mkdir
 
 
 class TestIsAllowedPath:
@@ -194,3 +194,60 @@ class TestHandleGetFsVideos:
         monkeypatch.setattr("sys.platform", "win32")
         p = PureWindowsPath(r"D:\GoPro\trip1")
         assert _is_allowed_path(p) is True
+
+
+class TestHandlePostFsMkdir:
+    def test_missing_parent_returns_400(self):
+        handler = MagicMock()
+        handle_post_fs_mkdir(handler, {"name": "newdir"})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "parent and name required"}, 400)
+
+    def test_missing_name_returns_400(self):
+        handler = MagicMock()
+        handle_post_fs_mkdir(handler, {"parent": "/tmp"})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "parent and name required"}, 400)
+
+    def test_empty_name_returns_400(self):
+        handler = MagicMock()
+        handle_post_fs_mkdir(handler, {"parent": "/tmp", "name": "  "})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "parent and name required"}, 400)
+
+    def test_name_with_slash_returns_400(self):
+        handler = MagicMock()
+        handle_post_fs_mkdir(handler, {"parent": "/tmp", "name": "a/b"})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "invalid name"}, 400)
+
+    def test_name_with_backslash_returns_400(self):
+        handler = MagicMock()
+        handle_post_fs_mkdir(handler, {"parent": "/tmp", "name": "a\\b"})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "invalid name"}, 400)
+
+    def test_name_with_dotdot_returns_400(self):
+        handler = MagicMock()
+        handle_post_fs_mkdir(handler, {"parent": "/tmp", "name": ".."})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "invalid name"}, 400)
+
+    def test_parent_not_allowed_returns_403(self, monkeypatch):
+        monkeypatch.setattr("clio.ui.routes.fs._is_allowed_path", lambda p: False)
+        handler = MagicMock()
+        handle_post_fs_mkdir(handler, {"parent": "/tmp", "name": "newdir"})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "access denied"}, 403)
+
+    def test_new_dir_not_allowed_returns_403(self, tmp_path, monkeypatch):
+        """New dir resolves outside the allowed tree after symlink."""
+        monkeypatch.setattr("clio.ui.routes.fs._is_allowed_path", lambda p: p == tmp_path.resolve())
+        handler = MagicMock()
+        handle_post_fs_mkdir(handler, {"parent": str(tmp_path), "name": "newdir"})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "access denied"}, 403)
+
+    def test_os_error_returns_500(self, monkeypatch):
+        monkeypatch.setattr("clio.ui.routes.fs._is_allowed_path", lambda p: True)
+
+        def mock_mkdir(*a, **kw):
+            raise OSError("permission denied")
+
+        monkeypatch.setattr("pathlib.Path.mkdir", mock_mkdir)
+
+        handler = MagicMock()
+        handle_post_fs_mkdir(handler, {"parent": "/tmp", "name": "newdir"})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "permission denied"}, 500)
