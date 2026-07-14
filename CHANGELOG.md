@@ -5,13 +5,23 @@
 ### Fixed
 - fix(ui): guard `browse-mkdir` onclick assignment with null check to prevent crash in test/jsdom
 - fix(chore): untrack `project.yaml` from git (already in `.gitignore` but accidentally tracked)
+- fix(ui): remove stale `type: ignore[attr-defined]` in texts.py + handler_protocol.py (\_resolve_in and \_get_state already on Protocol)
+- chore(ui): remove dead `R-XXX` placeholder code in main.js (no project-item is ever disabled)
 
 ### Added
+- feat(ui): `PUT /api/videos/relink` — relink offline videos to new paths (backend + frontend `prompt()` UX)
+- feat(ui): "重新关联路径..." context menu option for offline videos
 - test(fs): 9 test cases for `handle_post_fs_mkdir` (missing params, path traversal, access denied, OSError)
+- test(routes): 7 test cases for `handle_put_videos_relink` (missing params, bad path, not found, ambiguous match, success)
+- test(frontend): 6 test cases for `relinkVideo` (api params, cancel, same-path, error, network, fallback)
 
 ### Changed
 - docs(roadmap): mark A-007 route registry as complete (router.py already integrated)
-- docs(AGENTS.md): update test count 1111→1138, add `npm test` to Quick Reference
+- docs(roadmap): remove CR-003 from remaining open items (already done in Phase 2)
+- docs(AGENTS.md): update test count 1111→1153, add `npm test` to Quick Reference
+
+### Removed
+- chore(ui): delete `runner_feat.js` and `runner_main.js` (1027 lines of dead code; all features already in `runner.js`)
 
 ## 2026-07-14
 
