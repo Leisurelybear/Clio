@@ -7,11 +7,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 from clio.ui.routes.videos import (
     _VIDEOS_CACHE,
     _parse_segment_info,
     handle_get_video,
     handle_get_videos,
+    handle_put_videos_relink,
     handle_put_videos_selected,
 )
 
@@ -519,3 +522,92 @@ class TestVideosJsonCacheInvalidation:
         payload2 = handler._send_json.call_args[0][0]
         assert len(payload2["videos"]) == 1
         assert payload2["videos"][0].get("abs_path")
+
+
+class TestHandlePutVideosRelink:
+    """Tests for handle_put_videos_relink."""
+
+    @pytest.fixture
+    def handler(self):
+        h = MagicMock()
+        h._resolve_project_dir.return_value = Path("/nonexistent/project")
+        return h
+
+    def test_missing_params(self, handler):
+        handle_put_videos_relink(handler, {}, {})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "需要提供 old_path 和 new_path"}, 400)
+
+    def test_new_path_not_exist(self, handler):
+        handle_put_videos_relink(handler, {}, {"old_path": "/old/v.mp4", "new_path": "/new/v.mp4"})
+        resp = handler._send_json.call_args.args[0]
+        assert resp.get("ok") is False
+        assert "不是有效的视频文件" in resp.get("error", "")
+
+    def test_new_path_not_video(self, handler):
+        with patch("pathlib.Path.exists", return_value=True):
+            with patch("pathlib.Path.is_file", return_value=True):
+                with patch("pathlib.Path.suffix", ".txt"):
+                    handle_put_videos_relink(handler, {}, {"old_path": "/old/v.mp4", "new_path": "/new/v.txt"})
+        resp = handler._send_json.call_args.args[0]
+        assert resp.get("ok") is False
+        assert "不是有效的视频文件" in resp.get("error", "")
+
+    def test_old_path_not_found(self, handler):
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("pathlib.Path.is_file", return_value=True),
+            patch("pathlib.Path.suffix", ".mp4"),
+            patch("clio.ui.routes.videos.load_selected_videos", return_value=[]),
+        ):
+            handle_put_videos_relink(handler, {}, {"old_path": "/old/v.mp4", "new_path": "/new/v.mp4"})
+        resp = handler._send_json.call_args.args[0]
+        assert resp.get("ok") is False
+        assert "未在项目视频列表中找到" in resp.get("error", "")
+
+    def test_multiple_matches_by_name(self, handler):
+        videos = [Path("/a/dup.MP4"), Path("/b/dup.MP4")]
+        with (
+            patch("pathlib.Path.exists", return_value=True),
+            patch("pathlib.Path.is_file", return_value=True),
+            patch("pathlib.Path.suffix", ".mp4"),
+            patch("clio.ui.routes.videos.load_selected_videos", return_value=videos),
+        ):
+            handle_put_videos_relink(handler, {}, {"old_path": "/old/dup.MP4", "new_path": "/new/v.mp4"})
+        resp = handler._send_json.call_args.args[0]
+        assert resp.get("ok") is False
+        assert "找到多个同名文件" in resp.get("error", "")
+
+    def test_successful_relink_by_resolved_path(self, tmp_path, handler):
+        old_file = tmp_path / "video.MP4"
+        old_file.write_text("dummy")
+        new_file = tmp_path / "renamed.MP4"
+        new_file.write_text("dummy")
+        videos = [old_file]
+        with (
+            patch("clio.ui.routes.videos.load_selected_videos", return_value=videos),
+            patch("clio.ui.routes.videos.save_selected_videos") as mock_save,
+            patch("clio.ui.routes.videos._invalidate_videos_cache") as mock_invalidate,
+        ):
+            handle_put_videos_relink(handler, {}, {"old_path": str(old_file), "new_path": str(new_file)})
+        resp = handler._send_json.call_args.args[0]
+        assert resp.get("ok") is True
+        mock_save.assert_called_once()
+        saved = mock_save.call_args.args[1]
+        assert str(saved[0]) == str(new_file.resolve())
+        mock_invalidate.assert_called_once()
+
+    def test_successful_relink_by_fallback_filename(self, tmp_path, handler):
+        new_file = tmp_path / "video.MP4"
+        new_file.write_text("dummy")
+        # old path is gone, videos.json still references it
+        videos = [tmp_path / "video.MP4"]
+        with (
+            patch("clio.ui.routes.videos.load_selected_videos", return_value=videos),
+            patch("clio.ui.routes.videos.save_selected_videos") as mock_save,
+            patch("clio.ui.routes.videos._invalidate_videos_cache"),
+        ):
+            handle_put_videos_relink(handler, {}, {"old_path": str(tmp_path / "video.MP4"), "new_path": str(new_file)})
+        resp = handler._send_json.call_args.args[0]
+        assert resp.get("ok") is True
+        saved = mock_save.call_args.args[1]
+        assert str(saved[0]) == str(new_file.resolve())
