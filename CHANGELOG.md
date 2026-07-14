@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-15
+
+### Fixed
+- fix(ui): guard `browse-mkdir` onclick assignment with null check to prevent crash in test/jsdom
+- fix(chore): untrack `project.yaml` from git (already in `.gitignore` but accidentally tracked)
+
+### Added
+- test(fs): 9 test cases for `handle_post_fs_mkdir` (missing params, path traversal, access denied, OSError)
+
+### Changed
+- docs(roadmap): mark A-007 route registry as complete (router.py already integrated)
+- docs(AGENTS.md): update test count 1111→1138, add `npm test` to Quick Reference
+
 ## 2026-07-14
 
 ### Added
