@@ -88,6 +88,7 @@ from clio.ui.routes.videos import (
     handle_get_videos,
     handle_get_videos_selected,
     handle_get_vmeta,
+    handle_put_videos_relink,
     handle_put_videos_selected,
 )
 from clio.ui.routes.whisper_routes import (
@@ -392,6 +393,7 @@ def make_handler(
             Route("GET", "/api/vmeta/{stem}", "handle_get_vmeta"),
             Route("GET", "/api/videos/selected", "handle_get_videos_selected"),
             Route("PUT", "/api/videos/selected", "handle_put_videos_selected"),
+            Route("PUT", "/api/videos/relink", "handle_put_videos_relink"),
             Route("GET", "/api/texts", "handle_get_texts"),
             Route("GET", "/api/voiceover", "handle_get_voiceover"),
             Route("GET", "/api/plans", "handle_get_plans"),
