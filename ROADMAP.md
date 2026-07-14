@@ -13,7 +13,6 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | CR-006 | Reduce frontend `innerHTML` risk (121 usages) | Large | ✅ Done |
 | R-017 | Plan panel timeline drag-and-drop navigation | Medium | ✅ Done |
 | R-024 | GoPro GPMF telemetry as highlight signal | Large | Low |
-| A-007 | Route registry (`clio/ui/router.py`) | Medium | Low |
 | R-004 | Visual config editing (deferred from global/project split) | Small | Low |
 | Documentation | Update AGENTS.md §7 commit history, CHANGELOG.md | Small | Low |
 
@@ -684,7 +683,7 @@ High-value open items that are not already covered by completed fixes:
 
 | ID | Source | Item | Suggested approach | Status |
 | --- | --- | --- | --- | --- |
-| A-007 | 2026-06-28 ARCH-001 | Replace `server.py` hand-written route `if` chain with a route registry | Keep stdlib `http.server`; add `clio/ui/router.py` with method/path registration and path params | [ ] |
+| A-007 | 2026-06-28 ARCH-001 | Replace `server.py` hand-written route `if` chain with a route registry | Keep stdlib `http.server`; add `clio/ui/router.py` with method/path registration and path params | [x] |
 | A-008 | 2026-06-28 ARCH-004 | Debounce `ProcessingState.mark()` disk flushes | Batch writes by time or pending count, flush on shutdown | [x] |
 | B-099 | 2026-06-24 O-06 | OpenAI-compatible provider timeout is hardcoded to 120s | Add `ProviderConfig.timeout_sec`, parse YAML, pass to `httpx.Client(timeout=...)` | [x] |
 | B-100 | 2026-06-24 O-07 | `extract_json()` has no response length guard | Add maximum response length / warning before regex scan to avoid pathological AI responses | [x] |
