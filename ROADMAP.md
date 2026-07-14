@@ -9,7 +9,6 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
-| CR-003 | Reusable artifact identity index service | Large | Medium |
 | CR-006 | Reduce frontend `innerHTML` risk (121 usages) | Large | ✅ Done |
 | R-017 | Plan panel timeline drag-and-drop navigation | Medium | ✅ Done |
 | R-024 | GoPro GPMF telemetry as highlight signal | Large | Low |
