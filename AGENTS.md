@@ -14,7 +14,7 @@ An AI preprocessing pipeline: raw travel vlog footage -> ffmpeg compression -> G
 - google-genai (Gemini 2.5 Flash video File API)
 - httpx (DeepSeek / OpenAI compatible calls)
 - PyYAML (config parsing; split into `config.yaml` global + `project.yaml` per-project)
-- pytest (unit tests, auto-run in CI; 1111 test cases)
+- pytest (unit tests, auto-run in CI; 1138 test cases)
 
 Dependencies in `requirements.txt`; `setup.ps1`/`setup.sh` creates venv + installs ffmpeg + copies `.env` in one click.
 
@@ -151,9 +151,10 @@ For new features: discuss plan first -> user confirms -> implement -> one commit
 ```bash
 python -m pytest clio/tests/ -v
 python -m pytest clio/tests/test_utils.py -v
+npm test                # frontend Vitest (requires Node 18+)
 ```
 
-GitHub Actions runs tests on Python 3.11/3.12 (Ubuntu + Windows).
+GitHub Actions runs pytest on Python 3.11/3.12 (Ubuntu + Windows); Vitest in CI.
 
 ### Code Formatting
 
