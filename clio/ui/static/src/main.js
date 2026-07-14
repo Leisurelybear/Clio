@@ -220,11 +220,6 @@ async function init() {
   });
   $$('.project-item').forEach(p => {
     p.onclick = (e) => {
-      if (p.classList.contains('disabled')) {
-        const name = p.querySelector('.name').textContent;
-        setStatus(`「${name}」功能待对应 R-XXX 实现`, 'warn');
-        return;
-      }
       if (e.target.tagName === 'SELECT') return;
       if (p.dataset.entity === 'plan') selectPlan();
       else if (p.dataset.entity === 'run') selectRun();
@@ -282,7 +277,7 @@ async function init() {
     }
     if (mod && e.key >= '1' && e.key <= '5') {
       e.preventDefault();
-      const items = $$('.project-item:not(.disabled)');
+      const items = $$('.project-item');
       const idx = parseInt(e.key) - 1;
       if (idx < items.length) items[idx].click();
     }
