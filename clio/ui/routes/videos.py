@@ -506,3 +506,44 @@ def handle_put_videos_selected(handler: HandlerProtocol, qs: dict[str, Any], obj
         payload["rejected"] = rejected[:20]
         payload["rejected_count"] = len(rejected)
     handler._send_json(payload)
+
+
+def handle_put_videos_relink(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
+    """Handle PUT /api/videos/relink — replace a broken path in videos.json with a new one."""
+    proj_dir = handler._resolve_project_dir(qs)
+    old_path = obj.get("old_path")
+    new_path = obj.get("new_path")
+    if not old_path or not new_path:
+        return handler._send_json({"ok": False, "error": "需要提供 old_path 和 new_path"}, 400)
+    new = Path(new_path).expanduser()
+    try:
+        resolved = new.resolve()
+    except OSError:
+        return handler._send_json({"ok": False, "error": f"无法解析新路径: {new_path}"}, 400)
+    if not resolved.is_file() or resolved.suffix.lower() not in VIDEO_EXTS:
+        return handler._send_json({"ok": False, "error": f"新路径不是有效的视频文件: {new_path}"}, 400)
+    videos = load_selected_videos(proj_dir)
+    old_str = str(Path(old_path).expanduser().resolve())
+    matched_idx = None
+    for idx, v in enumerate(videos):
+        try:
+            if str(v.resolve()) == old_str:
+                matched_idx = idx
+                break
+        except OSError:
+            if str(v) == old_str or str(v) == str(Path(old_path)):
+                matched_idx = idx
+                break
+    if matched_idx is None:
+        old_name = Path(old_path).name
+        matches = [(i, v) for i, v in enumerate(videos) if Path(v).name == old_name]
+        if len(matches) == 1:
+            matched_idx = matches[0][0]
+        elif len(matches) > 1:
+            return handler._send_json({"ok": False, "error": f"找到多个同名文件 ({old_name})，请指定完整路径"}, 400)
+        else:
+            return handler._send_json({"ok": False, "error": f"未在项目视频列表中找到: {old_path}"}, 404)
+    videos[matched_idx] = resolved
+    save_selected_videos(proj_dir, videos)
+    _invalidate_videos_cache(proj_dir)
+    handler._send_json({"ok": True, "path": str(resolved)})

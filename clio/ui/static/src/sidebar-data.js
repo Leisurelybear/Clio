@@ -5,6 +5,28 @@ import {
 import { api, icon } from './api.js';
 import { updateRunFilesBadge } from './runner.js';
 
+// ── Video relink helper ───────────────────────────────────────
+
+export async function relinkVideo(file, absPath) {
+  const oldPath = absPath || file;
+  const userInput = prompt(
+    `视频文件离线：${oldPath}\n\n请输入文件的新路径：\n（可使用完整路径，如 D:\\Videos\\GL010695.MP4）`,
+    oldPath
+  );
+  if (!userInput || userInput === oldPath) return;
+  try {
+    const r = await api('PUT', '/api/videos/relink', { old_path: oldPath, new_path: userInput });
+    if (r.ok) {
+      setStatus(`已重新关联: ${userInput}`, 'ok');
+      await loadVideos();
+    } else {
+      setStatus('重新关联失败: ' + (r.error || '未知错误'), 'err');
+    }
+  } catch (e) {
+    setStatus('重新关联失败: ' + e.message, 'err');
+  }
+}
+
 // ── Video removal helper ──────────────────────────────────────
 
 export async function removeVideoFromProject(file, absPath = null) {
@@ -242,9 +264,10 @@ function renderVideoItem(v) {
           ${state.source === 'original'
             ? (v.missing
                ? `<button class="menu-item" disabled style="opacity:0.4" title="文件离线">压缩视频</button>
-               <button class="menu-item" disabled style="opacity:0.4" title="文件离线">Whisper 转录</button>
-               <div class="menu-divider"></div>
-               <button class="menu-item menu-item-danger" data-action="remove" title="从项目中移除该视频">从项目移除</button>`
+                <button class="menu-item" disabled style="opacity:0.4" title="文件离线">Whisper 转录</button>
+                <div class="menu-divider"></div>
+                <button class="menu-item" data-action="relink" title="文件移动或重命名后，重新关联新路径">重新关联路径...</button>
+                <button class="menu-item menu-item-danger" data-action="remove" title="从项目中移除该视频">从项目移除</button>`
                : `<button class="menu-item" data-action="compress" title="用 ffmpeg 将原视频压缩为 640p">压缩视频</button>
                <button class="menu-item" data-action="transcribe" title="用 faster-whisper 提取音频转文字">Whisper 转录</button>
                <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">AI分析视频</button>
@@ -305,6 +328,10 @@ function renderVideoItem(v) {
         if (_portalCloseHandler) { document.removeEventListener('click', _portalCloseHandler); _portalCloseHandler = null; }
         const task = item.dataset.action;
         const file = v.file;
+        if (task === 'relink') {
+          await relinkVideo(file, v.abs_path || (v.match && v.match.abs_path) || null);
+          return;
+        }
         if (task === 'remove') {
           if (confirm(`确定从项目中移除 ${file} 吗？`)) {
             await removeVideoFromProject(file, v.abs_path || (v.match && v.match.abs_path) || null);
