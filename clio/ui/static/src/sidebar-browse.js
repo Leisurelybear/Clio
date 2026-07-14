@@ -60,7 +60,8 @@ export async function loadBrowseDir(path) {
   }
 }
 
-$('browse-mkdir').onclick = async () => {
+const mkdirBtn = $('browse-mkdir');
+if (mkdirBtn) mkdirBtn.onclick = async () => {
   const name = prompt('输入新文件夹名称：');
   if (!name || !name.trim()) return;
   try {
