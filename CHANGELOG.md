@@ -13,6 +13,10 @@
 - fix(ui): register `handle_post_fs_mkdir` in `_POST_HANDLER_PARAMS` (fixes TypeError from unwanted `qs` argument)
 - fix(ui): add path traversal validation in mkdir endpoint (reject `/`, `\\`, `..` in name; validate `new_dir.resolve()`)
 - fix(ui): backdrop click no longer closes file-management modals (video manager, browse dir, new project, open project)
+- fix(processing_state): replace `threading.Timer` with daemon `Thread` to avoid Python 3.10 `__init__` race condition
+- fix(test): wrap ad-hoc `MonkeyPatch()` in `try/finally` in `test_routes_run.py` to prevent test isolation leak
+- fix(test): add missing `_build_original_stem_map` patch in `test_cancel_during_extract_marks_cancelled`
+- fix(test): pass `recursive=True` to `find_videos` in `test_recursive_finds_nested`
 
 ### Changed
 - chore(gitignore): ignore `project.json`, `videos.json`, `*.migrate-bak`
