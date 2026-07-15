@@ -5,15 +5,20 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
-## Remaining Open Items (2026-07-10)
+## Remaining Open Items (2026-07-15)
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
-| CR-006 | Reduce frontend `innerHTML` risk (121 usages) | Large | ✅ Done |
-| R-017 | Plan panel timeline drag-and-drop navigation | Medium | ✅ Done |
 | R-024 | GoPro GPMF telemetry as highlight signal | Large | Low |
-| R-004 | Visual config editing (deferred from global/project split) | Small | Low |
-| Documentation | Update AGENTS.md §7 commit history, CHANGELOG.md | Small | Low |
+| A-006 | Frontend ES module dynamic import circular reference | Medium | Low |
+
+**Recently completed (no longer open):**
+- CR-006, R-017, R-004 — done earlier
+- B-089 — AGENTS.md §7 is now a short Quick Reference (no long commit dump)
+- B-092 / U-007 — Whisper cancel uses chunked download (ctypes only for DLL/drive listing)
+- B-095 / U-010 — server dispatch + fs route HTTP tests
+- B-096 — whisper route tests present (`test_routes_whisper.py`)
+- **feat/project-video-manager** — `project_dir` + `videos.json`, UI video manager, migrate CLI, relink offline videos (this branch)
 
 ## Project Review Remediation Plan (2026-06-26)
 
@@ -804,14 +809,14 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 | B-086 | `server.py:524` hardcodes `config_path.parent / "projects.json"` instead of calling `_registry_path()` | Use `_registry_path(config_path)` for consistency | ✅ U-004 |
 | B-087 | `serve.ps1`/`serve.sh` hardcodes project directory paths | Remove hardcoded paths, make distributable | ✅ `fcbccf5` |
 | B-088 | `ROADMAP.md` 925 lines — completed features not archived | Archive completed sections to separate file | ✅ `88d7238` |
-| B-089 | `AGENTS.md` §7 commit history 100+ entries too long | Trim to ~30 most recent, archive rest | 🆕 |
+| B-089 | `AGENTS.md` §7 commit history 100+ entries too long | Trim to ~30 most recent, archive rest | ✅ Done (AGENTS §7 is Quick Reference only) |
 | B-090 | `pipeline.py` cancel_event not propagated to analyze/scripts/plan/label | Add `cancel_event` param + loop check to all 4 functions (see U-005) | ✅ U-005 |
 | B-091 | `RateLimiter.__enter__` holds lock during `time.sleep()`, blocks parallel AI calls | Split acquire() from sleep (see U-006) | ✅ `already in U-006` |
-| B-092 | `whisper_routes.py` ctypes thread kill unsafe (C ext blocks injection, resource leak) | Replace with chunked download (see U-007) | 🆕 |
+| B-092 | `whisper_routes.py` ctypes thread kill unsafe (C ext blocks injection, resource leak) | Replace with chunked download (see U-007) | ✅ U-007 |
 | B-093 | `transcribe.py` low-confidence segments silently dropped, no record kept | Mark with `low_confidence` flag instead of discard (see U-009) | ✅ U-009 |
 | B-094 | `/api/fs/dirs` no path restriction, exposes full filesystem in LAN mode | Add root restriction + token auth (see U-008) | ✅ `767bc92` |
-| B-095 | `server.py` only 6% test coverage, no integration tests for dispatch/error paths | Add HTTP-level tests (see U-010) | 🆕 |
-| B-096 | `whisper_routes.py` 48% coverage — new feature, test lagging behind | Add tests for install/cancel/model management flows | 🆕 |
+| B-095 | `server.py` only 6% test coverage, no integration tests for dispatch/error paths | Add HTTP-level tests (see U-010) | ✅ U-010 |
+| B-096 | `whisper_routes.py` 48% coverage — new feature, test lagging behind | Add tests for install/cancel/model management flows | ✅ U-010c / `test_routes_whisper.py` |
 | B-097 | `videos.py:101` `text_sidecars.get(idx)[0]` always picks first text file for all split segments, each segment should map to its own text/script sidecar | Add compressed_stem map for segment-specific text/script matching | ✅ `05edab2` |
 | B-074 | `analyze.py:_wrap_with_context` reads `trip_context.md` from disk on every AI call | Module-level `_trip_context_cache` | ✅ `fe57a7f` |
 | B-075 | `ui/server.py` Range request doesn't support suffix `bytes=-N` | Empty start + non-empty end → suffix calculation | ✅ `d2591a9` |
@@ -839,12 +844,13 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 ## ✅ Recently Completed
 
-| Commit | Description | Date |
+| Commit / Branch | Description | Date |
 | --- | --- | --- |
+| `feat/project-video-manager` | Decouple project from media: `project_dir` + `videos.json`, pipeline cutover, UI video manager (mkdir / drag-drop / relink), `migrate` CLI, route registry A-007, dead-code cleanup | 2026-07-11 → 07-15 |
 | `c7bc732` (PR #18) | Merge feat/ui-redesign → main: prompt management (R-010d/e), confidence scoring (R-010b), model comparison CLI (R-010c), cover frame extraction (R-022), transcript alignment (R-023), webhook trigger (R-025), all-days planning (R-021), verify sidecar (R-020), progress debounce, toast notifications, provider connection test (CR-008), skipped diagnostics (CR-008), layout resize (R-016), video counterpart navigation, context_override tests (R-019f), and 41 other commits | 2026-07-10 |
 | `be636f2`~`2a712f7` (14 commits) | R-017: Model Registry & Task Binding UI | 2026-07-02~07-03 |
 | `43a922b` | feat(ui): run panel prompt injection (R-019) | 2026-07-01 |
 
 Older completed sections (commit log, test coverage verification, code review audit) archived to [`docs/archive/2026-07-01-roadmap-archive.md`](docs/archive/2026-07-01-roadmap-archive.md).
 
-### Test count: 954 → 1010+ (R-017 added UI unit tests + backend model parsing tests; feat/ui-redesign merge added prompt routes, cover, transcript_align tests)
+### Test count: 1153 pytest + 135 vitest (as of 2026-07-15 on `feat/project-video-manager`)

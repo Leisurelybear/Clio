@@ -1,5 +1,8 @@
 # Project-Video Manager Implementation Plan
 
+> **Status (2026-07-15): COMPLETE** on branch `feat/project-video-manager`.
+> All 13 tasks landed (data model, pipeline cutover, UI backend rename, migrate CLI, frontend video manager, mkdir/drag-drop/relink, tests). Checkbox steps below are historical; do not re-run.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Decouple project directory from `input_dir`, remove the single `input_dir` concept, store selected videos in `videos.json`, add UI file browser for video selection, migrate existing projects.
