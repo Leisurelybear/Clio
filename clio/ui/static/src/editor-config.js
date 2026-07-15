@@ -25,8 +25,64 @@ const PROMPT_LABELS = {
 };
 
 
+const FIELD_LABELS = {
+  // plan
+  'plan.plans_subdir': '规划子目录',
+  'plan.max_clips_per_day': '每日最多片段数',
+  'plan.target_duration_sec': '目标时长（秒）',
+  'plan.use_transcripts': '注入语音转录',
+  // analyze
+  'analyze.compressed_subdir': '压缩视频子目录',
+  'analyze.texts_subdir': '分析结果子目录',
+  'analyze.skip_existing': '跳过已处理文件',
+  'analyze.max_analyze_duration_min': '最长分析时长（分钟）',
+  'analyze.max_workers': 'AI 分析并发数',
+  // script
+  'script.scripts_subdir': '口播子目录',
+  'script.template_file': '口播模板文件',
+  'script.target_words': '口播目标字数',
+  // compress (project)
+  'compress.target_size_mb': '目标体积（MB）',
+  'compress.max_width': '最大宽度（像素）',
+  'compress.split_max_min': '超长分段阈值（分钟）',
+  'compress.splits_subdir': '分段子目录',
+  'compress.reencode_split': '分段时重新编码',
+  // whisper (project)
+  'whisper.enabled': '启用 Whisper',
+  'whisper.model_size': '模型大小',
+  'whisper.language': '识别语言',
+  'whisper.device': '运行设备',
+  'whisper.max_segments_per_clip': '每片段最多转录段数',
+  'whisper.transcripts_subdir': '转录子目录',
+  // export
+  'export.canvas_ratio': '画布比例',
+  'export.output_subdir': '导出子目录',
+  'export.jianying_draft_dir': '剪映草稿目录',
+  'export.auto_copy_draft': '自动复制草稿',
+  // paths
+  'paths.output_dir': '输出目录',
+  'paths.ffmpeg': 'ffmpeg 路径',
+  'paths.ffprobe': 'ffprobe 路径',
+  'paths.logs_dir': '日志目录',
+  // ai
+  'ai.context': '项目背景（追加到 trip_context）',
+  'ai.debug_print_prompt': '调试打印完整 prompt',
+  'ai.provider_ttl_min': 'Provider 缓存 TTL（分钟）',
+  // provider
+  'max_tokens': 'max_tokens（0=不限制）',
+  'timeout_sec': 'HTTP 超时（秒）',
+  'retry_attempts': '额外重试次数',
+  'requests_per_minute': '每分钟请求上限（0=不限）',
+  'poll_interval_sec': '轮询间隔（秒）',
+};
+
+
 export function labelFromPath(path) {
-  return path ? path.split('.').pop() : 'config';
+  if (!path) return 'config';
+  if (FIELD_LABELS[path]) return FIELD_LABELS[path];
+  const leaf = path.split('.').pop();
+  if (FIELD_LABELS[leaf]) return FIELD_LABELS[leaf];
+  return leaf;
 }
 
 function providerCapabilities(provider) {

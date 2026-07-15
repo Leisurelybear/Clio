@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import tempfile
+from dataclasses import asdict, is_dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import unquote
@@ -11,6 +12,16 @@ from urllib.parse import unquote
 import yaml
 
 from clio.config import CONFIG_DESCRIPTIONS, deep_merge, load_config, load_global_config
+from clio.config.models import (
+    AnalyzeConfig,
+    ExportConfig,
+    PlanConfig,
+    ProjectAIConfig,
+    ProjectCompressConfig,
+    ProjectPathsConfig,
+    ProjectWhisperConfig,
+    ScriptConfig,
+)
 from clio.config.parsers import _infer_provider_capabilities
 from clio.ui.services.file_service import (
     _coerce_config_types,
@@ -191,6 +202,49 @@ _SPLIT_PROJECT: dict[str, set[str]] = {
 }
 
 
+def _json_safe(value: Any) -> Any:
+    """Convert dataclass/Path defaults into plain JSON-serializable structures."""
+    if is_dataclass(value) and not isinstance(value, type):
+        return _json_safe(asdict(value))
+    if isinstance(value, Path):
+        return str(value)
+    if isinstance(value, dict):
+        return {str(k): _json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [_json_safe(v) for v in value]
+    return value
+
+
+def _project_config_defaults() -> dict[str, Any]:
+    """Full project-layer defaults so UI can show missing sections (e.g. plan)."""
+    return {
+        "paths": _json_safe(ProjectPathsConfig()),
+        "ai": _json_safe(ProjectAIConfig()),
+        "compress": _json_safe(ProjectCompressConfig()),
+        "analyze": _json_safe(AnalyzeConfig()),
+        "script": _json_safe(ScriptConfig()),
+        "plan": _json_safe(PlanConfig()),
+        "whisper": _json_safe(ProjectWhisperConfig()),
+        "export": _json_safe(ExportConfig()),
+    }
+
+
+def _merge_project_with_defaults(raw: dict[str, Any]) -> dict[str, Any]:
+    """Overlay project.yaml on defaults, then keep only project-owned fields."""
+    merged = deep_merge(_project_config_defaults(), raw if isinstance(raw, dict) else {})
+    result: dict[str, Any] = {}
+    for section, val in merged.items():
+        if not isinstance(val, dict):
+            continue
+        if section in _SPLIT_PROJECT:
+            kept = {k: v for k, v in val.items() if k in _SPLIT_PROJECT[section]}
+            if kept:
+                result[section] = kept
+        elif _is_project_section(section):
+            result[section] = val
+    return result
+
+
 def _is_global_section(section: str) -> bool:
     return section in _GLOBAL_SECTIONS or section in _SPLIT_GLOBAL
 
@@ -270,17 +324,9 @@ def handle_get_config_project(handler: HandlerProtocol, qs: dict[str, Any]) -> N
     except Exception as e:
         return handler._send_json({"error": f"cannot read project.yaml: {e}"}, 500)
 
-    result: dict = {}
-    for section, val in raw.items():
-        if not isinstance(val, dict):
-            continue
-        if section in _SPLIT_PROJECT:
-            kept = {k: v for k, v in val.items() if k in _SPLIT_PROJECT.get(section, set())}
-            if kept:
-                result[section] = kept
-        elif _is_project_section(section):
-            result[section] = val
-    handler._send_json(result)
+    # Merge dataclass defaults so UI always shows plan/analyze/script/... even if
+    # the on-disk project.yaml only has a subset of sections (common after migrate).
+    handler._send_json(_merge_project_with_defaults(raw if isinstance(raw, dict) else {}))
 
 
 def handle_put_config_global(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
@@ -396,7 +442,7 @@ def _normalize_provider(name: str, obj: dict[str, Any]) -> dict[str, Any]:
         "retry_attempts": obj.get("retry_attempts", 2),
         "requests_per_minute": obj.get("requests_per_minute", 0),
         "timeout_sec": obj.get("timeout_sec", 120.0),
-        "max_tokens": obj.get("max_tokens", 4096),
+        "max_tokens": obj.get("max_tokens", 0),
         "models": obj.get("models", []),
         "capabilities": obj.get("capabilities") or _infer_provider_capabilities(provider_type),
     }

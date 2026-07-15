@@ -439,6 +439,37 @@ class TestHandleGetConfigProject:
         assert "cache_dir" not in payload["whisper"]
         assert "hf_endpoint" not in payload["whisper"]
 
+    def test_fills_missing_plan_defaults(self, tmp_path: Path):
+        """project.yaml without plan section still returns plan defaults for UI."""
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_bytes(b"")
+        proj_dir = tmp_path / "project"
+        proj_dir.mkdir()
+        (proj_dir / "project.yaml").write_text(
+            yaml.dump(
+                {
+                    "paths": {"output_dir": "./out"},
+                    "ai": {"tasks": {}, "context": ""},
+                }
+            ),
+            encoding="utf-8",
+        )
+        handler.config_path = cfg
+        handler.project_dir = tmp_path
+        handler._resolve_project_dir.return_value = proj_dir
+        handler._send_json = MagicMock()
+        handle_get_config_project(handler, {})
+        payload = handler._send_json.call_args[0][0]
+        assert "plan" in payload
+        assert payload["plan"]["max_clips_per_day"] == 12
+        assert payload["plan"]["target_duration_sec"] == 180
+        assert payload["plan"]["use_transcripts"] is True
+        assert "analyze" in payload
+        assert "script" in payload
+        assert "export" in payload
+        assert payload["paths"]["output_dir"] == "./out"
+
 
 class TestHandlePutConfigGlobal:
     """PUT /api/config/global — writes to config.yaml, rejects project fields."""
