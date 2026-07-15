@@ -99,6 +99,16 @@ async function pollRerunStatus(task, file) {
         hideRerunProgress();
         refreshAfterRerun(task, file);
       }, 2000);
+    } else if (s.status === 'cancelled') {
+      overlay.dataset.active = 'false';
+      if (_rerunPollTimer) {
+        clearInterval(_rerunPollTimer);
+        _rerunPollTimer = null;
+      }
+      if (statusEl) statusEl.innerHTML = '<span class="warn">⏹ 已取消</span>';
+      setStatus('重跑已取消', 'warn');
+      addToast('重跑已取消', 'warning');
+      setTimeout(hideRerunProgress, 4000);
     } else if (s.status === 'error') {
       overlay.dataset.active = 'false';
       if (_rerunPollTimer) {
