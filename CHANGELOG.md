@@ -5,6 +5,8 @@
 ### Fixed
 - fix(config/ui): expose provider `max_tokens` / `timeout_sec` / `retry_attempts` / `requests_per_minute` / `poll_interval_sec` in Provider edit modal (were missing from UI)
 - fix(config): default `max_tokens` is now `0` (unlimited; omit field on OpenAI-compatible calls); 0 no longer fails validation
+- fix(config/ui): GET `/api/config/project` merges dataclass defaults so missing sections (plan/analyze/script/export/…) still appear in Settings
+- fix(ui): Chinese labels for plan fields (`目标时长（秒）`, `每日最多片段数`, …)
 
 ### Changed
 - docs: config.example.yaml documents max_tokens=0 unlimited semantics

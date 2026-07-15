@@ -100,6 +100,8 @@ def _inject_provider_defaults(raw: dict) -> None:
             pcfg.setdefault("requests_per_minute", 0)
             pcfg.setdefault("retry_attempts", 2)
             pcfg.setdefault("timeout_sec", 120.0)
+            pcfg.setdefault("max_tokens", 0)
+            pcfg.setdefault("poll_interval_sec", 5)
 
 
 def _inject_whisper_defaults(raw: dict) -> None:
