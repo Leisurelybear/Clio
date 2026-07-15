@@ -46,18 +46,21 @@ class OpenAICompatProvider:
     def generate_text(self, prompt: str, model: str) -> AIResponse:
         def _do() -> AIResponse:
             self._maybe_wait()
+            payload: dict = {
+                "model": model,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.3,
+            }
+            # 0 / negative → omit max_tokens (provider default / unlimited)
+            if self._max_tokens and self._max_tokens > 0:
+                payload["max_tokens"] = int(self._max_tokens)
             response = self._client.post(
                 f"{self._base_url}/chat/completions",
                 headers={
                     "Authorization": f"Bearer {self._api_key}",
                     "Content-Type": "application/json",
                 },
-                json={
-                    "model": model,
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": self._max_tokens,
-                    "temperature": 0.3,
-                },
+                json=payload,
             )
             sc = response.status_code
             if sc == 429 or sc >= 500:

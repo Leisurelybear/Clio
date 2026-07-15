@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-07-16
+
+### Fixed
+- fix(config/ui): expose provider `max_tokens` / `timeout_sec` / `retry_attempts` / `requests_per_minute` / `poll_interval_sec` in Provider edit modal (were missing from UI)
+- fix(config): default `max_tokens` is now `0` (unlimited; omit field on OpenAI-compatible calls); 0 no longer fails validation
+
+### Changed
+- docs: config.example.yaml documents max_tokens=0 unlimited semantics
+
 ## 2026-07-15
 
 ### Fixed

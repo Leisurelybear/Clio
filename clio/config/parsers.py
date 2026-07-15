@@ -39,7 +39,7 @@ def _parse_providers(raw: dict) -> dict[str, ProviderConfig]:
             retry_attempts=cfg.get("retry_attempts", 2),
             requests_per_minute=cfg.get("requests_per_minute", 0),
             timeout_sec=cfg.get("timeout_sec", 120.0),
-            max_tokens=cfg.get("max_tokens", 4096),
+            max_tokens=cfg.get("max_tokens", 0),
             models=cfg.get("models", []),
             capabilities=cfg.get("capabilities") or _infer_provider_capabilities(provider_type),
         )
