@@ -1025,6 +1025,7 @@ function _attachTaskBindingHandlers(pane, projectCfg) {
   if (gotoBtn) {
     gotoBtn.onclick = (e) => {
       e.preventDefault();
+      if (state.dirty && !confirm('设置有未保存的修改，确定切换标签吗？')) return;
       state.configTab = 'global';
       state.dirty = false;
       updateSaveBtn();
@@ -1035,6 +1036,7 @@ function _attachTaskBindingHandlers(pane, projectCfg) {
   pane.querySelectorAll('.edit-provider-link').forEach(link => {
     link.onclick = (e) => {
       e.preventDefault();
+      if (state.dirty && !confirm('设置有未保存的修改，确定切换标签吗？')) return;
       const pName = link.dataset.provider;
       state.configTab = 'global';
       state.dirty = false;
@@ -1236,6 +1238,8 @@ export function renderConfig() {
   // Tab switching
   pane.querySelectorAll('.config-tab-btn').forEach(btn => {
     btn.onclick = () => {
+      if (btn.dataset.configTab === state.configTab) return;
+      if (state.dirty && !confirm('设置有未保存的修改，确定切换标签吗？')) return;
       state.configTab = btn.dataset.configTab;
       state.dirty = false;
       updateSaveBtn();
