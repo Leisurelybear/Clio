@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import re
 import threading
 import time
@@ -140,7 +141,11 @@ def handle_get_run_status(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
         data["status"] = "idle"
         data["message"] = ""
         try:
-            progress_file.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            progress_file.parent.mkdir(parents=True, exist_ok=True)
+            suffix = os.urandom(4).hex()
+            tmp = progress_file.parent / f"{progress_file.name}.{suffix}.tmp"
+            tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+            tmp.replace(progress_file)
         except OSError:
             pass
     handler._send_json(data)
