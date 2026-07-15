@@ -109,6 +109,14 @@ def run_compress_all(
         from clio.tasks._video_loader import source_videos
 
         videos = source_videos(config)
+        offline = [v for v in videos if not v.is_file()]
+        if offline:
+            print(f"[跳过] {len(offline)} 个离线/缺失视频（仍保留在 videos.json，可用 relink 修复）")
+            for v in offline[:5]:
+                print(f"  - {v}")
+            if len(offline) > 5:
+                print(f"  ... 另有 {len(offline) - 5} 个")
+        videos = [v for v in videos if v.is_file()]
     if files is not None:
         selected = _selected_stems(files)
         videos = [v for v in videos if _matches_selected_stem(v, selected)]

@@ -9,7 +9,7 @@ from http import HTTPStatus
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from clio._constants import VIDEO_EXTS
+from clio._constants import VIDEO_EXTENSIONS, VIDEO_EXTS
 from clio.index import ArtifactIndex
 from clio.tasks._video_loader import load_selected_videos, save_selected_videos
 from clio.ui.services.file_service import (
@@ -62,6 +62,57 @@ def _resolve_original_video_path(root: Path, requested: str) -> Path | None:
     return candidate
 
 
+def _selection_stems(selected_set: set[Path]) -> set[str]:
+    return {p.stem.lower() for p in selected_set}
+
+
+def _compressed_matches_selection(
+    compressed: Path,
+    stem: str,
+    selected_set: set[Path],
+    orig: str | None,
+) -> bool:
+    """True if this compressed artifact belongs to the curated selection.
+
+    Matches absolute source path first, then basename / original stem. After
+    relink, .vmeta may still hold the old path while videos.json has the new
+    one — stem/basename matching keeps the compressed file visible.
+    """
+    meta = VideoMeta.read(compressed)
+    candidates: list[Path] = []
+    if meta is not None and meta.source_path:
+        candidates.append(Path(meta.source_path))
+    if orig:
+        candidates.append(Path(orig))
+
+    for cand in candidates:
+        try:
+            resolved = cand.resolve() if cand.is_absolute() or cand.exists() else cand
+        except OSError:
+            resolved = cand
+        if resolved in selected_set:
+            return True
+        if any(s.name.lower() == cand.name.lower() for s in selected_set):
+            return True
+        if cand.stem.lower() in _selection_stems(selected_set):
+            return True
+
+    # compressed stem like 001_GL010695 or 001_GL010695_seg01
+    suffix = stem.split("_", 1)[1] if "_" in stem else stem
+    suffix_l = suffix.lower()
+    stems = _selection_stems(selected_set)
+    if suffix_l in stems:
+        return True
+    m = _SEG_RE.match(suffix)
+    if m and m.group(1).lower() in stems:
+        return True
+    # strip _segNN manually if regex only matched full stem form
+    base = re.sub(r"_(?:seg|part|pt|chunk)\d+$", "", suffix_l, flags=re.IGNORECASE)
+    if base in stems:
+        return True
+    return False
+
+
 def _load_videos_json_selection(proj_dir: Path) -> set[Path] | None:
     """Load videos.json selection.
 
@@ -71,7 +122,13 @@ def _load_videos_json_selection(proj_dir: Path) -> set[Path] | None:
     if not (proj_dir / "videos.json").is_file():
         return None
     selected = load_selected_videos(proj_dir)
-    return {p.resolve() for p in selected}
+    out: set[Path] = set()
+    for p in selected:
+        try:
+            out.add(p.resolve())
+        except OSError:
+            out.add(p)
+    return out
 
 
 def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
@@ -199,23 +256,7 @@ def _build_videos_payload(
                 # Only filter when selection is non-empty. Empty videos.json still
                 # allows browsing existing compressed artifacts.
                 if selected_set:
-                    meta = VideoMeta.read(p)
-                    if meta is not None:
-                        if Path(meta.source_path).resolve() not in selected_set:
-                            continue
-                    elif orig:
-                        op = Path(orig)
-                        try:
-                            orig_resolved = (
-                                op.resolve() if op.is_file() or op.is_absolute() else (proj_dir / op).resolve()
-                            )
-                        except OSError:
-                            continue
-                        if orig_resolved not in selected_set:
-                            if not any(s.name == Path(orig).name for s in selected_set):
-                                continue
-                    else:
-                        # selection active but cannot link this compressed file → hide
+                    if not _compressed_matches_selection(p, stem, selected_set, orig):
                         continue
                 match_file = None
                 abs_match = None
@@ -324,19 +365,26 @@ def _build_videos_payload(
             # No videos.json → empty list (do not scan project_dir)
             video_paths = []
         for p in video_paths:
-            if p.is_dir() or p.suffix.lower() not in VIDEO_EXTS:
-                # Keep non-existing paths in list so user sees offline media
-                if not p.exists():
-                    videos.append(
-                        {
-                            "file": p.name,
-                            "source": "original",
-                            "index": None,
-                            "match": None,
-                            "abs_path": str(p),
-                            "missing": True,
-                        }
-                    )
+            try:
+                online = p.is_file() and p.suffix.lower() in VIDEO_EXTENSIONS
+            except OSError:
+                online = False
+            if not online:
+                # Offline or non-video entry: still surface so UI can relink/remove.
+                try:
+                    abs_shown = str(p.resolve())
+                except OSError:
+                    abs_shown = str(p)
+                videos.append(
+                    {
+                        "file": p.name,
+                        "source": "original",
+                        "index": None,
+                        "match": None,
+                        "abs_path": abs_shown,
+                        "missing": True,
+                    }
+                )
                 continue
             abs_path = str(p.resolve())
             rel_name = p.name
@@ -430,10 +478,16 @@ def handle_get_video(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
         abspath = qs.get("abspath", [None])[0]
         if abspath:
             vp = Path(abspath).resolve()
-            if not vp.is_file() or vp.suffix.lower() not in VIDEO_EXTS:
+            if not vp.is_file() or vp.suffix.lower() not in VIDEO_EXTENSIONS:
                 return handler.send_error(HTTPStatus.NOT_FOUND)
             selected = load_selected_videos(proj_dir)
-            if vp not in {p.resolve() for p in selected}:
+            allowed: set[Path] = set()
+            for p in selected:
+                try:
+                    allowed.add(p.resolve())
+                except OSError:
+                    allowed.add(p)
+            if vp not in allowed:
                 return handler.send_error(HTTPStatus.FORBIDDEN)
         else:
             vp = _resolve_original_video_path(proj_dir, fname)
@@ -474,7 +528,11 @@ def handle_get_videos_selected(handler: HandlerProtocol, qs: dict[str, Any]) -> 
 
 
 def handle_put_videos_selected(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
-    """Handle PUT /api/videos/selected — save to videos.json."""
+    """Handle PUT /api/videos/selected — save to videos.json.
+
+    Offline paths are kept: videos.json is an allowlist. Only wrong extensions /
+    unparseable values are rejected. Existing files are stored as resolved paths.
+    """
     proj_dir = handler._resolve_project_dir(qs)
     raw = obj.get("videos", [])
     if not isinstance(raw, list):
@@ -482,22 +540,32 @@ def handle_put_videos_selected(handler: HandlerProtocol, qs: dict[str, Any], obj
     paths: list[Path] = []
     rejected: list[str] = []
     for item in raw:
+        if item is None or str(item).strip() == "":
+            rejected.append(str(item))
+            continue
         p = Path(str(item)).expanduser()
         try:
             resolved = p.resolve()
         except OSError:
+            resolved = p
+        if resolved.suffix.lower() not in VIDEO_EXTENSIONS:
             rejected.append(str(item))
             continue
-        if not resolved.is_file() or resolved.suffix.lower() not in VIDEO_EXTS:
-            rejected.append(str(item))
-            continue
-        paths.append(resolved)
-    # Dedup while preserving order
-    seen: set[Path] = set()
+        # Prefer resolved path when the file exists; otherwise keep offline path.
+        if resolved.is_file():
+            paths.append(resolved)
+        else:
+            paths.append(resolved if resolved.is_absolute() else p)
+    # Dedup while preserving order (compare resolved string form)
+    seen: set[str] = set()
     unique: list[Path] = []
     for p in paths:
-        if p not in seen:
-            seen.add(p)
+        try:
+            key = str(p.resolve()).lower()
+        except OSError:
+            key = str(p).replace("\\", "/").lower()
+        if key not in seen:
+            seen.add(key)
             unique.append(p)
     save_selected_videos(proj_dir, unique)
     _invalidate_videos_cache(proj_dir)

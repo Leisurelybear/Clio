@@ -10,7 +10,11 @@ if TYPE_CHECKING:
 
 
 def load_selected_videos(project_dir: Path | None) -> list[Path]:
-    """从 project_dir/videos.json 读取选中视频列表。"""
+    """从 project_dir/videos.json 读取选中视频列表。
+
+    Offline / missing paths are kept — videos.json is an allowlist, not a live
+    scan. Callers that need existing files must filter with ``Path.is_file()``.
+    """
     if project_dir is None:
         return []
     video_file = Path(project_dir) / "videos.json"
@@ -18,9 +22,16 @@ def load_selected_videos(project_dir: Path | None) -> list[Path]:
         return []
     try:
         data = json.loads(video_file.read_text(encoding="utf-8"))
-        return [Path(p) for p in data]
     except (json.JSONDecodeError, OSError):
         return []
+    if not isinstance(data, list):
+        return []
+    paths: list[Path] = []
+    for item in data:
+        if item is None or item == "":
+            continue
+        paths.append(Path(str(item)))
+    return paths
 
 
 def save_selected_videos(project_dir: Path, videos: list[Path]) -> None:
