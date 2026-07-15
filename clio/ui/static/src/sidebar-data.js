@@ -219,7 +219,8 @@ function renderVideoItem(v) {
   if (state.selectionMode) {
     const isSelected = state.selectedFiles.includes(v.file);
     selectedClass = isSelected ? ' selected' : '';
-    checkboxHtml = `<input type="checkbox" class="video-checkbox" data-file="${escapeHtml(v.file)}" ${isSelected ? 'checked' : ''}>`;
+    const disabled = v.missing ? 'disabled title="离线视频不可选"' : '';
+    checkboxHtml = `<input type="checkbox" class="video-checkbox" data-file="${escapeHtml(v.file)}" ${isSelected ? 'checked' : ''} ${disabled}>`;
   }
   li.className = 'video-item' + selectedClass;
   if (state.currentVideo === v.file) li.classList.add('active');
@@ -402,16 +403,17 @@ export function renderVideoList() {
   if (state.selectionMode) {
     const headerDiv = document.createElement('div');
     headerDiv.className = 'selection-header';
-    const allSelected = state.videos.length > 0 && state.selectedFiles.length === state.videos.length;
+    const selectable = state.videos.filter(v => !v.missing);
+    const allSelected = selectable.length > 0 && selectable.every(v => state.selectedFiles.includes(v.file));
     headerDiv.innerHTML = `
-      <span class="selection-count">已选: ${state.selectedFiles.length}/${state.videos.length}</span>
+      <span class="selection-count">已选: ${state.selectedFiles.length}/${selectable.length}</span>
       <span class="selection-action" data-action="all">${allSelected ? '取消全选' : '全选'}</span>
     `;
     headerDiv.querySelector('[data-action="all"]').onclick = () => {
       if (allSelected) {
         state.selectedFiles = [];
       } else {
-        state.selectedFiles = state.videos.map(v => v.file);
+        state.selectedFiles = selectable.map(v => v.file);
       }
       renderVideoList();
     };
