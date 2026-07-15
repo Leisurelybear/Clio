@@ -14,6 +14,7 @@ from clio.ui.services.project_service import (
     _list_projects,
     _project_output_dir,
     _registry_path,
+    _registry_project_paths,
     _remove_from_registry,
     _save_last_project,
 )
@@ -204,7 +205,7 @@ def handle_post_project_remove(handler: HandlerProtocol, obj: dict) -> None:
                 reg = json.loads(reg_file.read_text(encoding="utf-8"))
             except (json.JSONDecodeError, OSError):
                 reg = {"projects": []}
-            for p_str in list(reg.get("projects", [])):
+            for p_str in list(_registry_project_paths(reg)):
                 p = Path(p_str)
                 proj_file = p / "project.json"
                 if proj_file.is_file():

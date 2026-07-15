@@ -189,13 +189,16 @@ def _migrate_one(old_dir: Path, config_path: Path, registry_file: Path) -> tuple
     except OSError as e:
         return False, f"{old_dir}: 写入 project.json 失败: {e}"
 
-    # 4. videos.json — preserve curated list if already present and non-empty
-    existing = load_selected_videos(new_dir)
-    if not existing and old_dir.resolve() != new_dir.resolve():
-        existing = load_selected_videos(old_dir)
-    if existing:
+    # 4. videos.json — preserve curated list if the file already exists
+    # (including intentional empty []). Only scan when the file is absent.
+    videos_json_target = new_dir / "videos.json"
+    videos_json_old = old_dir / "videos.json"
+    if videos_json_target.is_file() or (old_dir.resolve() != new_dir.resolve() and videos_json_old.is_file()):
+        existing = load_selected_videos(new_dir)
+        if not existing and old_dir.resolve() != new_dir.resolve() and videos_json_old.is_file():
+            existing = load_selected_videos(old_dir)
+            save_selected_videos(new_dir, existing)
         videos = existing
-        save_selected_videos(new_dir, videos)
         print(f"  保留已有 videos.json ({len(videos)} 个视频)")
     else:
         if old_input_path.is_dir():
