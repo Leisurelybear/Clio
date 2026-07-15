@@ -3,6 +3,15 @@
 ## 2026-07-15
 
 ### Fixed
+- fix(ui): original list marks offline `*.mp4` etc. as `missing:true` (relink CTA works)
+- fix(ui): `PUT /api/videos/selected` keeps offline paths instead of silently dropping them
+- fix(ui): compressed view still shows clips after relink (stem/basename match, not only .vmeta path)
+- fix(migrate): preserve intentional empty `videos.json=[]` instead of re-scanning input_dir
+- fix(cli): `transcribe` honors `-p/--project`; add `-p` to cut/export/verify/reindex
+- fix(cli): export uses `--out-dir` (avoids conflict with `-o/--output` from `_add_io_args`)
+- fix(doctor/check): report offline video count when selection has missing files
+- fix(registry): normalize dict entries in `projects.json` so Path(dict) cannot crash
+- fix(ui): fs video browser uses `VIDEO_EXTENSIONS` (includes mkv/avi) consistent with migrate
 - fix(ui): guard `browse-mkdir` onclick assignment with null check to prevent crash in test/jsdom
 - fix(chore): untrack `project.yaml` from git (already in `.gitignore` but accidentally tracked)
 - fix(ui): remove stale `type: ignore[attr-defined]` in texts.py + handler_protocol.py (\_resolve_in and \_get_state already on Protocol)
@@ -14,12 +23,14 @@
 - test(fs): 9 test cases for `handle_post_fs_mkdir` (missing params, path traversal, access denied, OSError)
 - test(routes): 7 test cases for `handle_put_videos_relink` (missing params, bad path, not found, ambiguous match, success)
 - test(frontend): 6 test cases for `relinkVideo` (api params, cancel, same-path, error, network, fallback)
+- test: offline original listing, PUT selected preserve offline, compressed-after-relink, loader non-list JSON
 
 ### Changed
 - docs(roadmap): mark A-007 route registry as complete (router.py already integrated)
 - docs(roadmap): remove CR-003 from remaining open items (already done in Phase 2)
 - docs(roadmap): refresh Remaining Open Items — mark B-089/B-092/B-095/B-096 done; record `feat/project-video-manager` complete
 - docs(AGENTS.md): update test count 1111→1153, add `npm test` to Quick Reference
+- compress: skip offline videos with a clear log instead of mid-run hard failure
 
 ### Removed
 - chore(ui): delete `runner_feat.js` and `runner_main.js` (1027 lines of dead code; all features already in `runner.js`)
