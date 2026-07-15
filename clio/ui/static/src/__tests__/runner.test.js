@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   buildSkippedDiagnostics,
   renderRunPreviewHtml,
   renderSkippedDiagnosticsHtml,
+  collectRunOptions,
 } from '../runner.js';
 
 describe('renderRunPreviewHtml', () => {
@@ -51,6 +52,39 @@ describe('renderRunPreviewHtml', () => {
 
   it('renders a neutral state without preview data', () => {
     expect(renderRunPreviewHtml(null)).toContain('选择步骤后显示预览');
+  });
+});
+
+describe('collectRunOptions', () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <input class="run-step-cb" data-step="compress" type="checkbox" checked>
+      <input class="run-step-cb" data-step="analyze" type="checkbox" checked>
+      <input class="run-step-cb" data-step="plan" type="checkbox">
+      <input id="run-day" value="day2">
+      <input id="run-use-transcripts" type="checkbox" checked>
+      <input id="run-overwrite" type="checkbox">
+      <textarea id="run-context-override">[analyze] focus food</textarea>
+    `;
+  });
+
+  it('collects checked steps and options from the run form', () => {
+    const opts = collectRunOptions();
+    expect(opts.steps).toEqual(['compress', 'analyze']);
+    expect(opts.day_label).toBe('day2');
+    expect(opts.use_transcripts).toBe(true);
+    expect(opts.overwrite).toBe(false);
+    expect(opts.context_override).toBe('[analyze] focus food');
+  });
+
+  it('marks overwrite when checkbox is checked', () => {
+    document.getElementById('run-overwrite').checked = true;
+    expect(collectRunOptions().overwrite).toBe(true);
+  });
+
+  it('defaults use_transcripts when checkbox is missing', () => {
+    document.getElementById('run-use-transcripts').remove();
+    expect(collectRunOptions().use_transcripts).toBe(true);
   });
 });
 

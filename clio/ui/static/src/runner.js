@@ -86,20 +86,21 @@ function renderRun() {
         <textarea id="run-context-override" class="run-prompt-input" placeholder="在本次运行时临时向所有 AI 添加额外指令。&#10;&#10;每条指令一行，支持按步骤前缀:&#10;[analyze] 注意画面中的食物特写&#10;[voiceover] 使用更口语化的风格&#10;[plan] 优先选取运动镜头&#10;&#10;不带前缀的指令将应用于所有步骤。&#10;这些提示仅在本次运行有效，不会保存到配置中。" rows="4" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input,#1e1e1e);color:var(--text-primary);font-size:var(--text-sm);resize:vertical;font-family:inherit"></textarea>
       </div>
     </details>
-    <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap">
       <button id="btn-run-start" class="btn-primary">${getRunButtonText()}</button>
       <span id="run-files-badge" class="run-files-badge" style="display:none"></span>
       <button id="btn-run-cancel" class="btn-secondary" style="display:none">取消</button>
-      <label class="run-option-check" id="option-overwrite-wrap" style="display:none">
+      <label class="run-option-check" id="option-overwrite-wrap">
         <input type="checkbox" id="run-overwrite">
         <span>覆盖现有输出</span>
       </label>
     </div>
+    <div id="run-preview" style="margin-top:12px"></div>
     <div id="run-progress" style="margin-top:12px"></div>
     <div id="run-state-container"></div>
   `;
 
-  // wire step checkbox change → persist
+  // wire step checkbox change → persist + refresh preview
   document.querySelectorAll('.run-step-cb').forEach(cb => {
     cb.addEventListener('change', () => {
       const checks = {};
@@ -108,9 +109,11 @@ function renderRun() {
       });
       saveStepSelection(checks, $('run-use-transcripts')?.checked ?? true);
       togglePlanSubOptions();
+      updateRunStartButtonState();
+      refreshRunPreview({ silent: true });
     });
   });
-  // wire use_transcripts change → persist
+  // wire use_transcripts change → persist + preview
   const useTransCb = $('run-use-transcripts');
   if (useTransCb) {
     useTransCb.addEventListener('change', () => {
@@ -119,11 +122,18 @@ function renderRun() {
         checks[c.dataset.step] = c.checked;
       });
       saveStepSelection(checks, useTransCb.checked);
+      refreshRunPreview({ silent: true });
     });
+  }
+  const overwriteCb = $('run-overwrite');
+  if (overwriteCb) {
+    overwriteCb.addEventListener('change', () => refreshRunPreview({ silent: true }));
   }
 
   togglePlanSubOptions();
   updateRunFilesBadge();
+  updateRunStartButtonState();
+  refreshRunPreview({ silent: true });
 
   const runBtn = $('btn-run-start');
   runBtn.onclick = startRun;
@@ -146,7 +156,37 @@ function getRunButtonText() {
   if (state.selectionMode && state.selectedFiles.length > 0) {
     return `${icon('play', 16)} 运行选中步骤 (${state.selectedFiles.length})`;
   }
+  if (state.selectionMode && state.selectedFiles.length === 0) {
+    return `${icon('play', 16)} 请先勾选视频`;
+  }
   return `${icon('play', 16)} 运行选中步骤`;
+}
+
+function updateRunStartButtonState() {
+  const btn = $('btn-run-start');
+  if (!btn || _runActive) return;
+  const noSelection = state.selectionMode && state.selectedFiles.length === 0;
+  btn.disabled = noSelection;
+  btn.innerHTML = getRunButtonText();
+  btn.title = noSelection ? '选择模式下请先勾选至少一个视频' : '';
+}
+
+function collectRunOptions() {
+  const steps = [...document.querySelectorAll('.run-step-cb:checked')].map(cb => cb.dataset.step);
+  const options = {
+    day_label: ($('run-day')?.value.trim() || state.currentDay || 'day1'),
+    steps,
+    use_transcripts: $('run-use-transcripts')?.checked ?? true,
+    overwrite: !!$('run-overwrite')?.checked,
+  };
+  if (state.selectionMode && state.selectedFiles.length > 0) {
+    options.files = state.selectedFiles.slice();
+  }
+  const contextOverride = $('run-context-override')?.value?.trim();
+  if (contextOverride) {
+    options.context_override = contextOverride;
+  }
+  return options;
 }
 
 function renderRunPreviewHtml(preview) {
@@ -212,53 +252,46 @@ async function refreshRunPreview({ silent = false } = {}) {
 
 function updateRunFilesBadge() {
   const badge = $('run-files-badge');
-  const overwrap = $('option-overwrite-wrap');
-  if (!badge || !overwrap) return;
-  if (state.selectionMode && state.selectedFiles.length > 0) {
-    const numFiles = state.selectedFiles.length;
-    badge.textContent = `(${numFiles} 个视频)`;
-    badge.style.display = 'inline';
-    overwrap.style.display = 'flex';
-  } else {
-    badge.style.display = 'none';
-    overwrap.style.display = 'none';
+  if (badge) {
+    if (state.selectionMode && state.selectedFiles.length > 0) {
+      badge.textContent = `(${state.selectedFiles.length} 个视频)`;
+      badge.style.display = 'inline';
+    } else if (state.selectionMode) {
+      badge.textContent = '(未勾选视频)';
+      badge.style.display = 'inline';
+    } else {
+      badge.style.display = 'none';
+    }
   }
+  // Overwrite is always available on the Run tab (not only multi-select)
+  const overwrap = $('option-overwrite-wrap');
+  if (overwrap) overwrap.style.display = 'flex';
+  updateRunStartButtonState();
+  if ($('run-preview')) refreshRunPreview({ silent: true });
 }
 
 async function startRun() {
   const btn = $('btn-run-start');
   if (btn.disabled) return;
+  if (state.selectionMode && state.selectedFiles.length === 0) {
+    setStatus('选择模式下请先勾选至少一个视频', 'warn');
+    addToast('请先勾选视频', 'warning');
+    return;
+  }
   btn.disabled = true;
   btn.textContent = '启动中...';
-  const checked = [...document.querySelectorAll('.run-step-cb:checked')].map(cb => cb.dataset.step);
-  if (!checked.length) {
-    btn.disabled = false;
-    btn.textContent = '运行选中步骤';
+  const options = collectRunOptions();
+  if (!options.steps.length) {
+    updateRunStartButtonState();
     setStatus('请至少选择一个步骤', 'warn');
     return;
   }
-  _lastRunDay = ($('run-day')?.value.trim() || state.currentDay);
-  _lastRunSteps = checked.slice();
+  _lastRunDay = options.day_label;
+  _lastRunSteps = options.steps.slice();
   _expectDoneNavigation = true;
   _stopRunSSE();
   try {
-    const body = {
-      day_label: _lastRunDay,
-      steps: checked,
-      use_transcripts: $('run-use-transcripts').checked,
-    };
-    if (state.selectionMode && state.selectedFiles.length > 0) {
-      body.files = state.selectedFiles;
-    }
-    const overwriteCb = $('run-overwrite');
-    if (overwriteCb && overwriteCb.checked) {
-      body.overwrite = true;
-    }
-    const contextOverride = $('run-context-override')?.value?.trim();
-    if (contextOverride) {
-      body.context_override = contextOverride;
-    }
-    const r = await api('POST', '/api/run/start', body);
+    const r = await api('POST', '/api/run/start', options);
     if (r.ok) {
       _runActive = true;
       const msg = r.message || '流水线已启动';
@@ -274,8 +307,8 @@ async function startRun() {
     const msg = '启动失败: ' + e.message;
     setStatus(msg, 'err');
     addToast(msg, 'error', 6000);
-    btn.disabled = false;
-    btn.innerHTML = `${icon('play', 16)} 运行选中步骤`;
+    _runActive = false;
+    updateRunStartButtonState();
   }
 }
 
@@ -351,7 +384,7 @@ async function _handleRunStatus(s) {
       const stale = !s.running;
       if (stale) {
         _runActive = false;
-        if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+        updateRunStartButtonState();
         const cancelBtn = $('btn-run-cancel');
         if (cancelBtn) cancelBtn.style.display = 'none';
         const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
@@ -398,7 +431,7 @@ async function _handleRunStatus(s) {
       _lastProgressSnapshot = null;
       _runActive = false;
       _stopRunPoll();
-      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+      updateRunStartButtonState();
       const cancelBtn = $('btn-run-cancel');
       if (cancelBtn) cancelBtn.style.display = 'none';
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
@@ -446,7 +479,7 @@ async function _handleRunStatus(s) {
       _lastProgressSnapshot = null;
       _runActive = false;
       _stopRunPoll();
-      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+      updateRunStartButtonState();
       const cancelBtn = $('btn-run-cancel');
       if (cancelBtn) cancelBtn.style.display = 'none';
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
@@ -458,7 +491,7 @@ async function _handleRunStatus(s) {
       _lastProgressSnapshot = null;
       _runActive = false;
       _stopRunPoll();
-      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+      updateRunStartButtonState();
       const cancelBtn = $('btn-run-cancel');
       if (cancelBtn) cancelBtn.style.display = 'none';
       const logsHtml = s.logs?.length ? `<div class="run-logs">${s.logs.map(l => `<div class="run-log-line">${escapeHtml(l)}</div>`).join('')}</div>` : '';
@@ -586,6 +619,8 @@ export {
   startRun,
   _stopRunPoll,
   updateRunFilesBadge,
+  updateRunStartButtonState,
+  collectRunOptions,
   _completionTargetForSteps,
   renderRunPreviewHtml,
   buildSkippedDiagnostics,
