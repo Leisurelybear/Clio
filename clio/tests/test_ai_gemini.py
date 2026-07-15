@@ -17,7 +17,7 @@ def _make_cfg(**kwargs) -> ProviderConfig:
         requests_per_minute=0,
         poll_interval_sec=5,
         retry_attempts=2,
-        max_tokens=4096,
+        max_tokens=0,
     )
     defaults.update(kwargs)
     return ProviderConfig(**defaults)

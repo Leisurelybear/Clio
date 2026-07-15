@@ -250,7 +250,7 @@ class TestValidateConfig:
             ),
             (
                 "ai.providers.gemini.max_tokens",
-                lambda cfg: setattr(cfg.global_cfg.ai.providers["gemini"], "max_tokens", 0),
+                lambda cfg: setattr(cfg.global_cfg.ai.providers["gemini"], "max_tokens", -1),
             ),
         ],
     )

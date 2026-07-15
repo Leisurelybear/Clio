@@ -27,7 +27,8 @@ class ProviderConfig:
     retry_attempts: int = 2
     requests_per_minute: int = 0
     timeout_sec: float = 120.0
-    max_tokens: int = 4096
+    # 0 = unlimited (do not send max_tokens to the API)
+    max_tokens: int = 0
     models: list[str] = field(default_factory=list)
     capabilities: list[str] = field(default_factory=list)
 

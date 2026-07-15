@@ -54,7 +54,10 @@ def _validate_config(config: AppConfig) -> None:
         _require_supported_provider_type(provider_name, provider_cfg.type)
         _require_min(f"ai.providers.{provider_name}.requests_per_minute", provider_cfg.requests_per_minute, 0)
         _require_min(f"ai.providers.{provider_name}.retry_attempts", provider_cfg.retry_attempts, 0)
-        _require_min(f"ai.providers.{provider_name}.max_tokens", provider_cfg.max_tokens, 1)
+        # 0 means unlimited; only reject negative values
+        _require_min(f"ai.providers.{provider_name}.max_tokens", provider_cfg.max_tokens, 0)
+        _require_min(f"ai.providers.{provider_name}.timeout_sec", provider_cfg.timeout_sec, 0)
+        _require_min(f"ai.providers.{provider_name}.poll_interval_sec", provider_cfg.poll_interval_sec, 0)
 
     for task_name, task_cfg in config.ai.tasks.items():
         if task_cfg.provider not in provider_names:

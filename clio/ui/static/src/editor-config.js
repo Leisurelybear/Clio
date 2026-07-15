@@ -554,6 +554,8 @@ export function _renderProviderList(providers, descs) {
         ${p.type !== 'gemini' ? `<div class="provider-card-field"><span class="provider-card-label">接口地址</span><span>${escapeHtml(p.base_url || '(默认)')}</span></div>` : ''}
         <div class="provider-card-field"><span class="provider-card-label">能力</span><span class="provider-card-models">${capabilityTags}</span></div>
         <div class="provider-card-field"><span class="provider-card-label">模型</span><span class="provider-card-models">${modelTags}</span></div>
+        <div class="provider-card-field"><span class="provider-card-label">max_tokens</span><span>${p.max_tokens === 0 || p.max_tokens == null ? '不限制' : escapeHtml(String(p.max_tokens))}</span></div>
+        <div class="provider-card-field"><span class="provider-card-label">timeout</span><span>${escapeHtml(String(p.timeout_sec ?? 120))}s</span></div>
         <div class="provider-test-status" data-provider="${escapeHtml(name)}"></div>
       </div>
     </div>`;
@@ -611,6 +613,38 @@ function _showProviderModal(providersObj, name, onSave) {
         <div id="modal-provider-capabilities"></div>
         <span class="hint">常用标签：video 表示可做视频理解，text 表示可做文本生成。</span>
       </div>
+      <div class="form-group" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div>
+          <label class="form-label">max_tokens</label>
+          <input id="modal-provider-max-tokens" class="form-input" type="number" min="0" step="1"
+            value="${existing?.max_tokens ?? 0}">
+          <span class="hint">0 = 不限制（推荐规划任务）</span>
+        </div>
+        <div>
+          <label class="form-label">timeout_sec</label>
+          <input id="modal-provider-timeout" class="form-input" type="number" min="0" step="1"
+            value="${existing?.timeout_sec ?? 120}">
+          <span class="hint">HTTP 超时（秒）</span>
+        </div>
+        <div>
+          <label class="form-label">retry_attempts</label>
+          <input id="modal-provider-retry" class="form-input" type="number" min="0" step="1"
+            value="${existing?.retry_attempts ?? 2}">
+          <span class="hint">额外重试次数</span>
+        </div>
+        <div>
+          <label class="form-label">requests_per_minute</label>
+          <input id="modal-provider-rpm" class="form-input" type="number" min="0" step="1"
+            value="${existing?.requests_per_minute ?? 0}">
+          <span class="hint">0 = 不限速</span>
+        </div>
+        <div id="modal-poll-group" style="${(existing?.type || 'gemini') === 'gemini' ? '' : 'display:none'}">
+          <label class="form-label">poll_interval_sec</label>
+          <input id="modal-provider-poll" class="form-input" type="number" min="0" step="1"
+            value="${existing?.poll_interval_sec ?? 5}">
+          <span class="hint">Gemini 文件轮询间隔</span>
+        </div>
+      </div>
       <div class="modal-actions">
         <button id="modal-cancel" class="btn-secondary">取消</button>
         <button id="modal-save" class="btn-primary">${isEdit ? '保存修改' : '添加'}</button>
@@ -638,10 +672,12 @@ function _showProviderModal(providersObj, name, onSave) {
   }
   renderCapabilitiesInput();
 
-  // Type toggle → show/hide base URL
+  // Type toggle → show/hide base URL + poll interval
   backdrop.querySelector('#modal-provider-type').onchange = (e) => {
-    const grp = backdrop.querySelector('#modal-base-url-group');
-    grp.style.display = e.target.value === 'gemini' ? 'none' : '';
+    const isGemini = e.target.value === 'gemini';
+    backdrop.querySelector('#modal-base-url-group').style.display = isGemini ? 'none' : '';
+    const pollGrp = backdrop.querySelector('#modal-poll-group');
+    if (pollGrp) pollGrp.style.display = isGemini ? '' : 'none';
     if (!isEdit) {
       capabilitiesList = [...providerCapabilities({ type: e.target.value })];
       renderCapabilitiesInput();
@@ -662,10 +698,25 @@ function _showProviderModal(providersObj, name, onSave) {
     const newType = backdrop.querySelector('#modal-provider-type').value;
     const newKey = backdrop.querySelector('#modal-provider-key').value.trim();
     const newBaseUrl = backdrop.querySelector('#modal-provider-base-url').value.trim();
+    const parseNum = (id, fallback) => {
+      const raw = backdrop.querySelector(id)?.value;
+      if (raw === undefined || raw === null || String(raw).trim() === '') return fallback;
+      const n = Number(raw);
+      return Number.isFinite(n) ? n : fallback;
+    };
+    const newMaxTokens = parseNum('#modal-provider-max-tokens', 0);
+    const newTimeout = parseNum('#modal-provider-timeout', 120);
+    const newRetry = parseNum('#modal-provider-retry', 2);
+    const newRpm = parseNum('#modal-provider-rpm', 0);
+    const newPoll = parseNum('#modal-provider-poll', 5);
 
     if (!newName) { setStatus('请填写 Provider 名称', 'warn'); return; }
     if (isEdit && newName !== name) { setStatus('名称不可修改（如需重命名请删除后重建）', 'warn'); return; }
     if (!isEdit && providersObj[newName]) { setStatus(`Provider "${newName}" 已存在`, 'warn'); return; }
+    if (newMaxTokens < 0 || newTimeout < 0 || newRetry < 0 || newRpm < 0 || newPoll < 0) {
+      setStatus('数值字段不能为负数', 'warn');
+      return;
+    }
 
     // Save API key to .env if provided
     if (newKey) {
@@ -696,6 +747,11 @@ function _showProviderModal(providersObj, name, onSave) {
       base_url: newBaseUrl || '',
       models: modelsList,
       capabilities: capabilitiesList,
+      max_tokens: newMaxTokens,
+      timeout_sec: newTimeout,
+      retry_attempts: newRetry,
+      requests_per_minute: newRpm,
+      poll_interval_sec: newPoll,
     };
 
     if (isEdit) {
@@ -713,6 +769,11 @@ function _showProviderModal(providersObj, name, onSave) {
         base_url: newBaseUrl || '',
         models: [...modelsList],
         capabilities: [...capabilitiesList],
+        max_tokens: newMaxTokens,
+        timeout_sec: newTimeout,
+        retry_attempts: newRetry,
+        requests_per_minute: newRpm,
+        poll_interval_sec: newPoll,
       };
     }
 

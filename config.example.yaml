@@ -84,7 +84,10 @@ ai:
       models:
         - deepseek-chat
         - deepseek-reasoner
-      # max_tokens: 4096
+      # max_tokens: 0          # 0 = 不限制（默认）；设正数如 8192 可限制输出长度
+      # timeout_sec: 120
+      # retry_attempts: 2
+      # requests_per_minute: 0 # 0 = 不限速
   #
   # ⚠️ 注意：不要在 config.yaml 里写 api_key 字段，密钥请放在 .env 文件中
   #    例如 .env 内容：GEMINI_API_KEY=AIza...  /  DEEPSEEK_API_KEY=sk-...

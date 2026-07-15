@@ -18,7 +18,7 @@ def _make_cfg(**kwargs) -> ProviderConfig:
         requests_per_minute=0,
         poll_interval_sec=5,
         retry_attempts=2,
-        max_tokens=4096,
+        max_tokens=0,
     )
     defaults.update(kwargs)
     return ProviderConfig(**defaults)
@@ -137,8 +137,20 @@ class TestGenerateText:
         call_kwargs = self._mock_client.post.call_args.kwargs
         assert call_kwargs["json"]["model"] == "deepseek-chat"
         assert call_kwargs["json"]["messages"][0]["content"] == "hello"
-        assert call_kwargs["json"]["max_tokens"] == 4096
+        assert "max_tokens" not in call_kwargs["json"]  # 0 = unlimited → omit field
         assert call_kwargs["headers"]["Authorization"] == "Bearer sk-test-key"
+
+    def test_positive_max_tokens_is_sent(self):
+        from clio.ai.openai_compat import OpenAICompatProvider
+
+        with patch("clio.ai.openai_compat.httpx.Client") as mock_cls:
+            mock_client = MagicMock()
+            mock_cls.return_value = mock_client
+            prov = OpenAICompatProvider(_make_cfg(max_tokens=2048), ProxyConfig(enabled=False, url=""))
+            resp = self._mock_response()
+            mock_client.post.return_value = resp
+            prov.generate_text("hello", "deepseek-chat")
+            assert mock_client.post.call_args.kwargs["json"]["max_tokens"] == 2048
 
     def test_429_raises_http_status_error(self):
         resp = self._mock_response(status_code=429)
