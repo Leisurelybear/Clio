@@ -131,8 +131,15 @@ export function renderPlan() {
   pane.appendChild(exportSection);
 
   $('btn-jianying-export')?.addEventListener('click', async () => {
+    const btn = $('btn-jianying-export');
+    if (btn?.disabled) return;
     const resultDiv = $('export-result');
     resultDiv.innerHTML = '<span class="muted">导出中…</span>';
+    if (btn) {
+      btn.disabled = true;
+      btn.dataset.prevLabel = btn.innerHTML;
+      btn.textContent = '导出中...';
+    }
     try {
       const r = await api('POST', '/api/export', { day: state.currentDay || 'day1', format: 'jianying' });
       if (r.ok) {
@@ -145,6 +152,11 @@ export function renderPlan() {
     } catch (e) {
       resultDiv.innerHTML = `<span style="color:var(--err,#c44)">✗ 导出失败: ${escapeHtml(e.message || e)}</span>`;
       addToast('导出失败: ' + (e.message || e), 'error', 6000);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = btn.dataset.prevLabel || `${icon('export', 16)} 导出到剪映`;
+      }
     }
   });
   $('btn-cut-exec').onclick = executeCut;
