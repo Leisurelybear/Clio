@@ -69,7 +69,12 @@ async function init() {
     const name = $('np-name').value.trim();
     const projectDir = $('np-input-dir').value.trim();
     const outputDir = $('np-output-dir').value.trim();
-    if (!name || !projectDir) { setStatus('Please fill in name and project directory', 'warn'); return; }
+    if (!name || !projectDir) { setStatus('请填写项目名称和项目目录', 'warn'); return; }
+    const createBtn = $('np-create');
+    if (createBtn.disabled) return;
+    createBtn.disabled = true;
+    const prevLabel = createBtn.textContent;
+    createBtn.textContent = '创建中...';
     try {
       const body = { name, project_dir: projectDir };
       if (outputDir) body.output_dir = outputDir;
@@ -78,10 +83,13 @@ async function init() {
         newModal.style.display = 'none';
         window.location.search = `?project=${encodeURIComponent(name)}&project_dir=${encodeURIComponent(projectDir)}`;
       } else {
-        setStatus('Create failed: ' + (r.error || 'unknown error'), 'err');
+        setStatus('创建失败: ' + (r.error || '未知错误'), 'err');
       }
     } catch (e) {
-      setStatus('Create failed: ' + e.message, 'err');
+      setStatus('创建失败: ' + e.message, 'err');
+    } finally {
+      createBtn.disabled = false;
+      createBtn.textContent = prevLabel;
     }
   };
 
@@ -106,28 +114,28 @@ async function init() {
           return `
           <div class="${cardClass}" data-name="${escapeHtml(p.name || '')}" data-project-dir="${escapeHtml(p.project_dir || p.input_dir || '')}" data-legacy="${isLegacy}" data-needs-videos="${needsVideos}">
             <div class="project-card-header">
-              <span class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(current)' : ''} ${legacyBadge}</span>
+              <span class="project-card-name">${escapeHtml(p.name)} ${p.is_current ? '(当前)' : ''} ${legacyBadge}</span>
               <span class="project-card-actions">
                 ${migrateBtn}
-                <button class="project-card-remove" title="Remove from project list">✕</button>
+                <button class="project-card-remove" title="从项目列表移除">✕</button>
               </span>
             </div>
             <div class="project-card-meta">
-              Project: ${escapeHtml(p.project_dir || p.input_dir || '')}<br>
-              Output: ${escapeHtml(p.output_dir || '')}<br>
-              Steps: ${[['compress','compress'],['analyze','analyze'],['scripts','scripts'],['plan','plan'],['label','label'],['cut','cut']]
-                .map(([k,l]) => p.steps?.[k] ? `<span class="step-dot done" title="${l} done">${l}</span>` : `<span class="step-dot" title="${l} pending">${l}</span>`)
+              项目目录: ${escapeHtml(p.project_dir || p.input_dir || '')}<br>
+              输出目录: ${escapeHtml(p.output_dir || '')}<br>
+              步骤: ${[['compress','压缩'],['analyze','分析'],['scripts','口播'],['plan','规划'],['label','标号'],['cut','裁剪']]
+                .map(([k,l]) => p.steps?.[k] ? `<span class="step-dot done" title="${l} 完成">${l}</span>` : `<span class="step-dot" title="${l} 待完成">${l}</span>`)
                 .join(' ')}
             </div>
           </div>`;
         }).join('')
-        : '<p class="muted">No projects yet. Create one first.</p>';
+        : '<p class="muted">还没有项目，请先新建一个。</p>';
       function _setupRemoveBtn(card, name, projectDir) {
         const removeBtn = card.querySelector('.project-card-remove');
         if (!removeBtn) return;
         removeBtn.onclick = async (e) => {
           e.stopPropagation();
-          if (!confirm(`Remove "${name}" from project list?`)) return;
+          if (!confirm(`从项目列表移除「${name}」？`)) return;
           const r2 = await api('POST', '/api/project/remove', { project_dir: projectDir });
           if (r2.ok) {
             if (name === state.currentProject?.name && projectDir === state.currentProjectDir) {
@@ -183,20 +191,25 @@ async function init() {
             return;
           }
           if (projectDir === state.currentProjectDir) { openModal.style.display = 'none'; return; }
-          if (state.dirty && !confirm('Switch project? Unsaved changes will be lost.')) return;
+          if (state.dirty && !confirm('切换项目？未保存的修改将丢失。')) return;
           openModal.style.display = 'none';
           window.location.search = `?project=${encodeURIComponent(name)}&project_dir=${encodeURIComponent(projectDir)}`;
         };
       });
     } catch (e) {
-      $('project-list-modal').innerHTML = '<p class="err">Failed to load projects: ' + escapeHtml(e.message) + '</p>';
+      $('project-list-modal').innerHTML = '<p class="err">加载项目列表失败: ' + escapeHtml(e.message) + '</p>';
     }
   };
   $('op-cancel').onclick = () => { openModal.style.display = 'none'; };
   openModal.querySelector('.modal-backdrop').onclick = null;
   $('op-open-path').onclick = async () => {
     const path = $('op-custom-path').value.trim();
-    if (!path) { setStatus('Please enter a project directory path', 'warn'); return; }
+    if (!path) { setStatus('请输入项目目录路径', 'warn'); return; }
+    const openBtn = $('op-open-path');
+    if (openBtn.disabled) return;
+    openBtn.disabled = true;
+    const prevLabel = openBtn.textContent;
+    openBtn.textContent = '打开中...';
     try {
       const r = await api('POST', '/api/project/add', { project_dir: path });
       if (r.ok) {
@@ -204,10 +217,13 @@ async function init() {
         const name = r.project?.name || path.split(/[\\/]/).pop();
         window.location.search = `?project=${encodeURIComponent(name)}&project_dir=${encodeURIComponent(path)}`;
       } else {
-        setStatus('Open failed: ' + (r.error || 'unknown error'), 'err');
+        setStatus('打开失败: ' + (r.error || '未知错误'), 'err');
       }
     } catch (e) {
-      setStatus('Open failed: ' + e.message, 'err');
+      setStatus('打开失败: ' + e.message, 'err');
+    } finally {
+      openBtn.disabled = false;
+      openBtn.textContent = prevLabel;
     }
   };
   $('op-custom-path').onkeydown = (e) => {
@@ -310,7 +326,7 @@ async function init() {
       $('proj-name').textContent = '—';
       $('proj-name-sidebar').textContent = '—';
       $('btn-open-project').click();
-      setStatus('No project loaded. Select a project to begin.', 'warn');
+      setStatus('尚未加载项目，请选择一个项目开始。', 'warn');
       return;
     }
     // 如果上次使用的项目是旧版，跳过自动跳转，让用户新建项目
