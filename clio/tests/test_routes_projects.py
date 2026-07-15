@@ -58,6 +58,46 @@ class TestHandleGetProjects:
         assert "projects" in payload
         assert "last_project" in payload
 
+    def test_last_project_includes_project_dir(self, tmp_path: Path):
+        """last_project must carry project_dir so auto-open cannot attach the wrong dir."""
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_bytes(b"")
+        handler.config_path = cfg
+        handler.project_dir = tmp_path / "default"
+        handler.project_dir.mkdir()
+        handler._send_json = MagicMock()
+        handler.__class__._config_cache = MagicMock()
+        handler.__class__._config_cache.keys.return_value = []
+
+        proj_a = tmp_path / "proj_a"
+        proj_a.mkdir()
+        (proj_a / "project.json").write_text(
+            json.dumps({"name": "Alpha", "project_dir": str(proj_a)}), encoding="utf-8"
+        )
+        proj_b = tmp_path / "proj_b"
+        proj_b.mkdir()
+        (proj_b / "project.json").write_text(json.dumps({"name": "Beta", "project_dir": str(proj_b)}), encoding="utf-8")
+
+        reg = tmp_path / "projects.json"
+        reg.write_text(
+            json.dumps(
+                {
+                    "projects": [str(proj_a), str(proj_b)],
+                    "last_project": {"name": "Beta", "project_dir": str(proj_b)},
+                }
+            ),
+            encoding="utf-8",
+        )
+        assert reg.is_file()
+
+        handle_get_projects(handler, {})
+        payload = handler._send_json.call_args[0][0]
+        last = payload["last_project"]
+        assert isinstance(last, dict)
+        assert last["name"] == "Beta"
+        assert last["project_dir"] == str(proj_b)
+
 
 class TestHandlePutProject:
     def test_updates_project_json(self, tmp_path: Path):

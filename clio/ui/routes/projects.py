@@ -51,15 +51,18 @@ def handle_get_projects(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     config_path = handler.config_path
     project_dir = handler.project_dir
     reg_file = _registry_path(config_path)
-    last_project_name = None
+    last_project_payload: dict[str, str | None] | None = None
     if reg_file.is_file():
         try:
             reg = json.loads(reg_file.read_text(encoding="utf-8"))
             last_project = reg.get("last_project")
             if isinstance(last_project, dict):
-                last_project_name = last_project.get("name")
-            else:
-                last_project_name = last_project
+                last_project_payload = {
+                    "name": last_project.get("name"),
+                    "project_dir": last_project.get("project_dir") or last_project.get("input_dir"),
+                }
+            elif last_project:
+                last_project_payload = {"name": str(last_project), "project_dir": None}
         except (json.JSONDecodeError, OSError):
             pass
     projects = _list_projects(config_path, project_dir, req_project, req_project_dir)
@@ -69,7 +72,12 @@ def handle_get_projects(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     for k in cache.keys():
         if k not in valid_dirs:
             cache.invalidate_key(k)
-    handler._send_json({"projects": projects, "last_project": last_project_name})
+    # Resolve project_dir from the project list when registry only stored a name
+    if last_project_payload and not last_project_payload.get("project_dir"):
+        match = next((p for p in projects if p.get("name") == last_project_payload.get("name")), None)
+        if match:
+            last_project_payload["project_dir"] = match.get("project_dir")
+    handler._send_json({"projects": projects, "last_project": last_project_payload})
 
 
 def handle_put_project(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:

@@ -76,7 +76,18 @@ export async function loadProjects() {
   try {
     const r = await api('GET', '/api/projects');
     state.projects = r.projects || [];
-    state.lastProject = r.last_project || null;
+    const last = r.last_project;
+    if (last && typeof last === 'object') {
+      state.lastProject = last.name || null;
+      state.lastProjectDir = last.project_dir || null;
+    } else {
+      state.lastProject = last || null;
+      state.lastProjectDir = null;
+    }
+    if (state.lastProject && !state.lastProjectDir) {
+      const match = state.projects.find(p => p.name === state.lastProject);
+      if (match) state.lastProjectDir = match.project_dir || null;
+    }
     state.currentProject = state.projects.find(p => p.is_current) || null;
     if (state.currentProject) {
       if (!state.currentProjectName) state.currentProjectName = state.currentProject.name;
@@ -89,6 +100,7 @@ export async function loadProjects() {
     state.currentProjectName = null;
     state.currentProjectDir = null;
     state.lastProject = null;
+    state.lastProjectDir = null;
     updateProjectSidebar();
   }
 }
@@ -207,7 +219,7 @@ function renderVideoItem(v) {
   if (state.selectionMode) {
     const isSelected = state.selectedFiles.includes(v.file);
     selectedClass = isSelected ? ' selected' : '';
-    checkboxHtml = `<input type="checkbox" class="video-checkbox" data-file="${v.file}" ${isSelected ? 'checked' : ''}>`;
+    checkboxHtml = `<input type="checkbox" class="video-checkbox" data-file="${escapeHtml(v.file)}" ${isSelected ? 'checked' : ''}>`;
   }
   li.className = 'video-item' + selectedClass;
   if (state.currentVideo === v.file) li.classList.add('active');

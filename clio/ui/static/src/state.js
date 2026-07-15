@@ -25,6 +25,7 @@ const state = {
   currentProjectName: null,
   currentProjectDir: null,
   lastProject: null,
+  lastProjectDir: null,
   groups: {},
   expandedGroups: {},
   // preview playback

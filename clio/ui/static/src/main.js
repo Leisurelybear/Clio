@@ -324,7 +324,10 @@ async function init() {
     }
     // 如果 URL 没有指定项目，但有上次使用的项目，自动跳转
     if (!urlProject && !urlProjectDir && state.lastProject && state.lastProject !== state.currentProject?.name) {
-      const projectDirParam = state.currentProjectDir ? `&project_dir=${encodeURIComponent(state.currentProjectDir)}` : '';
+      const lastDir = state.lastProjectDir
+        || state.projects.find(p => p.name === state.lastProject)?.project_dir
+        || '';
+      const projectDirParam = lastDir ? `&project_dir=${encodeURIComponent(lastDir)}` : '';
       window.location.search = `?project=${encodeURIComponent(state.lastProject)}${projectDirParam}`;
       return;
     }
