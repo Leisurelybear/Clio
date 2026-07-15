@@ -25,6 +25,7 @@ class TokenUsage:
 class AIResponse:
     text: str
     token_usage: TokenUsage | None = None
+    finish_reason: str | None = None
 
 
 @runtime_checkable

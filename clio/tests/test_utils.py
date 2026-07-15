@@ -68,6 +68,39 @@ class TestExtractJson:
         with pytest.raises(ValueError):
             extract_json("{a: 1}")
 
+    def test_truncated_plan_json_is_repaired(self):
+        """Model hit max_tokens mid-string: close open string + brackets."""
+        text = (
+            "{\n"
+            '  "day_title": "巴黎·戴高乐",\n'
+            '  "theme": "从机场到市区",\n'
+            '  "total_estimated_sec": 179,\n'
+            '  "sequence": [\n'
+            "    {\n"
+            '      "index": "001",\n'
+            '      "title": "机舱",\n'
+            '      "reason": "开场",\n'
+            '      "use_timeline": "00:00-00:15",\n'
+            '      "voiceover_hint": "飞机落地"\n'
+            "    },\n"
+            "    {\n"
+            '      "index": "002",\n'
+            '      "title": "列车",\n'
+            '      "reason": "转场",\n'
+            '      "use_timeline": "00:00-00:47",\n'
+            '      "voiceover_hi'
+        )
+        data = extract_json(text)
+        assert data["day_title"] == "巴黎·戴高乐"
+        assert data["total_estimated_sec"] == 179
+        assert len(data["sequence"]) == 1
+        assert data["sequence"][0]["index"] == "001"
+
+    def test_truncated_after_first_object_no_closing_brace(self):
+        text = '{"a": 1, "b": [1, 2'
+        data = extract_json(text)
+        assert data == {"a": 1, "b": [1, 2]}
+
 
 # ── mask_if_looks_like_key ──────────────────────────────────────────
 
