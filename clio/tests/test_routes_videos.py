@@ -524,6 +524,108 @@ class TestVideosJsonCacheInvalidation:
         assert payload2["videos"][0].get("abs_path")
 
 
+class TestOfflineOriginalListing:
+    def test_offline_video_marked_missing(self, tmp_path: Path):
+        _clear_videos_cache()
+        handler = MagicMock()
+        proj_dir = tmp_path / "proj"
+        proj_dir.mkdir()
+        proj_out = tmp_path / "out"
+        (proj_out / "compressed").mkdir(parents=True)
+        offline = tmp_path / "gone" / "clip.mp4"  # does not exist
+        (proj_dir / "videos.json").write_text(__import__("json").dumps([str(offline)]), encoding="utf-8")
+        handler._resolve_project_dir.return_value = proj_dir
+        handler._get_project_output.return_value = proj_out
+        handler._get_config.return_value = SimpleNamespace(
+            paths=SimpleNamespace(ffprobe=""),
+            whisper=SimpleNamespace(transcripts_subdir="transcripts"),
+        )
+        handler._send_json = MagicMock()
+        handle_get_videos(handler, {"source": ["original"]})
+        payload = handler._send_json.call_args[0][0]
+        assert len(payload["videos"]) == 1
+        assert payload["videos"][0]["missing"] is True
+        assert payload["videos"][0]["file"] == "clip.mp4"
+
+
+class TestPutVideosSelectedOffline:
+    def test_preserves_offline_paths(self, tmp_path: Path):
+        handler = MagicMock()
+        proj_dir = tmp_path / "proj"
+        proj_dir.mkdir()
+        handler._resolve_project_dir.return_value = proj_dir
+        handler._send_json = MagicMock()
+        online = tmp_path / "live.mp4"
+        online.write_bytes(b"x")
+        offline = tmp_path / "offline_drive" / "old.mp4"
+        handle_put_videos_selected(
+            handler,
+            {},
+            {"videos": [str(online), str(offline)]},
+        )
+        resp = handler._send_json.call_args[0][0]
+        assert resp["ok"] is True
+        assert resp["count"] == 2
+        saved = __import__("json").loads((proj_dir / "videos.json").read_text(encoding="utf-8"))
+        assert len(saved) == 2
+        assert any("live.mp4" in s for s in saved)
+        assert any("old.mp4" in s for s in saved)
+
+    def test_rejects_bad_extension(self, tmp_path: Path):
+        handler = MagicMock()
+        proj_dir = tmp_path / "proj"
+        proj_dir.mkdir()
+        handler._resolve_project_dir.return_value = proj_dir
+        handler._send_json = MagicMock()
+        txt = tmp_path / "notes.txt"
+        txt.write_text("x")
+        handle_put_videos_selected(handler, {}, {"videos": [str(txt)]})
+        resp = handler._send_json.call_args[0][0]
+        assert resp["ok"] is True
+        assert resp["count"] == 0
+        assert resp.get("rejected_count") == 1
+
+
+class TestCompressedMatchesAfterRelink:
+    def test_stem_match_keeps_compressed_visible(self, tmp_path: Path):
+        """After relink, .vmeta may still point at old path; stem match must keep row."""
+        _clear_videos_cache()
+        from clio.vmeta import VideoMeta
+
+        proj_dir = tmp_path / "proj"
+        proj_dir.mkdir()
+        proj_out = tmp_path / "out"
+        comp_dir = proj_out / "compressed"
+        comp_dir.mkdir(parents=True)
+        old = tmp_path / "old" / "GL010695.MP4"
+        new = tmp_path / "new" / "GL010695.MP4"
+        old.parent.mkdir()
+        new.parent.mkdir()
+        old.write_bytes(b"old")  # vmeta build needs source stat
+        new.write_bytes(b"new")
+        # compressed artifact + vmeta with OLD source
+        comp = comp_dir / "001_GL010695.mp4"
+        comp.write_bytes(b"c")
+        meta = VideoMeta.build(old, comp, source_duration=1.0, target_duration=1.0)
+        meta.write(comp)
+        # remove old file to simulate offline after move; selection points at new
+        old.unlink()
+        (proj_dir / "videos.json").write_text(__import__("json").dumps([str(new.resolve())]), encoding="utf-8")
+
+        handler = MagicMock()
+        handler._resolve_project_dir.return_value = proj_dir
+        handler._get_project_output.return_value = proj_out
+        handler._get_config.return_value = SimpleNamespace(
+            paths=SimpleNamespace(ffprobe=""),
+            whisper=SimpleNamespace(transcripts_subdir="transcripts"),
+        )
+        handler._send_json = MagicMock()
+        handle_get_videos(handler, {"source": ["compressed"]})
+        payload = handler._send_json.call_args[0][0]
+        assert len(payload["videos"]) == 1
+        assert payload["videos"][0]["file"] == "001_GL010695.mp4"
+
+
 class TestHandlePutVideosRelink:
     """Tests for handle_put_videos_relink."""
 

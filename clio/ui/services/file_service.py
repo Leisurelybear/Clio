@@ -189,13 +189,19 @@ def _find_original_for_compressed(
         if selected:
             for p in selected:
                 if p.stem.lower() == suffix:
-                    return str(p.resolve())
+                    try:
+                        return str(p.resolve()) if p.is_file() else str(p)
+                    except OSError:
+                        return str(p)
             m = re.match(r"^(.+)_seg\d+$", suffix)
             if m:
                 base = m.group(1)
                 for p in selected:
                     if p.stem.lower() == base:
-                        return str(p.resolve())
+                        try:
+                            return str(p.resolve()) if p.is_file() else str(p)
+                        except OSError:
+                            return str(p)
             # videos.json present but no match — do not fall through to dir scan
             # of project_dir (would miss external-only selections intentionally)
             if project_dir is not None:

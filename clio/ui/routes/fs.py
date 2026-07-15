@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
 
-from clio._constants import VIDEO_EXTS
+from clio._constants import VIDEO_EXTENSIONS
 from clio.ui.services.file_service import _list_drives
 
 # ── security: restrict file-system browsing to known-safe roots ──
@@ -111,7 +111,7 @@ def handle_get_fs_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
                     if entry.is_dir() or entry.name.startswith("."):
                         continue
                     ext = Path(entry.name).suffix.lower()
-                    if ext not in VIDEO_EXTS:
+                    if ext not in VIDEO_EXTENSIONS:
                         continue
                     st = entry.stat()
                     files.append(

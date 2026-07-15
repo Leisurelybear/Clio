@@ -149,7 +149,10 @@ async function _vmAddSelected() {
     const newVideos = [..._selectedFiles].map(p => p.replace(/\\/g, '/'));
     newVideos.forEach(p => existing.add(p));
     const merged = [...existing];
-    await api('PUT', '/api/videos/selected', { videos: merged });
+    const r = await api('PUT', '/api/videos/selected', { videos: merged });
+    if (r && r.rejected_count) {
+      alert(`已添加，但有 ${r.rejected_count} 个路径被拒绝（扩展名无效或无法解析）`);
+    }
     closeVideoManager();
     await loadVideos();
   } catch (e) {
