@@ -74,9 +74,13 @@ class OpenAICompatProvider:
                     completion_tokens=usage_raw.get("completion_tokens", 0),
                     total_tokens=usage_raw.get("total_tokens", 0),
                 )
+            choice0 = (data.get("choices") or [{}])[0]
+            finish_reason = choice0.get("finish_reason")
+            content = (choice0.get("message") or {}).get("content") or ""
             return AIResponse(
-                text=data["choices"][0]["message"]["content"] or "",
+                text=content,
                 token_usage=usage,
+                finish_reason=finish_reason,
             )
 
         return with_retry(

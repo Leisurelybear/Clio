@@ -159,6 +159,11 @@ def _call_ai(
     with timed(f"{label} {provider_id}/{model}"):
         resp = fn()
     print(f"  响应: {format_size(len(resp.text.encode('utf-8')))}")
+    if getattr(resp, "finish_reason", None) in ("length", "max_tokens"):
+        print(
+            f"  [警告] 模型输出被截断 (finish_reason={resp.finish_reason})，"
+            "JSON 可能不完整；可在 config.yaml 提高该 provider 的 max_tokens 后重试"
+        )
     if token_store and resp.token_usage:
         token_store.record(task_name or label, model, resp.token_usage)
     return resp.text

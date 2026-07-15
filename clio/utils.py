@@ -95,18 +95,74 @@ def _fix_trailing_commas(text: str) -> str:
     return re.sub(r",\s*([}\]])", r"\1", text)
 
 
+def _repair_truncated_json(text: str) -> str | None:
+    """Best-effort close of truncated JSON objects/arrays.
+
+    Models often hit max_tokens mid-string; the partial payload still has the
+    leading structure. Close any open string, drop a dangling comma, then close
+    open braces/brackets so json.loads can recover partial results.
+    """
+    if not text or "{" not in text:
+        return None
+    # Start from first object brace (ignore prose prefix)
+    start = text.find("{")
+    s = text[start:].rstrip()
+    if not s:
+        return None
+
+    stack: list[str] = []
+    in_str = False
+    esc = False
+    for ch in s:
+        if in_str:
+            if esc:
+                esc = False
+            elif ch == "\\":
+                esc = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch in "{[":
+            stack.append(ch)
+        elif ch == "}" and stack and stack[-1] == "{":
+            stack.pop()
+        elif ch == "]" and stack and stack[-1] == "[":
+            stack.pop()
+
+    if not stack and not in_str:
+        return None  # structurally closed already; not a truncation case
+
+    repaired = s
+    if in_str:
+        repaired += '"'
+    # Drop trailing comma before we close containers
+    repaired = re.sub(r",\s*$", "", repaired)
+    while stack:
+        opener = stack.pop()
+        repaired += "]" if opener == "[" else "}"
+    return repaired
+
+
+def _try_load_json_object(candidate: str) -> dict | None:
+    try:
+        data = json.loads(candidate)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
 def extract_json(text: str) -> dict:
     """从 AI 返回的文本中容错提取 JSON 对象。
 
-    先尝试整体解析（多数情况）；失败时用正则抓第一个 {...} 块。
-    仍失败时尝试清理尾部逗号后重试。
+    顺序：整段解析 → 贪婪 {...} 块 → 清尾逗号 → 截断补全（关字符串/括号）。
     都失败时抛出 ValueError，含原文前 500 字方便排查。
     """
     text = text.strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        pass
+    loaded = _try_load_json_object(text)
+    if loaded is not None:
+        return loaded
 
     if len(text) > MAX_EXTRACT_JSON_SCAN_CHARS:
         raise ValueError(
@@ -114,20 +170,38 @@ def extract_json(text: str) -> dict:
         )
 
     match = re.search(r"\{[\s\S]*\}", text)
-    if not match:
-        raise ValueError(f"AI 返回内容无法解析为 JSON:\n{text[:500]}")
+    candidates: list[str] = []
+    if match:
+        candidates.append(match.group())
+    # Also try from first `{` to end (truncated payloads often have no final `}`)
+    first_brace = text.find("{")
+    if first_brace >= 0:
+        tail = text[first_brace:]
+        if tail not in candidates:
+            candidates.append(tail)
 
-    candidate = match.group()
-    try:
-        return json.loads(candidate)
-    except json.JSONDecodeError:
-        pass
+    last_err: Exception | None = None
+    for candidate in candidates:
+        loaded = _try_load_json_object(candidate)
+        if loaded is not None:
+            return loaded
+        fixed = _fix_trailing_commas(candidate)
+        loaded = _try_load_json_object(fixed)
+        if loaded is not None:
+            return loaded
+        repaired = _repair_truncated_json(fixed)
+        if repaired:
+            loaded = _try_load_json_object(repaired)
+            if loaded is not None:
+                print("  [JSON] AI 输出被截断，已尽力补全括号/字符串后解析")
+                return loaded
+        try:
+            json.loads(candidate)
+        except json.JSONDecodeError as e:
+            last_err = e
 
-    fixed = _fix_trailing_commas(candidate)
-    try:
-        return json.loads(fixed)
-    except json.JSONDecodeError:
-        raise ValueError(f"AI 返回内容无法解析为 JSON:\n{text[:500]}")
+    hint = f" ({last_err})" if last_err else ""
+    raise ValueError(f"AI 返回内容无法解析为 JSON{hint}:\n{text[:500]}")
 
 
 def mask_if_looks_like_key(value: str) -> str:
