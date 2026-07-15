@@ -1,6 +1,7 @@
-import { $, escapeHtml } from './utils.js';
+import { $, escapeHtml, setStatus } from './utils.js';
 import { api } from './api.js';
 import { loadVideos } from './sidebar-data.js';
+import { addToast } from './toast.js';
 
 let _currentPath = '';
 let _selectedFiles = new Set();
@@ -151,11 +152,21 @@ async function _vmAddSelected() {
     const merged = [...existing];
     const r = await api('PUT', '/api/videos/selected', { videos: merged });
     if (r && r.rejected_count) {
-      alert(`已添加，但有 ${r.rejected_count} 个路径被拒绝（扩展名无效或无法解析）`);
+      const msg = `已添加，但有 ${r.rejected_count} 个路径被拒绝（扩展名无效或无法解析）`;
+      setStatus(msg, 'warn');
+      addToast(msg, 'warning', 6000);
+    } else {
+      const msg = `已添加 ${newVideos.length} 个视频`;
+      setStatus(msg, 'ok');
+      addToast(msg, 'success');
     }
     closeVideoManager();
     await loadVideos();
   } catch (e) {
+    const msg = '添加视频失败: ' + e.message;
+    setStatus(msg, 'err');
+    addToast(msg, 'error', 6000);
+  } finally {
     addBtn.disabled = false;
     addBtn.textContent = '添加选中';
   }
@@ -244,17 +255,34 @@ function _vmInitDragDrop() {
       const absPaths = _vmDropAbsolutePaths(dt);
       if (absPaths.length > 0) {
         let added = 0;
+        let ignored = 0;
         for (const p of absPaths) {
+          const base = p.replace(/^.*[\\/]/, '');
+          const dot = base.lastIndexOf('.');
+          const ext = dot > 0 ? base.slice(dot).toLowerCase() : '';
+          if (!_VIDEO_EXTS_DND.has(ext)) {
+            ignored++;
+            continue;
+          }
           if (!_selectedFiles.has(p)) { _selectedFiles.add(p); added++; }
         }
         if (added > 0) {
           _vmRenderEntries($('vm-list'), [...document.querySelectorAll('#vm-list .browse-item[data-path]')].map(el => el.dataset.path), [..._allVideoFiles]);
           _vmUpdateSelectedCount();
         }
+        if (ignored > 0) {
+          addToast(`已忽略 ${ignored} 个非视频文件`, 'warning');
+        }
+        if (added === 0 && ignored === 0) {
+          addToast('没有可添加的视频路径', 'info');
+        }
         return;
       }
       // Strategy 2: match filenames against current directory listing
-      if (_allVideoFiles.length === 0) return;
+      if (_allVideoFiles.length === 0) {
+        addToast('无法解析拖入路径，请切换到含视频的目录后勾选添加', 'warning');
+        return;
+      }
       const names = _vmDropNames(dt);
       if (names.length === 0) return;
       let matched = 0;
