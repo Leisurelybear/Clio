@@ -18,6 +18,7 @@
 ### Changed
 - docs(roadmap): mark A-007 route registry as complete (router.py already integrated)
 - docs(roadmap): remove CR-003 from remaining open items (already done in Phase 2)
+- docs(roadmap): refresh Remaining Open Items — mark B-089/B-092/B-095/B-096 done; record `feat/project-video-manager` complete
 - docs(AGENTS.md): update test count 1111→1153, add `npm test` to Quick Reference
 
 ### Removed
