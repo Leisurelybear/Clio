@@ -133,13 +133,18 @@ def collect_doctor_checks(
     project_dir = config.project_dir
     videos = source_videos(config)
     if project_dir and project_dir.is_dir():
-        items.append(
-            DoctorItem(
-                "项目视频",
-                "OK" if videos else "WARN",
-                f"{project_dir} ({len(videos)} 个视频)",
-            )
-        )
+        existing = sum(1 for v in videos if v.is_file())
+        offline = len(videos) - existing
+        if not videos:
+            status: DoctorStatus = "WARN"
+            detail = f"{project_dir} (0 个视频 — 请在 UI 添加或 migrate)"
+        elif offline:
+            status = "WARN"
+            detail = f"{project_dir} ({len(videos)} 个视频, {offline} 个离线)"
+        else:
+            status = "OK"
+            detail = f"{project_dir} ({len(videos)} 个视频)"
+        items.append(DoctorItem("项目视频", status, detail))
     else:
         items.append(
             DoctorItem(
