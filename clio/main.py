@@ -85,7 +85,16 @@ def run_check(config_path: Path, project_dir: Path | None = None) -> int:
     project_dir = config.project_dir
     videos = source_videos(config)
     if project_dir and project_dir.is_dir():
-        print(f"  [OK] 项目 '{project_dir.name}' ({len(videos)} 个视频) - {project_dir}")
+        existing = sum(1 for v in videos if v.is_file())
+        offline = len(videos) - existing
+        detail = f"{project_dir} ({len(videos)} 个视频"
+        if offline:
+            detail += f", 其中 {offline} 个离线"
+        detail += ")"
+        mark = "OK" if videos and offline == 0 else ("WARN" if videos else "WARN")
+        print(f"  [{mark}] 项目 '{project_dir.name}' - {detail}")
+        if not videos:
+            print("       提示: 在 Web UI 视频管理中勾选素材，或运行 python main.py migrate")
     else:
         print("  [WARN] 未指定项目，使用 -p/--project 选择项目目录")
 
@@ -174,6 +183,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--day", default="day1", help="日 vlog 标签")
 
     p_cut = sub.add_parser("cut", help="根据规划从视频中裁剪片段")
+    _add_io_args(p_cut)
     p_cut.add_argument("--day", default="day1", help="日 vlog 标签（默认 day1）")
     p_cut.add_argument(
         "--out-dir",
@@ -266,18 +276,30 @@ def main(argv: list[str] | None = None) -> int:
     p_tokens.set_defaults(func=cmd_tokens)
 
     p_export = sub.add_parser("export", help="导出 plan 到剪辑软件草稿")
+    _add_io_args(p_export)
     p_export.add_argument("--format", default="jianying", choices=["jianying"], help="导出格式")
     p_export.add_argument("--day", default="day1", help="日 vlog 标签（默认 day1）")
-    p_export.add_argument("--output", type=Path, default=None, help="输出目录（默认 output/export/<day>_<format>/）")
+    # -o/--output already from _add_io_args (output_dir override for config).
+    # Export destination uses --out-dir to avoid argparse conflict.
+    p_export.add_argument(
+        "--out-dir",
+        type=Path,
+        default=None,
+        dest="export_out_dir",
+        help="导出草稿输出目录（默认 output/export/<day>_<format>/）",
+    )
 
     _p_verify = sub.add_parser("verify", help="校验压缩文件与原始视频的完整性")
+    _add_io_args(_p_verify)
 
     p_reindex = sub.add_parser("reindex", help="重建 .vmeta / .vindex sidecar 文件")
+    _add_io_args(p_reindex)
     p_reindex.add_argument(
-        "--project",
+        "--name",
         type=str,
         default="",
-        help="指定项目名（默认自动检测）",
+        dest="project_name",
+        help="按项目名匹配（可选；优先使用 -p/--project 目录）",
     )
 
     p_transcribe = sub.add_parser("transcribe", help="Whisper ASR 语音转录（需先安装 faster-whisper）")
@@ -310,7 +332,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "transcribe":
         from clio.tasks.transcribe import run_transcribe_all
 
-        config = load_config(config_path, project_dir=getattr(args, "input", None))
+        config = _prepare_config(config_path, args)
         config.analyze.skip_existing = not getattr(args, "force", False)
         run_transcribe_all(config)
         return 0
@@ -468,7 +490,11 @@ def main(argv: list[str] | None = None) -> int:
             from clio.export import export_plan
 
             plan_path = config.plans_dir / f"{args.day}_plan.json"
-            out_dir = args.output or config.paths.output_dir / "export" / f"{args.day}_{args.format}"
+            out_dir = (
+                getattr(args, "export_out_dir", None)
+                or getattr(args, "output", None)
+                or config.paths.output_dir / "export" / f"{args.day}_{args.format}"
+            )
             export_plan(
                 args.format,
                 plan_path,
