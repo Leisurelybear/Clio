@@ -5,20 +5,35 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
-## Remaining Open Items (2026-07-15)
+## Remaining Open Items (2026-07-16)
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
 | R-024 | GoPro GPMF telemetry as highlight signal | Large | Low |
 | A-006 | Frontend ES module dynamic import circular reference | Medium | Low |
+| UX-next-1 | Offline relink via browse modal (reuse FS browse) | Medium | Medium |
+| UX-next-2 | Restore lastEntity / lastVideo on project open | Small | Medium |
 
-**Recently completed (no longer open):**
+**Recently completed (2026-07-16 UX/bug iteration):** see `docs/analysis/2026-07-16-iteration.md`
+
+- BUG-A: last_project auto-open uses own `project_dir` (`9592ddd`)
+- BUG-B: selection checkbox `data-file` escaped
+- Run preview wired + overwrite always visible + empty selection guard (`6c85f6d`)
+- Select-all skips offline (`0ebcaea`)
+- Atomic stale progress demotion (`2cc5f60`)
+- Rerun poll handles `cancelled` (`a6d3f8f`)
+- Settings dirty confirm on tab switch (`b34244b`)
+- Video-manager toast + DnD extension filter (`96c9be2`)
+- Project create/open Chinese copy + busy guards (`c536987`)
+- Jianying export double-submit guard (`1791970`)
+
+**Earlier completed (no longer open):**
 - CR-006, R-017, R-004 — done earlier
 - B-089 — AGENTS.md §7 is now a short Quick Reference (no long commit dump)
 - B-092 / U-007 — Whisper cancel uses chunked download (ctypes only for DLL/drive listing)
 - B-095 / U-010 — server dispatch + fs route HTTP tests
 - B-096 — whisper route tests present (`test_routes_whisper.py`)
-- **feat/project-video-manager** — `project_dir` + `videos.json`, UI video manager, migrate CLI, relink offline videos (this branch)
+- **feat/project-video-manager** — `project_dir` + `videos.json`, UI video manager, migrate CLI, relink offline videos
 
 ## Project Review Remediation Plan (2026-06-26)
 
@@ -853,4 +868,4 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 Older completed sections (commit log, test coverage verification, code review audit) archived to [`docs/archive/2026-07-01-roadmap-archive.md`](docs/archive/2026-07-01-roadmap-archive.md).
 
-### Test count: 1153 pytest + 135 vitest (as of 2026-07-15 on `feat/project-video-manager`)
+### Test count: 1164 pytest + 138 vitest (as of 2026-07-16 on `main`)

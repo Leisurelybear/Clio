@@ -14,7 +14,7 @@ An AI preprocessing pipeline: raw travel vlog footage -> ffmpeg compression -> G
 - google-genai (Gemini 2.5 Flash video File API)
 - httpx (DeepSeek / OpenAI compatible calls)
 - PyYAML (config parsing; split into `config.yaml` global + `project.yaml` per-project)
-- pytest (unit tests, auto-run in CI; 1159 test cases)
+- pytest (unit tests, auto-run in CI; 1164 test cases)
 
 Dependencies in `requirements.txt`; `setup.ps1`/`setup.sh` creates venv + installs ffmpeg + copies `.env` in one click.
 
@@ -54,7 +54,7 @@ vlog-video-analysis/
 ├── config.example.yaml / .env.example
 ├── requirements.txt / requirements-locked.txt
 ├── .github/workflows/test.yml
-└── clio/tests/                pytest unit tests (1159 cases)
+└── clio/tests/                pytest unit tests (1164 cases)
 ```
 
 > See `docs/superpowers/agents/directory-tree.md` for full tree with file-level annotations and test coverage details.
