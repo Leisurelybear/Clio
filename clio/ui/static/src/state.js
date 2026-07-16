@@ -26,6 +26,8 @@ const state = {
   currentProjectDir: null,
   lastProject: null,
   lastProjectDir: null,
+  lastEntity: null,  // restored from project.json after loadProject
+  lastVideo: null,
   groups: {},
   expandedGroups: {},
   // preview playback

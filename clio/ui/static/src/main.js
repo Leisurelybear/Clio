@@ -29,6 +29,7 @@ import {
   toggleSelection,
   hideRerunProgress,
 } from './sidebar.js';
+import { resolveSessionRestore } from './session-restore.js';
 
 // Expose functions referenced by inline onclick handlers in HTML
 window.switchToOriginalThenCompress = switchToOriginalThenCompress;
@@ -405,11 +406,35 @@ async function init() {
       catch (e) { /* ignore */ }
     }
     await loadVideos();
-    if (state.videos.length) {
+    const restore = resolveSessionRestore({
+      lastEntity: state.lastEntity,
+      lastVideo: state.lastVideo,
+      videos: state.videos,
+    });
+    if (restore.entity === 'plan') {
+      await selectPlan();
+      if (restore.video) {
+        // keep plan entity but ensure a player source is available when possible
+        const v = state.videos.find(x => x.file === restore.video);
+        if (v && !v.missing) {
+          state.currentVideo = restore.video;
+        }
+      }
+    } else if (restore.entity === 'run') {
+      await selectRun();
+    } else if (restore.entity === 'config') {
+      await selectConfig();
+    } else if (restore.entity === 'logs') {
+      await selectLogs();
+    } else if (restore.entity === 'tokens') {
+      await selectTokens();
+    } else if (restore.video) {
+      await selectVideo(restore.video);
+    } else if (state.videos.length) {
       await selectVideo(state.videos[0].file);
     } else {
-      setStatus('No video files in project directory', 'warn');
-      renderVideoList(); // 显示空状态
+      setStatus('项目目录中暂无视频文件', 'warn');
+      renderVideoList();
     }
   } catch (e) {
     $('proj-name').textContent = '(加载失败)';
