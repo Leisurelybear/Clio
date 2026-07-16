@@ -57,11 +57,14 @@ function updateSaveBtn() {
 
 function setStatus(msg, kind = '') {
   const el = $('status');
+  if (!el) return;
   el.textContent = msg || '';
   el.className = 'status ' + kind;
   if (msg) {
     const captured = msg;
-    setTimeout(() => { if (el.textContent === captured) el.textContent = ''; }, 4000);
+    // Errors stick longer so users can read them; info/ok clear quickly
+    const ttl = kind === 'err' || kind === 'error' ? 8000 : 4000;
+    setTimeout(() => { if (el.textContent === captured) el.textContent = ''; }, ttl);
   }
 }
 
