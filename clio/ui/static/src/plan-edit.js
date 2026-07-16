@@ -17,3 +17,75 @@ export function removeSegment(sequence, index) {
 export function patchSegment(segment, fields) {
   return { ...segment, ...fields };
 }
+
+/** Format seconds as MM:SS (minutes may exceed 59 for long clips). */
+export function formatTimelineSec(sec) {
+  const n = Number(sec);
+  if (!Number.isFinite(n) || n < 0) return '00:00';
+  const total = Math.floor(n);
+  const m = Math.floor(total / 60).toString().padStart(2, '0');
+  const s = (total % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
+}
+
+function parseTimelineParts(range) {
+  const raw = String(range || '').trim();
+  if (!raw) return null;
+  const parts = raw.split('-');
+  if (parts.length < 2) return null;
+  return { start: parts[0].trim(), end: parts.slice(1).join('-').trim() };
+}
+
+function timecodeToSec(tc) {
+  if (!tc) return null;
+  const parts = String(tc).split(':').map(Number);
+  if (parts.some((x) => !Number.isFinite(x))) return null;
+  if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  if (parts.length === 2) return parts[0] * 60 + parts[1];
+  if (parts.length === 1) return parts[0];
+  return null;
+}
+
+/**
+ * Set start or end of use_timeline from player seconds.
+ * @param {string} currentRange existing "MM:SS-MM:SS" or empty
+ * @param {'start'|'end'} which
+ * @param {number} sec player currentTime
+ * @returns {string}
+ */
+export function setTimelineBound(currentRange, which, sec) {
+  const t = formatTimelineSec(sec);
+  const parts = parseTimelineParts(currentRange);
+  let startSec = parts ? timecodeToSec(parts.start) : null;
+  let endSec = parts ? timecodeToSec(parts.end) : null;
+  const newSec = Number.isFinite(sec) && sec >= 0 ? Math.floor(sec) : 0;
+
+  if (which === 'start') {
+    startSec = newSec;
+    if (endSec == null || endSec <= startSec) endSec = startSec + 5;
+  } else {
+    endSec = newSec;
+    if (startSec == null || startSec >= endSec) startSec = Math.max(0, endSec - 5);
+  }
+  return `${formatTimelineSec(startSec)}-${formatTimelineSec(endSec)}`;
+}
+
+/**
+ * Insert a new segment after atIndex (-1 = prepend).
+ * @param {Array} sequence
+ * @param {number} atIndex index after which to insert; -1 prepends
+ * @param {{index: string, title?: string, reason?: string, use_timeline?: string, voiceover_hint?: string}} fields
+ */
+export function insertSegment(sequence, atIndex, fields) {
+  const seg = {
+    index: String(fields?.index ?? ''),
+    title: fields?.title ?? '',
+    reason: fields?.reason ?? '',
+    use_timeline: fields?.use_timeline ?? '',
+    voiceover_hint: fields?.voiceover_hint ?? '',
+  };
+  const arr = sequence.slice();
+  const insertAt = Math.max(0, Math.min(arr.length, Number(atIndex) + 1));
+  arr.splice(insertAt, 0, seg);
+  return arr;
+}
