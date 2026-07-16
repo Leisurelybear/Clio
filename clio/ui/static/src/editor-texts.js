@@ -4,6 +4,7 @@ import { api, icon } from './api.js';
 import { playVideoSegment } from './viewer.js';
 import { renderVideoList } from './sidebar.js';
 import { renderRefineUI, refineCurrentFile } from './editor-refine.js';
+import { renderEmptyArtifactHtml, bindEmptyArtifactActions } from './empty-states.js';
 
 
 function _jumpToTranscriptTime(timeSec) {
@@ -61,7 +62,33 @@ export function renderTexts() {
   const t = state.texts;
   const pane = $('tab-texts');
   if (!t) {
-    pane.innerHTML = '<p class="muted">当前视频没有对应的 texts JSON</p>';
+    pane.innerHTML = renderEmptyArtifactHtml('texts');
+    bindEmptyArtifactActions(pane, {
+      onRun: () => import('./sidebar.js').then(m => m.goToRunTab()),
+      onRerun: async (task) => {
+        const file = state.currentVideo;
+        if (!file) {
+          setStatus('请先选择视频', 'warn');
+          return;
+        }
+        setStatus(`正在重跑 ${task} (${file})...`, 'ok');
+        try {
+          const r = await api('POST', '/api/rerun', {
+            video: file,
+            task,
+            source: state.source,
+          });
+          if (r.ok) {
+            setStatus(r.message || `${task} 已启动`, 'ok');
+            import('./sidebar-rerun.js').then(mod => mod.showRerunProgress(task, file));
+          } else {
+            throw new Error(r.error || '重跑失败');
+          }
+        } catch (e) {
+          setStatus('重跑失败: ' + e.message, 'err');
+        }
+      },
+    });
     return;
   }
   pane.innerHTML = `
