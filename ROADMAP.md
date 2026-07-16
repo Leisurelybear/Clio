@@ -5,11 +5,13 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
-## Remaining Open Items (2026-07-16)
+## Remaining Open Items (2026-07-17)
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
 | R-025 | Multi-language / i18n (UI + CLI user-facing copy) | Large | Medium |
+
+**Recently completed (2026-07-17 R-026):** Plan domain model (`clio/plan_model.py`), PUT validation, readiness API (`POST /api/plan/readiness`), export/cut force gates, UI reorder/delete/title/timeline edit + readiness panel. Spec: `docs/superpowers/specs/2026-07-17-plan-domain-edit-readiness-design.md`. Plan: `docs/superpowers/plans/2026-07-17-plan-domain-edit-readiness.md`.
 
 ### R-025 Multi-language (i18n)
 
