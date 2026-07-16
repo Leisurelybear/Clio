@@ -2,10 +2,17 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 
 from clio.export import export_plan
+from clio.plan_model import Plan
+from clio.plan_readiness import (
+    check_plan_export_readiness,
+    collect_project_indices,
+    readiness_block_payload,
+)
 from clio.ui.handler_protocol import HandlerProtocol
 
 
@@ -45,6 +52,7 @@ def handle_post_export(
     """POST /api/export — export plan to JianYing draft."""
     day = obj.get("day", "day1")
     fmt = obj.get("format", "jianying")
+    force = bool(obj.get("force"))
 
     proj_dir = handler._resolve_project_dir(qs)
     cfg = handler._get_config(proj_dir)
@@ -52,6 +60,19 @@ def handle_post_export(
     plan_path = cfg.plans_dir / f"{day}_plan.json"
     if not plan_path.is_file():
         handler._send_json({"ok": False, "error": f"plan 文件不存在: {plan_path}"}, 404)
+        return
+
+    try:
+        plan = Plan.from_dict(json.loads(plan_path.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError) as e:
+        handler._send_json({"ok": False, "error": str(e)}, 400)
+        return
+
+    known, offline = collect_project_indices(cfg)
+    result = check_plan_export_readiness(plan, known_indices=known, offline_indices=offline, source="original")
+    blocked = readiness_block_payload(result, force=force)
+    if blocked is not None:
+        handler._send_json(blocked, 400)
         return
 
     out_dir = cfg.paths.output_dir / "export" / f"{day}_{fmt}"
@@ -70,11 +91,11 @@ def handle_post_export(
         handler._send_json({"ok": False, "error": str(e)}, 400)
         return
 
-    result = {"ok": True, "path": str(result_path)}
+    result_body = {"ok": True, "path": str(result_path)}
 
     if cfg.export.auto_copy_draft and cfg.export.jianying_draft_dir:
         jy_dir = _copy_draft_to_jianying(result_path, cfg.export.jianying_draft_dir, day)
         if jy_dir:
-            result["jianying_draft"] = str(jy_dir)
+            result_body["jianying_draft"] = str(jy_dir)
 
-    handler._send_json(result)
+    handler._send_json(result_body)

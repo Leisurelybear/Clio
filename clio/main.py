@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -202,6 +203,11 @@ def main(argv: list[str] | None = None) -> int:
         default="compressed",
         help="视频来源（compressed: 从压缩版裁剪 / original: 从原片裁剪）",
     )
+    p_cut.add_argument(
+        "--force",
+        action="store_true",
+        help="忽略规划就绪警告（error 仍会阻止）",
+    )
 
     p_refine = sub.add_parser("refine", help="用 AI + trip 上下文 审阅并修正已有分析/口播")
     p_refine.add_argument(
@@ -287,6 +293,11 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         dest="export_out_dir",
         help="导出草稿输出目录（默认 output/export/<day>_<format>/）",
+    )
+    p_export.add_argument(
+        "--force",
+        action="store_true",
+        help="忽略规划就绪警告（error 仍会阻止）",
     )
 
     _p_verify = sub.add_parser("verify", help="校验压缩文件与原始视频的完整性")
@@ -447,9 +458,28 @@ def main(argv: list[str] | None = None) -> int:
                 return 1
         elif args.command == "cut":
             from clio.pipeline import run_cut_all
+            from clio.plan_model import Plan
+            from clio.plan_readiness import (
+                check_plan_export_readiness,
+                collect_project_indices,
+                readiness_block_payload,
+            )
             from clio.tasks.reindex import auto_reindex_if_needed
 
             auto_reindex_if_needed(config)
+            plan_path = config.plans_dir / f"{args.day}_plan.json"
+            if not plan_path.is_file():
+                print(f"错误: 规划文件不存在: {plan_path}", file=sys.stderr)
+                return 1
+            plan = Plan.from_dict(json.loads(plan_path.read_text(encoding="utf-8")))
+            known, offline = collect_project_indices(config)
+            ready = check_plan_export_readiness(plan, known_indices=known, offline_indices=offline, source=args.source)
+            blocked = readiness_block_payload(ready, force=bool(getattr(args, "force", False)))
+            if blocked is not None:
+                print(f"错误: {blocked['error']}", file=sys.stderr)
+                for issue in ready.errors + (ready.warnings if not getattr(args, "force", False) else []):
+                    print(f"  [{issue.level}] {issue.message}", file=sys.stderr)
+                return 1
             run_cut_all(
                 config,
                 day_label=args.day,
@@ -488,8 +518,26 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         elif args.command == "export":
             from clio.export import export_plan
+            from clio.plan_model import Plan
+            from clio.plan_readiness import (
+                check_plan_export_readiness,
+                collect_project_indices,
+                readiness_block_payload,
+            )
 
             plan_path = config.plans_dir / f"{args.day}_plan.json"
+            if not plan_path.is_file():
+                print(f"错误: 规划文件不存在: {plan_path}", file=sys.stderr)
+                return 1
+            plan = Plan.from_dict(json.loads(plan_path.read_text(encoding="utf-8")))
+            known, offline = collect_project_indices(config)
+            ready = check_plan_export_readiness(plan, known_indices=known, offline_indices=offline, source="original")
+            blocked = readiness_block_payload(ready, force=bool(getattr(args, "force", False)))
+            if blocked is not None:
+                print(f"错误: {blocked['error']}", file=sys.stderr)
+                for issue in ready.errors + (ready.warnings if not getattr(args, "force", False) else []):
+                    print(f"  [{issue.level}] {issue.message}", file=sys.stderr)
+                return 1
             out_dir = (
                 getattr(args, "export_out_dir", None)
                 or getattr(args, "output", None)

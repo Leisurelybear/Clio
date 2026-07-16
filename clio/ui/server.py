@@ -48,6 +48,7 @@ from clio.ui.routes.plan import (
     handle_get_plan,
     handle_get_plans,
     handle_post_cut,
+    handle_post_plan_readiness,
     handle_put_plan,
 )
 from clio.ui.routes.processing_state_routes import handle_get_processing_state
@@ -432,6 +433,7 @@ def make_handler(
             Route("POST", "/api/config/init", "handle_post_config_init"),
             Route("POST", "/api/providers", "handle_post_provider"),
             Route("POST", "/api/cut", "handle_post_cut"),
+            Route("POST", "/api/plan/readiness", "handle_post_plan_readiness"),
             Route("POST", "/api/refine", "handle_post_refine"),
             Route("POST", "/api/export", "handle_post_export"),
             Route("POST", "/api/project/create", "handle_post_project_create"),

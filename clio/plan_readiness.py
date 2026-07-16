@@ -160,3 +160,21 @@ def collect_project_indices(cfg: Any) -> tuple[set[str], set[str]]:
             pass
 
     return known, offline
+
+
+def readiness_block_payload(result: ReadinessResult, *, force: bool) -> dict[str, Any] | None:
+    """If export/cut should be blocked, return JSON body (caller sends 400). Else None."""
+    if result.errors:
+        return {
+            "ok": False,
+            "error": result.errors[0].message,
+            "issues": result.to_dict(),
+        }
+    if result.warnings and not force:
+        return {
+            "ok": False,
+            "error": "规划存在警告，确认后请传 force: true",
+            "issues": result.to_dict(),
+            "needs_force": True,
+        }
+    return None

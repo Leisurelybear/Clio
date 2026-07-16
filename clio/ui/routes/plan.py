@@ -1,4 +1,4 @@
-"""Route handlers: /api/plan, /api/plans, /api/cut"""
+"""Route handlers: /api/plan, /api/plans, /api/cut, /api/plan/readiness"""
 
 from __future__ import annotations
 
@@ -8,6 +8,11 @@ from typing import TYPE_CHECKING, Any
 
 from clio.pipeline import run_cut_all
 from clio.plan_model import Plan
+from clio.plan_readiness import (
+    check_plan_export_readiness,
+    collect_project_indices,
+    readiness_block_payload,
+)
 from clio.schema import add_schema_version
 from clio.ui.services.file_service import _is_safe_basename, _save_atomic
 
@@ -65,6 +70,48 @@ def handle_put_plan(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> 
     handler._send_json({"ok": True, "path": str(p)})
 
 
+def handle_post_plan_readiness(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
+    """POST /api/plan/readiness — optional inline plan body for dirty buffer checks."""
+    body = obj if isinstance(obj, dict) else {}
+    day = body.get("day") or (qs.get("day", ["day1"])[0] if qs else "day1")
+    day = str(day)
+    if not _is_safe_basename(day) or not day:
+        return handler._send_json({"ok": False, "error": "forbidden"}, 403)
+    source = str(body.get("source") or "compressed")
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
+
+    inline = body.get("plan")
+    if isinstance(inline, dict):
+        plan = Plan.from_dict(inline)
+    else:
+        path = cfg.plans_dir / f"{day}_plan.json"
+        if not path.is_file():
+            return handler._send_json(
+                {
+                    "ok": False,
+                    "errors": [
+                        {
+                            "level": "error",
+                            "code": "plan_missing",
+                            "message": f"规划文件不存在: {path}",
+                        }
+                    ],
+                    "warnings": [],
+                },
+                404,
+            )
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            return handler._send_json({"ok": False, "error": str(e)}, 400)
+        plan = Plan.from_dict(raw if isinstance(raw, dict) else {})
+
+    known, offline = collect_project_indices(cfg)
+    result = check_plan_export_readiness(plan, known_indices=known, offline_indices=offline, source=source)
+    handler._send_json(result.to_dict())
+
+
 def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dict) -> None:
     """Handle POST /api/cut."""
     day_label = obj.get("day_label", "day1")
@@ -73,6 +120,7 @@ def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dic
     source = obj.get("source", "compressed")
     reencode = obj.get("reencode", False)
     out_dir_raw = obj.get("output_dir", None)
+    force = bool(obj.get("force"))
 
     if source not in ("compressed", "original"):
         return handler._send_json({"ok": False, "error": "source must be compressed|original"}, 400)
@@ -80,6 +128,19 @@ def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dic
     out_path = Path(out_dir_raw) if out_dir_raw else None
     proj_dir = handler._resolve_project_dir(qs)
     cfg = handler._get_config(proj_dir)
+
+    plan_path = cfg.plans_dir / f"{day_label}_plan.json"
+    if not plan_path.is_file():
+        return handler._send_json({"ok": False, "error": f"规划文件不存在: {plan_path}"}, 404)
+    try:
+        plan = Plan.from_dict(json.loads(plan_path.read_text(encoding="utf-8")))
+    except (json.JSONDecodeError, OSError) as e:
+        return handler._send_json({"ok": False, "error": str(e)}, 400)
+    known, offline = collect_project_indices(cfg)
+    result = check_plan_export_readiness(plan, known_indices=known, offline_indices=offline, source=str(source))
+    blocked = readiness_block_payload(result, force=force)
+    if blocked is not None:
+        return handler._send_json(blocked, 400)
 
     try:
         run_cut_all(

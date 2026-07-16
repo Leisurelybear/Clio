@@ -6,7 +6,13 @@ import json
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from clio.ui.routes.plan import handle_get_plan, handle_get_plans, handle_post_cut, handle_put_plan
+from clio.ui.routes.plan import (
+    handle_get_plan,
+    handle_get_plans,
+    handle_post_cut,
+    handle_post_plan_readiness,
+    handle_put_plan,
+)
 
 
 class TestHandleGetPlans:
@@ -128,6 +134,29 @@ class TestHandlePutPlanValidation:
         saved = json.loads((proj_out / "plans" / "day1_plan.json").read_text(encoding="utf-8"))
         assert saved["sequence"][0]["index"] == "001"
         assert "_schema_version" in saved
+
+
+class TestHandlePostPlanReadiness:
+    def test_readiness_with_inline_plan_empty_sequence(self, tmp_path: Path):
+        handler = MagicMock()
+        handler._resolve_project_dir.return_value = tmp_path
+        cfg = MagicMock()
+        cfg.plans_dir = tmp_path / "plans"
+        cfg.compressed_dir = tmp_path / "compressed"
+        cfg.texts_dir = tmp_path / "texts"
+        cfg.compressed_dir.mkdir()
+        cfg.texts_dir.mkdir()
+        cfg.project_dir = None
+        handler._get_config.return_value = cfg
+        handler._send_json = MagicMock()
+        handle_post_plan_readiness(
+            handler,
+            {},
+            {"day": "day1", "plan": {"day_title": "d", "sequence": []}},
+        )
+        payload = handler._send_json.call_args[0][0]
+        assert payload["ok"] is False
+        assert payload["errors"]
 
 
 class TestHandlePostCut:
