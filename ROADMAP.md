@@ -13,6 +13,8 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Recently completed (2026-07-17 R-026):** Plan domain model (`clio/plan_model.py`), PUT validation, readiness API (`POST /api/plan/readiness`), export/cut force gates, UI reorder/delete/title/timeline edit + readiness panel. Spec: `docs/superpowers/specs/2026-07-17-plan-domain-edit-readiness-design.md`. Plan: `docs/superpowers/plans/2026-07-17-plan-domain-edit-readiness.md`.
 
+**R-026 follow-up (same day):** playhead 起点/终点填 `use_timeline`；`+插入` / 末尾插入片段；fix empty `known_indices` false `index_missing`. Tests: 1202 pytest + 184 vitest.
+
 ### R-025 Multi-language (i18n)
 
 **Goal:** Users can switch the product language (at least **zh-CN** and **en**) without forking the codebase. AI prompts may stay language-configurable separately (see below).
