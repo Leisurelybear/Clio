@@ -4,7 +4,7 @@ import { api, icon } from './api.js';
 import { renderPreviewBar, startPreview, _playPreviewSegment } from './viewer.js';
 import { addToast } from './toast.js';
 import { resolveEditorSaveTarget } from './editor-save.js';
-import { reorderSequence, removeSegment, patchSegment } from './plan-edit.js';
+import { reorderSequence, removeSegment, patchSegment, setTimelineBound, insertSegment } from './plan-edit.js';
 
 let _readinessTimer = null;
 let _lastReadiness = { ok: true, errors: [], warnings: [] };
@@ -130,6 +130,49 @@ function confirmWarningsIfNeeded() {
   return true;
 }
 
+function playerCurrentTimeSec() {
+  const player = $('player');
+  if (!player) return null;
+  const t = player.currentTime;
+  return Number.isFinite(t) ? t : null;
+}
+
+function applyTimelineBound(segIndex, which) {
+  const p = state.plan;
+  if (!p?.sequence?.[segIndex]) return;
+  const sec = playerCurrentTimeSec();
+  if (sec == null) {
+    addToast('请先在播放器中打开对应视频', 'warning');
+    return;
+  }
+  const next = setTimelineBound(p.sequence[segIndex].use_timeline || '', which, sec);
+  p.sequence[segIndex] = patchSegment(p.sequence[segIndex], { use_timeline: next });
+  markDirty();
+  renderPlan();
+}
+
+function promptInsertAfter(afterIndex) {
+  const p = state.plan;
+  if (!p) return;
+  const videos = state.videos || [];
+  const options = videos
+    .filter((v) => v.index)
+    .map((v) => `${v.index} ${v.title || v.file || ''}`.trim());
+  const hint = options.length
+    ? `可选 index 示例: ${options.slice(0, 8).join(' | ')}`
+    : '输入视频 index，例如 001';
+  const raw = prompt(`在第 ${afterIndex + 1} 段后插入片段\n${hint}\n\n视频 index:`, '');
+  if (raw == null) return;
+  const index = String(raw).trim();
+  if (!index) {
+    addToast('index 不能为空', 'warning');
+    return;
+  }
+  const v = videos.find((x) => String(x.index) === index);
+  const title = v?.title || v?.file || '';
+  applySequence(insertSegment(p.sequence, afterIndex, { index, title }));
+}
+
 export function renderPlan() {
   const p = state.plan;
   const pane = $('tab-plan');
@@ -200,11 +243,16 @@ export function renderPlan() {
         <span class="plan-drag-handle" title="拖拽排序" aria-hidden="true">⠿</span>
         <button type="button" class="plan-move-btn" data-move="up" title="上移" ${i === 0 ? 'disabled' : ''}>↑</button>
         <button type="button" class="plan-move-btn" data-move="down" title="下移" ${i === p.sequence.length - 1 ? 'disabled' : ''}>↓</button>
+        <button type="button" class="plan-ins-btn" data-ins title="在此后插入片段">+插入</button>
         <button type="button" class="plan-del-btn" data-del title="删除片段">删除</button>
         <span class="muted">视频 [${escapeHtml(seg.index || '?')}]</span>
       </div>
       <label>标题 <input value="${escapeHtml(seg.title || '')}" data-k="title"></label>
-      <label>时间轴 <input value="${escapeHtml(seg.use_timeline || '')}" data-k="use_timeline" placeholder="00:10-00:45"></label>
+      <label class="plan-timeline-row">时间轴
+        <input value="${escapeHtml(seg.use_timeline || '')}" data-k="use_timeline" placeholder="00:10-00:45">
+        <button type="button" class="plan-tl-btn" data-tl="start" title="用播放器当前位置作为起点">起点</button>
+        <button type="button" class="plan-tl-btn" data-tl="end" title="用播放器当前位置作为终点">终点</button>
+      </label>
       <label>理由 <input value="${escapeHtml(seg.reason || '')}" data-k="reason"></label>
       <label>口播提示 <textarea rows="2" data-k="voiceover_hint">${escapeHtml(seg.voiceover_hint || '')}</textarea></label>
     `;
@@ -236,10 +284,20 @@ export function renderPlan() {
       if (i >= p.sequence.length - 1) return;
       applySequence(reorderSequence(p.sequence, i, i + 1));
     });
+    li.querySelector('[data-ins]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      promptInsertAfter(i);
+    });
     li.querySelector('[data-del]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!confirm(`删除第 ${i + 1} 段「${seg.title || seg.index || ''}」？`)) return;
       applySequence(removeSegment(p.sequence, i));
+    });
+    li.querySelectorAll('[data-tl]').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        applyTimelineBound(i, btn.dataset.tl);
+      });
     });
     li.addEventListener('dragstart', (e) => {
       _dragFromIndex = i;
@@ -261,6 +319,16 @@ export function renderPlan() {
       _dragFromIndex = null;
     });
     ol.appendChild(li);
+  });
+
+  // Prepend control when sequence empty or for first insert
+  const insertBar = document.createElement('div');
+  insertBar.className = 'plan-insert-bar';
+  insertBar.innerHTML = `<button type="button" id="btn-plan-insert-end" class="btn-secondary">在末尾插入片段</button>`;
+  ol.parentNode?.insertBefore(insertBar, ol.nextSibling);
+  insertBar.querySelector('#btn-plan-insert-end')?.addEventListener('click', () => {
+    const n = p.sequence?.length || 0;
+    promptInsertAfter(n - 1); // -1 when empty → prepend
   });
 
   const cutSection = document.createElement('div');

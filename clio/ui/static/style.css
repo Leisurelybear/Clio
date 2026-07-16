@@ -2048,3 +2048,23 @@ select.form-input { cursor: pointer; }
   color: var(--warn, #b8860b);
   cursor: pointer;
 }
+
+.plan-timeline-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.plan-timeline-row input {
+  flex: 1 1 8rem;
+  min-width: 6rem;
+}
+.plan-tl-btn,
+.plan-ins-btn {
+  font-size: var(--text-sm, 12px);
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.plan-insert-bar {
+  margin: 8px 0 12px;
+}
