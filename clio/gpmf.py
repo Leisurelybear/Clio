@@ -164,3 +164,26 @@ def format_telemetry_for_prompt(summary: TelemetrySummary | None) -> str:
         lines.append(f"- 遥测覆盖时长约 {_fmt_tc(summary.duration_sec)}")
     lines.append("请优先考虑这些时刻附近的动作/风景作为 highlight。")
     return "\n".join(lines) + "\n"
+
+
+def merge_telemetry_into_context(
+    context_override: str | None,
+    original_video: Path | None,
+    *,
+    use_gpmf: bool,
+) -> str | None:
+    """Optionally append GPMF prompt block to an existing context override.
+
+    - ``use_gpmf=False`` → return ``context_override`` unchanged (no I/O).
+    - No GPS/GPMF on the clip → return ``context_override`` unchanged.
+    - Telemetry present → append formatted block after any existing override.
+    """
+    if not use_gpmf:
+        return context_override
+    block = format_telemetry_for_prompt(load_telemetry_summary(original_video))
+    if not block:
+        return context_override
+    base = (context_override or "").strip()
+    if base:
+        return f"{base}\n\n{block}"
+    return block

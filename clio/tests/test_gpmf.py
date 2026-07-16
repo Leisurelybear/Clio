@@ -11,6 +11,7 @@ from clio.gpmf import (
     TelemetrySummary,
     format_telemetry_for_prompt,
     load_telemetry_summary,
+    merge_telemetry_into_context,
     probe_gpmf_marker,
     summarize_from_sidecar,
 )
@@ -125,3 +126,51 @@ class TestFormatTelemetryForPrompt:
         assert "00:12" in text
         assert "01:03" in text
         assert "120" in text
+
+
+class TestMergeTelemetryIntoContext:
+    def test_disabled_returns_override_unchanged(self, tmp_path: Path):
+        video = tmp_path / "GL.MP4"
+        video.write_bytes(b"x")
+        (tmp_path / "GL.gpmf.json").write_text(
+            json.dumps({"speed": [{"t_sec": 1.0, "value": 40, "unit": "km/h"}]}),
+            encoding="utf-8",
+        )
+        assert merge_telemetry_into_context("keep me", video, use_gpmf=False) == "keep me"
+        assert merge_telemetry_into_context(None, video, use_gpmf=False) is None
+
+    def test_enabled_appends_block_when_sidecar_exists(self, tmp_path: Path):
+        video = tmp_path / "GL.MP4"
+        video.write_bytes(b"x")
+        (tmp_path / "GL.gpmf.json").write_text(
+            json.dumps(
+                {
+                    "speed": [{"t_sec": 12.0, "value": 50, "unit": "km/h"}],
+                    "elevation_m": [100, 200],
+                }
+            ),
+            encoding="utf-8",
+        )
+        out = merge_telemetry_into_context("user note", video, use_gpmf=True)
+        assert out is not None
+        assert "user note" in out
+        assert "运动遥测" in out or "GPMF" in out
+        assert "00:12" in out
+
+    def test_enabled_no_gps_is_noop(self, tmp_path: Path):
+        phone = tmp_path / "IMG.MOV"
+        phone.write_bytes(b"ftypqt  " + b"\x00" * 50)
+        assert merge_telemetry_into_context("only", phone, use_gpmf=True) == "only"
+        assert merge_telemetry_into_context(None, phone, use_gpmf=True) is None
+
+    def test_enabled_without_override_returns_block_only(self, tmp_path: Path):
+        video = tmp_path / "GL.MP4"
+        video.write_bytes(b"x")
+        (tmp_path / "GL.gpmf.json").write_text(
+            json.dumps({"speed": [{"t_sec": 5.0, "value": 30, "unit": "km/h"}]}),
+            encoding="utf-8",
+        )
+        out = merge_telemetry_into_context(None, video, use_gpmf=True)
+        assert out
+        assert "运动遥测" in out or "GPMF" in out
+        assert "user note" not in out
