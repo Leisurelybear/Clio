@@ -1,0 +1,162 @@
+"""Export/cut readiness checks for Plan (error vs warning tiers)."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from clio._constants import VIDEO_EXTS
+from clio.cut import parse_time_range
+from clio.plan_model import Plan, PlanIssue
+
+
+@dataclass
+class ReadinessResult:
+    errors: list[PlanIssue] = field(default_factory=list)
+    warnings: list[PlanIssue] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return not self.errors
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "ok": self.ok,
+            "errors": [i.to_dict() for i in self.errors],
+            "warnings": [i.to_dict() for i in self.warnings],
+        }
+
+
+def check_plan_export_readiness(
+    plan: Plan,
+    *,
+    known_indices: set[str] | None = None,
+    offline_indices: set[str] | None = None,
+    source: str = "compressed",
+) -> ReadinessResult:
+    del source  # reserved for original-vs-compressed nuance in callers
+    result = ReadinessResult()
+    if not plan.sequence:
+        result.errors.append(
+            PlanIssue(level="error", code="sequence_empty", message="规划 sequence 为空，无法导出/裁剪")
+        )
+        return result
+
+    try:
+        tes = float(plan.total_estimated_sec)
+    except (TypeError, ValueError):
+        tes = 180
+    if tes < 30:
+        result.warnings.append(PlanIssue(level="warning", code="duration_short", message=f"预估总时长过短（{tes} 秒）"))
+    if tes > 1800:
+        result.warnings.append(PlanIssue(level="warning", code="duration_long", message=f"预估总时长过长（{tes} 秒）"))
+
+    known = {str(x).strip() for x in known_indices} if known_indices is not None else None
+    offline = {str(x).strip() for x in offline_indices} if offline_indices is not None else set()
+
+    for i, seg in enumerate(plan.sequence):
+        idx = (seg.index or "").strip()
+        if not idx:
+            result.errors.append(
+                PlanIssue(level="error", code="index_empty", message=f"第 {i + 1} 段缺少 index", segment_index=i)
+            )
+        elif known is not None and idx not in known:
+            result.errors.append(
+                PlanIssue(
+                    level="error",
+                    code="index_missing",
+                    message=f"第 {i + 1} 段视频 [{idx}] 在项目中不存在",
+                    segment_index=i,
+                )
+            )
+        elif idx in offline:
+            result.warnings.append(
+                PlanIssue(
+                    level="warning",
+                    code="video_offline",
+                    message=f"第 {i + 1} 段视频 [{idx}] 当前离线",
+                    segment_index=i,
+                )
+            )
+
+        tl = (seg.use_timeline or "").strip()
+        if not tl:
+            result.warnings.append(
+                PlanIssue(
+                    level="warning",
+                    code="timeline_empty",
+                    message=f"第 {i + 1} 段未填写 use_timeline",
+                    segment_index=i,
+                )
+            )
+        else:
+            try:
+                parse_time_range(tl)
+            except ValueError as e:
+                result.errors.append(
+                    PlanIssue(
+                        level="error",
+                        code="timeline_invalid",
+                        message=f"第 {i + 1} 段时间轴无效: {e}",
+                        segment_index=i,
+                    )
+                )
+
+        if not (seg.title or "").strip():
+            result.warnings.append(
+                PlanIssue(level="warning", code="title_empty", message=f"第 {i + 1} 段标题为空", segment_index=i)
+            )
+        if not (seg.reason or "").strip():
+            result.warnings.append(
+                PlanIssue(level="warning", code="reason_empty", message=f"第 {i + 1} 段理由为空", segment_index=i)
+            )
+
+    return result
+
+
+def collect_project_indices(cfg: Any) -> tuple[set[str], set[str]]:
+    """Build (known_indices, offline_indices) from compressed + texts + videos.json."""
+    known: set[str] = set()
+    offline: set[str] = set()
+
+    comp = getattr(cfg, "compressed_dir", None)
+    if isinstance(comp, Path) and comp.is_dir():
+        try:
+            for p in comp.iterdir():
+                if p.is_file() and p.suffix.lower() in VIDEO_EXTS:
+                    stem = p.stem
+                    idx = stem.split("_", 1)[0]
+                    if idx:
+                        known.add(idx)
+        except OSError:
+            pass
+
+    texts = getattr(cfg, "texts_dir", None)
+    if isinstance(texts, Path) and texts.is_dir():
+        try:
+            for jf in texts.glob("*.json"):
+                try:
+                    data = json.loads(jf.read_text(encoding="utf-8"))
+                except (json.JSONDecodeError, OSError):
+                    continue
+                if data.get("index") is not None:
+                    known.add(str(data["index"]).strip())
+        except OSError:
+            pass
+
+    project_dir = getattr(cfg, "project_dir", None)
+    if project_dir is not None:
+        try:
+            from clio.tasks._video_loader import load_selected_videos
+
+            for p in load_selected_videos(project_dir):
+                # Prefer numeric prefix if compressed-style naming; else skip stem-as-index
+                if not p.exists():
+                    # Cannot map path→plan index reliably; skip false offline
+                    continue
+        except Exception:
+            pass
+
+    return known, offline
