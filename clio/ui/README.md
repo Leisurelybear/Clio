@@ -84,7 +84,7 @@ UI 只读 / 写 `config.yaml` 里 `paths.output_dir` 下的文件：
 | 分析 (texts) | sidebar → 视频 → tab「分析」 | `output/texts*/*.json` | `title`, `location`, `mood`, `summary`, `timeline[]`，可含同期声 `transcript` |
 | 口播 (scripts) | sidebar → 视频 → tab「口播」 | `output/scripts/*_voiceover.json` | `title`, `voiceover`, `edit_tip`, `duration_hint_sec` |
 | 转录 (transcript) | sidebar → 视频 → tab「转录」 | `output/transcripts/*.json` | `segments[]`，支持手动添加、编辑、删除 |
-| 规划 (plan) | sidebar → 📋 规划 | `output/plans/day<N>_plan.json` | `theme`, `opening_tip`, `ending_tip`, `sequence[]` |
+| 规划 (plan) | sidebar → 📋 规划 | `output/plans/day<N>_plan.json` | `day_title`, `theme`, `opening_tip`, `ending_tip`, `sequence[]`（可编辑，见下） |
 | 设置 (config) | sidebar → ⚙ 设置 → 项目 tab | `project.yaml` | 项目级字段，嵌套表单渲染 |
 | 设置 (config) | sidebar → ⚙ 设置 → 全局 tab | `config.yaml`（global-only 字段） | 保存后需重启服务 |
 | 设置 (config) | sidebar → ⚙ 设置 → 合并视图 tab | 合并后配置 | 只读查看全局+项目字段来源 |
@@ -123,6 +123,24 @@ header 右侧的 **`压缩` / `原视频`** 切换按钮决定侧栏列的是哪
 - 在 `texts` / `口播` tab 有未保存改动时切换源 → 弹确认框，避免丢改动
 - `规划 (plan)` tab 不受源影响，按 `sequence[].index` 在当前视图里找对应视频并跳转
 - **在规划视图（sidebar 📋 规划 激活）下点 header 的源切换**：仅刷新视频列表 + 清空播放器，**不会**把视图切回视频模式（规划 vs 视频是两个独立工作区）。要回到视频模式，点 sidebar 的某个视频条目即可
+
+## 规划结构编辑与导出检查 (R-026)
+
+进入 sidebar **📋 规划** 后，可在不重跑 AI 的情况下改结构：
+
+| 操作 | 说明 |
+| --- | --- |
+| 拖拽 / ↑↓ | 调整 `sequence[]` 顺序 |
+| 删除 | 删除某一段（确认后） |
+| +插入 / 末尾插入 | 按视频 `index` 插入新段 |
+| 标题 / 时间轴 / 理由 / 口播提示 | 直接改字段；`Ctrl+S` 保存（后端校验非法时间轴） |
+| 起点 / 终点 | 用播放器当前时间写入该段 `use_timeline` |
+| 就绪检查面板 | `POST /api/plan/readiness`：error 阻塞裁剪/导出；warning 可确认后 `force` 继续 |
+| 未保存改动 | 裁剪/导出前会提示先保存（不静默写盘） |
+
+CLI 对齐：`python main.py cut|export ... --force` 仅忽略 **warning**，**error** 仍阻止。
+
+> 不做「单段 AI regenerate」：需要重写文案时改字段或整日重跑 `plan`。
 
 ## 规划预览播放
 

@@ -1,7 +1,7 @@
 # Design: Plan Domain Model, Structural Edit & Export Readiness
 
 **Date**: 2026-07-17  
-**Status**: Approved for implementation planning  
+**Status**: Implemented on `main` (incl. playhead + insert follow-up; per-segment AI regenerate declined)  
 **Route**: A — “剪辑师一天流” (plan edit + export checklist)  
 **Approach**: Domain model foundation (approach 3), incremental adoption
 
@@ -244,13 +244,16 @@ Commit style: one feature/fix per commit; Chinese UI copy, English commits (proj
 | `editor-plan.js` grows further | New logic in `plan-edit.js`; DOM stays in editor-plan |
 | Global artifact version vs plan evolution | Field compatibility via `extras`; breaking changes bump global artifact version when needed |
 
-## 10. Follow-ups (explicitly out of scope)
+## 10. Follow-ups
 
-- Player playhead → `use_timeline` start/end buttons.
-- Insert segment from video list; per-segment AI regenerate.
-- Incremental PATCH segment APIs.
-- EDL / FCPXML / other NLE intermediates.
-- JianYing real draft version compatibility (already deferred product-wide).
+| Item | Status |
+| --- | --- |
+| Player playhead → `use_timeline` start/end buttons | **Done** (same day follow-up) |
+| Insert segment (prompt index / end insert) | **Done** (same day follow-up) |
+| Per-segment AI regenerate | **Declined** (2026-07-17) — use structural edit + full `plan` re-run |
+| Incremental PATCH segment APIs | Out of scope (local edit + full PUT is enough) |
+| EDL / FCPXML / other NLE intermediates | Out of scope |
+| JianYing real draft version compatibility | Deferred product-wide |
 
 ## 11. Decisions log
 
@@ -258,8 +261,8 @@ Commit style: one feature/fix per commit; Chinese UI copy, English commits (proj
 | --- | --- | --- |
 | Product route | A — plan edit + readiness | Last mile plan → cut/export |
 | Architecture | Domain model (approach 3), incremental | Extensibility without big-bang rewrite |
-| Edit depth | Standard: reorder, delete, timeline/title text | Enough for daily use; insert/regen later |
-| Timeline UX | Text + validate now; playhead pick later | Fast delivery |
+| Edit depth | Standard + insert + playhead bounds | Regen declined |
+| Timeline UX | Text + playhead start/end buttons | Follow-up shipped same day |
 | Readiness UX | Tiered: error block / warning force | Blocks real failures without nags |
 | Empty sequence on save | Allowed | Users may clear while rebuilding order |
 | Mutation API | Local edit + full PUT | Avoid PATCH surface until insert/regen |

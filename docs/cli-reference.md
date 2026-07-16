@@ -160,6 +160,9 @@ python main.py cut --day day1 --source original
 
 # Re-encode (default -c copy finishes in seconds; with --reencode uses h264 for precise cutting)
 python main.py cut --day day1 --reencode
+
+# Ignore readiness warnings only (errors still block)
+python main.py cut --day day1 --force
 ```
 
 | Parameter | Default | Description |
@@ -168,9 +171,30 @@ python main.py cut --day day1 --reencode
 | `--out-dir` | `output/cuts/<day>/` | Output directory, can be user-specified |
 | `--source` | `compressed` | Video source: `compressed` or `original` |
 | `--reencode` | — | h264 re-encoding (default `-c copy` for fast cut) |
+| `--force` | — | Proceed despite plan **warnings** (empty title, offline media, etc.). **Errors** (bad timeline, empty sequence, missing index when known) still fail |
+
+Before cutting, Clio runs the same readiness checks as the Web UI (`clio/plan_readiness.py`). Fix errors in the plan editor or re-run `plan`; use `--force` only when warnings are acceptable.
 
 Outputs each segment as `<index>_<title>_seg_<number>.mp4`; if a corresponding `texts JSON` exists, it is also copied to the same directory.
 After completion, generates `manifest.md` (markdown table with info for each segment).
+
+---
+
+## `export` — Export Plan to Editor Draft
+
+Export `plans/<day>_plan.json` to a JianYing-oriented draft folder under `output/export/`.
+
+```bash
+python main.py export --day day1 --format jianying
+python main.py export --day day1 --out-dir "E:/drafts/day1" --force
+```
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--day` | `day1` | Plan label |
+| `--format` | `jianying` | Export format (currently only `jianying`) |
+| `--out-dir` | `output/export/<day>_<format>/` | Draft output directory |
+| `--force` | — | Same as `cut --force`: ignore readiness **warnings** only |
 
 ---
 

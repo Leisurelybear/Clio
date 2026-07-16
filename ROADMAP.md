@@ -11,9 +11,21 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | --- | --- | --- | --- |
 | R-025 | Multi-language / i18n (UI + CLI user-facing copy) | Large | Medium |
 
-**Recently completed (2026-07-17 R-026):** Plan domain model (`clio/plan_model.py`), PUT validation, readiness API (`POST /api/plan/readiness`), export/cut force gates, UI reorder/delete/title/timeline edit + readiness panel. Spec: `docs/superpowers/specs/2026-07-17-plan-domain-edit-readiness-design.md`. Plan: `docs/superpowers/plans/2026-07-17-plan-domain-edit-readiness.md`.
+### Deferred by choice
 
-**R-026 follow-up (same day):** playhead 起点/终点填 `use_timeline`；`+插入` / 末尾插入片段；fix empty `known_indices` false `index_missing`. Tests: 1202 pytest + 184 vitest.
+| Item | Why |
+| --- | --- |
+| JianYing real draft version compatibility | Version-specific, not generic |
+| Per-segment AI regenerate on plan rows | User declined — structural edit + full re-plan cover the need |
+
+**Recently completed (2026-07-17 R-026 + follow-up, on `origin/main`):**
+
+- Plan domain model (`clio/plan_model.py`) + save validation + AI write normalize
+- Tiered export/cut readiness (`clio/plan_readiness.py`, `POST /api/plan/readiness`, `force` skips warnings only)
+- UI: reorder / delete / title+timeline edit, readiness panel, dirty-before-export
+- Follow-up: playhead **起点/终点**, **+插入** segment; fix empty `known_indices` false positives
+- Spec: `docs/superpowers/specs/2026-07-17-plan-domain-edit-readiness-design.md`
+- Plan: `docs/superpowers/plans/2026-07-17-plan-domain-edit-readiness.md`
 
 ### R-025 Multi-language (i18n)
 
@@ -907,6 +919,7 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 | Commit / Branch | Description | Date |
 | --- | --- | --- |
+| R-026 (`3cfba1e`…`694b3f9`) | Plan domain edit + export readiness + playhead/insert follow-up | 2026-07-17 |
 | `feat/project-video-manager` | Decouple project from media: `project_dir` + `videos.json`, pipeline cutover, UI video manager (mkdir / drag-drop / relink), `migrate` CLI, route registry A-007, dead-code cleanup | 2026-07-11 → 07-15 |
 | `c7bc732` (PR #18) | Merge feat/ui-redesign → main: prompt management (R-010d/e), confidence scoring (R-010b), model comparison CLI (R-010c), cover frame extraction (R-022), transcript alignment (R-023), webhook trigger (R-025), all-days planning (R-021), verify sidecar (R-020), progress debounce, toast notifications, provider connection test (CR-008), skipped diagnostics (CR-008), layout resize (R-016), video counterpart navigation, context_override tests (R-019f), and 41 other commits | 2026-07-10 |
 | `be636f2`~`2a712f7` (14 commits) | R-017: Model Registry & Task Binding UI | 2026-07-02~07-03 |
@@ -914,4 +927,4 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 Older completed sections (commit log, test coverage verification, code review audit) archived to [`docs/archive/2026-07-01-roadmap-archive.md`](docs/archive/2026-07-01-roadmap-archive.md).
 
-### Test count: 1176 pytest + 156 vitest (as of 2026-07-16 wave 2 on `main`)
+### Test count: 1202 pytest + 184 vitest (as of 2026-07-17 R-026 on `main`)

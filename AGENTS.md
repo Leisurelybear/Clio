@@ -14,7 +14,7 @@ An AI preprocessing pipeline: raw travel vlog footage -> ffmpeg compression -> G
 - google-genai (Gemini 2.5 Flash video File API)
 - httpx (DeepSeek / OpenAI compatible calls)
 - PyYAML (config parsing; split into `config.yaml` global + `project.yaml` per-project)
-- pytest (unit tests, auto-run in CI; 1176 test cases)
+- pytest (unit tests, auto-run in CI; 1200+ test cases)
 
 Dependencies in `requirements.txt`; `setup.ps1`/`setup.sh` creates venv + installs ffmpeg + copies `.env` in one click.
 
@@ -35,6 +35,8 @@ vlog-video-analysis/
 │   ├── utils.py               ffmpeg discovery, file IO, extract_json
 │   ├── log.py                 Logging (hourly rotating, TeeWriter)
 │   ├── cut.py                 Segment cutting (ffmpeg wrapper)
+│   ├── plan_model.py          Plan/PlanSegment domain + save validation (R-026)
+│   ├── plan_readiness.py      Export/cut readiness (error/warning tiers)
 │   ├── split.py               Long video splitter
 │   ├── vmeta.py               .vmeta/.vindex sidecar metadata
 │   ├── progress.py            Progress tracker (used by UI + CLI)
@@ -43,8 +45,8 @@ vlog-video-analysis/
 │   │   ├── server.py          HTTP server
 │   │   ├── routes/            Route handlers (split into focused modules)
 │   │   └── static/            Frontend (no build step, ES modules)
-│   │       └── src/           ES modules: sidebar.js, sidebar-data.js,
-│   │                           sidebar-rerun.js, sidebar-browse.js, editor-config.js, ...
+│   │       └── src/           ES modules: editor-plan.js, plan-edit.js,
+│   │                           sidebar.js, runner.js, editor-config.js, ...
 │   └── ai/                    AI providers
 │       ├── base.py            TaskName enum, Provider Protocol
 │       ├── factory.py         Provider lookup by name
@@ -54,7 +56,7 @@ vlog-video-analysis/
 ├── config.example.yaml / .env.example
 ├── requirements.txt / requirements-locked.txt
 ├── .github/workflows/test.yml
-└── clio/tests/                pytest unit tests (1176 cases)
+└── clio/tests/                pytest unit tests (1200+ cases)
 ```
 
 > See `docs/superpowers/agents/directory-tree.md` for full tree with file-level annotations and test coverage details.
