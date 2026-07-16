@@ -9,8 +9,9 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
-| R-024b | Wire GPMF summary into analyze prompt (opt-in config) | Medium | Medium |
 | A-006 | Frontend ES module dynamic import circular reference | Medium | Low |
+
+**Recently completed (2026-07-16 R-024b):** opt-in `analyze.use_gpmf` injects GPMF/sidecar summary into analyze `context_override` via `merge_telemetry_into_context`; default false; no GPS → no-op.
 
 **Recently completed (2026-07-16 iteration wave 2):** see `docs/analysis/2026-07-16-iteration-wave2.md`
 

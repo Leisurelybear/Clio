@@ -70,8 +70,16 @@ print(format_telemetry_for_prompt(s))
 
 | ID | Item |
 | --- | --- |
-| R-024b | Opt-in inject GPMF block into analyze context |
 | A-006 | Static editor↔editor-config cycle |
+
+## R-024b (same day follow-up)
+
+| Item | Detail |
+| --- | --- |
+| Config | `analyze.use_gpmf: false` (project) |
+| Merge | `clio.gpmf.merge_telemetry_into_context` |
+| Wire | `clio/tasks/analyze.py` `_process_video_item` before `analyze_video` |
+| Constraint | No GPS / flag off → context unchanged |
 
 ## Post-wave UI review fixes (same day)
 

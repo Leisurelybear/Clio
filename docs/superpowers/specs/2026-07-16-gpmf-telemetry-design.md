@@ -1,7 +1,7 @@
 # Design: GoPro GPMF telemetry as highlight signal (R-024)
 
 **Date**: 2026-07-16  
-**Status**: MVP prototype (parse + format for AI context). Full pipeline injection optional next.
+**Status**: MVP + R-024b opt-in analyze injection (`analyze.use_gpmf`, default false).
 
 ## Problem
 
@@ -78,14 +78,14 @@ MVP delivers `format_telemetry_for_prompt(summary) -> str` only; analyze.py wiri
 
 - `clio/gpmf.py` — pure functions: load sidecar, probe marker, summarize, format
 - `clio/tests/test_gpmf.py` — TDD coverage
-- Config flag (later): `analyze.use_gpmf: true` default false until validated
+- Config flag: `analyze.use_gpmf` default false until validated; when true, `merge_telemetry_into_context` appends the block to analyze `context_override`
 
 ## Acceptance (MVP)
 
 - [x] Unit tests for sidecar parse + format + missing file
 - [x] `probe_gpmf_marker(path)` returns bool without crashing on random files
 - [x] No pipeline dependency; import is lazy-safe
-- [ ] (Next) Optional inject into `analyze_video` when original path known
+- [x] Optional inject into analyze when original path known (`analyze.use_gpmf`, `merge_telemetry_into_context`)
 
 ## Risks
 
