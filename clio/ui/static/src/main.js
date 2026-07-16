@@ -289,7 +289,18 @@ async function init() {
     const mod = e.ctrlKey || e.metaKey;
     if (e.key === 's' && mod) { e.preventDefault(); save(); }
     if (e.key === 'Escape') {
-      $$('.modal').forEach(m => { if (m.style.display !== 'none') m.style.display = 'none'; });
+      // Close topmost open modal only (preserve stacked dialog state)
+      const openModals = [...$$('.modal')].filter(m => m.style.display !== 'none');
+      if (openModals.length) {
+        const top = openModals[openModals.length - 1];
+        if (top.id === 'modal-relink') {
+          import('./sidebar-relink.js').then(m => m.closeRelinkModal());
+        } else if (top.id === 'modal-video-manage') {
+          import('./sidebar-video-manage.js').then(m => m.closeVideoManager());
+        } else {
+          top.style.display = 'none';
+        }
+      }
     }
     if (mod && e.key >= '1' && e.key <= '5') {
       e.preventDefault();

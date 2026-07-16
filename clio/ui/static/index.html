@@ -229,6 +229,35 @@
   </div>
 </div>
 
+<!-- Offline video relink modal: type path or browse -->
+<div id="modal-relink" class="modal" style="display:none;">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog modal-dialog-wide">
+    <h3>重新关联视频路径</h3>
+    <p class="hint" id="relink-hint">文件已离线，请输入新路径或从下方浏览选择。</p>
+    <label style="display:block;margin:8px 0 4px;font-size:var(--text-sm);color:var(--text-secondary)">原路径</label>
+    <div id="relink-old-path" class="browse-path" style="user-select:all;word-break:break-all"></div>
+    <label style="display:block;margin:12px 0 4px;font-size:var(--text-sm);color:var(--text-secondary)">新路径</label>
+    <div class="input-with-browse" style="display:flex;gap:8px;align-items:center">
+      <input id="relink-new-path" type="text" placeholder="D:\Videos\GL010695.MP4" style="flex:1;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input,#1e1e1e);color:var(--text-primary);font:inherit;font-size:var(--text-sm)">
+      <button type="button" id="relink-toggle-browse" class="btn-secondary">浏览</button>
+    </div>
+    <div id="relink-browse-panel" style="display:none;margin-top:12px">
+      <div class="browse-path" id="relink-browse-path">正在加载...</div>
+      <div class="browse-dir-list" id="relink-browse-list" style="max-height:240px;overflow:auto">
+        <p class="muted">点击「浏览」加载目录</p>
+      </div>
+      <div class="modal-actions" style="margin-top:8px;">
+        <button type="button" id="relink-browse-up" class="btn-secondary" style="display:none">上级目录</button>
+      </div>
+    </div>
+    <div class="modal-actions" style="margin-top:12px;">
+      <button type="button" id="relink-confirm" class="btn-primary">确认关联</button>
+      <button type="button" id="relink-cancel" class="btn-secondary">取消</button>
+    </div>
+  </div>
+</div>
+
 <!-- Rerun Progress Overlay -->
 <div id="rerun-overlay">
   <div class="rerun-header">

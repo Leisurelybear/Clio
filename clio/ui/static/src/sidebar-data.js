@@ -7,24 +7,23 @@ import { updateRunFilesBadge } from './runner.js';
 
 // ── Video relink helper ───────────────────────────────────────
 
+/** Open relink modal (type path or browse). API submit lives in sidebar-relink.js. */
 export async function relinkVideo(file, absPath) {
   const oldPath = absPath || file;
-  const userInput = prompt(
-    `视频文件离线：${oldPath}\n\n请输入文件的新路径：\n（可使用完整路径，如 D:\\Videos\\GL010695.MP4）`,
-    oldPath
-  );
-  if (!userInput || userInput === oldPath) return;
-  try {
-    const r = await api('PUT', '/api/videos/relink', { old_path: oldPath, new_path: userInput });
-    if (r.ok) {
-      setStatus(`已重新关联: ${userInput}`, 'ok');
-      await loadVideos();
-    } else {
-      setStatus('重新关联失败: ' + (r.error || '未知错误'), 'err');
-    }
-  } catch (e) {
-    setStatus('重新关联失败: ' + e.message, 'err');
+  const { openRelinkModal } = await import('./sidebar-relink.js');
+  openRelinkModal({ oldPath, displayName: file });
+}
+
+/** Programmatic relink used by tests and callers that already have a new path. */
+export async function submitRelink(oldPath, newPath) {
+  const r = await api('PUT', '/api/videos/relink', { old_path: oldPath, new_path: newPath });
+  if (r.ok) {
+    setStatus(`已重新关联: ${newPath}`, 'ok');
+    await loadVideos();
+    return r;
   }
+  setStatus('重新关联失败: ' + (r.error || '未知错误'), 'err');
+  return r;
 }
 
 // ── Video removal helper ──────────────────────────────────────
@@ -140,7 +139,8 @@ export async function loadVideos() {
   const r = await api('GET', `/api/videos?source=${state.source}`);
   state.videos = r.videos;
   state.groups = r.groups || {};
-  $('video-count').textContent = `(${state.videos.length})`;
+  const countEl = $('video-count');
+  if (countEl) countEl.textContent = `(${state.videos.length})`;
   updateSelectBtnVisibility();
   renderVideoList();
   // Hint when project has no selected originals yet
@@ -301,7 +301,8 @@ function renderVideoItem(v) {
     if (e.target.closest('.match-jump')) return;
     if (e.target.closest('.video-actions')) return;
     if (v.missing) {
-      setStatus('该视频文件当前不可用（路径离线或不存在）', 'warn');
+      setStatus('该视频文件当前不可用，请重新关联路径', 'warn');
+      relinkVideo(v.file, v.abs_path || (v.match && v.match.abs_path) || null);
       return;
     }
     if (state.selectionMode) {
@@ -399,6 +400,7 @@ function renderVideoItem(v) {
 
 export function renderVideoList() {
   const ul = $('video-list');
+  if (!ul) return;
   ul.innerHTML = '';
   if (state.selectionMode) {
     const headerDiv = document.createElement('div');

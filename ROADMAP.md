@@ -11,10 +11,11 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | --- | --- | --- | --- |
 | R-024 | GoPro GPMF telemetry as highlight signal | Large | Low |
 | A-006 | Frontend ES module dynamic import circular reference | Medium | Low |
-| UX-next-1 | Offline relink via browse modal (reuse FS browse) | Medium | Medium |
 | UX-next-2 | Restore lastEntity / lastVideo on project open | Small | Medium |
 
 **Recently completed (2026-07-16 UX/bug iteration):** see `docs/analysis/2026-07-16-iteration.md`
+
+- UX-next-1: offline relink modal supports type-in path + directory browse
 
 - BUG-A: last_project auto-open uses own `project_dir` (`9592ddd`)
 - BUG-B: selection checkbox `data-file` escaped

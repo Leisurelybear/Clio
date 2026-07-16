@@ -57,10 +57,16 @@ Focus: real bugs + UX friction, one small module per commit, Chinese dialogue / 
 | --- | --- | --- | --- |
 | R-024 | GoPro GPMF telemetry as highlight signal | Large | Low |
 | A-006 | Break static `editor`↔`editor-config` cycle when next touching those modules | Medium | Low |
-| UX-next-1 | Relink offline video via browse modal (reuse video-manager FS browse) | M | Medium |
+| UX-next-1 | ~~Relink offline video via browse modal~~ — done (type + browse) | — | — |
 | UX-next-2 | Restore `lastEntity` / `lastVideo` after project open | S | Medium |
 | UX-next-3 | Texts/voiceover empty states → “去运行 / 重跑” CTAs | S | Low |
 | UX-next-4 | Toast `aria-live` + longer sticky error status | S | Low |
+
+### Follow-up same day: offline relink modal
+
+- New `sidebar-relink.js` + `#modal-relink`: paste/type path **or** toggle in-modal FS browse (dirs + video files)
+- Offline row click opens the modal; ⋮ menu still works
+- Escape closes only the topmost modal
 
 ## Files touched
 
