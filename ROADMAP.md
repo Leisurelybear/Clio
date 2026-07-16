@@ -9,11 +9,16 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
-| R-024 | GoPro GPMF telemetry as highlight signal | Large | Low |
+| R-024b | Wire GPMF summary into analyze prompt (opt-in config) | Medium | Medium |
 | A-006 | Frontend ES module dynamic import circular reference | Medium | Low |
-| UX-next-2 | Restore lastEntity / lastVideo on project open | Small | Medium |
 
-**Recently completed (2026-07-16 UX/bug iteration):** see `docs/analysis/2026-07-16-iteration.md`
+**Recently completed (2026-07-16 iteration wave 2):** see `docs/analysis/2026-07-16-iteration-wave2.md`
+
+- Direction A: session restore, empty CTAs, toast a11y
+- Direction B: offline summary + batch relink
+- Direction C / R-024 MVP: optional GPMF summary (`clio/gpmf.py`); GPS never required
+
+**Earlier same-day (wave 1):** see `docs/analysis/2026-07-16-iteration.md`
 
 - UX-next-1: offline relink modal supports type-in path + directory browse
 
@@ -869,4 +874,4 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 Older completed sections (commit log, test coverage verification, code review audit) archived to [`docs/archive/2026-07-01-roadmap-archive.md`](docs/archive/2026-07-01-roadmap-archive.md).
 
-### Test count: 1164 pytest + 138 vitest (as of 2026-07-16 on `main`)
+### Test count: 1176 pytest + 156 vitest (as of 2026-07-16 wave 2 on `main`)
