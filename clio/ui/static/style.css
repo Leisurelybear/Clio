@@ -1977,3 +1977,32 @@ select.form-input { cursor: pointer; }
   .toast { animation: none; }
   .toast.removing { animation: none; opacity: 0; }
 }
+
+/* Offline summary bar (original source) */
+.offline-summary {
+  margin: 6px 0 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--warning-border, #b8860b);
+  background: var(--warning-bg, #2a2520);
+  border-radius: var(--radius-sm, 4px);
+  font-size: var(--text-sm);
+}
+.offline-summary-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.offline-summary-text { color: var(--text-primary); }
+.offline-batch-btn {
+  font-size: var(--text-xs) !important;
+  padding: 4px 10px !important;
+}
+.br-match-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  max-height: 160px;
+  overflow: auto;
+}
+.br-match-list li { margin-bottom: 6px; }

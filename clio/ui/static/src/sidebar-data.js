@@ -4,6 +4,7 @@ import {
 } from './utils.js';
 import { api, icon } from './api.js';
 import { updateRunFilesBadge } from './runner.js';
+import { summarizeOfflineVideos } from './offline-media.js';
 
 // ── Video relink helper ───────────────────────────────────────
 
@@ -402,6 +403,7 @@ export function renderVideoList() {
   const ul = $('video-list');
   if (!ul) return;
   ul.innerHTML = '';
+  renderOfflineSummary();
   if (state.selectionMode) {
     const headerDiv = document.createElement('div');
     headerDiv.className = 'selection-header';
@@ -507,4 +509,29 @@ export function renderVideoList() {
 
   scrollActiveVideoIntoView();
   updateRunFilesBadge();
+}
+
+function renderOfflineSummary() {
+  const box = $('offline-summary');
+  if (!box) return;
+  // Only meaningful in original view where offline paths are listed
+  const summary = summarizeOfflineVideos(state.videos || []);
+  if (!summary.count || state.source !== 'original') {
+    box.hidden = true;
+    box.innerHTML = '';
+    return;
+  }
+  box.hidden = false;
+  box.innerHTML = `
+    <div class="offline-summary-inner">
+      <span class="offline-summary-text">⚠ ${summary.count} 个视频离线</span>
+      <button type="button" class="sidebar-btn offline-batch-btn" id="btn-batch-relink" title="按文件名批量重新关联">批量关联</button>
+    </div>
+  `;
+  const btn = box.querySelector('#btn-batch-relink');
+  if (btn) {
+    btn.onclick = () => {
+      import('./sidebar-batch-relink.js').then(m => m.openBatchRelinkModal());
+    };
+  }
 }

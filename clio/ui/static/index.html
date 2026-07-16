@@ -80,6 +80,7 @@
           选择视频
         </button>
       </div>
+      <div id="offline-summary" class="offline-summary" hidden></div>
       <ul id="video-list"></ul>
       <h3>流水线</h3>
       <ul id="step-list" class="step-list"></ul>
@@ -254,6 +255,28 @@
     <div class="modal-actions" style="margin-top:12px;">
       <button type="button" id="relink-confirm" class="btn-primary">确认关联</button>
       <button type="button" id="relink-cancel" class="btn-secondary">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- Batch offline relink: pick a folder, auto-match by filename -->
+<div id="modal-batch-relink" class="modal" style="display:none;">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog modal-dialog-wide">
+    <h3>批量重新关联离线视频</h3>
+    <p class="hint">选择包含新文件的目录，按文件名自动匹配离线条目（忽略 001_ 序号前缀）。</p>
+    <div class="browse-path" id="br-path">正在加载...</div>
+    <div class="browse-dir-list" id="br-list" style="max-height:180px;overflow:auto">
+      <p class="muted">选择目录…</p>
+    </div>
+    <div class="modal-actions" style="margin-top:8px;">
+      <button type="button" id="br-up" class="btn-secondary" style="display:none">上级目录</button>
+      <button type="button" id="br-scan" class="btn-primary" disabled>扫描此目录并匹配</button>
+    </div>
+    <div id="br-result" style="margin-top:12px;font-size:var(--text-sm)"></div>
+    <div class="modal-actions" style="margin-top:12px;">
+      <button type="button" id="br-apply" class="btn-primary" disabled>应用匹配</button>
+      <button type="button" id="br-cancel" class="btn-secondary">关闭</button>
     </div>
   </div>
 </div>
