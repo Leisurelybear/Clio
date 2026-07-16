@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import { $, $$, escapeHtml, markDirty, updateSaveBtn, setStatus, setDeep } from './utils.js';
 import { api, icon } from './api.js';
-import { renderActiveTab } from './editor.js';
+// Dynamic import avoids static cycle: editor.js → editor-config.js → editor.js (A-006)
 
 const DEFAULT_PROVIDERS = ['gemini', 'openai', 'deepseek'];
 const DEFAULT_MODELS = {
@@ -279,7 +279,7 @@ export async function initProjectConfig() {
       state.configGlobal = global || {};
       state.configProject = project || {};
       state._needsConfigInit = false;
-      renderActiveTab();
+      import('./editor.js').then(m => m.renderActiveTab());
     } else {
       setStatus('创建失败: ' + (r.error || '未知错误'), 'err');
     }

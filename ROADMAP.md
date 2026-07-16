@@ -9,7 +9,9 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
-| A-006 | Frontend ES module dynamic import circular reference | Medium | Low |
+| *(none high)* | — | — | — |
+
+**Recently completed (2026-07-16 small fixes):** A-006 editor↔editor-config cycle broken (dynamic import); remove/add video selection helpers (ambiguous basename + net-new toast).
 
 **Recently completed (2026-07-16 R-024b):** opt-in `analyze.use_gpmf` injects GPMF/sidecar summary into analyze `context_override` via `merge_telemetry_into_context`; default false; no GPS → no-op.
 
