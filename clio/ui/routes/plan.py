@@ -7,6 +7,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from clio.pipeline import run_cut_all
+from clio.plan_model import Plan
+from clio.schema import add_schema_version
 from clio.ui.services.file_service import _is_safe_basename, _save_atomic
 
 if TYPE_CHECKING:
@@ -45,8 +47,21 @@ def handle_put_plan(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> 
         return handler._send_json({"ok": False, "error": "forbidden"}, 403)
     proj_out = handler._get_project_output(qs)
     p = proj_out / "plans" / f"{day}_plan.json"
-    data = json.dumps(obj, ensure_ascii=False, indent=2).encode("utf-8")
-    _save_atomic(p, data)
+    plan = Plan.from_dict(obj if isinstance(obj, dict) else {})
+    issues = plan.validate_for_save()
+    if issues:
+        return handler._send_json(
+            {
+                "ok": False,
+                "error": issues[0].message,
+                "issues": [i.to_dict() for i in issues],
+            },
+            400,
+        )
+    data = add_schema_version(plan.to_dict())
+    payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+    p.parent.mkdir(parents=True, exist_ok=True)
+    _save_atomic(p, payload)
     handler._send_json({"ok": True, "path": str(p)})
 
 

@@ -144,9 +144,13 @@ def run_plan_vlog(
             context_override=context_override,
             task_prompts=task_prompts,
         )
-        if config.plan.use_transcripts:
-            plan["_transcripts_missing"] = not transcripts_map
-    add_schema_version(plan)
+    from clio.plan_model import Plan
+
+    plan_obj = Plan.from_dict(plan)
+    plan = plan_obj.to_dict()
+    if config.plan.use_transcripts:
+        plan["_transcripts_missing"] = not transcripts_map
+    plan = add_schema_version(plan)
     write_json_atomic(out_json, plan)
     if tracker:
         tracker.log(f"规划 {day_label} ✓")
