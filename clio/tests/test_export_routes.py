@@ -104,3 +104,29 @@ class TestHandlePostExport:
             handle_post_export(handler, {}, {"day": "day1", "format": "jianying", "force": True})
 
         handler._send_json.assert_called_once_with({"ok": True, "path": str(result_path)})
+
+    def test_warnings_without_force_needs_force(self, handler: MagicMock) -> None:
+        plan = {
+            "day_title": "d",
+            "total_estimated_sec": 120,
+            "sequence": [
+                {
+                    "index": "001",
+                    "title": "",
+                    "reason": "",
+                    "use_timeline": "00:00-00:10",
+                    "voiceover_hint": "",
+                }
+            ],
+        }
+        plan_path = handler._get_config.return_value.plans_dir / "day1_plan.json"
+        plan_path.write_text(json.dumps(plan), encoding="utf-8")
+        with (
+            patch("clio.ui.routes.export.collect_project_indices", return_value=({"001"}, set())),
+            patch("clio.ui.routes.export.export_plan") as mock_export,
+        ):
+            handle_post_export(handler, {}, {"day": "day1", "format": "jianying"})
+            mock_export.assert_not_called()
+        args = handler._send_json.call_args[0]
+        assert args[1] == 400
+        assert args[0].get("needs_force") is True
