@@ -6,7 +6,17 @@ import { loadVideos, renderSteps } from './sidebar-data.js';
 
 let _rerunPollTimer = null;
 let _rerunPollStart = 0;
-const RERUN_POLL_TIMEOUT = 120_000;
+// Long AI analyze can exceed 2 min; only fail after long idle wall clock
+const RERUN_POLL_TIMEOUT = 30 * 60_000;
+
+/** Menu + empty CTA send task "analyze"; legacy alias "texts". */
+export function shouldReloadTextsAfterRerun(task) {
+  return task === 'analyze' || task === 'texts' || task === 'all';
+}
+
+export function shouldReloadVoiceoverAfterRerun(task) {
+  return task === 'voiceover' || task === 'all';
+}
 
 export function showRerunProgress(task, file) {
   const overlay = $('rerun-overlay');
@@ -134,10 +144,10 @@ async function refreshAfterRerun(task, file) {
     const v = state.videos.find(x => x.file === file);
     if (!v) return;
     try {
-      if ((task === 'texts' || task === 'all') && v.text_json) {
+      if (shouldReloadTextsAfterRerun(task) && v.text_json) {
         state.texts = await api('GET', `/api/texts?file=${encodeURIComponent(v.text_json)}`);
       }
-      if ((task === 'voiceover' || task === 'all') && v.script_json) {
+      if (shouldReloadVoiceoverAfterRerun(task) && v.script_json) {
         state.voiceover = await api('GET', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`);
       }
       import('./editor.js').then(mod => mod.renderActiveTab());

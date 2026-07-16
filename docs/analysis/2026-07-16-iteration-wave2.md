@@ -72,3 +72,14 @@ print(format_telemetry_for_prompt(s))
 | --- | --- |
 | R-024b | Opt-in inject GPMF block into analyze context |
 | A-006 | Static editor↔editor-config cycle |
+
+## Post-wave UI review fixes (same day)
+
+| Fix | Summary |
+| --- | --- |
+| save target | `resolveEditorSaveTarget` — transcript/run/merged no longer false-“已保存” |
+| dirty tab | editor tab switch confirms when dirty |
+| analyze refresh | `shouldReloadTextsAfterRerun('analyze')` reloads texts JSON |
+| goToRunTab | dirty confirm like `selectRun` |
+| Escape | closes batch-relink via `closeBatchRelinkModal` |
+| rerun poll | wall timeout 30 min (was 2 min) |
