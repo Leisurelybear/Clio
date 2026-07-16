@@ -1,6 +1,33 @@
 const VALID_ENTITIES = new Set(['video', 'plan', 'run', 'config', 'logs', 'tokens']);
 
 /**
+ * Build PUT /api/project body for session fields.
+ * Omits lastVideo when currentVideo is null/undefined so a transient clear
+ * (e.g. setSource mid-switch) does not wipe the stored lastVideo via merge.
+ * Pass extra.lastVideo explicitly to force a value (including null).
+ */
+export function buildProjectSavePayload({
+  currentDay,
+  source,
+  currentEntity,
+  currentVideo,
+  projectName,
+} = {}, extra = {}) {
+  const payload = {
+    currentDay,
+    source,
+    lastEntity: currentEntity,
+  };
+  if (currentVideo != null && currentVideo !== '') {
+    payload.lastVideo = currentVideo;
+  }
+  if (projectName) {
+    payload.name = projectName;
+  }
+  return Object.assign(payload, extra || {});
+}
+
+/**
  * Decide which entity/video to open after project load.
  * Pure helper — no DOM / network.
  */

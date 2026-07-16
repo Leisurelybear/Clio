@@ -175,12 +175,13 @@ export async function loadProject() {
 
 export async function saveProject(extra) {
   try {
-    await api('PUT', '/api/project', Object.assign({
+    const { buildProjectSavePayload } = await import('./session-restore.js');
+    await api('PUT', '/api/project', buildProjectSavePayload({
       currentDay: state.currentDay,
       source: state.source,
-      lastEntity: state.currentEntity,
-      lastVideo: state.currentVideo,
-      name: state.projectName || undefined,
+      currentEntity: state.currentEntity,
+      currentVideo: state.currentVideo,
+      projectName: state.projectName,
     }, extra || {}));
   } catch (e) { /* 静默 */ }
 }

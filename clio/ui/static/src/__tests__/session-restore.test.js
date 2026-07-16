@@ -1,5 +1,52 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSessionRestore } from '../session-restore.js';
+import { resolveSessionRestore, buildProjectSavePayload } from '../session-restore.js';
+
+describe('buildProjectSavePayload', () => {
+  const base = {
+    currentDay: 'day1',
+    source: 'compressed',
+    currentEntity: 'video',
+    currentVideo: '003_c.mp4',
+    projectName: 'Trip',
+  };
+
+  it('writes lastEntity and lastVideo when a video is selected', () => {
+    expect(buildProjectSavePayload(base)).toEqual({
+      currentDay: 'day1',
+      source: 'compressed',
+      lastEntity: 'video',
+      lastVideo: '003_c.mp4',
+      name: 'Trip',
+    });
+  });
+
+  it('omits lastVideo when currentVideo is null so PUT merge keeps the previous value', () => {
+    const payload = buildProjectSavePayload({
+      ...base,
+      currentEntity: 'run',
+      currentVideo: null,
+      projectName: '',
+    });
+    expect(payload).toEqual({
+      currentDay: 'day1',
+      source: 'compressed',
+      lastEntity: 'run',
+    });
+    expect(payload).not.toHaveProperty('lastVideo');
+    expect(payload).not.toHaveProperty('name');
+  });
+
+  it('allows explicit lastVideo override via extra (including null clear)', () => {
+    expect(buildProjectSavePayload(
+      { ...base, currentVideo: null },
+      { lastVideo: 'kept.mp4' },
+    )).toMatchObject({ lastVideo: 'kept.mp4', lastEntity: 'video' });
+
+    expect(buildProjectSavePayload(base, { lastVideo: null })).toMatchObject({
+      lastVideo: null,
+    });
+  });
+});
 
 describe('resolveSessionRestore', () => {
   const videos = [

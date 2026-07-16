@@ -70,6 +70,7 @@ async function selectVideo(file) {
   renderVideoList();
   import('./editor.js').then(mod => mod.renderActiveTab());
   updateEntityUI();
+  saveProject();
 }
 
 async function selectPlan(dayOverride) {
@@ -89,6 +90,7 @@ async function selectPlan(dayOverride) {
   updateEntityUI();
   updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
+  saveProject();
 }
 
 async function selectRun() {
@@ -102,6 +104,7 @@ async function selectRun() {
   updateEntityUI();
   updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
+  saveProject();
 }
 
 async function selectConfig() {
@@ -139,6 +142,7 @@ async function selectConfig() {
   updateEntityUI();
   updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
+  saveProject();
 }
 
 async function selectLogs() {
@@ -152,6 +156,7 @@ async function selectLogs() {
   updateEntityUI();
   updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
+  saveProject();
 }
 
 async function selectTokens() {
@@ -165,6 +170,7 @@ async function selectTokens() {
   updateEntityUI();
   updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
+  saveProject();
 }
 
 function toggleSelection() {
@@ -242,6 +248,7 @@ async function setSource(source, options = {}) {
           setStatus('对应原视频当前离线，已切换视图', 'warn');
           state.currentVideo = target.file;
           renderVideoList();
+          saveProject();
         } else {
           await selectVideo(target ? target.file : state.videos[0].file);
         }
@@ -294,6 +301,7 @@ function goToRunTab() {
   state.currentEntity = 'run';
   updateEntityUI();
   import('./editor.js').then(mod => mod.renderActiveTab());
+  saveProject();
 }
 
 export {
