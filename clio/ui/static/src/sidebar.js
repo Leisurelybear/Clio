@@ -297,9 +297,16 @@ async function switchToOriginalThenCompress() {
 }
 
 function goToRunTab() {
+  // Same dirty guard as selectRun — empty CTAs should not discard edits silently
+  if (state.dirty) {
+    if (!confirm('当前 tab 有未保存的修改，确定切换到运行吗？')) return;
+  }
+  if (state.previewActive) stopPreview();
   $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'run';
+  state.dirty = false;
   updateEntityUI();
+  updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
   saveProject();
 }

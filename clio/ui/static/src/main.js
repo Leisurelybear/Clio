@@ -30,6 +30,7 @@ import {
   hideRerunProgress,
 } from './sidebar.js';
 import { resolveSessionRestore } from './session-restore.js';
+import { shouldConfirmDirtyTabSwitch } from './editor-save.js';
 
 // Expose functions referenced by inline onclick handlers in HTML
 window.switchToOriginalThenCompress = switchToOriginalThenCompress;
@@ -284,7 +285,15 @@ async function init() {
   $('btn-save').onclick = save;
   document.getElementById('btn-select-videos').addEventListener('click', toggleSelection);
   document.getElementById('btn-add-videos').addEventListener('click', () => import('./sidebar-video-manage.js').then(m => m.openVideoManager()));
-  $$('.tab').forEach(t => t.onclick = () => { state.currentTab = t.dataset.tab; renderActiveTab(); });
+  $$('.tab').forEach(t => t.onclick = () => {
+    const toTab = t.dataset.tab;
+    if (shouldConfirmDirtyTabSwitch({ dirty: state.dirty, fromTab: state.currentTab, toTab })) {
+      if (!confirm('当前 tab 有未保存的修改，确定切换吗？')) return;
+      state.dirty = false;
+    }
+    state.currentTab = toTab;
+    renderActiveTab();
+  });
   setupPlayer();
   document.addEventListener('keydown', (e) => {
     const mod = e.ctrlKey || e.metaKey;
@@ -298,6 +307,8 @@ async function init() {
           import('./sidebar-relink.js').then(m => m.closeRelinkModal());
         } else if (top.id === 'modal-video-manage') {
           import('./sidebar-video-manage.js').then(m => m.closeVideoManager());
+        } else if (top.id === 'modal-batch-relink') {
+          import('./sidebar-batch-relink.js').then(m => m.closeBatchRelinkModal());
         } else {
           top.style.display = 'none';
         }
