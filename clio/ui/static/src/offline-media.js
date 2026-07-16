@@ -42,11 +42,13 @@ export function matchBatchRelink(offline = [], candidates = []) {
   const unmatched = [];
   const ambiguous = [];
   const seenAmbiguous = new Set();
+  const usedPaths = new Set(); // each candidate path at most once
 
   for (const item of offline) {
     const key = stemKey(item.file || item.abs_path || '');
-    const hits = byKey.get(key) || [];
+    const hits = (byKey.get(key) || []).filter(h => !usedPaths.has(h.path));
     if (hits.length === 1) {
+      usedPaths.add(hits[0].path);
       matched.push({
         file: item.file,
         old_path: item.abs_path || item.file,

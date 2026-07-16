@@ -17,6 +17,7 @@ TDD, multi-commit, docs updated. GPS/GPMF treated as **optional**.
 | `e2df4af` | `resolveSessionRestore` + open lastEntity/lastVideo |
 | `fd50744` | texts/voiceover empty states with Run / Rerun CTAs |
 | `8a31153` | toast `aria-live` + 8s error default; status bar matches |
+| (fix) | Session **write** path: `select*` / `goToRunTab` call `saveProject`; `buildProjectSavePayload` omits null `lastVideo` so `setSource` mid-clear does not wipe stored video |
 
 ## Direction B — Media robustness
 
@@ -24,6 +25,7 @@ TDD, multi-commit, docs updated. GPS/GPMF treated as **optional**.
 | --- | --- |
 | `353cc8b` | pure `summarizeOfflineVideos` / `matchBatchRelink` |
 | `9ee76b0` | offline summary bar + batch relink modal (filename match) |
+| (fix) | Each candidate path matches at most one offline row (stem collision) |
 
 ## Direction C — GPMF (R-024 MVP)
 

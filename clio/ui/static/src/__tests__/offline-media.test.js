@@ -70,4 +70,18 @@ describe('matchBatchRelink', () => {
     expect(r.matched[0].old_path).toBe('clip.mp4');
     expect(r.matched[0].new_path).toBe('D:/here/clip.mp4');
   });
+
+  it('assigns each candidate path to at most one offline item', () => {
+    // Two project rows normalize to the same stem; only one file on disk.
+    const r = matchBatchRelink(
+      [
+        { file: '001_GL.MP4', abs_path: 'D:/old/GL.MP4' },
+        { file: 'GL.MP4', abs_path: 'E:/other/GL.MP4' },
+      ],
+      [{ path: 'F:/new/GL.MP4', name: 'GL.MP4' }],
+    );
+    expect(r.matched).toHaveLength(1);
+    expect(r.matched[0].new_path).toBe('F:/new/GL.MP4');
+    expect(r.unmatched).toHaveLength(1);
+  });
 });
