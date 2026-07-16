@@ -4,7 +4,11 @@ import { api, icon } from './api.js';
 import { renderPreviewBar, startPreview, _playPreviewSegment } from './viewer.js';
 import { addToast } from './toast.js';
 import { resolveEditorSaveTarget } from './editor-save.js';
+import { reorderSequence, removeSegment, patchSegment } from './plan-edit.js';
 
+let _readinessTimer = null;
+let _lastReadiness = { ok: true, errors: [], warnings: [] };
+let _dragFromIndex = null;
 
 export function configSaveStatusForTab(tab) {
   if (tab === 'project') {
@@ -19,6 +23,112 @@ export function configSaveStatusForTab(tab) {
   return { message: '合并视图为只读，无法保存', level: 'warn' };
 }
 
+function applySequence(next) {
+  if (!state.plan) return;
+  state.plan.sequence = next;
+  markDirty();
+  renderPlan();
+}
+
+function scheduleReadinessCheck() {
+  if (_readinessTimer) clearTimeout(_readinessTimer);
+  _readinessTimer = setTimeout(() => {
+    _readinessTimer = null;
+    refreshReadinessPanel();
+  }, 400);
+}
+
+async function refreshReadinessPanel() {
+  const panel = $('plan-readiness');
+  if (!panel || !state.plan) return;
+  panel.innerHTML = '<p class="muted">检查规划就绪状态…</p>';
+  try {
+    const r = await api('POST', '/api/plan/readiness', {
+      day: state.currentDay || 'day1',
+      source: $('cut-source')?.value || 'compressed',
+      plan: state.plan,
+    });
+    const errors = r.errors || [];
+    const warnings = r.warnings || [];
+    _lastReadiness = { ok: !!r.ok, errors, warnings };
+    renderReadinessList(panel, errors, warnings);
+    updateActionButtonsGate();
+  } catch (e) {
+    panel.innerHTML = `<p class="err">就绪检查失败: ${escapeHtml(e.message || e)}</p>`;
+    _lastReadiness = { ok: false, errors: [{ message: String(e.message || e) }], warnings: [] };
+    updateActionButtonsGate();
+  }
+}
+
+function renderReadinessList(panel, errors, warnings) {
+  if (!errors.length && !warnings.length) {
+    panel.innerHTML = '<p class="ok">规划检查通过，可以裁剪/导出。</p>';
+    return;
+  }
+  const parts = ['<h3>导出/裁剪检查</h3>'];
+  if (errors.length) {
+    parts.push('<ul class="plan-readiness-errors">');
+    for (const issue of errors) {
+      const idx = issue.segment_index;
+      parts.push(
+        `<li class="plan-issue-error" data-seg="${idx != null ? idx : ''}">${escapeHtml(issue.message || issue.code || '错误')}</li>`
+      );
+    }
+    parts.push('</ul>');
+  }
+  if (warnings.length) {
+    parts.push('<ul class="plan-readiness-warnings">');
+    for (const issue of warnings) {
+      const idx = issue.segment_index;
+      parts.push(
+        `<li class="plan-issue-warn" data-seg="${idx != null ? idx : ''}">${escapeHtml(issue.message || issue.code || '警告')}</li>`
+      );
+    }
+    parts.push('</ul>');
+  }
+  panel.innerHTML = parts.join('');
+  panel.querySelectorAll('[data-seg]').forEach((el) => {
+    el.onclick = () => {
+      const i = el.getAttribute('data-seg');
+      if (i === '' || i == null) return;
+      document.querySelector(`[data-preview-index="${i}"]`)?.scrollIntoView({ block: 'nearest' });
+    };
+  });
+}
+
+function updateActionButtonsGate() {
+  const hasErrors = (_lastReadiness.errors || []).length > 0;
+  const cutBtn = $('btn-cut-exec');
+  const expBtn = $('btn-jianying-export');
+  if (cutBtn) {
+    cutBtn.disabled = hasErrors;
+    cutBtn.title = hasErrors ? '请先修复规划错误' : '';
+  }
+  if (expBtn) {
+    expBtn.disabled = hasErrors;
+    expBtn.title = hasErrors ? '请先修复规划错误' : '';
+  }
+}
+
+function ensureSavedBeforeAction() {
+  if (!state.dirty) return true;
+  alert('有未保存的规划修改，请先保存后再裁剪/导出。');
+  return false;
+}
+
+function confirmWarningsIfNeeded() {
+  const warnings = _lastReadiness.warnings || [];
+  const errors = _lastReadiness.errors || [];
+  if (errors.length) {
+    addToast(errors[0].message || '规划存在错误，无法继续', 'error', 6000);
+    return false;
+  }
+  if (warnings.length) {
+    const preview = warnings.slice(0, 5).map((w) => w.message).join('\n');
+    return confirm(`规划存在警告：\n${preview}\n\n仍要继续？`);
+  }
+  return true;
+}
 
 export function renderPlan() {
   const p = state.plan;
@@ -33,6 +143,8 @@ export function renderPlan() {
     `;
     return;
   }
+  if (!Array.isArray(p.sequence)) p.sequence = [];
+
   pane.innerHTML = `
     <h3>编排元信息</h3>
     ${state.availablePlans.length >= 1 ? `
@@ -44,12 +156,14 @@ export function renderPlan() {
       </select>
     </label>
     ` : ''}
+    <label>标题 <input data-field="day_title"></label>
     <label>主题 <input data-field="theme"></label>
     <label>开场提示 <textarea data-field="opening_tip" rows="2"></textarea></label>
     <label>收尾提示 <textarea data-field="ending_tip" rows="2"></textarea></label>
-    <h3>顺序 (sequence) — ${(p.sequence || []).length} 项</h3>
-    <p class="hint">点击 segment 跳到对应视频</p>
+    <h3>顺序 (sequence) — ${p.sequence.length} 项</h3>
+    <p class="hint">拖动手柄或使用 ↑↓ 调整顺序；点击片段跳转预览</p>
     <ol id="plan-list"></ol>
+    <div id="plan-readiness" class="plan-readiness cut-section"></div>
   `;
   const daySelect = pane.querySelector('#plan-day-select');
   if (daySelect) {
@@ -65,24 +179,37 @@ export function renderPlan() {
       await import('./sidebar.js').then(mod => mod.selectPlan());
     };
   }
-  for (const k of ['theme', 'opening_tip', 'ending_tip']) {
+  for (const k of ['day_title', 'theme', 'opening_tip', 'ending_tip']) {
     const el = pane.querySelector(`[data-field="${k}"]`);
+    if (!el) continue;
     el.value = p[k] || '';
-    el.oninput = () => { p[k] = el.value; markDirty(); };
+    el.oninput = () => {
+      p[k] = el.value;
+      markDirty();
+      scheduleReadinessCheck();
+    };
   }
   const ol = pane.querySelector('#plan-list');
-  (p.sequence || []).forEach((seg, i) => {
+  p.sequence.forEach((seg, i) => {
     const li = document.createElement('li');
     li.className = 'plan-seg' + (state.previewActive && state.previewIndex === i ? ' preview-active' : '');
-    li.dataset.previewIndex = i;
+    li.dataset.previewIndex = String(i);
+    li.draggable = true;
     li.innerHTML = `
-      <div class="seg-time">${escapeHtml(seg.use_timeline || '')} <span class="muted">视频 [${escapeHtml(seg.index || '?')}]</span></div>
-      <div class="seg-title">${escapeHtml(seg.title || '')}</div>
+      <div class="plan-seg-toolbar">
+        <span class="plan-drag-handle" title="拖拽排序" aria-hidden="true">⠿</span>
+        <button type="button" class="plan-move-btn" data-move="up" title="上移" ${i === 0 ? 'disabled' : ''}>↑</button>
+        <button type="button" class="plan-move-btn" data-move="down" title="下移" ${i === p.sequence.length - 1 ? 'disabled' : ''}>↓</button>
+        <button type="button" class="plan-del-btn" data-del title="删除片段">删除</button>
+        <span class="muted">视频 [${escapeHtml(seg.index || '?')}]</span>
+      </div>
+      <label>标题 <input value="${escapeHtml(seg.title || '')}" data-k="title"></label>
+      <label>时间轴 <input value="${escapeHtml(seg.use_timeline || '')}" data-k="use_timeline" placeholder="00:10-00:45"></label>
       <label>理由 <input value="${escapeHtml(seg.reason || '')}" data-k="reason"></label>
       <label>口播提示 <textarea rows="2" data-k="voiceover_hint">${escapeHtml(seg.voiceover_hint || '')}</textarea></label>
     `;
     li.onclick = (e) => {
-      if (e.target.matches('input, textarea')) return;
+      if (e.target.closest('input, textarea, button, .plan-drag-handle')) return;
       const v = state.videos.find(x => x.index === seg.index);
       if (!v) { setStatus(`找不到视频 [${seg.index}]，请重新生成规划`, 'warn'); return; }
       if (state.previewActive) {
@@ -94,9 +221,44 @@ export function renderPlan() {
     };
     li.querySelectorAll('[data-k]').forEach(inp => {
       inp.oninput = (e) => {
-        p.sequence[i][e.target.dataset.k] = e.target.value;
+        p.sequence[i] = patchSegment(p.sequence[i], { [e.target.dataset.k]: e.target.value });
         markDirty();
+        scheduleReadinessCheck();
       };
+    });
+    li.querySelector('[data-move="up"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (i <= 0) return;
+      applySequence(reorderSequence(p.sequence, i, i - 1));
+    });
+    li.querySelector('[data-move="down"]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (i >= p.sequence.length - 1) return;
+      applySequence(reorderSequence(p.sequence, i, i + 1));
+    });
+    li.querySelector('[data-del]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!confirm(`删除第 ${i + 1} 段「${seg.title || seg.index || ''}」？`)) return;
+      applySequence(removeSegment(p.sequence, i));
+    });
+    li.addEventListener('dragstart', (e) => {
+      _dragFromIndex = i;
+      li.classList.add('plan-seg-dragging');
+      e.dataTransfer.effectAllowed = 'move';
+    });
+    li.addEventListener('dragend', () => {
+      li.classList.remove('plan-seg-dragging');
+      _dragFromIndex = null;
+    });
+    li.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+    });
+    li.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (_dragFromIndex == null || _dragFromIndex === i) return;
+      applySequence(reorderSequence(p.sequence, _dragFromIndex, i));
+      _dragFromIndex = null;
     });
     ol.appendChild(li);
   });
@@ -131,9 +293,15 @@ export function renderPlan() {
   `;
   pane.appendChild(exportSection);
 
+  $('cut-source')?.addEventListener('change', () => scheduleReadinessCheck());
+
   $('btn-jianying-export')?.addEventListener('click', async () => {
     const btn = $('btn-jianying-export');
     if (btn?.disabled) return;
+    if (!ensureSavedBeforeAction()) return;
+    await refreshReadinessPanel();
+    if (!confirmWarningsIfNeeded()) return;
+    const force = (_lastReadiness.warnings || []).length > 0;
     const resultDiv = $('export-result');
     resultDiv.innerHTML = '<span class="muted">导出中…</span>';
     if (btn) {
@@ -142,14 +310,13 @@ export function renderPlan() {
       btn.textContent = '导出中...';
     }
     try {
-      const r = await api('POST', '/api/export', { day: state.currentDay || 'day1', format: 'jianying' });
-      if (r.ok) {
-        resultDiv.innerHTML = `<span style="color:var(--ok,#484)">✓ 已导出到 ${escapeHtml(r.path)}</span>`;
-        addToast('已导出到剪映', 'success');
-      } else {
-        resultDiv.innerHTML = `<span style="color:var(--err,#c44)">✗ ${escapeHtml(r.error || '导出失败')}</span>`;
-        addToast(r.error || '导出失败', 'error', 6000);
-      }
+      const r = await api('POST', '/api/export', {
+        day: state.currentDay || 'day1',
+        format: 'jianying',
+        force,
+      });
+      resultDiv.innerHTML = `<span style="color:var(--ok,#484)">✓ 已导出到 ${escapeHtml(r.path)}</span>`;
+      addToast('已导出到剪映', 'success');
     } catch (e) {
       resultDiv.innerHTML = `<span style="color:var(--err,#c44)">✗ 导出失败: ${escapeHtml(e.message || e)}</span>`;
       addToast('导出失败: ' + (e.message || e), 'error', 6000);
@@ -158,27 +325,35 @@ export function renderPlan() {
         btn.disabled = false;
         btn.innerHTML = btn.dataset.prevLabel || `${icon('export', 16)} 导出到剪映`;
       }
+      updateActionButtonsGate();
     }
   });
   $('btn-cut-exec').onclick = executeCut;
+  scheduleReadinessCheck();
 }
 
 
 export async function executeCut() {
   const btn = $('btn-cut-exec');
   const result = $('cut-result');
+  if (btn?.disabled) return;
+  if (!ensureSavedBeforeAction()) return;
+  await refreshReadinessPanel();
+  if (!confirmWarningsIfNeeded()) return;
+  const force = (_lastReadiness.warnings || []).length > 0;
   btn.disabled = true;
   btn.textContent = '裁剪中...';
   result.innerHTML = '<p class="muted">请等待，正在裁剪视频片段...</p>';
   try {
     const dayLabel = state.currentDay;
-    let planCheck;
-    try { planCheck = await api('GET', `/api/plan?day=${dayLabel}`); }
-    catch (e) {
+    try {
+      await api('GET', `/api/plan?day=${dayLabel}`);
+    } catch (e) {
       result.innerHTML = `<p class="err">规划文件不存在: 请先运行 CLI 命令 <code>python main.py plan --day ${escapeHtml(dayLabel)}</code> 生成规划。</p>`;
       setStatus('裁剪失败: 规划文件不存在', 'err');
       btn.disabled = false;
       btn.textContent = '执行裁剪';
+      updateActionButtonsGate();
       return;
     }
     const r = await api('POST', '/api/cut', {
@@ -186,17 +361,14 @@ export async function executeCut() {
       source: $('cut-source').value,
       reencode: $('cut-reencode').checked,
       output_dir: $('cut-outdir').value.trim() || null,
+      force,
     });
-    if (r.ok) {
-      result.innerHTML = `<p class="ok">裁剪完成</p><p>输出目录: ${escapeHtml(r.output_dir)}</p>`;
-      setStatus('裁剪完成', 'ok');
-      addToast('裁剪完成', 'success');
-      state.steps.cut = true;
-      import('./sidebar.js').then(mod => mod.renderSteps());
-      import('./sidebar.js').then(mod => mod.saveProject());
-    } else {
-      throw new Error(r.error || '裁剪失败');
-    }
+    result.innerHTML = `<p class="ok">裁剪完成</p><p>输出目录: ${escapeHtml(r.output_dir)}</p>`;
+    setStatus('裁剪完成', 'ok');
+    addToast('裁剪完成', 'success');
+    state.steps.cut = true;
+    import('./sidebar.js').then(mod => mod.renderSteps());
+    import('./sidebar.js').then(mod => mod.saveProject());
   } catch (e) {
     result.innerHTML = `<p class="err">错误: ${escapeHtml(e.message)}</p>`;
     const msg = '裁剪失败: ' + e.message;
@@ -205,6 +377,7 @@ export async function executeCut() {
   } finally {
     btn.disabled = false;
     btn.textContent = '执行裁剪';
+    updateActionButtonsGate();
   }
 }
 
@@ -245,18 +418,15 @@ export async function save() {
       return;
     }
     if (target.action === 'plan') {
-      const r = await api('PUT', `/api/plan?day=${day}`, planData);
-      if (!r.ok) throw new Error(r.error);
+      await api('PUT', `/api/plan?day=${day}`, planData);
     } else if (target.action === 'texts') {
       const v = state.videos.find(x => x.file === videoFile);
       if (!v || !v.text_json) throw new Error('当前视频没有 texts JSON');
-      const r = await api('PUT', `/api/texts?file=${encodeURIComponent(v.text_json)}`, textsData);
-      if (!r.ok) throw new Error(r.error);
+      await api('PUT', `/api/texts?file=${encodeURIComponent(v.text_json)}`, textsData);
     } else if (target.action === 'voiceover') {
       const v = state.videos.find(x => x.file === videoFile);
       if (!v || !v.script_json) throw new Error('当前视频没有 voiceover JSON');
-      const r = await api('PUT', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`, voiceoverData);
-      if (!r.ok) throw new Error(r.error);
+      await api('PUT', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`, voiceoverData);
     } else {
       setStatus('当前页无可保存内容', 'warn');
       return;
@@ -265,6 +435,7 @@ export async function save() {
     updateSaveBtn();
     setStatus('已保存', 'ok');
     addToast('已保存', 'success');
+    if (target.action === 'plan') scheduleReadinessCheck();
   } catch (e) {
     const msg = '保存失败: ' + e.message;
     setStatus(msg, 'err');
