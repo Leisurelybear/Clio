@@ -43,6 +43,9 @@ analyze:
   skip_existing: true
   max_analyze_duration_min: 45
   max_workers: 1
+  # Optional: inject GoPro GPMF / sidecar summary into AI analyze context.
+  # Default false. Missing GPS/GPMF is always a silent no-op.
+  use_gpmf: false
 
 script:
   scripts_subdir: scripts

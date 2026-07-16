@@ -47,6 +47,7 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     "analyze.skip_existing": "全局跳过开关：跳过已处理的文件（影响所有步骤）",
     "analyze.max_analyze_duration_min": "超过此分钟数的压缩视频跳过 AI 分析。0 不限制",
     "analyze.max_workers": "AI 分析并发数（ThreadPoolExecutor），1=串行",
+    "analyze.use_gpmf": "可选：将原片旁 .gpmf.json / GPMF 探测摘要注入 AI 分析上下文（默认关闭；无 GPS 时静默跳过）",
     # naming
     "naming.index_width": "文件名中索引编号的位数（如 3 表示 001）",
     # script
