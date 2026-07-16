@@ -153,6 +153,13 @@ def _process_video_item(
     print(f"  [{compressed.name}] 分析中...")
     t0 = time.monotonic()
     try:
+        from clio.gpmf import merge_telemetry_into_context
+
+        effective_context = merge_telemetry_into_context(
+            context_override,
+            original,
+            use_gpmf=bool(getattr(config.analyze, "use_gpmf", False)),
+        )
         # Pass cancel_event to analyze_video if supported
         analysis = analyze_video(
             str(compressed),
@@ -160,7 +167,7 @@ def _process_video_item(
             progress_callback=lambda msg: None,
             token_store=token_store,
             cancel_event=cancel_event,
-            context_override=context_override,
+            context_override=effective_context,
             task_prompts=task_prompts,
         )
     except Exception as e:
