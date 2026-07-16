@@ -3,6 +3,7 @@ import { $, escapeHtml, markDirty, updateSidebarDay, setStatus, updateSaveBtn } 
 import { api, icon } from './api.js';
 import { renderPreviewBar, startPreview, _playPreviewSegment } from './viewer.js';
 import { addToast } from './toast.js';
+import { resolveEditorSaveTarget } from './editor-save.js';
 
 
 export function configSaveStatusForTab(tab) {
@@ -217,45 +218,48 @@ export async function save() {
   const planData = state.plan;
   const textsData = state.texts;
   const voiceoverData = state.voiceover;
-  const configRaw = state.configRaw;
+  const target = resolveEditorSaveTarget({
+    entity,
+    tab,
+    configTab: state.configTab,
+  });
+  if (target.action === 'noop') {
+    setStatus(target.reason || '当前页无可保存内容', 'warn');
+    return;
+  }
   try {
-    if (entity === 'run') {
-      setStatus('当前视图不需要保存', 'warn');
-      return;
-    }
-    if (entity === 'config') {
-      const tab = state.configTab || 'global';
+    if (target.action === 'config') {
+      const ct = target.configTab || 'global';
       let r;
-      if (tab === 'global') {
+      if (ct === 'global') {
         r = await api('PUT', '/api/config/global', state.configGlobal);
-      } else if (tab === 'project') {
-        r = await api('PUT', '/api/config/project', state.configProject);
       } else {
-        setStatus('合并视图为只读，无法保存', 'warn');
-        return;
+        r = await api('PUT', '/api/config/project', state.configProject);
       }
       if (r.error) throw new Error(r.error);
       state.dirty = false;
       updateSaveBtn();
-      const status = configSaveStatusForTab(tab);
+      const status = configSaveStatusForTab(ct);
       setStatus(status.message, status.level);
       addToast(status.message, status.level === 'ok' ? 'success' : 'warning');
       return;
     }
-    if (entity === 'plan') {
+    if (target.action === 'plan') {
       const r = await api('PUT', `/api/plan?day=${day}`, planData);
       if (!r.ok) throw new Error(r.error);
-    } else {
+    } else if (target.action === 'texts') {
       const v = state.videos.find(x => x.file === videoFile);
-      if (tab === 'texts') {
-        if (!v || !v.text_json) throw new Error('当前视频没有 texts JSON');
-        const r = await api('PUT', `/api/texts?file=${encodeURIComponent(v.text_json)}`, textsData);
-        if (!r.ok) throw new Error(r.error);
-      } else if (tab === 'voiceover') {
-        if (!v || !v.script_json) throw new Error('当前视频没有 voiceover JSON');
-        const r = await api('PUT', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`, voiceoverData);
-        if (!r.ok) throw new Error(r.error);
-      }
+      if (!v || !v.text_json) throw new Error('当前视频没有 texts JSON');
+      const r = await api('PUT', `/api/texts?file=${encodeURIComponent(v.text_json)}`, textsData);
+      if (!r.ok) throw new Error(r.error);
+    } else if (target.action === 'voiceover') {
+      const v = state.videos.find(x => x.file === videoFile);
+      if (!v || !v.script_json) throw new Error('当前视频没有 voiceover JSON');
+      const r = await api('PUT', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`, voiceoverData);
+      if (!r.ok) throw new Error(r.error);
+    } else {
+      setStatus('当前页无可保存内容', 'warn');
+      return;
     }
     state.dirty = false;
     updateSaveBtn();
