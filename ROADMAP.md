@@ -9,7 +9,40 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
-| *(none high)* | — | — | — |
+| R-025 | Multi-language / i18n (UI + CLI user-facing copy) | Large | Medium |
+
+### R-025 Multi-language (i18n)
+
+**Goal:** Users can switch the product language (at least **zh-CN** and **en**) without forking the codebase. AI prompts may stay language-configurable separately (see below).
+
+**Why:** UI/CLI strings are mostly hard-coded Chinese; README already has `README.en.md`, but the app itself is not bilingual. Non-Chinese users cannot use Clio comfortably.
+
+**Non-goals (initial):**
+- Full translation of AI system prompts for every locale (optional later; `ai.context` / trip_context already allow project-level language)
+- Auto-detect from OS without an explicit setting
+- Per-string CMS / remote translations
+
+**Proposed scope (phased):**
+
+| Phase | Scope | Notes |
+| --- | --- | --- |
+| R-025a | Catalog + resolver | Message keys, `t(key)` / `t(key, params)`, load `locales/zh-CN.json` + `en.json`; default `zh-CN` |
+| R-025b | Config | `ui.language` (or `app.locale`) in global config; Settings dropdown; persist |
+| R-025c | Web UI copy | Replace hard-coded strings in static UI (sidebar, run, toasts, empty states, modals) |
+| R-025d | CLI / doctor / errors | User-facing Python messages go through the same catalog (or thin Python mirror) |
+| R-025e | Docs | README note: language switch; keep `README.md` / `README.en.md` in sync with default locale story |
+
+**Conventions (when implementing):**
+- One feature / locale plumbing per commit where practical
+- Keys stable English identifiers (`run.start`, `video.offline.batch_relink`)
+- Fall back: missing key → zh-CN → key string (never crash)
+- Dates/numbers: start with locale string only; full ICU later if needed
+- Tests: pure `t()` fallback + at least one UI string keyed
+
+**Related existing pieces:**
+- `README.en.md` (docs only)
+- Project `ai.context` / `templates/trip_context.md` (content language for AI, not UI chrome)
+- Config descriptions already mixed CN in UI tooltips
 
 **Recently completed (2026-07-16 small fixes):** A-006 editor↔editor-config cycle broken (dynamic import); remove/add video selection helpers (ambiguous basename + net-new toast).
 
