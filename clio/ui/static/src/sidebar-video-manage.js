@@ -145,18 +145,27 @@ async function _vmAddSelected() {
   addBtn.disabled = true;
   addBtn.textContent = '保存中...';
   try {
+    const { mergeSelectedVideos } = await import('./video-selection.js');
     const current = await api('GET', '/api/videos/selected');
-    const existing = new Set((current.videos || []).map(p => p.replace(/\\/g, '/')));
-    const newVideos = [..._selectedFiles].map(p => p.replace(/\\/g, '/'));
-    newVideos.forEach(p => existing.add(p));
-    const merged = [...existing];
+    const { merged, added, already } = mergeSelectedVideos(
+      current.videos || [],
+      [..._selectedFiles],
+    );
     const r = await api('PUT', '/api/videos/selected', { videos: merged });
     if (r && r.rejected_count) {
       const msg = `已添加，但有 ${r.rejected_count} 个路径被拒绝（扩展名无效或无法解析）`;
       setStatus(msg, 'warn');
       addToast(msg, 'warning', 6000);
+    } else if (added === 0) {
+      const msg = already
+        ? `所选 ${already} 个均已在项目中`
+        : '没有新视频需要添加';
+      setStatus(msg, 'warn');
+      addToast(msg, 'warning');
     } else {
-      const msg = `已添加 ${newVideos.length} 个视频`;
+      const msg = already
+        ? `新增 ${added} 个视频（另 ${already} 个已存在）`
+        : `已添加 ${added} 个视频`;
       setStatus(msg, 'ok');
       addToast(msg, 'success');
     }

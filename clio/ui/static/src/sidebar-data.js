@@ -31,37 +31,18 @@ export async function submitRelink(oldPath, newPath) {
 
 export async function removeVideoFromProject(file, absPath = null) {
   try {
+    const { findSelectedVideoIndex } = await import('./video-selection.js');
     const r = await api('GET', '/api/videos/selected');
     const videos = (r.videos || []).slice();
-    const norm = (p) => String(p || '').replace(/\\/g, '/').toLowerCase();
-    const targetAbs = absPath ? norm(absPath) : '';
     const display = String(file || '');
     const baseName = display.replace(/^.*[\\/]/, '');
-    // "001_GL010695.MP4" → "GL010695.MP4"
     const stripped = baseName.replace(/^\d+_/, '');
-
-    let idx = -1;
-    if (targetAbs) {
-      idx = videos.findIndex(p => norm(p) === targetAbs);
-    }
-    if (idx === -1) {
-      idx = videos.findIndex(p => {
-        const n = norm(p);
-        const leaf = n.split('/').pop() || '';
-        return (
-          leaf === baseName.toLowerCase()
-          || leaf === stripped.toLowerCase()
-          || n.endsWith('/' + baseName.toLowerCase())
-          || n.endsWith('/' + stripped.toLowerCase())
-          || n === display.toLowerCase()
-        );
-      });
-    }
-    if (idx === -1) {
-      setStatus('未在项目视频列表中找到该文件', 'err');
+    const found = findSelectedVideoIndex(videos, { file, absPath });
+    if (found.index === -1) {
+      setStatus(found.error || '未在项目视频列表中找到该文件', 'err');
       return;
     }
-    videos.splice(idx, 1);
+    videos.splice(found.index, 1);
     await api('PUT', '/api/videos/selected', { videos });
     await loadVideos();
     setStatus(`已移除 ${stripped || baseName || file}`, 'ok');
