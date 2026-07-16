@@ -53,8 +53,8 @@ def check_plan_export_readiness(
     if tes > 1800:
         result.warnings.append(PlanIssue(level="warning", code="duration_long", message=f"预估总时长过长（{tes} 秒）"))
 
-    known = {str(x).strip() for x in known_indices} if known_indices is not None else None
-    offline = {str(x).strip() for x in offline_indices} if offline_indices is not None else set()
+    known = {str(x).strip() for x in known_indices} if known_indices else None
+    offline = {str(x).strip() for x in offline_indices} if offline_indices else set()
 
     for i, seg in enumerate(plan.sequence):
         idx = (seg.index or "").strip()
