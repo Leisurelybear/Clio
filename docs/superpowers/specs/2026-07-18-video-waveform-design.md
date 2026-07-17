@@ -1,7 +1,7 @@
 # Design: Video player audio waveform (lazy peaks)
 
 **Date**: 2026-07-18  
-**Status**: Draft (design approved in conversation; awaiting user review of this file)  
+**Status**: Implemented on `main` (lazy peaks + player scrub bar; regenerate menu deferred)  
 **Scope**: Main player pane only — scrubbable amplitude waveform under `<video>`  
 **Approach**: Backend lazy peaks cache from **original** source + non-blocking frontend render/poll
 
