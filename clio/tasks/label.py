@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 from clio.config import AppConfig
@@ -13,6 +16,65 @@ from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
 from clio.tasks._helpers import _eta_line, _matches_selected_artifact, _selected_stems
 from clio.utils import format_index, resolve_binary, run_ffmpeg
+
+
+def escape_drawtext_path(path: str | Path) -> str:
+    """Escape a filesystem path for use in ffmpeg drawtext fontfile= value."""
+    s = Path(path).expanduser().resolve().as_posix()
+    # Filter options are colon-separated; drive letters and other colons need \:
+    s = s.replace("\\", "/").replace(":", r"\:").replace("'", r"\'")
+    return s
+
+
+def resolve_drawtext_font() -> Path:
+    """Pick a TTF/TTC that freetype can open without Fontconfig.
+
+    Winget/static Windows ffmpeg builds often ship with Fontconfig enabled but
+    no default config, so drawtext without fontfile fails (or segfaults).
+    """
+    candidates: list[Path] = []
+    if sys.platform == "win32":
+        windir = Path(os.environ.get("WINDIR", r"C:\Windows"))
+        fonts = windir / "Fonts"
+        candidates = [
+            fonts / "arial.ttf",
+            fonts / "segoeui.ttf",
+            fonts / "calibri.ttf",
+            fonts / "consola.ttf",
+            fonts / "msyh.ttc",
+            fonts / "simhei.ttf",
+        ]
+    elif sys.platform == "darwin":
+        candidates = [
+            Path("/System/Library/Fonts/Supplemental/Arial.ttf"),
+            Path("/Library/Fonts/Arial.ttf"),
+            Path("/System/Library/Fonts/Helvetica.ttc"),
+        ]
+    else:
+        candidates = [
+            Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"),
+            Path("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf"),
+            Path("/usr/share/fonts/TTF/DejaVuSans.ttf"),
+        ]
+    for c in candidates:
+        if c.is_file():
+            return c
+    raise FileNotFoundError(
+        "找不到可用于 drawtext 的字体文件。Windows 请确认 C:\\Windows\\Fonts\\arial.ttf（或 segoeui.ttf）存在。"
+    )
+
+
+def build_label_drawtext_vf(label: str, font_path: str | Path | None = None) -> str:
+    """Build drawtext filter that burns an index watermark with an explicit font."""
+    font = Path(font_path) if font_path is not None else resolve_drawtext_font()
+    if not font.is_file():
+        raise FileNotFoundError(f"字体文件不存在: {font}")
+    safe_label = str(label).replace("\\", r"\\").replace("'", r"\'").replace(":", r"\:")
+    font_esc = escape_drawtext_path(font)
+    return (
+        f"drawtext=fontfile='{font_esc}':text='{safe_label}':"
+        f"fontsize=36:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=8:x=20:y=20"
+    )
 
 
 def run_label_videos(
@@ -28,6 +90,7 @@ def run_label_videos(
     labeled_dir = config.paths.output_dir / "labeled"
     labeled_dir.mkdir(parents=True, exist_ok=True)
     state = ProcessingState(config.paths.output_dir)
+    font_path = resolve_drawtext_font()
 
     json_files = sorted(config.texts_dir.glob("*.json"))
     if files is not None:
@@ -75,7 +138,7 @@ def run_label_videos(
                 tracker.next(message=f"标注 {json_file.stem}")
             t0 = time.monotonic()
             label = idx.replace("'", "")
-            vf = f"drawtext=text='{label}':fontsize=36:fontcolor=white:box=1:boxcolor=black@0.5:boxborderw=8:x=20:y=20"
+            vf = build_label_drawtext_vf(label, font_path)
             try:
                 run_ffmpeg(["-i", str(compressed), "-vf", vf, "-an", "-y", str(out)], ffmpeg, cancel_event=cancel_event)
                 state.mark(orig_stem, "label", "done")

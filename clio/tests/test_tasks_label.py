@@ -45,10 +45,39 @@ def cfg(tmp_path) -> AppConfig:
     return AppConfig(global_cfg=global_cfg, project_cfg=project_cfg)
 
 
+class TestDrawtextHelpers:
+    def test_escape_drawtext_path_escapes_drive_colon(self, tmp_path):
+        from clio.tasks.label import escape_drawtext_path
+
+        font = tmp_path / "arial.ttf"
+        font.write_bytes(b"\x00")
+        escaped = escape_drawtext_path(font)
+        assert ":" not in escaped or r"\:" in escaped
+        assert escaped.endswith("arial.ttf")
+        # Windows drive path becomes C\:/... form
+        if len(str(font.resolve().as_posix())) >= 2 and font.resolve().as_posix()[1] == ":":
+            assert escaped.startswith(font.resolve().as_posix()[0] + r"\:")
+
+    def test_build_label_drawtext_vf_includes_fontfile(self, tmp_path):
+        from clio.tasks.label import build_label_drawtext_vf
+
+        font = tmp_path / "arial.ttf"
+        font.write_bytes(b"\x00")
+        vf = build_label_drawtext_vf("001", font)
+        assert vf.startswith("drawtext=fontfile='")
+        assert "text='001'" in vf
+        assert "fontsize=36" in vf
+        assert "arial.ttf" in vf
+
+
 class TestRunLabelVideos:
+    @patch("clio.tasks.label.resolve_drawtext_font")
     @patch("clio.tasks.label.run_ffmpeg")
     @patch("clio.tasks.label.resolve_binary")
-    def test_skips_if_no_compressed_file(self, mock_resolve, mock_ffmpeg, cfg):
+    def test_skips_if_no_compressed_file(self, mock_resolve, mock_ffmpeg, mock_font, cfg, tmp_path):
+        font = tmp_path / "arial.ttf"
+        font.write_bytes(b"\x00")
+        mock_font.return_value = font
         (cfg.texts_dir / "001_test.json").write_text('{"index": 1}')
         mock_resolve.return_value = "ffmpeg"
 
@@ -57,9 +86,13 @@ class TestRunLabelVideos:
         run_label_videos(cfg)
         mock_ffmpeg.assert_not_called()
 
+    @patch("clio.tasks.label.resolve_drawtext_font")
     @patch("clio.tasks.label.run_ffmpeg")
     @patch("clio.tasks.label.resolve_binary")
-    def test_labels_video(self, mock_resolve, mock_ffmpeg, cfg):
+    def test_labels_video(self, mock_resolve, mock_ffmpeg, mock_font, cfg, tmp_path):
+        font = tmp_path / "arial.ttf"
+        font.write_bytes(b"\x00")
+        mock_font.return_value = font
         (cfg.texts_dir / "001_test.json").write_text('{"index": 1}')
         compressed = cfg.compressed_dir / "001_original.mp4"
         compressed.write_bytes(b"\x00")
@@ -73,9 +106,13 @@ class TestRunLabelVideos:
         assert out.name == "001_test_labeled.mp4"
         mock_ffmpeg.assert_called_once()
 
+    @patch("clio.tasks.label.resolve_drawtext_font")
     @patch("clio.tasks.label.run_ffmpeg")
     @patch("clio.tasks.label.resolve_binary")
-    def test_skip_existing(self, mock_resolve, mock_ffmpeg, cfg):
+    def test_skip_existing(self, mock_resolve, mock_ffmpeg, mock_font, cfg, tmp_path):
+        font = tmp_path / "arial.ttf"
+        font.write_bytes(b"\x00")
+        mock_font.return_value = font
         (cfg.texts_dir / "001.json").write_text('{"index": 1}')
         compressed = cfg.compressed_dir / "001_original.mp4"
         compressed.write_bytes(b"\x00")
@@ -90,9 +127,13 @@ class TestRunLabelVideos:
         run_label_videos(cfg)
         mock_ffmpeg.assert_not_called()
 
+    @patch("clio.tasks.label.resolve_drawtext_font")
     @patch("clio.tasks.label.run_ffmpeg")
     @patch("clio.tasks.label.resolve_binary")
-    def test_uses_index_from_data(self, mock_resolve, mock_ffmpeg, cfg):
+    def test_uses_index_from_data(self, mock_resolve, mock_ffmpeg, mock_font, cfg, tmp_path):
+        font = tmp_path / "arial.ttf"
+        font.write_bytes(b"\x00")
+        mock_font.return_value = font
         (cfg.texts_dir / "001_test.json").write_text('{"index": 42}')
         compressed = cfg.compressed_dir / "042_src.mp4"
         compressed.write_bytes(b"\x00")
@@ -107,9 +148,13 @@ class TestRunLabelVideos:
         args = mock_ffmpeg.call_args.args[0]
         assert any("042_src.mp4" in str(a) for a in args)
 
+    @patch("clio.tasks.label.resolve_drawtext_font")
     @patch("clio.tasks.label.run_ffmpeg")
     @patch("clio.tasks.label.resolve_binary")
-    def test_passes_drawtext_filter(self, mock_resolve, mock_ffmpeg, cfg):
+    def test_passes_drawtext_filter(self, mock_resolve, mock_ffmpeg, mock_font, cfg, tmp_path):
+        font = tmp_path / "arial.ttf"
+        font.write_bytes(b"\x00")
+        mock_font.return_value = font
         (cfg.texts_dir / "001_test.json").write_text('{"index": 1}')
         compressed = cfg.compressed_dir / "001_src.mp4"
         compressed.write_bytes(b"\x00")
@@ -121,12 +166,19 @@ class TestRunLabelVideos:
         args = mock_ffmpeg.call_args.args[0]
         vf_idx = args.index("-vf") + 1 if "-vf" in args else -1
         assert vf_idx > 0
-        assert "drawtext" in args[vf_idx]
-        assert "001" in args[vf_idx]
+        vf = args[vf_idx]
+        assert "drawtext" in vf
+        assert "001" in vf
+        assert "fontfile=" in vf
+        assert "arial.ttf" in vf
 
+    @patch("clio.tasks.label.resolve_drawtext_font")
     @patch("clio.tasks.label.run_ffmpeg")
     @patch("clio.tasks.label.resolve_binary")
-    def test_tracker_next_called(self, mock_resolve, mock_ffmpeg, cfg):
+    def test_tracker_next_called(self, mock_resolve, mock_ffmpeg, mock_font, cfg, tmp_path):
+        font = tmp_path / "arial.ttf"
+        font.write_bytes(b"\x00")
+        mock_font.return_value = font
         (cfg.texts_dir / "001.json").write_text('{"index": 1}')
         compressed = cfg.compressed_dir / "001_src.mp4"
         compressed.write_bytes(b"\x00")
@@ -140,9 +192,13 @@ class TestRunLabelVideos:
         tracker.next.assert_called_once()
         tracker.log.assert_called_once()
 
+    @patch("clio.tasks.label.resolve_drawtext_font")
     @patch("clio.tasks.label.run_ffmpeg")
     @patch("clio.tasks.label.resolve_binary")
-    def test_files_filter(self, mock_resolve, mock_ffmpeg, cfg):
+    def test_files_filter(self, mock_resolve, mock_ffmpeg, mock_font, cfg, tmp_path):
+        font = tmp_path / "arial.ttf"
+        font.write_bytes(b"\x00")
+        mock_font.return_value = font
         (cfg.texts_dir / "001_A.json").write_text('{"index": 1}')
         (cfg.texts_dir / "002_B.json").write_text('{"index": 2}')
         (cfg.texts_dir / "003_C.json").write_text('{"index": 3}')
@@ -158,9 +214,13 @@ class TestRunLabelVideos:
         args = mock_ffmpeg.call_args.args[0]
         assert any("002_src.mp4" in str(a) for a in args)
 
+    @patch("clio.tasks.label.resolve_drawtext_font")
     @patch("clio.tasks.label.run_ffmpeg")
     @patch("clio.tasks.label.resolve_binary")
-    def test_overwrite_flag(self, mock_resolve, mock_ffmpeg, cfg):
+    def test_overwrite_flag(self, mock_resolve, mock_ffmpeg, mock_font, cfg, tmp_path):
+        font = tmp_path / "arial.ttf"
+        font.write_bytes(b"\x00")
+        mock_font.return_value = font
         (cfg.texts_dir / "001.json").write_text('{"index": 1}')
         compressed = cfg.compressed_dir / "001_src.mp4"
         compressed.write_bytes(b"\x00")
