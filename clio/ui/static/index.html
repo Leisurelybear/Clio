@@ -12,6 +12,9 @@
     <div class="proj">
       <span class="label">PROJECT</span>
       <span id="proj-name" class="value">加载中...</span>
+      <button id="btn-reveal-project" class="btn-icon" type="button" title="在资源管理器中打开项目目录" aria-label="打开项目目录">
+        <span class="icon"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><path d="M12 11v6"/><path d="M9 14l3 3 3-3"/></svg></span>
+      </button>
     </div>
   </div>
   <div class="source-toggle">
@@ -41,6 +44,7 @@
       <div id="project-actions">
         <button id="btn-open-project" class="sidebar-btn" title="打开已有项目"><span class="icon"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></span> 打开项目</button>
         <button id="btn-new-project" class="sidebar-btn" title="新建项目"><span class="icon"><svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span> 新建</button>
+        <button id="btn-reveal-project-sidebar" class="sidebar-btn" type="button" title="在资源管理器中打开当前项目目录"><span class="icon"><svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/><polyline points="12 11 12 17"/><polyline points="9 14 12 17 15 14"/></svg></span> 打开目录</button>
       </div>
       <ul id="project-list">
         <li class="project-item" data-entity="plan" title="打开编排 (plan) 面板">

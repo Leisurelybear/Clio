@@ -3,7 +3,14 @@ from __future__ import annotations
 from pathlib import Path, PureWindowsPath
 from unittest.mock import MagicMock
 
-from clio.ui.routes.fs import _is_allowed_path, handle_get_fs_dirs, handle_get_fs_videos, handle_post_fs_mkdir
+from clio.ui.routes.fs import (
+    _is_allowed_path,
+    build_reveal_command,
+    handle_get_fs_dirs,
+    handle_get_fs_videos,
+    handle_post_fs_mkdir,
+    handle_post_fs_reveal,
+)
 
 
 class TestIsAllowedPath:
@@ -251,3 +258,50 @@ class TestHandlePostFsMkdir:
         handler = MagicMock()
         handle_post_fs_mkdir(handler, {"parent": "/tmp", "name": "newdir"})
         handler._send_json.assert_called_once_with({"ok": False, "error": "permission denied"}, 500)
+
+
+class TestBuildRevealCommand:
+    def test_darwin(self):
+        p = Path.cwd()
+        assert build_reveal_command(p, "darwin") == ["open", str(p)]
+
+    def test_linux(self):
+        p = Path.cwd()
+        assert build_reveal_command(p, "linux") == ["xdg-open", str(p)]
+
+
+class TestHandlePostFsReveal:
+    def test_missing_path_returns_400(self):
+        handler = MagicMock()
+        handle_post_fs_reveal(handler, {})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "path is required"}, 400)
+
+    def test_access_denied(self, monkeypatch):
+        monkeypatch.setattr("clio.ui.routes.fs._is_allowed_path", lambda p: False)
+        handler = MagicMock()
+        handle_post_fs_reveal(handler, {"path": "/etc"})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "access denied"}, 403)
+
+    def test_not_directory(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("clio.ui.routes.fs._is_allowed_path", lambda p: True)
+        f = tmp_path / "file.txt"
+        f.write_bytes(b"")
+        handler = MagicMock()
+        handle_post_fs_reveal(handler, {"path": str(f)})
+        handler._send_json.assert_called_once_with({"ok": False, "error": "not a directory"}, 400)
+
+    def test_opens_directory(self, tmp_path, monkeypatch):
+        monkeypatch.setattr("clio.ui.routes.fs._is_allowed_path", lambda p: True)
+        opened: list[Path] = []
+
+        def fake_reveal(path: Path) -> Path:
+            opened.append(path)
+            return path.resolve()
+
+        monkeypatch.setattr("clio.ui.routes.fs.reveal_path_in_file_manager", fake_reveal)
+        handler = MagicMock()
+        handle_post_fs_reveal(handler, {"path": str(tmp_path)})
+        assert opened and opened[0].resolve() == tmp_path.resolve()
+        payload = handler._send_json.call_args.args[0]
+        assert payload["ok"] is True
+        assert Path(payload["path"]).resolve() == tmp_path.resolve()

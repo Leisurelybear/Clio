@@ -281,6 +281,28 @@ async function init() {
       setStatus('已重新加载', 'ok');
     } catch (e) { setStatus('重载失败: ' + e.message, 'err'); }
   };
+  async function revealProjectDir() {
+    const path = state.currentProjectDir
+      || state.currentProject?.project_dir
+      || state.config?.project_dir
+      || '';
+    if (!path) {
+      setStatus('当前没有项目目录', 'warn');
+      return;
+    }
+    try {
+      const r = await api('POST', '/api/fs/reveal', { path });
+      if (r.ok) {
+        setStatus(`已打开: ${r.path || path}`, 'ok');
+      } else {
+        throw new Error(r.error || '打开失败');
+      }
+    } catch (e) {
+      setStatus('打开目录失败: ' + e.message, 'err');
+    }
+  }
+  $('btn-reveal-project')?.addEventListener('click', revealProjectDir);
+  $('btn-reveal-project-sidebar')?.addEventListener('click', revealProjectDir);
   document.getElementById('btn-theme').onclick = toggleTheme;
   $('btn-save').onclick = save;
   document.getElementById('btn-select-videos').addEventListener('click', toggleSelection);

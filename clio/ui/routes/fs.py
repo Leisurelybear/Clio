@@ -1,8 +1,9 @@
-"""Route handlers: /api/fs/dirs, /api/fs/videos, /api/fs/mkdir"""
+"""Route handlers: /api/fs/dirs, /api/fs/videos, /api/fs/mkdir, /api/fs/reveal"""
 
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -91,6 +92,49 @@ def handle_post_fs_mkdir(handler: HandlerProtocol, obj: dict) -> None:
         return handler._send_json({"ok": True, "path": str(new_dir)})
     except OSError as e:
         return handler._send_json({"ok": False, "error": str(e)}, 500)
+
+
+def build_reveal_command(path: Path, platform: str | None = None) -> list[str]:
+    """CLI used to open a directory in the OS file manager (non-Windows path)."""
+    plat = platform if platform is not None else sys.platform
+    target = str(path)
+    if plat == "darwin":
+        return ["open", target]
+    return ["xdg-open", target]
+
+
+def reveal_path_in_file_manager(path: Path) -> Path:
+    """Open *path* in Explorer / Finder / file manager. Returns resolved path."""
+    resolved = path.expanduser().resolve()
+    if not resolved.is_dir():
+        raise FileNotFoundError(f"not a directory: {resolved}")
+    if sys.platform == "win32":
+        # explorer.exe returns non-zero even on success; startfile is reliable.
+        os.startfile(str(resolved))  # type: ignore[attr-defined]
+        return resolved
+    cmd = build_reveal_command(resolved)
+    subprocess.run(cmd, check=False)
+    return resolved
+
+
+def handle_post_fs_reveal(handler: HandlerProtocol, obj: dict) -> None:
+    """Handle POST /api/fs/reveal — open a directory in the system file manager."""
+    raw = (obj.get("path") or "").strip()
+    if not raw:
+        return handler._send_json({"ok": False, "error": "path is required"}, 400)
+    try:
+        resolved = Path(raw).expanduser().resolve()
+    except OSError as e:
+        return handler._send_json({"ok": False, "error": str(e)}, 400)
+    if not _is_allowed_path(resolved):
+        return handler._send_json({"ok": False, "error": "access denied"}, 403)
+    if not resolved.is_dir():
+        return handler._send_json({"ok": False, "error": "not a directory"}, 400)
+    try:
+        opened = reveal_path_in_file_manager(resolved)
+    except OSError as e:
+        return handler._send_json({"ok": False, "error": str(e)}, 500)
+    return handler._send_json({"ok": True, "path": str(opened)})
 
 
 def handle_get_fs_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
