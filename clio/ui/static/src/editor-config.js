@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { $, $$, escapeHtml, markDirty, updateSaveBtn, setStatus, setDeep } from './utils.js';
+import { $, $$, escapeHtml, markDirty, clearDirty, setStatus, setDeep } from './utils.js';
 import { api, icon } from './api.js';
 // Dynamic import avoids static cycle: editor.js → editor-config.js → editor.js (A-006)
 
@@ -1027,8 +1027,7 @@ function _attachTaskBindingHandlers(pane, projectCfg) {
       e.preventDefault();
       if (state.dirty && !confirm('设置有未保存的修改，确定切换标签吗？')) return;
       state.configTab = 'global';
-      state.dirty = false;
-      updateSaveBtn();
+      clearDirty();
       renderConfig();
     };
   }
@@ -1039,8 +1038,7 @@ function _attachTaskBindingHandlers(pane, projectCfg) {
       if (state.dirty && !confirm('设置有未保存的修改，确定切换标签吗？')) return;
       const pName = link.dataset.provider;
       state.configTab = 'global';
-      state.dirty = false;
-      updateSaveBtn();
+      clearDirty();
       renderConfig();
       setTimeout(() => {
         const editBtn = document.querySelector(`.btn-provider-edit[data-provider="${_escapeCssAttributeValue(pName)}"]`);
@@ -1241,8 +1239,7 @@ export function renderConfig() {
       if (btn.dataset.configTab === state.configTab) return;
       if (state.dirty && !confirm('设置有未保存的修改，确定切换标签吗？')) return;
       state.configTab = btn.dataset.configTab;
-      state.dirty = false;
-      updateSaveBtn();
+      clearDirty();
       renderConfig();
     };
   });

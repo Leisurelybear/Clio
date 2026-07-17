@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { $, $$, escapeHtml, setStatus, updateSidebarDay } from './utils.js';
+import { $, $$, escapeHtml, setStatus, updateSidebarDay, clearDirty } from './utils.js';
 import { api, submitToken } from './api.js';
 import { initLayout } from './layout.js';
 import { initTheme, toggleTheme } from './theme.js';
@@ -289,7 +289,7 @@ async function init() {
     const toTab = t.dataset.tab;
     if (shouldConfirmDirtyTabSwitch({ dirty: state.dirty, fromTab: state.currentTab, toTab })) {
       if (!confirm('当前 tab 有未保存的修改，确定切换吗？')) return;
-      state.dirty = false;
+      clearDirty();
     }
     state.currentTab = toTab;
     renderActiveTab();

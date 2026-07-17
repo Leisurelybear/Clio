@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { $, escapeHtml, markDirty, updateSidebarDay, setStatus, updateSaveBtn } from './utils.js';
+import { $, escapeHtml, markDirty, clearDirty, updateSidebarDay, setStatus } from './utils.js';
 import { api, icon } from './api.js';
 import { renderPreviewBar, startPreview, _playPreviewSegment } from './viewer.js';
 import { addToast } from './toast.js';
@@ -260,7 +260,7 @@ export function renderPlan() {
       if (state.dirty && !confirm('切换分集将丢弃当前修改，确定吗？')) { daySelect.value = state.currentDay; return; }
       state.currentDay = day;
       state.plan = null;
-      state.dirty = false;
+      clearDirty();
       updateSidebarDay();
       await import('./sidebar.js').then(mod => mod.saveProject());
       await import('./sidebar.js').then(mod => mod.selectPlan());
@@ -550,8 +550,7 @@ export async function save() {
         r = await api('PUT', '/api/config/project', state.configProject);
       }
       if (r.error) throw new Error(r.error);
-      state.dirty = false;
-      updateSaveBtn();
+      clearDirty();
       const status = configSaveStatusForTab(ct);
       setStatus(status.message, status.level);
       addToast(status.message, status.level === 'ok' ? 'success' : 'warning');
@@ -571,8 +570,7 @@ export async function save() {
       setStatus('当前页无可保存内容', 'warn');
       return;
     }
-    state.dirty = false;
-    updateSaveBtn();
+    clearDirty();
     setStatus('已保存', 'ok');
     addToast('已保存', 'success');
     if (target.action === 'plan') scheduleReadinessCheck();

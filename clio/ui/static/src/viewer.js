@@ -1,5 +1,5 @@
 import { state } from './state.js';
-import { $, parseTimecode, fmtTime, setStatus, escapeHtml } from './utils.js';
+import { $, parseTimecode, fmtTime, setStatus, escapeHtml, clearDirty } from './utils.js';
 import { icon } from './api.js';
 
 function playVideoSegment(file, seekTo) {
@@ -241,7 +241,7 @@ function _playPreviewSegment() {
 function _autoSwitchSegment(file) {
   if (state.currentVideo === file) return;
   state.currentVideo = file;
-  state.dirty = false;
+  clearDirty();
   state.texts = null;
   state.voiceover = null;
   state.transcript = null;

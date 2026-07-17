@@ -1,7 +1,7 @@
 import { state } from './state.js';
 import {
   $, $$, setStatus, fmtTime,
-  updateSidebarDay, updateEntityUI,
+  updateSidebarDay, updateEntityUI, clearDirty,
 } from './utils.js';
 import { api } from './api.js';
 import { playVideoSegment, stopPreview } from './viewer.js';
@@ -23,7 +23,7 @@ async function selectVideo(file) {
   $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'video';
   state.currentVideo = file;
-  state.dirty = false;
+  clearDirty();
   state.texts = null;
   state.voiceover = null;
   state.transcript = null;
@@ -80,7 +80,7 @@ async function selectPlan(dayOverride) {
   if (state.previewActive) stopPreview();
   $('player-pane').classList.add('plan-mode');
   state.currentEntity = 'plan';
-  state.dirty = false;
+  clearDirty();
   if (dayOverride) state.currentDay = dayOverride;
   const runner = await import('./runner.js');
   runner._stopRunPoll();
@@ -100,7 +100,7 @@ async function selectRun() {
   if (state.previewActive) stopPreview();
   $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'run';
-  state.dirty = false;
+  clearDirty();
   updateEntityUI();
   updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
@@ -114,7 +114,7 @@ async function selectConfig() {
   if (state.previewActive) stopPreview();
   $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'config';
-  state.dirty = false;
+  clearDirty();
   try {
     const [raw, global, project] = await Promise.all([
       api('GET', '/api/config/raw'),
@@ -152,7 +152,7 @@ async function selectLogs() {
   if (state.previewActive) stopPreview();
   $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'logs';
-  state.dirty = false;
+  clearDirty();
   updateEntityUI();
   updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
@@ -166,7 +166,7 @@ async function selectTokens() {
   if (state.previewActive) stopPreview();
   $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'tokens';
-  state.dirty = false;
+  clearDirty();
   updateEntityUI();
   updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());
@@ -304,7 +304,7 @@ function goToRunTab() {
   if (state.previewActive) stopPreview();
   $('player-pane').classList.remove('plan-mode');
   state.currentEntity = 'run';
-  state.dirty = false;
+  clearDirty();
   updateEntityUI();
   updateSelectBtnVisibility();
   import('./editor.js').then(mod => mod.renderActiveTab());

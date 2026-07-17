@@ -1,5 +1,14 @@
-import { describe, it, expect } from 'vitest';
-import { escapeHtml, fmtTime, parseTimecode, getDeep, setDeep } from '../utils.js';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { state } from '../state.js';
+import {
+  escapeHtml,
+  fmtTime,
+  parseTimecode,
+  getDeep,
+  setDeep,
+  markDirty,
+  clearDirty,
+} from '../utils.js';
 
 describe('escapeHtml', () => {
   it('escapes & < > " \'', () => {
@@ -113,5 +122,39 @@ describe('setDeep', () => {
     const obj = {};
     setDeep(obj, 'x.y.z', 'deep');
     expect(obj.x.y.z).toBe('deep');
+  });
+});
+
+describe('markDirty / clearDirty', () => {
+  let btn;
+  let prevDirty;
+
+  beforeEach(() => {
+    prevDirty = state.dirty;
+    btn = document.createElement('button');
+    btn.id = 'btn-save';
+    btn.textContent = '保存';
+    document.body.appendChild(btn);
+  });
+
+  afterEach(() => {
+    state.dirty = prevDirty;
+    btn.remove();
+  });
+
+  it('markDirty sets dirty and labels Save as changed', () => {
+    clearDirty();
+    markDirty();
+    expect(state.dirty).toBe(true);
+    expect(btn.textContent).toBe('保存 (有改动)');
+    expect(btn.classList.contains('dirty')).toBe(true);
+  });
+
+  it('clearDirty resets dirty and Save label (discard / leave page)', () => {
+    markDirty();
+    clearDirty();
+    expect(state.dirty).toBe(false);
+    expect(btn.textContent).toBe('保存');
+    expect(btn.classList.contains('dirty')).toBe(false);
   });
 });

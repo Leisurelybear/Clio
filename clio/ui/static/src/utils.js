@@ -49,8 +49,12 @@ function setDeep(obj, path, value) {
 
 function markDirty() { state.dirty = true; updateSaveBtn(); }
 
+/** Clear unsaved flag and sync the Save button label (discard / after save). */
+function clearDirty() { state.dirty = false; updateSaveBtn(); }
+
 function updateSaveBtn() {
   const btn = $('btn-save');
+  if (!btn) return;
   btn.classList.toggle('dirty', state.dirty);
   btn.textContent = state.dirty ? '保存 (有改动)' : '保存';
 }
@@ -117,6 +121,7 @@ export {
   getDeep,
   setDeep,
   markDirty,
+  clearDirty,
   updateSaveBtn,
   setStatus,
   updateSidebarDay,
