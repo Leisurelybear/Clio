@@ -11,6 +11,7 @@ import {
   setTimelineBound,
   insertSegment,
   computeDropToIndex,
+  computeDragAutoScrollDelta,
 } from './plan-edit.js';
 
 let _readinessTimer = null;
@@ -18,6 +19,19 @@ let _lastReadiness = { ok: true, errors: [], warnings: [] };
 let _dragFromIndex = null;
 let _dropToIndex = null;
 let _highlightTimer = null;
+
+function planScrollParent() {
+  return document.querySelector('#tab-plan');
+}
+
+/** Scroll the plan pane when the pointer nears its top/bottom during drag. */
+function autoScrollDuringDrag(clientY) {
+  const scroller = planScrollParent();
+  if (!scroller || _dragFromIndex == null) return;
+  const rect = scroller.getBoundingClientRect();
+  const delta = computeDragAutoScrollDelta(clientY, rect.top, rect.bottom);
+  if (delta) scroller.scrollTop += delta;
+}
 
 export function configSaveStatusForTab(tab) {
   if (tab === 'project') {
@@ -361,6 +375,7 @@ export function renderPlan() {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
       if (_dragFromIndex == null) return;
+      autoScrollDuringDrag(e.clientY);
       const rect = li.getBoundingClientRect();
       const placeAfter = e.clientY > rect.top + rect.height / 2;
       const to = computeDropToIndex(_dragFromIndex, i, placeAfter, p.sequence.length);
@@ -391,6 +406,14 @@ export function renderPlan() {
     if (!ol.contains(e.relatedTarget)) {
       clearDropIndicator();
     }
+  });
+
+  // Pane-level dragover: keep scrolling when pointer is in empty chrome / padding
+  pane.addEventListener('dragover', (e) => {
+    if (_dragFromIndex == null) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    autoScrollDuringDrag(e.clientY);
   });
 
   // Prepend control when sequence empty or for first insert

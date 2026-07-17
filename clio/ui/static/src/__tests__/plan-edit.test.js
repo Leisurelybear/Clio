@@ -7,6 +7,7 @@ import {
   setTimelineBound,
   insertSegment,
   computeDropToIndex,
+  computeDragAutoScrollDelta,
 } from '../plan-edit.js';
 
 describe('plan-edit', () => {
@@ -108,5 +109,30 @@ describe('computeDropToIndex', () => {
     expect(computeDropToIndex(-1, 0, false, n)).toBeNull();
     expect(computeDropToIndex(0, 9, false, n)).toBeNull();
     expect(computeDropToIndex(0, 0, false, 0)).toBeNull();
+  });
+});
+
+describe('computeDragAutoScrollDelta', () => {
+  const top = 100;
+  const bottom = 500; // viewport height 400
+
+  it('returns 0 in the middle band', () => {
+    expect(computeDragAutoScrollDelta(300, top, bottom)).toBe(0);
+  });
+
+  it('scrolls up near top edge (negative delta)', () => {
+    const d = computeDragAutoScrollDelta(110, top, bottom, 48, 18);
+    expect(d).toBeLessThan(0);
+  });
+
+  it('scrolls down near bottom edge (positive delta)', () => {
+    const d = computeDragAutoScrollDelta(490, top, bottom, 48, 18);
+    expect(d).toBeGreaterThan(0);
+  });
+
+  it('faster closer to the extreme edge', () => {
+    const near = Math.abs(computeDragAutoScrollDelta(140, top, bottom, 48, 18));
+    const far = Math.abs(computeDragAutoScrollDelta(105, top, bottom, 48, 18));
+    expect(far).toBeGreaterThanOrEqual(near);
   });
 });

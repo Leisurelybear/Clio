@@ -36,6 +36,41 @@ export function computeDropToIndex(fromIndex, overIndex, placeAfter, length) {
   return insertBefore > from ? insertBefore - 1 : insertBefore;
 }
 
+/**
+ * Pixels to scroll a viewport while dragging near its top/bottom edge.
+ * Negative = scroll up. Zero when pointer is in the safe middle band.
+ * @param {number} clientY pointer Y
+ * @param {number} viewportTop getBoundingClientRect().top
+ * @param {number} viewportBottom getBoundingClientRect().bottom
+ * @param {number} [edgePx=48] edge band height
+ * @param {number} [maxStep=18] max scroll per event at the extreme edge
+ * @returns {number}
+ */
+export function computeDragAutoScrollDelta(
+  clientY,
+  viewportTop,
+  viewportBottom,
+  edgePx = 48,
+  maxStep = 18,
+) {
+  const y = Number(clientY);
+  const top = Number(viewportTop);
+  const bottom = Number(viewportBottom);
+  if (!Number.isFinite(y) || !Number.isFinite(top) || !Number.isFinite(bottom)) return 0;
+  if (bottom <= top) return 0;
+  const edge = Math.max(8, Number(edgePx) || 48);
+  const max = Math.max(1, Number(maxStep) || 18);
+  if (y < top + edge) {
+    const t = Math.min(1, (top + edge - y) / edge);
+    return -Math.ceil(max * t);
+  }
+  if (y > bottom - edge) {
+    const t = Math.min(1, (y - (bottom - edge)) / edge);
+    return Math.ceil(max * t);
+  }
+  return 0;
+}
+
 export function removeSegment(sequence, index) {
   return sequence.filter((_, i) => i !== index);
 }
