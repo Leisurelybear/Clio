@@ -4,11 +4,20 @@ import { api, icon } from './api.js';
 import { renderPreviewBar, startPreview, _playPreviewSegment } from './viewer.js';
 import { addToast } from './toast.js';
 import { resolveEditorSaveTarget } from './editor-save.js';
-import { reorderSequence, removeSegment, patchSegment, setTimelineBound, insertSegment } from './plan-edit.js';
+import {
+  reorderSequence,
+  removeSegment,
+  patchSegment,
+  setTimelineBound,
+  insertSegment,
+  computeDropToIndex,
+} from './plan-edit.js';
 
 let _readinessTimer = null;
 let _lastReadiness = { ok: true, errors: [], warnings: [] };
 let _dragFromIndex = null;
+let _dropToIndex = null;
+let _highlightTimer = null;
 
 export function configSaveStatusForTab(tab) {
   if (tab === 'project') {
@@ -23,11 +32,46 @@ export function configSaveStatusForTab(tab) {
   return { message: '合并视图为只读，无法保存', level: 'warn' };
 }
 
-function applySequence(next) {
+function applySequence(next, opts = {}) {
   if (!state.plan) return;
   state.plan.sequence = next;
   markDirty();
   renderPlan();
+  const hi = opts.highlightIndex;
+  if (hi == null || hi < 0) return;
+  const el = document.querySelector(`#plan-list [data-preview-index="${hi}"]`);
+  if (!el) return;
+  el.classList.add('plan-seg-just-moved');
+  try {
+    el.scrollIntoView({ block: 'nearest' });
+  } catch { /* ignore */ }
+  if (_highlightTimer) clearTimeout(_highlightTimer);
+  _highlightTimer = setTimeout(() => {
+    el.classList.remove('plan-seg-just-moved');
+    _highlightTimer = null;
+  }, 700);
+}
+
+function clearDropIndicator() {
+  document.querySelectorAll('.plan-seg-drop-before, .plan-seg-drop-after').forEach((node) => {
+    node.classList.remove('plan-seg-drop-before', 'plan-seg-drop-after');
+  });
+  _dropToIndex = null;
+}
+
+/** Paint insert line for pending toIndex (final index of moved item). */
+function paintDropIndicator(fromIndex, toIndex, length) {
+  clearDropIndicator();
+  if (toIndex == null || length <= 0) return;
+  _dropToIndex = toIndex;
+  const list = document.querySelectorAll('#plan-list .plan-seg');
+  if (!list.length) return;
+  const insertBefore = toIndex < fromIndex ? toIndex : toIndex + 1;
+  if (insertBefore >= length) {
+    list[length - 1]?.classList.add('plan-seg-drop-after');
+  } else {
+    list[insertBefore]?.classList.add('plan-seg-drop-before');
+  }
 }
 
 function scheduleReadinessCheck() {
@@ -277,12 +321,12 @@ export function renderPlan() {
     li.querySelector('[data-move="up"]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       if (i <= 0) return;
-      applySequence(reorderSequence(p.sequence, i, i - 1));
+      applySequence(reorderSequence(p.sequence, i, i - 1), { highlightIndex: i - 1 });
     });
     li.querySelector('[data-move="down"]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       if (i >= p.sequence.length - 1) return;
-      applySequence(reorderSequence(p.sequence, i, i + 1));
+      applySequence(reorderSequence(p.sequence, i, i + 1), { highlightIndex: i + 1 });
     });
     li.querySelector('[data-ins]')?.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -301,24 +345,52 @@ export function renderPlan() {
     });
     li.addEventListener('dragstart', (e) => {
       _dragFromIndex = i;
+      _dropToIndex = null;
       li.classList.add('plan-seg-dragging');
       e.dataTransfer.effectAllowed = 'move';
+      try {
+        e.dataTransfer.setData('text/plain', String(i));
+      } catch { /* ignore */ }
     });
     li.addEventListener('dragend', () => {
       li.classList.remove('plan-seg-dragging');
+      clearDropIndicator();
       _dragFromIndex = null;
     });
     li.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
+      if (_dragFromIndex == null) return;
+      const rect = li.getBoundingClientRect();
+      const placeAfter = e.clientY > rect.top + rect.height / 2;
+      const to = computeDropToIndex(_dragFromIndex, i, placeAfter, p.sequence.length);
+      if (to == null) {
+        clearDropIndicator();
+        return;
+      }
+      paintDropIndicator(_dragFromIndex, to, p.sequence.length);
     });
     li.addEventListener('drop', (e) => {
       e.preventDefault();
-      if (_dragFromIndex == null || _dragFromIndex === i) return;
-      applySequence(reorderSequence(p.sequence, _dragFromIndex, i));
+      e.stopPropagation();
+      if (_dragFromIndex == null) return;
+      const rect = li.getBoundingClientRect();
+      const placeAfter = e.clientY > rect.top + rect.height / 2;
+      const to = computeDropToIndex(_dragFromIndex, i, placeAfter, p.sequence.length);
+      const from = _dragFromIndex;
+      clearDropIndicator();
       _dragFromIndex = null;
+      li.classList.remove('plan-seg-dragging');
+      if (to == null) return;
+      applySequence(reorderSequence(p.sequence, from, to), { highlightIndex: to });
     });
     ol.appendChild(li);
+  });
+
+  ol.addEventListener('dragleave', (e) => {
+    if (!ol.contains(e.relatedTarget)) {
+      clearDropIndicator();
+    }
   });
 
   // Prepend control when sequence empty or for first insert
