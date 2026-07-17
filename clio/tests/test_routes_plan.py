@@ -7,9 +7,11 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 from clio.ui.routes.plan import (
+    handle_get_cut_orphaned_backups,
     handle_get_plan,
     handle_get_plans,
     handle_post_cut,
+    handle_post_cut_restore_backups,
     handle_post_plan_readiness,
     handle_put_plan,
 )
@@ -223,3 +225,33 @@ class TestHandlePostCut:
         assert payload["code"] == "cut_output_exists"
         assert payload["count"] == 1
         assert "old.mp4" in payload["files"]
+
+
+class TestOrphanedCutBackupRoutes:
+    def test_get_lists_backups(self, tmp_path: Path):
+        day = tmp_path / "cuts" / "day1"
+        day.mkdir(parents=True)
+        (day / "a.mp4.clio_bak").write_bytes(b"old")
+        handler = MagicMock()
+        handler._get_project_output.return_value = tmp_path
+        handler._send_json = MagicMock()
+        handle_get_cut_orphaned_backups(handler, {})
+        payload = handler._send_json.call_args[0][0]
+        assert payload["count"] == 1
+        assert payload["items"][0]["name"] == "a.mp4"
+
+    def test_post_restores(self, tmp_path: Path):
+        day = tmp_path / "cuts" / "day1"
+        day.mkdir(parents=True)
+        bak = day / "a.mp4.clio_bak"
+        bak.write_bytes(b"old")
+        (day / "a.mp4").write_bytes(b"partial")
+        handler = MagicMock()
+        handler._get_project_output.return_value = tmp_path
+        handler._send_json = MagicMock()
+        handle_post_cut_restore_backups(handler, {}, {})
+        payload = handler._send_json.call_args[0][0]
+        assert payload["ok"] is True
+        assert payload["count"] == 1
+        assert (day / "a.mp4").read_bytes() == b"old"
+        assert not bak.exists()

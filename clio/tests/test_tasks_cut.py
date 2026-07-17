@@ -58,6 +58,45 @@ def _write_plan(cfg: AppConfig, day_label: str = "day1", seq: list | None = None
     plan_path.write_text(json.dumps(plan), encoding="utf-8")
 
 
+class TestOrphanedCutBackups:
+    def test_list_and_restore(self, tmp_path):
+        from clio.tasks.cut import (
+            CUT_BAK_SUFFIX,
+            list_orphaned_cut_backups,
+            restore_orphaned_cut_backups,
+        )
+
+        day = tmp_path / "cuts" / "day1"
+        day.mkdir(parents=True)
+        target = day / "clip.mp4"
+        bak = day / f"clip.mp4{CUT_BAK_SUFFIX}"
+        # incomplete new file + backup of old
+        target.write_bytes(b"partial")
+        bak.write_bytes(b"oldgood")
+
+        items = list_orphaned_cut_backups(tmp_path)
+        assert len(items) == 1
+        assert items[0]["name"] == "clip.mp4"
+        assert items[0]["day"] == "day1"
+
+        result = restore_orphaned_cut_backups(tmp_path)
+        assert result["count"] == 1
+        assert target.read_bytes() == b"oldgood"
+        assert not bak.exists()
+        assert list_orphaned_cut_backups(tmp_path) == []
+
+    def test_restore_when_only_bak(self, tmp_path):
+        from clio.tasks.cut import CUT_BAK_SUFFIX, restore_orphaned_cut_backup
+
+        day = tmp_path / "cuts" / "day1"
+        day.mkdir(parents=True)
+        bak = day / f"only.mp4{CUT_BAK_SUFFIX}"
+        bak.write_bytes(b"old")
+        restore_orphaned_cut_backup(bak)
+        assert (day / "only.mp4").read_bytes() == b"old"
+        assert not bak.exists()
+
+
 class TestReplaceFileSafely:
     def test_writes_new_file(self, tmp_path):
         from clio.tasks.cut import replace_file_safely

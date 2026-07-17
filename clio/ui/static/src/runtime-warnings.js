@@ -4,7 +4,16 @@ function isLocalHost(hostname) {
   return LOCAL_HOSTS.has(String(hostname || '').toLowerCase());
 }
 
-function buildRuntimeWarnings({ config = {}, hostname = '', hasToken = false } = {}) {
+/**
+ * Build runtime banner warnings (config / host / orphaned cut backups).
+ * @param {{ config?: object, hostname?: string, hasToken?: boolean, orphanedCutBackups?: Array }} opts
+ */
+function buildRuntimeWarnings({
+  config = {},
+  hostname = '',
+  hasToken = false,
+  orphanedCutBackups = null,
+} = {}) {
   const warnings = [];
   const debugPrintPrompt = Boolean(config?.ai?.debug_print_prompt);
   if (debugPrintPrompt) {
@@ -31,10 +40,28 @@ function buildRuntimeWarnings({ config = {}, hostname = '', hasToken = false } =
     }
   }
 
+  const orphans = Array.isArray(orphanedCutBackups) ? orphanedCutBackups : [];
+  if (orphans.length > 0) {
+    const sample = orphans
+      .slice(0, 3)
+      .map((o) => o.name || o.target || '')
+      .filter(Boolean)
+      .join('、');
+    const more = orphans.length > 3 ? ` 等 ${orphans.length} 个` : '';
+    warnings.push({
+      id: 'cut-orphaned-bak',
+      level: 'warning',
+      text:
+        `检测到未完成的裁剪覆盖备份（*.clio_bak）${sample ? `：${sample}${more}` : `（${orphans.length} 个）`}。` +
+        '中断的重剪可能留下旧文件备份；可一键恢复为覆盖前的视频。',
+      action: { id: 'restore-cut-backups', label: '恢复旧文件' },
+    });
+  }
+
   return warnings;
 }
 
-function renderRuntimeWarnings(container, warnings) {
+function renderRuntimeWarnings(container, warnings, handlers = {}) {
   if (!container) return;
   container.replaceChildren();
   container.hidden = warnings.length === 0;
@@ -42,19 +69,43 @@ function renderRuntimeWarnings(container, warnings) {
     const item = document.createElement('div');
     item.className = `runtime-warning ${warning.level}`;
     item.dataset.warningId = warning.id;
-    item.textContent = warning.text;
+
+    const text = document.createElement('span');
+    text.className = 'runtime-warning-text';
+    text.textContent = warning.text;
+    item.appendChild(text);
+
+    if (warning.action?.id) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'runtime-warning-action';
+      btn.textContent = warning.action.label || '处理';
+      btn.dataset.actionId = warning.action.id;
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        handlers.onAction?.(warning.action.id, warning);
+      });
+      item.appendChild(btn);
+    }
+
     container.appendChild(item);
   }
 }
 
-function updateRuntimeWarnings(config) {
+/**
+ * Refresh banner: static config/host warnings + optional orphaned cut bak scan.
+ * @param {object} config
+ * @param {{ orphanedCutBackups?: Array|null, onAction?: (id: string, warning: object) => void }} [opts]
+ */
+function updateRuntimeWarnings(config, opts = {}) {
   const container = document.getElementById('runtime-warnings');
   const warnings = buildRuntimeWarnings({
     config,
     hostname: window.location.hostname,
     hasToken: Boolean(sessionStorage.getItem('api_token')),
+    orphanedCutBackups: opts.orphanedCutBackups,
   });
-  renderRuntimeWarnings(container, warnings);
+  renderRuntimeWarnings(container, warnings, { onAction: opts.onAction });
 }
 
 export { buildRuntimeWarnings, renderRuntimeWarnings, updateRuntimeWarnings };

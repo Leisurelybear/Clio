@@ -39,6 +39,47 @@ window.initProjectConfig = initProjectConfig;
 window.refineCurrentFile = refineCurrentFile;
 window.addToast = addToast;
 
+let _orphanedCutBackups = [];
+
+async function refreshRuntimeWarningsBanner() {
+  try {
+    const r = await api('GET', '/api/cut/orphaned-backups');
+    _orphanedCutBackups = r.items || [];
+  } catch {
+    _orphanedCutBackups = [];
+  }
+  updateRuntimeWarnings(state.config, {
+    orphanedCutBackups: _orphanedCutBackups,
+    onAction: handleRuntimeWarningAction,
+  });
+}
+
+async function handleRuntimeWarningAction(actionId) {
+  if (actionId !== 'restore-cut-backups') return;
+  if (!_orphanedCutBackups.length) {
+    setStatus('没有可恢复的裁剪备份', 'warn');
+    return;
+  }
+  const n = _orphanedCutBackups.length;
+  if (!confirm(`将恢复 ${n} 个中断覆盖前的旧裁剪文件（删除残缺新文件并还原 *.clio_bak）。继续？`)) {
+    return;
+  }
+  try {
+    const r = await api('POST', '/api/cut/restore-backups', {});
+    const count = r.count || (r.restored || []).length || 0;
+    const errN = (r.errors || []).length;
+    setStatus(
+      errN ? `已恢复 ${count} 个，${errN} 个失败` : `已恢复 ${count} 个裁剪备份`,
+      errN ? 'warn' : 'ok',
+    );
+    addToast(errN ? `恢复 ${count}，失败 ${errN}` : `已恢复 ${count} 个旧文件`, errN ? 'warning' : 'success');
+  } catch (e) {
+    setStatus('恢复失败: ' + e.message, 'err');
+    addToast('恢复失败: ' + e.message, 'error', 6000);
+  }
+  await refreshRuntimeWarningsBanner();
+}
+
 async function init() {
   initLayout();
   initTheme();
@@ -410,7 +451,7 @@ async function init() {
       state.currentProjectName = urlProject;
     }
     await loadConfig();
-    updateRuntimeWarnings(state.config);
+    await refreshRuntimeWarningsBanner();
     await loadProject();
     renderSteps();
     // 检查项目是否缺少 project.yaml，提示用户创建

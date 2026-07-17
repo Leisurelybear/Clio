@@ -100,8 +100,41 @@ export function renderTexts() {
     });
     return;
   }
+
+  const coverTs = String(t.cover_timestamp || '').trim();
+  const coverFile = String(t.cover_file || '').trim();
+  const coverName = coverFile ? coverFile.replace(/\\/g, '/').split('/').pop() : '';
+  let coverHtml = '';
+  if (coverName || coverTs) {
+    let coverUrl = '';
+    if (coverName) {
+      const params = new URLSearchParams();
+      params.set('file', coverName);
+      if (state.currentProjectName) params.set('project', state.currentProjectName);
+      if (state.currentProjectDir) params.set('project_dir', state.currentProjectDir);
+      const tok = sessionStorage.getItem('api_token');
+      if (tok) params.set('token', tok);
+      coverUrl = `/api/cover?${params.toString()}`;
+    }
+    const img = coverUrl
+      ? `<img class="texts-cover-img" alt="AI 封面帧" src="${escapeHtml(coverUrl)}" loading="lazy">`
+      : '';
+    coverHtml = `
+      <div class="texts-cover">
+        ${img}
+        <div class="texts-cover-meta">
+          <div><strong>AI 封面参考</strong></div>
+          <div>时间点：${escapeHtml(coverTs || '—')}</div>
+          ${coverName ? `<div>文件：<code>${escapeHtml(coverName)}</code></div>` : ''}
+          <p class="hint" style="margin:6px 0 0">分析时 AI 建议的封面帧（非叠字成品）。可跳到播放器对应位置。</p>
+          ${coverTs ? `<button type="button" class="btn-secondary" id="btn-cover-seek" style="margin-top:8px">跳到封面时间</button>` : ''}
+        </div>
+      </div>`;
+  }
+
   pane.innerHTML = `
     <h3>基础信息</h3>
+    ${coverHtml}
     <label>标题 <input data-field="title"></label>
     <label>位置 <input data-field="location"></label>
     <label>情绪 <input data-field="mood"></label>
@@ -119,6 +152,10 @@ export function renderTexts() {
   const sumEl = pane.querySelector('[data-field="summary"]');
   sumEl.value = t.summary || '';
   sumEl.oninput = () => { t.summary = sumEl.value; markDirty(); };
+
+  pane.querySelector('#btn-cover-seek')?.addEventListener('click', () => {
+    if (coverTs) _jumpToTranscriptTime(parseTimecode(coverTs));
+  });
 
   const ol = pane.querySelector('#timeline-list');
   for (const seg of (t.timeline || [])) {

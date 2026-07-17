@@ -7,6 +7,7 @@ import re
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 from clio._constants import VIDEO_EXTS
 from clio.config import AppConfig
@@ -26,6 +27,7 @@ from clio.vmeta import VideoMeta
 
 _SEG_RE = re.compile(r"^(.+)_seg(\d+)$")
 _VIDEO_OUT_EXTS = {".mp4", ".mov", ".mkv", ".m4v", ".webm"}
+CUT_BAK_SUFFIX = ".clio_bak"
 
 
 def resolve_cut_output_dir(config: AppConfig, day_label: str, output_dir: Path | None = None) -> Path:
@@ -75,6 +77,94 @@ def replace_file_safely(dest: Path, write_fn) -> None:
         raise
     if bak is not None and bak.exists():
         bak.unlink()
+
+
+def target_path_for_cut_bak(bak: Path) -> Path | None:
+    """Map foo.mp4.clio_bak → foo.mp4. Returns None if not a cut backup name."""
+    name = bak.name
+    if not name.endswith(CUT_BAK_SUFFIX):
+        return None
+    target_name = name[: -len(CUT_BAK_SUFFIX)]
+    if not target_name:
+        return None
+    return bak.with_name(target_name)
+
+
+def list_orphaned_cut_backups(project_output_dir: Path) -> list[dict[str, str]]:
+    """Find leftover *.clio_bak under output/cuts (interrupted re-cut).
+
+    Each item: bak, target, day (relative day folder under cuts when known).
+    """
+    cuts_root = Path(project_output_dir) / "cuts"
+    if not cuts_root.is_dir():
+        return []
+    found: list[dict[str, str]] = []
+    try:
+        for bak in sorted(cuts_root.rglob(f"*{CUT_BAK_SUFFIX}")):
+            if not bak.is_file():
+                continue
+            target = target_path_for_cut_bak(bak)
+            if target is None:
+                continue
+            day = ""
+            try:
+                rel = bak.relative_to(cuts_root)
+                if len(rel.parts) >= 2:
+                    day = rel.parts[0]
+            except ValueError:
+                day = ""
+            found.append(
+                {
+                    "bak": str(bak.resolve()),
+                    "target": str(target.resolve()),
+                    "day": day,
+                    "name": target.name,
+                }
+            )
+    except OSError:
+        return found
+    return found
+
+
+def restore_orphaned_cut_backup(bak: Path) -> dict[str, str]:
+    """Restore one backup: remove incomplete target if present, rename bak → target."""
+    bak = Path(bak)
+    target = target_path_for_cut_bak(bak)
+    if target is None:
+        raise ValueError(f"not a cut backup: {bak}")
+    if not bak.is_file():
+        raise FileNotFoundError(f"backup missing: {bak}")
+    if target.exists():
+        target.unlink()
+    bak.replace(target)
+    return {"bak": str(bak), "target": str(target), "name": target.name}
+
+
+def restore_orphaned_cut_backups(
+    project_output_dir: Path,
+    *,
+    only: list[str] | None = None,
+) -> dict[str, Any]:
+    """Restore orphaned cut backups under output/cuts.
+
+    only: optional list of absolute bak paths or target basenames to restore.
+    """
+    items = list_orphaned_cut_backups(project_output_dir)
+    if only is not None:
+        wanted = {str(Path(x)) for x in only} | set(only)
+        items = [
+            it
+            for it in items
+            if it["bak"] in wanted or it["target"] in wanted or it["name"] in wanted or Path(it["bak"]).name in wanted
+        ]
+    restored: list[dict[str, str]] = []
+    errors: list[dict[str, str]] = []
+    for it in items:
+        try:
+            restored.append(restore_orphaned_cut_backup(Path(it["bak"])))
+        except OSError as e:
+            errors.append({"bak": it["bak"], "error": str(e)})
+    return {"restored": restored, "errors": errors, "count": len(restored)}
 
 
 def _compute_segment_offset(compressed_stem: str, comp_dir: Path, original_path: Path, ffprobe: str) -> float:

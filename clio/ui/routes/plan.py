@@ -14,7 +14,12 @@ from clio.plan_readiness import (
     readiness_block_payload,
 )
 from clio.schema import add_schema_version
-from clio.tasks.cut import list_existing_cut_videos, resolve_cut_output_dir
+from clio.tasks.cut import (
+    list_existing_cut_videos,
+    list_orphaned_cut_backups,
+    resolve_cut_output_dir,
+    restore_orphaned_cut_backups,
+)
 from clio.ui.services.file_service import _is_safe_basename, _save_atomic
 
 if TYPE_CHECKING:
@@ -185,3 +190,21 @@ def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dic
             "day_label": day_label,
         }
     )
+
+
+def handle_get_cut_orphaned_backups(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
+    """GET /api/cut/orphaned-backups — leftover *.clio_bak from interrupted re-cuts."""
+    proj_out = handler._get_project_output(qs)
+    items = list_orphaned_cut_backups(proj_out)
+    handler._send_json({"ok": True, "count": len(items), "items": items})
+
+
+def handle_post_cut_restore_backups(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dict) -> None:
+    """POST /api/cut/restore-backups — restore orphaned cut backups (old files)."""
+    body = obj if isinstance(obj, dict) else {}
+    only = body.get("paths")
+    if only is not None and not isinstance(only, list):
+        return handler._send_json({"ok": False, "error": "paths must be a list"}, 400)
+    proj_out = handler._get_project_output(qs)
+    result = restore_orphaned_cut_backups(proj_out, only=only)
+    handler._send_json({"ok": True, **result})

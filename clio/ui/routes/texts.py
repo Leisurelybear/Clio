@@ -1,9 +1,11 @@
-"""Route handlers: /api/texts, /api/voiceover"""
+"""Route handlers: /api/texts, /api/voiceover, /api/cover"""
 
 from __future__ import annotations
 
 import json
+import mimetypes
 from http import HTTPStatus
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from clio.ui.services.file_service import _save_atomic
@@ -30,6 +32,19 @@ def handle_get_voiceover(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     if p is None:
         return handler.send_error(HTTPStatus.NOT_FOUND)
     handler._send_bytes(p.read_bytes(), "application/json; charset=utf-8")
+
+
+def handle_get_cover(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
+    """Handle GET /api/cover?file=<name.jpg> — AI-picked cover frame under covers/."""
+    proj_out = handler._get_project_output(qs)
+    raw = qs.get("file", [""])[0]
+    # Accept "covers/foo.jpg" or "foo.jpg"
+    basename = Path(str(raw).replace("\\", "/")).name
+    p = handler._resolve_in("covers", basename, proj_out)
+    if p is None:
+        return handler.send_error(HTTPStatus.NOT_FOUND)
+    ct = mimetypes.guess_type(str(p))[0] or "image/jpeg"
+    handler._send_bytes(p.read_bytes(), ct)
 
 
 def handle_put_texts(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:

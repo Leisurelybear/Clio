@@ -57,6 +57,19 @@ describe('buildRuntimeWarnings', () => {
       }),
     ]);
   });
+
+  it('warns when orphaned cut backups exist', () => {
+    const warnings = buildRuntimeWarnings({
+      config: {},
+      hostname: '127.0.0.1',
+      hasToken: true,
+      orphanedCutBackups: [{ name: 'a.mp4', bak: '/x/a.mp4.clio_bak' }],
+    });
+    expect(warnings.some((w) => w.id === 'cut-orphaned-bak')).toBe(true);
+    const w = warnings.find((w) => w.id === 'cut-orphaned-bak');
+    expect(w.action?.id).toBe('restore-cut-backups');
+    expect(w.text).toMatch(/clio_bak|备份/);
+  });
 });
 
 describe('renderRuntimeWarnings', () => {
@@ -69,6 +82,28 @@ describe('renderRuntimeWarnings', () => {
     expect(container.querySelector('.runtime-warning')).not.toBeNull();
     expect(container.textContent).toContain('<script>alert(1)</script>');
     expect(container.innerHTML).not.toContain('<script>');
+  });
+
+  it('renders action button and invokes handler', () => {
+    const container = document.createElement('div');
+    let called = null;
+    renderRuntimeWarnings(
+      container,
+      [
+        {
+          id: 'cut-orphaned-bak',
+          level: 'warning',
+          text: 'orphans',
+          action: { id: 'restore-cut-backups', label: '恢复旧文件' },
+        },
+      ],
+      { onAction: (id) => { called = id; } },
+    );
+    const btn = container.querySelector('.runtime-warning-action');
+    expect(btn).not.toBeNull();
+    expect(btn.textContent).toBe('恢复旧文件');
+    btn.click();
+    expect(called).toBe('restore-cut-backups');
   });
 
   it('hides the container when there are no warnings', () => {

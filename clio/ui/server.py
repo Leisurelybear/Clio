@@ -50,9 +50,11 @@ from clio.ui.routes.fs import (
     handle_post_fs_reveal,
 )
 from clio.ui.routes.plan import (
+    handle_get_cut_orphaned_backups,
     handle_get_plan,
     handle_get_plans,
     handle_post_cut,
+    handle_post_cut_restore_backups,
     handle_post_plan_readiness,
     handle_put_plan,
 )
@@ -78,6 +80,7 @@ from clio.ui.routes.run import (
 )
 from clio.ui.routes.static_files import handle_favicon, handle_index, handle_static
 from clio.ui.routes.texts import (
+    handle_get_cover,
     handle_get_texts,
     handle_get_voiceover,
     handle_put_texts,
@@ -383,6 +386,7 @@ def make_handler(
         "handle_post_project_migrate": {"obj"},
         "handle_post_fs_mkdir": {"obj"},
         "handle_post_fs_reveal": {"obj"},
+        "handle_post_cut_restore_backups": {"qs", "obj"},
     }
 
     router = Router(resolver=_resolve_handler)
@@ -403,6 +407,8 @@ def make_handler(
             Route("PUT", "/api/videos/relink", "handle_put_videos_relink"),
             Route("GET", "/api/texts", "handle_get_texts"),
             Route("GET", "/api/voiceover", "handle_get_voiceover"),
+            Route("GET", "/api/cover", "handle_get_cover"),
+            Route("GET", "/api/cut/orphaned-backups", "handle_get_cut_orphaned_backups"),
             Route("GET", "/api/plans", "handle_get_plans"),
             Route("GET", "/api/run/status", "handle_get_run_status"),
             Route("GET", "/api/run/stream", "handle_get_run_stream"),
@@ -440,6 +446,7 @@ def make_handler(
             Route("POST", "/api/config/init", "handle_post_config_init"),
             Route("POST", "/api/providers", "handle_post_provider"),
             Route("POST", "/api/cut", "handle_post_cut"),
+            Route("POST", "/api/cut/restore-backups", "handle_post_cut_restore_backups"),
             Route("POST", "/api/plan/readiness", "handle_post_plan_readiness"),
             Route("POST", "/api/refine", "handle_post_refine"),
             Route("POST", "/api/export", "handle_post_export"),
