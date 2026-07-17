@@ -83,6 +83,14 @@ describe('buildVideoMenuItems', () => {
     expect(enabled.sort()).toEqual(['relink', 'remove'].sort());
   });
 
+  it('compressed offline: pipeline actions disabled; only remove enabled', () => {
+    const items = buildVideoMenuItems({ missing: true, file: '001_a.mp4' }, 'compressed');
+    const enabled = items.filter((i) => !i.divider && !i.disabled).map((i) => i.action);
+    expect(enabled).toEqual(['remove']);
+    expect(items.find((i) => i.action === 'analyze')?.disabled).toBe(true);
+    expect(items.find((i) => i.action === 'transcribe')?.disabled).toBe(true);
+  });
+
   it('disabled analyze on original explains switch to compressed', () => {
     const item = buildVideoMenuItems({ missing: false }, 'original').find(
       (i) => i.action === 'analyze'

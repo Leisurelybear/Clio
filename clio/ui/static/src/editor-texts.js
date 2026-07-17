@@ -158,9 +158,10 @@ export function renderTranscript() {
     });
     pane.insertAdjacentHTML(
       'beforeend',
-      `<p class="hint" style="margin-top:12px">也可
-        <button id="btn-create-transcript" type="button" class="sidebar-btn" style="display:inline;padding:2px 8px;cursor:pointer;font:inherit">创建手动转录</button>
-        后自由编辑时间轴条目。</p>`
+      `<p style="margin-top:12px">
+        <button id="btn-create-transcript" type="button" class="btn-primary">${icon('plus', 14)} 创建手动转录</button>
+      </p>
+      <p class="hint" style="margin-top:8px">手动创建后可自由编辑时间轴；也可上方重跑 Whisper 或去运行流水线自动生成。</p>`
     );
     pane.querySelector('#btn-create-transcript').onclick = async () => {
       const v = state.videos.find(x => x.file === state.currentVideo);

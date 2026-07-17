@@ -93,6 +93,49 @@ export function buildVideoMenuItems(video, source) {
   }
 
   // compressed view
+  if (missing) {
+    return [
+      {
+        action: 'compress',
+        label: '压缩视频',
+        disabled: true,
+        title: '文件离线',
+      },
+      {
+        action: 'analyze',
+        label: 'AI分析视频',
+        disabled: true,
+        title: '文件离线',
+      },
+      {
+        action: 'voiceover',
+        label: '重跑口播文案',
+        disabled: true,
+        title: '文件离线',
+      },
+      {
+        action: 'transcribe',
+        label: 'Whisper 转录',
+        disabled: true,
+        title: '文件离线',
+      },
+      {
+        action: 'all',
+        label: '重跑全部',
+        disabled: true,
+        title: '文件离线',
+      },
+      { divider: true },
+      {
+        action: 'remove',
+        label: '从项目移除',
+        disabled: false,
+        danger: true,
+        title: '从项目视频列表移除对应原片（若能解析）',
+      },
+    ];
+  }
+
   return [
     {
       action: 'compress',
