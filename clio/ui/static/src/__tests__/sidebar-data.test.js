@@ -114,3 +114,34 @@ describe('submitRelink', () => {
     await expect(submitRelink('D:/old/video.mp4', 'D:/new/video.mp4')).rejects.toThrow('网络错误');
   });
 });
+
+
+describe('videoThumbHtml', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it('renders icon placeholder when no cover_file', async () => {
+    const { videoThumbHtml } = await import('../sidebar-data.js');
+    const html = videoThumbHtml({ file: 'a.mp4' });
+    expect(html).toContain('video-thumb');
+    expect(html).not.toContain('has-cover');
+    expect(html).not.toContain('/api/cover');
+  });
+
+  it('renders cover img with project params when cover_file set', async () => {
+    const { state } = await import('../state.js');
+    state.currentProjectName = 'France';
+    state.currentProjectDir = 'D:/vlog/France';
+    sessionStorage.setItem('api_token', 'tok123');
+
+    const { videoThumbHtml } = await import('../sidebar-data.js');
+    const html = videoThumbHtml({ cover_file: 'covers/001_title.jpg' });
+    expect(html).toContain('has-cover');
+    expect(html).toContain('/api/cover?');
+    expect(html).toContain('file=001_title.jpg');
+    expect(html).toContain('project=France');
+    expect(html).toContain('token=tok123');
+    expect(html).toContain('video-thumb-fallback');
+  });
+});

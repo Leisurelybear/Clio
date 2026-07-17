@@ -600,14 +600,42 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
 .video-item.missing .video-name { color: var(--warn, #b8860b); }
 
 .video-thumb {
-  width: 32px; height: 20px;
+  width: 48px; height: 32px;
   background: var(--bg-surface-2);
   border-radius: 3px;
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
   border: 1px solid var(--border);
+  overflow: hidden;
+  position: relative;
 }
 .video-thumb .icon { width: 14px; height: 14px; color: var(--text-muted); }
+.video-thumb.has-cover {
+  background: #0a0a0a;
+  padding: 0;
+}
+.video-thumb.has-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  position: relative;
+  z-index: 1;
+}
+.video-thumb-fallback {
+  display: none;
+  position: absolute;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+}
+/* img load error → JS adds .cover-error and removes .has-cover */
+.video-thumb.cover-error img {
+  display: none;
+}
+.video-thumb.cover-error .video-thumb-fallback {
+  display: flex;
+}
 
 .video-info { flex: 1; min-width: 0; }
 

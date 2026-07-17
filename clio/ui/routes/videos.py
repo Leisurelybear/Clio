@@ -176,6 +176,7 @@ def _videos_cache_signature(proj_dir: Path, proj_out: Path, comp_dir: Path, cfg:
         tuple((str(td), _dir_fingerprint(td, json_only=True)) for td in text_dirs),
         _dir_fingerprint(proj_out / "scripts", json_only=True),
         _dir_fingerprint(proj_out / cfg.whisper.transcripts_subdir, json_only=True),
+        _dir_fingerprint(proj_out / "covers"),  # AI cover thumbs
         cfg.whisper.transcripts_subdir,
         cfg.paths.ffprobe,
     )
@@ -211,6 +212,38 @@ def _dir_fingerprint(path: Path, *, video_only: bool = False, json_only: bool = 
     return tuple(entries)
 
 
+def _cover_map(proj_out: Path) -> dict[str, str]:
+    """Map analysis stem → cover basename under output/covers/."""
+    covers_dir = proj_out / "covers"
+    mapping: dict[str, str] = {}
+    if not covers_dir.is_dir():
+        return mapping
+    try:
+        for p in covers_dir.iterdir():
+            if p.is_file() and p.suffix.lower() in {".jpg", ".jpeg", ".png", ".webp"}:
+                mapping[p.stem] = p.name
+    except OSError:
+        return mapping
+    return mapping
+
+
+def _cover_for_text_json(
+    text_json: str | None,
+    cover_map: dict[str, str],
+    index: str | None = None,
+) -> str | None:
+    if text_json:
+        stem = Path(text_json).stem
+        if stem in cover_map:
+            return cover_map[stem]
+    if index:
+        # Prefer exact / unique prefix match for "001_title.jpg"
+        for stem, name in cover_map.items():
+            if stem == index or stem.startswith(f"{index}_"):
+                return name
+    return None
+
+
 def _build_videos_payload(
     handler: HandlerProtocol,
     proj_dir: Path,
@@ -237,6 +270,8 @@ def _build_videos_payload(
     for g in index.all_groups():
         if g.texts:
             text_titles[g.compressed.index] = g.texts[0].title
+
+    cover_map = _cover_map(proj_out)
 
     videos: list[dict] = []
     groups: dict[str, dict] = {}
@@ -276,12 +311,17 @@ def _build_videos_payload(
                     except OSError:
                         abs_match = str(op)
                         match_missing = True
+                text_json = group.texts[0].path.name if group and group.texts else None
+                cover_file = (
+                    group.cover.path.name if group and group.cover else _cover_for_text_json(text_json, cover_map, idx)
+                )
                 v: dict[str, Any] = {
                     "file": p.name,
                     "source": "compressed",
                     "index": idx,
                     "title": group.texts[0].title if group and group.texts else text_titles.get(idx, ""),
-                    "text_json": group.texts[0].path.name if group and group.texts else None,
+                    "text_json": text_json,
+                    "cover_file": cover_file,
                     "script_json": group.script.path.name if group and group.script else None,
                     "transcript_file": group.transcript.stem if group and group.transcript else None,
                     "match": (
@@ -421,13 +461,20 @@ def _build_videos_payload(
             segment_matches = [{"source": "compressed", "file": cf, "index": ci} for cf, ci in comp]
             for c_file, c_idx in comp:
                 group = index.lookup(compressed_stem=Path(c_file).stem)
+                text_json = group.texts[0].path.name if group and group.texts else None
+                cover_file = (
+                    group.cover.path.name
+                    if group and group.cover
+                    else _cover_for_text_json(text_json, cover_map, c_idx)
+                )
                 seg_v: dict[str, Any] = {
                     "file": f"{c_idx}_{rel_name}",
                     "source": "original",
                     "index": c_idx,
                     "title": text_titles.get(c_idx, ""),
                     "offset_sec": seg_offsets.get(c_idx, 0.0),
-                    "text_json": group.texts[0].path.name if group and group.texts else None,
+                    "text_json": text_json,
+                    "cover_file": cover_file,
                     "script_json": group.script.path.name if group and group.script else None,
                     "transcript_file": group.transcript.stem if group and group.transcript else None,
                     "match": {"source": "compressed", "file": c_file, "index": c_idx},

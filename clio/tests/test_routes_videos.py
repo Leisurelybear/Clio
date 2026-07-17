@@ -11,6 +11,8 @@ import pytest
 
 from clio.ui.routes.videos import (
     _VIDEOS_CACHE,
+    _cover_for_text_json,
+    _cover_map,
     _parse_segment_info,
     handle_get_video,
     handle_get_videos,
@@ -713,3 +715,67 @@ class TestHandlePutVideosRelink:
         assert resp.get("ok") is True
         saved = mock_save.call_args.args[1]
         assert str(saved[0]) == str(new_file.resolve())
+
+
+class TestCoverMap:
+    def test_maps_image_stems(self, tmp_path: Path):
+        covers = tmp_path / "covers"
+        covers.mkdir()
+        (covers / "001_title.jpg").write_bytes(b"x")
+        (covers / "002_other.png").write_bytes(b"x")
+        (covers / "notes.txt").write_text("skip")
+        mapping = _cover_map(tmp_path)
+        assert mapping["001_title"] == "001_title.jpg"
+        assert mapping["002_other"] == "002_other.png"
+        assert "notes" not in mapping
+
+    def test_missing_covers_dir(self, tmp_path: Path):
+        assert _cover_map(tmp_path) == {}
+
+    def test_cover_for_text_json_exact_stem(self):
+        mapping = {"001_hello": "001_hello.jpg"}
+        assert _cover_for_text_json("001_hello.json", mapping) == "001_hello.jpg"
+        assert _cover_for_text_json(None, mapping, "001") == "001_hello.jpg"
+        assert _cover_for_text_json(None, mapping, "999") is None
+
+
+class TestVideosPayloadCoverFile:
+    def setup_method(self):
+        _clear_videos_cache()
+
+    def test_cover_file_attached_for_compressed(self, tmp_path: Path):
+        import json
+
+        handler = MagicMock()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
+        proj_out = tmp_path / "output"
+        proj_out.mkdir()
+        comp_dir = proj_out / "compressed"
+        comp_dir.mkdir()
+        (comp_dir / "001_GL010695.mp4").write_bytes(b"")
+        texts = proj_out / "texts"
+        texts.mkdir()
+        (texts / "001_GL010695.json").write_text(json.dumps({"title": "t", "segments": []}), encoding="utf-8")
+        covers = proj_out / "covers"
+        covers.mkdir()
+        (covers / "001_GL010695.jpg").write_bytes(b"img")
+
+        handler._resolve_project_dir.return_value = proj_dir
+        handler._get_project_output.return_value = proj_out
+        handler._send_json = MagicMock()
+        cfg = SimpleNamespace(
+            paths=SimpleNamespace(ffprobe=""),
+            whisper=SimpleNamespace(transcripts_subdir="transcripts"),
+        )
+        handler._get_config.return_value = cfg
+
+        with patch("clio.ui.routes.videos.load_selected_videos", return_value=[]):
+            # empty selected_set allows browsing all compressed artifacts
+            handle_get_videos(handler, {"source": ["compressed"]})
+
+        payload = handler._send_json.call_args[0][0]
+        assert len(payload["videos"]) == 1
+        v = payload["videos"][0]
+        assert v.get("cover_file") == "001_GL010695.jpg"
+        assert v.get("text_json") == "001_GL010695.json"

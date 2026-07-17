@@ -200,6 +200,37 @@ function scrollActiveVideoIntoView() {
   });
 }
 
+/** Cover thumbnail HTML for video list (falls back to video icon). */
+export function videoThumbHtml(v) {
+  const name = String(v?.cover_file || '').replace(/\\/g, '/').split('/').pop();
+  if (!name) {
+    return `<div class="video-thumb">${icon('video')}</div>`;
+  }
+  const params = new URLSearchParams();
+  params.set('file', name);
+  if (state.currentProjectName) params.set('project', state.currentProjectName);
+  if (state.currentProjectDir) params.set('project_dir', state.currentProjectDir);
+  const tok = sessionStorage.getItem('api_token');
+  if (tok) params.set('token', tok);
+  const src = `/api/cover?${params.toString()}`;
+  // Fallback icon under img; onerror on the img swaps to icon via .cover-error.
+  return `<div class="video-thumb has-cover" title="AI 封面">
+    <img src="${escapeHtml(src)}" alt="" loading="lazy" decoding="async">
+    <span class="video-thumb-fallback">${icon('video')}</span>
+  </div>`;
+}
+
+function bindCoverThumbFallback(root) {
+  const img = root?.querySelector?.('.video-thumb.has-cover img');
+  if (!img) return;
+  img.addEventListener('error', () => {
+    const thumb = img.closest('.video-thumb');
+    if (!thumb) return;
+    thumb.classList.add('cover-error');
+    thumb.classList.remove('has-cover');
+  }, { once: true });
+}
+
 function renderVideoItem(v) {
   const li = document.createElement('li');
   let checkboxHtml = '';
@@ -250,7 +281,7 @@ function renderVideoItem(v) {
 
   const durHtml = v.duration_sec ? `<span class="video-duration">${Math.round(v.duration_sec)}s</span>` : '';
 
-  li.innerHTML = `<div class="video-thumb">${icon('video')}</div>
+  li.innerHTML = `${videoThumbHtml(v)}
     <div class="video-info">
       <div class="video-name">${checkboxHtml}${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)}${durHtml}</div>
       <div class="video-step-badges">${stepBadges}</div>
@@ -264,6 +295,7 @@ function renderVideoItem(v) {
         </div>
       </div>
   `;
+  bindCoverThumbFallback(li);
 
   li.onclick = (e) => {
     if (e.target.closest('.match-jump')) return;
