@@ -382,6 +382,7 @@ def make_handler(
         "handle_post_project_remove": {"obj"},
         "handle_post_project_migrate": {"obj"},
         "handle_post_fs_mkdir": {"obj"},
+        "handle_post_fs_reveal": {"obj"},
     }
 
     router = Router(resolver=_resolve_handler)
