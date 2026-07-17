@@ -440,7 +440,10 @@ export function renderPlan() {
     <label><input type="checkbox" id="cut-reencode"> 重新编码 (默认 -c copy 快速)</label>
     <label>输出目录 (留空则 output/cuts/&lt;day&gt;)
       <span class="input-with-browse"><input id="cut-outdir" placeholder="例如 E:/剪辑素材/第一天"><button class="browse-btn" data-target="cut-outdir" type="button">浏览</button></span></label>
-    <button id="btn-cut-exec" class="btn-primary">${icon('cut', 16)} 执行裁剪</button>
+    <div class="cut-actions" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px;align-items:center;">
+      <button id="btn-cut-exec" class="btn-primary" type="button">${icon('cut', 16)} 执行裁剪</button>
+      <button id="btn-cut-open-dir" class="btn-secondary" type="button" title="在资源管理器中打开裁剪输出目录">${icon('folder', 16)} 打开目录</button>
+    </div>
     <div id="cut-result" style="margin-top:12px"></div>
   `;
   pane.appendChild(cutSection);
@@ -457,6 +460,27 @@ export function renderPlan() {
   pane.appendChild(exportSection);
 
   $('cut-source')?.addEventListener('change', () => scheduleReadinessCheck());
+
+  $('btn-cut-open-dir')?.addEventListener('click', async () => {
+    const custom = $('cut-outdir')?.value?.trim();
+    let path = custom;
+    if (!path) {
+      const base = state.config?.output_dir || '';
+      const day = state.currentDay || 'day1';
+      if (!base) {
+        setStatus('无法解析默认裁剪目录（output_dir 未知）', 'warn');
+        return;
+      }
+      path = `${String(base).replace(/[\\/]+$/, '')}/cuts/${day}`;
+    }
+    try {
+      const r = await api('POST', '/api/fs/reveal', { path });
+      if (r.ok) setStatus(`已打开: ${r.path || path}`, 'ok');
+      else throw new Error(r.error || '打开失败');
+    } catch (e) {
+      setStatus('打开目录失败: ' + e.message, 'err');
+    }
+  });
 
   $('btn-jianying-export')?.addEventListener('click', async () => {
     const btn = $('btn-jianying-export');
@@ -519,13 +543,38 @@ export async function executeCut() {
       updateActionButtonsGate();
       return;
     }
-    const r = await api('POST', '/api/cut', {
+    const body = {
       day_label: dayLabel,
       source: $('cut-source').value,
       reencode: $('cut-reencode').checked,
       output_dir: $('cut-outdir').value.trim() || null,
       force,
-    });
+      overwrite: false,
+    };
+    let r;
+    try {
+      r = await api('POST', '/api/cut', body);
+    } catch (e) {
+      if (e.status === 409 && e.body?.code === 'cut_output_exists') {
+        const count = e.body.count || e.body.files?.length || '?';
+        const dir = e.body.output_dir || body.output_dir || '';
+        const preview = e.body.preview || (e.body.files || []).slice(0, 8).join('、') || '';
+        const ok = confirm(
+          `输出目录已有 ${count} 个裁剪视频，是否覆盖重剪？\n\n` +
+          `目录: ${dir}\n` +
+          (preview ? `示例: ${preview}\n\n` : '\n') +
+          '将先备份旧文件，生成新裁剪成功后再删除备份。'
+        );
+        if (!ok) {
+          result.innerHTML = '<p class="muted">已取消覆盖裁剪</p>';
+          setStatus('已取消裁剪', 'warn');
+          return;
+        }
+        r = await api('POST', '/api/cut', { ...body, overwrite: true });
+      } else {
+        throw e;
+      }
+    }
     result.innerHTML = `<p class="ok">裁剪完成</p><p>输出目录: ${escapeHtml(r.output_dir)}</p>`;
     setStatus('裁剪完成', 'ok');
     addToast('裁剪完成', 'success');

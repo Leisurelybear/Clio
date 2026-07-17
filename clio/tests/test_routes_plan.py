@@ -165,3 +165,61 @@ class TestHandlePostCut:
         handler._send_json = MagicMock()
         handle_post_cut(handler, {}, {"source": "invalid"})
         handler._send_json.assert_called_once_with({"ok": False, "error": "source must be compressed|original"}, 400)
+
+    def test_existing_output_returns_409_without_overwrite(self, tmp_path: Path):
+        from clio.config import AppConfig
+        from clio.config.models import (
+            AnalyzeConfig,
+            GlobalConfig,
+            GlobalPathsConfig,
+            NamingConfig,
+            PlanConfig,
+            ProjectConfig,
+            ProjectPathsConfig,
+            ScriptConfig,
+        )
+
+        plans = tmp_path / "plans"
+        plans.mkdir()
+        plan = {
+            "day_title": "d",
+            "sequence": [{"index": "001", "title": "A", "use_timeline": "00:00-00:05", "reason": "r"}],
+        }
+        (plans / "day1_plan.json").write_text(json.dumps(plan), encoding="utf-8")
+        cuts = tmp_path / "cuts" / "day1"
+        cuts.mkdir(parents=True)
+        (cuts / "old.mp4").write_bytes(b"\x00")
+
+        cfg = AppConfig(
+            global_cfg=GlobalConfig(
+                paths=GlobalPathsConfig(ffmpeg="ffmpeg", ffprobe="ffprobe"),
+                naming=NamingConfig(index_width=3),
+            ),
+            project_cfg=ProjectConfig(
+                paths=ProjectPathsConfig(output_dir=tmp_path),
+                analyze=AnalyzeConfig(
+                    skip_existing=True,
+                    texts_subdir="texts",
+                    compressed_subdir="compressed",
+                ),
+                script=ScriptConfig(scripts_subdir="scripts"),
+                plan=PlanConfig(plans_subdir="plans"),
+            ),
+            project_dir=tmp_path,
+        )
+        handler = MagicMock()
+        handler._resolve_project_dir.return_value = tmp_path
+        handler._get_config.return_value = cfg
+        handler._send_json = MagicMock()
+
+        handle_post_cut(handler, {}, {"day_label": "day1", "source": "compressed", "overwrite": False, "force": True})
+        args = handler._send_json.call_args
+        payload = args[0][0]
+        status = args[0][1] if len(args[0]) > 1 else args[1].get("status") if args[1] else None
+        # status may be positional second arg
+        if status is None and len(handler._send_json.call_args.args) > 1:
+            status = handler._send_json.call_args.args[1]
+        assert status == 409
+        assert payload["code"] == "cut_output_exists"
+        assert payload["count"] == 1
+        assert "old.mp4" in payload["files"]

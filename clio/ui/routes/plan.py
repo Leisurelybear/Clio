@@ -14,6 +14,7 @@ from clio.plan_readiness import (
     readiness_block_payload,
 )
 from clio.schema import add_schema_version
+from clio.tasks.cut import list_existing_cut_videos, resolve_cut_output_dir
 from clio.ui.services.file_service import _is_safe_basename, _save_atomic
 
 if TYPE_CHECKING:
@@ -121,6 +122,8 @@ def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dic
     reencode = obj.get("reencode", False)
     out_dir_raw = obj.get("output_dir", None)
     force = bool(obj.get("force"))
+    # Default False so UI can prompt; CLI pipeline passes True / uses run_cut_all directly.
+    overwrite = bool(obj.get("overwrite", False))
 
     if source not in ("compressed", "original"):
         return handler._send_json({"ok": False, "error": "source must be compressed|original"}, 400)
@@ -128,6 +131,7 @@ def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dic
     out_path = Path(out_dir_raw) if out_dir_raw else None
     proj_dir = handler._resolve_project_dir(qs)
     cfg = handler._get_config(proj_dir)
+    actual_out_path = resolve_cut_output_dir(cfg, day_label, out_path)
 
     plan_path = cfg.plans_dir / f"{day_label}_plan.json"
     if not plan_path.is_file():
@@ -142,6 +146,24 @@ def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dic
     if blocked is not None:
         return handler._send_json(blocked, 400)
 
+    existing = list_existing_cut_videos(actual_out_path)
+    if existing and not overwrite:
+        preview = existing[:12]
+        more = len(existing) - len(preview)
+        hint = "、".join(preview) + (f" 等 {more} 个" if more > 0 else "")
+        return handler._send_json(
+            {
+                "ok": False,
+                "error": f"输出目录已有 {len(existing)} 个裁剪视频，确认覆盖后重试",
+                "code": "cut_output_exists",
+                "count": len(existing),
+                "files": existing,
+                "preview": hint,
+                "output_dir": str(actual_out_path),
+            },
+            409,
+        )
+
     try:
         run_cut_all(
             cfg,
@@ -149,15 +171,17 @@ def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dic
             output_dir=out_path,
             reencode=bool(reencode),
             source=source,
+            overwrite=True,
         )
+    except FileExistsError as e:
+        return handler._send_json({"ok": False, "error": str(e), "code": "cut_output_exists"}, 409)
     except Exception as e:
         return handler._send_json({"ok": False, "error": str(e)}, 500)
 
-    actual_out = str(out_path or (handler.output_dir / "cuts" / day_label))
     handler._send_json(
         {
             "ok": True,
-            "output_dir": actual_out,
+            "output_dir": str(actual_out_path),
             "day_label": day_label,
         }
     )

@@ -32,8 +32,15 @@ async function api(method, url, body) {
   if (!r.ok) {
     const txt = await r.text();
     let detail = txt;
-    try { detail = JSON.parse(txt).error || txt; } catch {}
-    throw new Error(`HTTP ${r.status}: ${detail}`);
+    let body = null;
+    try {
+      body = JSON.parse(txt);
+      detail = body.error || txt;
+    } catch { /* plain text */ }
+    const err = new Error(`HTTP ${r.status}: ${detail}`);
+    err.status = r.status;
+    err.body = body;
+    throw err;
   }
   if (r.status === 204) return null;
   const ct = r.headers.get('Content-Type') || '';

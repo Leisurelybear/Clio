@@ -25,6 +25,56 @@ from clio.utils import (
 from clio.vmeta import VideoMeta
 
 _SEG_RE = re.compile(r"^(.+)_seg(\d+)$")
+_VIDEO_OUT_EXTS = {".mp4", ".mov", ".mkv", ".m4v", ".webm"}
+
+
+def resolve_cut_output_dir(config: AppConfig, day_label: str, output_dir: Path | None = None) -> Path:
+    """Resolve where cut clips are written for a day."""
+    if output_dir is not None:
+        return Path(output_dir).expanduser().resolve()
+    return (config.paths.output_dir / "cuts" / day_label).resolve()
+
+
+def list_existing_cut_videos(out_root: Path) -> list[str]:
+    """Basenames of video files already present under a cut output directory."""
+    if not out_root.is_dir():
+        return []
+    names: list[str] = []
+    try:
+        for p in sorted(out_root.iterdir()):
+            if p.is_file() and p.suffix.lower() in _VIDEO_OUT_EXTS:
+                names.append(p.name)
+    except OSError:
+        return []
+    return names
+
+
+def replace_file_safely(dest: Path, write_fn) -> None:
+    """Write *dest* via rename-backup → write → delete-backup; restore on failure.
+
+    Matches product rule for re-cuts: keep old file until the new one succeeds.
+    """
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    bak: Path | None = None
+    if dest.exists():
+        bak = dest.with_name(dest.name + ".clio_bak")
+        if bak.exists():
+            bak.unlink()
+        dest.replace(bak)
+    try:
+        write_fn(dest)
+    except Exception:
+        if bak is not None and bak.exists():
+            if dest.exists():
+                try:
+                    dest.unlink()
+                except OSError:
+                    pass
+            bak.replace(dest)
+        raise
+    if bak is not None and bak.exists():
+        bak.unlink()
 
 
 def _compute_segment_offset(compressed_stem: str, comp_dir: Path, original_path: Path, ffprobe: str) -> float:
@@ -66,6 +116,7 @@ def run_cut_all(
     reencode: bool = False,
     source: str = "compressed",
     cancel_event: threading.Event | None = None,
+    overwrite: bool = True,
 ) -> list[dict]:
     """根据 plan 按时间区间裁剪视频片段。
 
@@ -73,6 +124,8 @@ def run_cut_all(
     用 ffmpeg 从对应压缩视频中裁剪 [use_timeline] 段。
 
     输出：剪好的 clip 文件 + 对应 texts JSON + manifest.md。
+    overwrite=False 时若输出目录已有视频则抛 FileExistsError（不改写）。
+    overwrite=True 时对每个目标文件先备份再写，成功后删备份。
     """
     plan_path = config.plans_dir / f"{day_label}_plan.json"
     if not plan_path.is_file():
@@ -84,7 +137,10 @@ def run_cut_all(
         print(f"规划文件中没有 sequence 段: {plan_path.name}")
         return []
 
-    out_root = (output_dir or config.paths.output_dir / "cuts" / day_label).resolve()
+    out_root = resolve_cut_output_dir(config, day_label, output_dir)
+    existing = list_existing_cut_videos(out_root)
+    if existing and not overwrite:
+        raise FileExistsError(f"输出目录已有 {len(existing)} 个裁剪视频: {out_root}")
     out_root.mkdir(parents=True, exist_ok=True)
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
     ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
@@ -192,7 +248,19 @@ def run_cut_all(
             print(_eta_line("裁剪", i, len(seq), clip_stem, completed, elapsed_total))
             t0 = time.monotonic()
             try:
-                cut_one(video_path, clip_path, start, end, ffmpeg, reencode=reencode, cancel_event=cancel_event)
+
+                def _write_clip(dest: Path) -> None:
+                    cut_one(
+                        video_path,
+                        dest,
+                        start,
+                        end,
+                        ffmpeg,
+                        reencode=reencode,
+                        cancel_event=cancel_event,
+                    )
+
+                replace_file_safely(clip_path, _write_clip)
                 state.mark(_orig_stem_from_path(video_path), "cut", "done")
             except Exception:
                 state.mark(_orig_stem_from_path(video_path), "cut", "error")
@@ -213,7 +281,7 @@ def run_cut_all(
                     "end_sec": round(end, 2),
                 }
                 dst = out_root / f"{clip_stem}.json"
-                write_json_atomic(dst, data)
+                replace_file_safely(dst, lambda p, d=data: write_json_atomic(p, d))
                 text_json = dst.name
                 print(f"  -> texts: {dst.name}")
 

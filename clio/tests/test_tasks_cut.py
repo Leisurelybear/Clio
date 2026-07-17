@@ -58,6 +58,80 @@ def _write_plan(cfg: AppConfig, day_label: str = "day1", seq: list | None = None
     plan_path.write_text(json.dumps(plan), encoding="utf-8")
 
 
+class TestReplaceFileSafely:
+    def test_writes_new_file(self, tmp_path):
+        from clio.tasks.cut import replace_file_safely
+
+        dest = tmp_path / "out.mp4"
+
+        def write(p):
+            p.write_bytes(b"new")
+
+        replace_file_safely(dest, write)
+        assert dest.read_bytes() == b"new"
+        assert not (tmp_path / "out.mp4.clio_bak").exists()
+
+    def test_restores_backup_on_write_failure(self, tmp_path):
+        from clio.tasks.cut import replace_file_safely
+
+        dest = tmp_path / "out.mp4"
+        dest.write_bytes(b"old")
+
+        def boom(p):
+            raise RuntimeError("ffmpeg failed")
+
+        with pytest.raises(RuntimeError, match="ffmpeg failed"):
+            replace_file_safely(dest, boom)
+        assert dest.read_bytes() == b"old"
+        assert not (tmp_path / "out.mp4.clio_bak").exists()
+
+    def test_deletes_backup_after_success(self, tmp_path):
+        from clio.tasks.cut import replace_file_safely
+
+        dest = tmp_path / "out.mp4"
+        dest.write_bytes(b"old")
+
+        def write(p):
+            p.write_bytes(b"new")
+
+        replace_file_safely(dest, write)
+        assert dest.read_bytes() == b"new"
+        assert not (tmp_path / "out.mp4.clio_bak").exists()
+
+
+class TestListExistingCutVideos:
+    def test_lists_video_basenames(self, tmp_path):
+        from clio.tasks.cut import list_existing_cut_videos
+
+        (tmp_path / "a.mp4").write_bytes(b"")
+        (tmp_path / "b.json").write_bytes(b"")
+        (tmp_path / "c.mov").write_bytes(b"")
+        assert list_existing_cut_videos(tmp_path) == ["a.mp4", "c.mov"]
+
+    def test_empty_or_missing_dir(self, tmp_path):
+        from clio.tasks.cut import list_existing_cut_videos
+
+        assert list_existing_cut_videos(tmp_path / "nope") == []
+        assert list_existing_cut_videos(tmp_path) == []
+
+
+class TestRunCutAllOverwrite:
+    @patch("clio.tasks.cut.cut_one")
+    @patch("clio.tasks.cut.resolve_binary")
+    def test_refuses_existing_without_overwrite(self, mock_resolve, mock_cut, cfg):
+        _write_plan(cfg, seq=[{"index": "001", "title": "A", "use_timeline": "00:00-00:10"}])
+        (cfg.compressed_dir / "001_src.mp4").write_bytes(b"\x00")
+        out = cfg.paths.output_dir / "cuts" / "day1"
+        out.mkdir(parents=True)
+        (out / "old_clip.mp4").write_bytes(b"\x00")
+        mock_resolve.return_value = "ffmpeg"
+        from clio.tasks.cut import run_cut_all
+
+        with pytest.raises(FileExistsError):
+            run_cut_all(cfg, "day1", overwrite=False)
+        mock_cut.assert_not_called()
+
+
 class TestComputeSegmentOffset:
     def test_no_seg_suffix_returns_zero(self, cfg):
         from clio.tasks.cut import _compute_segment_offset
