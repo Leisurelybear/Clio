@@ -6,6 +6,7 @@ import {
   formatTimelineSec,
   setTimelineBound,
   insertSegment,
+  computeDropToIndex,
 } from '../plan-edit.js';
 
 describe('plan-edit', () => {
@@ -65,5 +66,47 @@ describe('plan-edit', () => {
   it('insertSegment at -1 prepends', () => {
     const next = insertSegment(seq, -1, { index: '000' });
     expect(next.map((s) => s.index)).toEqual(['000', '001', '002', '003']);
+  });
+});
+
+describe('computeDropToIndex', () => {
+  const n = 4;
+
+  it('returns null when dropping on own slot (before or after self)', () => {
+    expect(computeDropToIndex(1, 1, false, n)).toBeNull();
+    expect(computeDropToIndex(1, 1, true, n)).toBeNull();
+    expect(computeDropToIndex(0, 0, false, n)).toBeNull();
+    expect(computeDropToIndex(0, 0, true, n)).toBeNull();
+  });
+
+  it('maps before overIndex when dragging down', () => {
+    // [A,B,C,D] drag A(0) before C(2) → final index 1 → [B,A,C,D]
+    expect(computeDropToIndex(0, 2, false, n)).toBe(1);
+    const seq = ['A', 'B', 'C', 'D'];
+    expect(reorderSequence(seq, 0, 1)).toEqual(['B', 'A', 'C', 'D']);
+  });
+
+  it('maps after overIndex when dragging down to end-ish', () => {
+    // drag A(0) after C(2) → final 2 → [B,C,A,D]
+    expect(computeDropToIndex(0, 2, true, n)).toBe(2);
+    expect(reorderSequence(['A', 'B', 'C', 'D'], 0, 2)).toEqual(['B', 'C', 'A', 'D']);
+  });
+
+  it('maps after last to end', () => {
+    // drag A(0) after D(3) → final 3 → [B,C,D,A]
+    expect(computeDropToIndex(0, 3, true, n)).toBe(3);
+    expect(reorderSequence(['A', 'B', 'C', 'D'], 0, 3)).toEqual(['B', 'C', 'D', 'A']);
+  });
+
+  it('maps before first when dragging up', () => {
+    // drag C(2) before A(0) → final 0
+    expect(computeDropToIndex(2, 0, false, n)).toBe(0);
+    expect(reorderSequence(['A', 'B', 'C', 'D'], 2, 0)).toEqual(['C', 'A', 'B', 'D']);
+  });
+
+  it('returns null for out-of-range inputs', () => {
+    expect(computeDropToIndex(-1, 0, false, n)).toBeNull();
+    expect(computeDropToIndex(0, 9, false, n)).toBeNull();
+    expect(computeDropToIndex(0, 0, false, 0)).toBeNull();
   });
 });

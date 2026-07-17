@@ -10,6 +10,32 @@ export function reorderSequence(sequence, fromIndex, toIndex) {
   return arr;
 }
 
+/**
+ * Map drag-over target to reorderSequence toIndex (final index of moved item).
+ * insertBefore = placeAfter ? over+1 : over; same gap as current → null;
+ * toIndex = insertBefore > from ? insertBefore - 1 : insertBefore.
+ * @param {number} fromIndex
+ * @param {number} overIndex segment under pointer
+ * @param {boolean} placeAfter true if pointer in lower half of over segment
+ * @param {number} length sequence length
+ * @returns {number|null}
+ */
+export function computeDropToIndex(fromIndex, overIndex, placeAfter, length) {
+  const n = Number(length) | 0;
+  const from = Number(fromIndex);
+  const over = Number(overIndex);
+  if (!Number.isFinite(from) || !Number.isFinite(over) || n <= 0) return null;
+  if (from < 0 || from >= n || over < 0 || over >= n) return null;
+
+  let insertBefore = placeAfter ? over + 1 : over;
+  if (insertBefore < 0) insertBefore = 0;
+  if (insertBefore > n) insertBefore = n;
+
+  if (insertBefore === from || insertBefore === from + 1) return null;
+
+  return insertBefore > from ? insertBefore - 1 : insertBefore;
+}
+
 export function removeSegment(sequence, index) {
   return sequence.filter((_, i) => i !== index);
 }
