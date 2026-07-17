@@ -1,7 +1,7 @@
 # Design: Plan sequence reorder visual feedback
 
 **Date**: 2026-07-17  
-**Status**: Draft (awaiting user review)  
+**Status**: Implemented on `main` (insert line + just-moved flash; no FLIP)  
 **Scope**: Plan entity UI only — drag + ↑↓ reorder feedback  
 **Approach**: A — pure CSS insert line + post-move highlight (no FLIP, no new deps)
 
