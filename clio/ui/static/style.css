@@ -2024,6 +2024,25 @@ select.form-input { cursor: pointer; }
 .plan-seg-dragging {
   opacity: 0.5;
 }
+.plan-seg-drop-before {
+  box-shadow: inset 0 3px 0 0 var(--accent);
+}
+.plan-seg-drop-after {
+  box-shadow: inset 0 -3px 0 0 var(--accent);
+}
+.plan-seg-just-moved {
+  animation: plan-seg-moved 0.7s ease;
+}
+@keyframes plan-seg-moved {
+  0% {
+    background: var(--accent-bg);
+    box-shadow: var(--accent-glow);
+    border-color: var(--accent);
+  }
+  100% {
+    /* return to stylesheet defaults for .plan-seg */
+  }
+}
 .plan-move-btn,
 .plan-del-btn {
   font-size: var(--text-sm, 12px);
