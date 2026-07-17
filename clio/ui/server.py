@@ -100,6 +100,7 @@ from clio.ui.routes.videos import (
     handle_put_videos_relink,
     handle_put_videos_selected,
 )
+from clio.ui.routes.waveform import handle_get_waveform
 from clio.ui.routes.whisper_routes import (
     handle_get_whisper_check,
     handle_get_whisper_install_status,
@@ -408,6 +409,7 @@ def make_handler(
             Route("GET", "/api/texts", "handle_get_texts"),
             Route("GET", "/api/voiceover", "handle_get_voiceover"),
             Route("GET", "/api/cover", "handle_get_cover"),
+            Route("GET", "/api/waveform", "handle_get_waveform"),
             Route("GET", "/api/cut/orphaned-backups", "handle_get_cut_orphaned_backups"),
             Route("GET", "/api/plans", "handle_get_plans"),
             Route("GET", "/api/run/status", "handle_get_run_status"),
