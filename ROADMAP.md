@@ -10,6 +10,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
 | R-025 | Multi-language / i18n (UI + CLI user-facing copy) | Large | Medium |
+| R-027 | Session logs filtering (UI) | Small | Medium |
 
 ### Deferred by choice
 
@@ -17,6 +18,34 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | --- | --- |
 | JianYing real draft version compatibility | Version-specific, not generic |
 | Per-segment AI regenerate on plan rows | User declined — structural edit + full re-plan cover the need |
+
+### R-027 Session logs filtering
+
+**Goal:** In the **会话日志** panel (`renderLogs` / `entity-logs`), users can narrow the live log stream so long runs are readable.
+
+**Why:** `GET /api/logs?offset=` only supports tailing plain lines. UI today is a flat mono dump + auto-scroll + clear (`editor-config.js` `renderLogs`). Pipeline/rerun noise makes it hard to find errors or a single step.
+
+**Current surface:**
+- UI: `clio/ui/static/src/editor-config.js` → `renderLogs()`
+- API: `GET /api/logs?offset=`, `POST /api/logs/clear`
+
+**Proposed scope (phased, keep small):**
+
+| Phase | Scope | Notes |
+| --- | --- | --- |
+| R-027a | Client-side text filter | Toolbar search input; filter already-rendered + new lines by substring (case-insensitive); empty = show all |
+| R-027b | Level / keyword chips (optional) | e.g. show only lines matching `error`/`✗`/`fail`, or step markers `▶`/`Step:` — pure client heuristics on existing strings |
+| R-027c | Server query params (only if needed) | `?q=` / level only if client filter is too slow on large buffers; default stays client-first |
+
+**Non-goals (initial):**
+- Structured log schema rewrite / JSON log format migration
+- Full regex engine UI (plain substring + simple presets enough)
+- Persisting filter across sessions (nice-to-have later)
+
+**Conventions:**
+- One feature per commit; TDD on pure filter helper if extracted
+- Filtering must not drop unread lines from `_logsOffset` tailing — hide in DOM or re-apply filter on buffer, still advance offset
+- Clear still clears server buffer; filter state can reset or keep (prefer keep)
 
 **Recently completed (2026-07-17 R-026 + follow-up, on `origin/main`):**
 
