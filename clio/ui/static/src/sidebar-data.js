@@ -5,6 +5,11 @@ import {
 import { api, icon } from './api.js';
 import { updateRunFilesBadge } from './runner.js';
 import { summarizeOfflineVideos } from './offline-media.js';
+import {
+  buildVideoStepBadges,
+  buildVideoMenuItems,
+  videoMenuItemsToHtml,
+} from './video-menu.js';
 
 // ── Video relink helper ───────────────────────────────────────
 
@@ -238,12 +243,10 @@ function renderVideoItem(v) {
   } else {
     matchBadge = `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
   }
-  const stepBadges = [
-    {label:'压缩', done: state.source === 'compressed'},
-    {label:'分析', done: !!v.text_json},
-    {label:'口播', done: !!v.script_json},
-    {label:'转录', done: !!v.transcript_file},
-  ].map(s => `<span class="video-step-badge ${s.done ? 'done' : 'pending'}">${s.label}</span>`).join('');
+  const stepBadges = buildVideoStepBadges(v, state.source)
+    .map(s => `<span class="video-step-badge ${s.done ? 'done' : 'pending'}">${s.label}</span>`)
+    .join('');
+  const menuHtml = videoMenuItemsToHtml(buildVideoMenuItems(v, state.source));
 
   const durHtml = v.duration_sec ? `<span class="video-duration">${Math.round(v.duration_sec)}s</span>` : '';
 
@@ -257,25 +260,7 @@ function renderVideoItem(v) {
       <div class="video-actions">
         <button class="menu-btn" title="操作">⋮</button>
         <div class="menu-dropdown">
-          ${state.source === 'original'
-            ? (v.missing
-               ? `<button class="menu-item" disabled style="opacity:0.4" title="文件离线">压缩视频</button>
-                <button class="menu-item" disabled style="opacity:0.4" title="文件离线">Whisper 转录</button>
-                <div class="menu-divider"></div>
-                <button class="menu-item" data-action="relink" title="文件移动或重命名后，重新关联新路径">重新关联路径...</button>
-                <button class="menu-item menu-item-danger" data-action="remove" title="从项目中移除该视频">从项目移除</button>`
-               : `<button class="menu-item" data-action="compress" title="用 ffmpeg 将原视频压缩为 640p">压缩视频</button>
-               <button class="menu-item" data-action="transcribe" title="用 faster-whisper 提取音频转文字">Whisper 转录</button>
-               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">AI分析视频</button>
-               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑口播文案</button>
-               <button class="menu-item" disabled style="opacity:0.4" title="请先压缩视频">重跑全部</button>
-               <div class="menu-divider"></div>
-               <button class="menu-item menu-item-danger" data-action="remove" title="从项目中移除该视频">从项目移除</button>`)
-            : `<button class="menu-item" data-action="compress" disabled style="opacity:0.4" title="视频已压缩">压缩视频</button>
-               <button class="menu-item" data-action="analyze" title="调用 AI 重新分析视频内容">AI分析视频</button>
-               <button class="menu-item" data-action="voiceover" title="基于分析结果，重新用 AI 生成口播解说文案">重跑口播文案</button>
-               <button class="menu-item" data-action="all" title="依次执行 AI 分析 + 口播文案">重跑全部</button>`
-          }
+          ${menuHtml}
         </div>
       </div>
   `;

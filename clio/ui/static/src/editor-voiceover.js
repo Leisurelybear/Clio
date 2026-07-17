@@ -8,8 +8,15 @@ import { renderEmptyArtifactHtml, bindEmptyArtifactActions } from './empty-state
 export function renderVoiceover() {
   const v = state.voiceover;
   const pane = $('tab-voiceover');
+  if (!state.currentVideo) {
+    pane.innerHTML = renderEmptyArtifactHtml('voiceover', { hasVideo: false });
+    return;
+  }
   if (!v) {
-    pane.innerHTML = renderEmptyArtifactHtml('voiceover');
+    pane.innerHTML = renderEmptyArtifactHtml('voiceover', {
+      hasVideo: true,
+      hasTexts: !!state.texts,
+    });
     bindEmptyArtifactActions(pane, {
       onRun: () => import('./sidebar.js').then(m => m.goToRunTab()),
       onRerun: async (task) => {
@@ -18,12 +25,15 @@ export function renderVoiceover() {
           setStatus('请先选择视频', 'warn');
           return;
         }
+        const vid = state.videos.find(x => x.file === file);
         setStatus(`正在重跑 ${task} (${file})...`, 'ok');
         try {
           const r = await api('POST', '/api/rerun', {
             video: file,
             task,
             source: state.source,
+            index: vid?.index || undefined,
+            abspath: vid?.abs_path || undefined,
           });
           if (r.ok) {
             setStatus(r.message || `${task} 已启动`, 'ok');

@@ -58,36 +58,45 @@ function _jumpToTranscriptTime(timeSec) {
   }
 }
 
+async function _rerunCurrentVideo(task) {
+  const file = state.currentVideo;
+  if (!file) {
+    setStatus('请先选择视频', 'warn');
+    return;
+  }
+  const v = state.videos.find(x => x.file === file);
+  setStatus(`正在重跑 ${task} (${file})...`, 'ok');
+  try {
+    const r = await api('POST', '/api/rerun', {
+      video: file,
+      task,
+      source: state.source,
+      index: v?.index || undefined,
+      abspath: v?.abs_path || undefined,
+    });
+    if (r.ok) {
+      setStatus(r.message || `${task} 已启动`, 'ok');
+      import('./sidebar-rerun.js').then(mod => mod.showRerunProgress(task, file));
+    } else {
+      throw new Error(r.error || '重跑失败');
+    }
+  } catch (e) {
+    setStatus('重跑失败: ' + e.message, 'err');
+  }
+}
+
 export function renderTexts() {
   const t = state.texts;
   const pane = $('tab-texts');
+  if (!state.currentVideo) {
+    pane.innerHTML = renderEmptyArtifactHtml('texts', { hasVideo: false });
+    return;
+  }
   if (!t) {
-    pane.innerHTML = renderEmptyArtifactHtml('texts');
+    pane.innerHTML = renderEmptyArtifactHtml('texts', { hasVideo: true });
     bindEmptyArtifactActions(pane, {
       onRun: () => import('./sidebar.js').then(m => m.goToRunTab()),
-      onRerun: async (task) => {
-        const file = state.currentVideo;
-        if (!file) {
-          setStatus('请先选择视频', 'warn');
-          return;
-        }
-        setStatus(`正在重跑 ${task} (${file})...`, 'ok');
-        try {
-          const r = await api('POST', '/api/rerun', {
-            video: file,
-            task,
-            source: state.source,
-          });
-          if (r.ok) {
-            setStatus(r.message || `${task} 已启动`, 'ok');
-            import('./sidebar-rerun.js').then(mod => mod.showRerunProgress(task, file));
-          } else {
-            throw new Error(r.error || '重跑失败');
-          }
-        } catch (e) {
-          setStatus('重跑失败: ' + e.message, 'err');
-        }
-      },
+      onRerun: (task) => _rerunCurrentVideo(task),
     });
     return;
   }
@@ -137,12 +146,22 @@ export function renderTexts() {
 export function renderTranscript() {
   const t = state.transcript;
   const pane = $('tab-transcript');
+  if (!state.currentVideo) {
+    pane.innerHTML = renderEmptyArtifactHtml('transcript', { hasVideo: false });
+    return;
+  }
   if (!t || !t.ok) {
-    pane.innerHTML = `
-      <p class="muted">当前视频没有转录数据。</p>
-      <button id="btn-create-transcript" class="btn-primary" style="margin-top:8px">${icon('plus', 14)} 创建手动转录</button>
-      <p class="hint" style="margin-top:8px">手动创建后，可自由添加、编辑和删除时间轴条目。也可先运行流水线中的「转录」步骤自动生成。</p>
-    `;
+    pane.innerHTML = renderEmptyArtifactHtml('transcript', { hasVideo: true });
+    bindEmptyArtifactActions(pane, {
+      onRun: () => import('./sidebar.js').then(m => m.goToRunTab()),
+      onRerun: (task) => _rerunCurrentVideo(task),
+    });
+    pane.insertAdjacentHTML(
+      'beforeend',
+      `<p class="hint" style="margin-top:12px">也可
+        <button id="btn-create-transcript" type="button" class="sidebar-btn" style="display:inline;padding:2px 8px;cursor:pointer;font:inherit">创建手动转录</button>
+        后自由编辑时间轴条目。</p>`
+    );
     pane.querySelector('#btn-create-transcript').onclick = async () => {
       const v = state.videos.find(x => x.file === state.currentVideo);
       if (!v) { setStatus('找不到当前视频', 'err'); return; }
