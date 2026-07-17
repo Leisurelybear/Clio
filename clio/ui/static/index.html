@@ -97,6 +97,11 @@
     <div class="player-wrap">
       <video id="player" controls preload="metadata"></video>
     </div>
+    <div id="waveform-bar" class="waveform-bar" hidden>
+      <canvas id="waveform-canvas" aria-hidden="true"></canvas>
+      <div class="waveform-playhead" id="waveform-playhead" hidden></div>
+      <div class="waveform-status" id="waveform-status" aria-live="polite"></div>
+    </div>
     <div id="player-info">
       <span id="player-name">请选择左侧视频</span>
       <span id="player-time">00:00 / 00:00</span>

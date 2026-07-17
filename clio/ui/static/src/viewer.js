@@ -1,6 +1,11 @@
 import { state } from './state.js';
 import { $, parseTimecode, fmtTime, setStatus, escapeHtml, clearDirty } from './utils.js';
 import { icon } from './api.js';
+import {
+  loadWaveformForCurrentVideo,
+  updateWaveformPlayhead,
+  bindWaveformScrub,
+} from './waveform.js';
 
 function playVideoSegment(file, seekTo) {
   state.currentVideo = file;
@@ -21,6 +26,7 @@ function playVideoSegment(file, seekTo) {
     const absParam = v?.abs_path ? `&abspath=${encodeURIComponent(v.abs_path)}` : '';
     player.src = `/api/video?file=${encodeURIComponent(file)}&source=${state.source}${absParam}${projParam}${extraParam}`;
   }
+  loadWaveformForCurrentVideo();
 }
 
 // ── Preview bar (R-012) ──────────────────────────────────────
@@ -305,8 +311,11 @@ function setupPlayer() {
     speedSel.onchange = () => { player.playbackRate = parseFloat(speedSel.value); };
   }
 
+  bindWaveformScrub(player);
+
   player.ontimeupdate = () => {
     $('player-time').textContent = `${fmtTime(player.currentTime)} / ${fmtTime(player.duration)}`;
+    updateWaveformPlayhead(player);
     if (state.previewActive && !player.seeking && state._previewEndTime !== null && player.currentTime >= state._previewEndTime) {
       state.previewIndex++;
       _playPreviewSegment();
