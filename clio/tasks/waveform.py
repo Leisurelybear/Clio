@@ -19,6 +19,8 @@ from typing import Any, Callable, Literal
 
 WAVEFORM_VERSION = 1
 STALE_SEC = 900
+# After a failed extract, do not re-kick until this cool-down elapses.
+ERROR_COOLDOWN_SEC = 60
 MAX_CONCURRENT_JOBS = 2
 _MIN_BINS, _MAX_BINS = 400, 2000
 
@@ -124,6 +126,31 @@ def clear_lock(project_output: Path, key: str) -> None:
     lock_path(project_output, key).unlink(missing_ok=True)
 
 
+def error_path(project_output: Path, key: str) -> Path:
+    return waveforms_dir(project_output) / f"{key}.error"
+
+
+def recent_error(
+    project_output: Path, key: str, *, now: float | None = None, cooldown_sec: float = ERROR_COOLDOWN_SEC
+) -> str | None:
+    """Return error message if a cool-down error file is still active."""
+    ep = error_path(project_output, key)
+    if not ep.is_file():
+        return None
+    try:
+        mtime = ep.stat().st_mtime
+        age = (time.time() if now is None else now) - mtime
+        if age > cooldown_sec:
+            return None
+        return ep.read_text(encoding="utf-8", errors="replace").strip() or "waveform extract failed"
+    except OSError:
+        return None
+
+
+def clear_error(project_output: Path, key: str) -> None:
+    error_path(project_output, key).unlink(missing_ok=True)
+
+
 def _key_lock(key: str) -> threading.Lock:
     with _key_locks_guard:
         if key not in _key_locks:
@@ -142,6 +169,7 @@ def extract_peaks_for_video(
     *,
     duration_sec: float | None = None,
     audio_source: str = "original",
+    ffprobe: str = "",
 ) -> dict[str, Any]:
     """Extract mono s16le via temp wav (8kHz is enough for amplitude peaks)."""
     from clio.utils import get_duration_sec, resolve_binary, run_ffmpeg
@@ -151,8 +179,9 @@ def extract_peaks_for_video(
     dur = duration_sec
     if dur is None or dur <= 0:
         try:
-            ffprobe = resolve_binary("", "ffprobe")
-            dur = get_duration_sec(video_path, ffprobe)
+            # Prefer configured ffprobe when provided; fall back to PATH discovery.
+            probe = resolve_binary(ffprobe, "ffprobe") if ffprobe else resolve_binary("", "ffprobe")
+            dur = get_duration_sec(video_path, probe)
         except Exception:
             dur = 0.0
     bins = bin_count_for_duration(dur if dur and dur > 0 else 60.0)
@@ -199,6 +228,7 @@ def ensure_waveform(
     *,
     duration_sec: float | None = None,
     audio_source: str = "original",
+    ffprobe: str = "",
 ) -> dict[str, Any]:
     source_path = Path(source_path)
     key = cache_key(source_path)
@@ -206,6 +236,9 @@ def ensure_waveform(
         ready = read_peaks(project_output, key)
         if ready is not None:
             return ready
+        err_msg = recent_error(project_output, key)
+        if err_msg is not None:
+            return {"status": "error", "error": err_msg, "key": key}
         st = lock_status(project_output, key)
         if st == "stale":
             clear_lock(project_output, key)
@@ -219,6 +252,7 @@ def ensure_waveform(
             return {"status": "pending", "started_at": started, "key": key}
 
         write_lock(project_output, key, source_path)
+        clear_error(project_output, key)
         started_at = time.time()
 
         def _job() -> None:
@@ -233,12 +267,13 @@ def ensure_waveform(
                     ffmpeg,
                     duration_sec=duration_sec,
                     audio_source=audio_source,
+                    ffprobe=ffprobe,
                 )
                 write_peaks_atomic(project_output, key, payload)
+                clear_error(project_output, key)
             except Exception as e:
                 try:
-                    err = waveforms_dir(project_output) / f"{key}.error"
-                    err.write_text(str(e)[:500], encoding="utf-8")
+                    error_path(project_output, key).write_text(str(e)[:500], encoding="utf-8")
                 except OSError:
                     pass
             finally:

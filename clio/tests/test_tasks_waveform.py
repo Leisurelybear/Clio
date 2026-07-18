@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import struct
+import time
 from pathlib import Path
 from unittest.mock import patch
 
@@ -109,7 +110,7 @@ class TestLockAndReadWrite:
         src.write_bytes(b"v")
         key = wf.cache_key(src)
 
-        def _fake_extract(video_path, ffmpeg, duration_sec=None, audio_source="original"):
+        def _fake_extract(video_path, ffmpeg, duration_sec=None, audio_source="original", ffprobe=""):
             return {
                 "version": 1,
                 "source_path": str(video_path),
@@ -135,3 +136,49 @@ class TestLockAndReadWrite:
             assert out2["peaks"] == [0.1, 0.9]
         else:
             assert out["peaks"] == [0.1, 0.9]
+
+
+class TestErrorCooldown:
+    def test_ensure_error_cooldown_skips_rejob(self, tmp_path: Path):
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+        key = wf.cache_key(src)
+        ep = wf.error_path(tmp_path, key)
+        ep.parent.mkdir(parents=True, exist_ok=True)
+        ep.write_text("boom", encoding="utf-8")
+        with patch.object(wf, "extract_peaks_for_video") as ex:
+            out = wf.ensure_waveform(tmp_path, src, ffmpeg="ffmpeg")
+        assert out["status"] == "error"
+        assert "boom" in out["error"]
+        ex.assert_not_called()
+
+    def test_ensure_error_expired_retries(self, tmp_path: Path, monkeypatch):
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+        key = wf.cache_key(src)
+        ep = wf.error_path(tmp_path, key)
+        ep.parent.mkdir(parents=True, exist_ok=True)
+        ep.write_text("old", encoding="utf-8")
+        # age the error beyond cool-down
+        old = time.time() - wf.ERROR_COOLDOWN_SEC - 5
+        import os
+
+        os.utime(ep, (old, old))
+
+        def _fake_extract(video_path, ffmpeg, duration_sec=None, audio_source="original", ffprobe=""):
+            return {
+                "version": 1,
+                "source_path": str(video_path),
+                "audio_source": audio_source,
+                "duration_sec": 1.0,
+                "bin_count": 400,
+                "peaks": [0.2],
+                "status": "ready",
+            }
+
+        with (
+            patch.object(wf, "extract_peaks_for_video", side_effect=_fake_extract),
+            patch.object(wf, "_spawn_job", side_effect=lambda fn: fn()),
+        ):
+            out = wf.ensure_waveform(tmp_path, src, ffmpeg="ffmpeg")
+        assert out["status"] in ("ready", "pending")

@@ -5,6 +5,7 @@ import {
 } from './utils.js';
 import { api } from './api.js';
 import { playVideoSegment, stopPreview } from './viewer.js';
+import { loadWaveformForCurrentVideo } from './waveform.js';
 import { showRerunProgress, hideRerunProgress } from './sidebar-rerun.js';
 import { openBrowseDir, loadBrowseDir } from './sidebar-browse.js';
 import { openVideoManager } from './sidebar-video-manage.js';
@@ -46,6 +47,7 @@ async function selectVideo(file) {
       player.currentTime = v.offset_sec;
     }
   };
+  loadWaveformForCurrentVideo();
 
   if (v.text_json) {
     try {

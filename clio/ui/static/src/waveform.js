@@ -122,10 +122,19 @@ export function resetWaveform() {
 }
 
 export function setWaveformStatus(text) {
-  const { bar, status } = _barEls();
-  if (bar) bar.hidden = false;
+  const { bar, canvas, playhead, status } = _barEls();
+  if (bar) {
+    bar.hidden = false;
+    bar.classList.remove('has-peaks');
+  }
+  // Drop previous video's peaks so scrub/playhead don't use stale amplitude.
+  _lastPeaks = [];
+  if (playhead) playhead.hidden = true;
+  if (canvas) {
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
   if (status) status.textContent = text || '';
-  if (bar && text) bar.classList.remove('has-peaks');
 }
 
 export function setWaveformPeaks(peaksPayload) {
@@ -241,6 +250,10 @@ export async function loadWaveformForCurrentVideo() {
         }
         return;
       }
+      if (body.status === 'error') {
+        setWaveformStatus(body.error ? `波形失败: ${body.error}` : '波形生成失败');
+        return;
+      }
       if (Array.isArray(body.peaks) || body.status === 'ready') {
         setWaveformPeaks(body);
         const player = $('player');
@@ -251,9 +264,13 @@ export async function loadWaveformForCurrentVideo() {
     } catch (err) {
       if (token !== _pollToken) return;
       const msg = err?.message || '波形加载失败';
-      // 404 no media
-      if (String(msg).includes('404') || String(msg).includes('no media')) {
+      const status = err?.status;
+      // 404 no media; 503 cool-down after extract failure (api() throws on !ok)
+      if (status === 404 || String(msg).includes('404') || String(msg).includes('no media')) {
         setWaveformStatus('无可用音频源');
+      } else if (status === 503) {
+        const detail = err?.body?.error;
+        setWaveformStatus(detail ? `波形失败: ${detail}` : '波形生成失败');
       } else {
         setWaveformStatus('波形加载失败');
       }

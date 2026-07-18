@@ -96,14 +96,20 @@ def handle_get_waveform(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
 
     peaks_path, audio_source = resolved
     cfg = handler._get_config(proj_dir)
-    ffmpeg = getattr(getattr(cfg, "paths", None), "ffmpeg", "") or "ffmpeg"
+    paths = getattr(cfg, "paths", None)
+    ffmpeg = getattr(paths, "ffmpeg", "") or "ffmpeg"
+    ffprobe = getattr(paths, "ffprobe", "") or ""
 
     result = ensure_waveform(
         proj_out,
         peaks_path,
         ffmpeg,
         audio_source=audio_source,
+        ffprobe=ffprobe,
     )
-    if result.get("status") == "pending":
+    status = result.get("status")
+    if status == "pending":
         return handler._send_json(result, 202)
+    if status == "error":
+        return handler._send_json(result, 503)
     return handler._send_json(result)
