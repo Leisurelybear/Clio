@@ -101,6 +101,16 @@ export async function loadConfig() {
   $('proj-name').title = `project: ${state.config.project_dir || ''}\noutput: ${state.config.output_dir || ''}`;
 }
 
+/** Probe ffmpeg/ffprobe; stores result on state.deps (null if request fails). */
+export async function loadFfmpegDeps() {
+  try {
+    state.deps = await api('GET', '/api/deps/ffmpeg');
+  } catch {
+    state.deps = null;
+  }
+  return state.deps;
+}
+
 export async function loadPlans() {
   try {
     const r = await api('GET', '/api/plans');

@@ -10,6 +10,7 @@ import { save, initProjectConfig, renderActiveTab, refineCurrentFile } from './e
 import {
   loadProjects,
   loadConfig,
+  loadFfmpegDeps,
   loadProject,
   loadPlans,
   loadVideos,
@@ -50,6 +51,7 @@ async function refreshRuntimeWarningsBanner() {
   }
   updateRuntimeWarnings(state.config, {
     orphanedCutBackups: _orphanedCutBackups,
+    ffmpegDeps: state.deps,
     onAction: handleRuntimeWarningAction,
   });
 }
@@ -451,6 +453,7 @@ async function init() {
       state.currentProjectName = urlProject;
     }
     await loadConfig();
+    await loadFfmpegDeps();
     await refreshRuntimeWarningsBanner();
     await loadProject();
     renderSteps();

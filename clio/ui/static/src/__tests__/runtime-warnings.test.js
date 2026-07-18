@@ -70,6 +70,34 @@ describe('buildRuntimeWarnings', () => {
     expect(w.action?.id).toBe('restore-cut-backups');
     expect(w.text).toMatch(/clio_bak|备份/);
   });
+
+  it('warns when ffmpeg deps are missing', () => {
+    const warnings = buildRuntimeWarnings({
+      config: {},
+      hostname: '127.0.0.1',
+      hasToken: true,
+      ffmpegDeps: {
+        ok: false,
+        missing: ['ffmpeg', 'ffprobe'],
+        detail: '未找到 ffmpeg、ffprobe。请运行 setup.ps1。',
+      },
+    });
+    const w = warnings.find((x) => x.id === 'ffmpeg-missing');
+    expect(w).toBeTruthy();
+    expect(w.level).toBe('warning');
+    expect(w.text).toMatch(/ffmpeg|setup/i);
+    expect(w.action).toBeUndefined();
+  });
+
+  it('does not warn when ffmpeg deps ok', () => {
+    const warnings = buildRuntimeWarnings({
+      config: {},
+      hostname: '127.0.0.1',
+      hasToken: true,
+      ffmpegDeps: { ok: true, missing: [], detail: '' },
+    });
+    expect(warnings.some((x) => x.id === 'ffmpeg-missing')).toBe(false);
+  });
 });
 
 describe('renderRuntimeWarnings', () => {

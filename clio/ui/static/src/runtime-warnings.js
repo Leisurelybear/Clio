@@ -13,6 +13,7 @@ function buildRuntimeWarnings({
   hostname = '',
   hasToken = false,
   orphanedCutBackups = null,
+  ffmpegDeps = null,
 } = {}) {
   const warnings = [];
   const debugPrintPrompt = Boolean(config?.ai?.debug_print_prompt);
@@ -55,6 +56,16 @@ function buildRuntimeWarnings({
         `检测到未完成的裁剪覆盖备份（*.clio_bak）${sample ? `：${sample}${more}` : `（${orphans.length} 个）`}。` +
         '中断的重剪可能留下旧文件备份；可一键恢复为覆盖前的视频。',
       action: { id: 'restore-cut-backups', label: '恢复旧文件' },
+    });
+  }
+
+  if (ffmpegDeps && ffmpegDeps.ok === false) {
+    warnings.push({
+      id: 'ffmpeg-missing',
+      level: 'warning',
+      text:
+        ffmpegDeps.detail ||
+        '未找到 ffmpeg/ffprobe。压缩 / 裁剪 / 转录抽音 / 波形等功能不可用。请运行 setup 脚本或配置 paths.ffmpeg。',
     });
   }
 
@@ -104,6 +115,7 @@ function updateRuntimeWarnings(config, opts = {}) {
     hostname: window.location.hostname,
     hasToken: Boolean(sessionStorage.getItem('api_token')),
     orphanedCutBackups: opts.orphanedCutBackups,
+    ffmpegDeps: opts.ffmpegDeps ?? null,
   });
   renderRuntimeWarnings(container, warnings, { onAction: opts.onAction });
 }

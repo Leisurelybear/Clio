@@ -37,6 +37,7 @@ const state = {
   selectionMode: false,
   selectedFiles: [],
   refining: null,  // {type: 'texts'|'scripts', file: string} when AI refine in progress
+  deps: null,  // { ok, ffmpeg, ffprobe, missing, detail } from GET /api/deps/ffmpeg
 };
 
 function clearSelection() {

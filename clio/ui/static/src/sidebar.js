@@ -10,7 +10,7 @@ import { showRerunProgress, hideRerunProgress } from './sidebar-rerun.js';
 import { openBrowseDir, loadBrowseDir } from './sidebar-browse.js';
 import { openVideoManager } from './sidebar-video-manage.js';
 import {
-  loadProjects, loadConfig, loadPlans, loadProject, loadVideos, saveProject,
+  loadProjects, loadConfig, loadFfmpegDeps, loadPlans, loadProject, loadVideos, saveProject,
   updateSelectBtnVisibility, renderSteps, renderVideoList,
 } from './sidebar-data.js';
 
@@ -316,6 +316,7 @@ function goToRunTab() {
 export {
   loadProjects,
   loadConfig,
+  loadFfmpegDeps,
   loadPlans,
   loadProject,
   loadVideos,
