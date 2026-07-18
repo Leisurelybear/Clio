@@ -635,7 +635,6 @@ export {
   updateRunFilesBadge,
   updateRunStartButtonState,
   collectRunOptions,
-  mediaStepsNeedFfmpeg,
   _completionTargetForSteps,
   renderRunPreviewHtml,
   buildSkippedDiagnostics,
