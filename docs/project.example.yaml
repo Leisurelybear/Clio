@@ -6,8 +6,10 @@
 # 属于项目级的配置项：
 #   paths: output_dir
 #   ai: tasks, context, context_file
-#   compress: target_size_mb, max_width, split_max_min, splits_subdir, reencode_split
-#   analyze, script, plan, export
+#   compress: target_size_mb, max_width
+#             (split_max_min / splits_subdir / reencode_split are deprecated no-ops)
+#   analyze: window_max_min, window_overlap_sec, max_analyze_duration_min, ...
+#   script, plan, export
 #   whisper: enabled, model_size, language, device, max_segments_per_clip, transcripts_subdir
 
 paths:

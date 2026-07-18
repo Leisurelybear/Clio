@@ -51,7 +51,16 @@ Existing compressed files are automatically skipped (when `skip_existing: true`)
 ## `analyze` — Compress + AI Analysis (Most Common)
 
 First compress (if not yet compressed), then call the provider configured in `ai.tasks.video_analyze` (default Gemini) for content analysis on each compressed video.
-Videos exceeding `max_analyze_duration_min` (default 30 minutes) are **skipped** (AI quota limitations).
+
+**Long clips (new path):** no physical `_segNN` files. Duration is split into logical windows
+(`analyze.window_max_min`, default 15 min, with `window_overlap_sec` overlap). Each window is a
+temp ffmpeg slice under `output/.analyze_windows/<compressed_stem>/`, analyzed separately, then
+merged into **one** texts JSON with **absolute** timeline times. Any window failure fails the whole
+clip (no partial texts). Oversized slices are re-encoded/shrunk to stay under Gemini’s ~200MB upload limit.
+
+**Legacy `_seg*` projects:** still analyzed one call per segment file. Optional whole-clip hard skip
+via `analyze.max_analyze_duration_min` applies only to those legacy segments (`0` = unlimited; new
+default for fresh configs).
 
 ```bash
 python main.py analyze -i "E:/Videos/云南"
@@ -62,7 +71,7 @@ python main.py analyze -i "E:/Videos/云南/GL010683.mp4"
 ```
 
 Output trilogy:
-- `output/<media folder name>/texts/<index>_<title>.json` — Structured analysis (machine-readable)
+- `output/<media folder name>/texts/<index>_<title>.json` — Structured analysis (machine-readable; may include `analyze_windows` debug metadata)
 - `output/<media folder name>/texts/<index>_<title>.txt` — Human-readable version (with timeline)
 - `output/<media folder name>/summary.csv` — Full media overview table (one row per entry)
 - `output/<media folder name>/covers/<index>_<title>.jpg` — Optional cover frame when analysis returns `cover_timestamp`

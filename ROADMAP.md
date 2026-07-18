@@ -44,11 +44,12 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Delivered:**
 - [x] Legacy gate + tests
-- [x] Compress 1 original → 1 file; `split_max_min` ignored
+- [x] Compress 1 original → 1 file; `split_max_min` ignored; leftover `_seg*` no longer blocks whole-file compress
 - [x] Config `window_max_min` / `window_overlap_sec`; default whole-clip hard cap 0
-- [x] Temp slices under `output/.analyze_windows/`; merge absolute timeline
-- [x] cut/export use `legacy_segment_offset_sec`
-- [x] Config UI labels; README / cli-reference product copy
+- [x] Temp slices under `output/.analyze_windows/<stem>/`; merge absolute timeline; fail-closed; >200MB shrink
+- [x] `max_analyze_duration_min` hard-skip only for legacy segments (does not block windowed whole files)
+- [x] cut/export/plan/transcript_align use `legacy_segment_offset_sec`
+- [x] Config UI labels; README / cli-reference / AGENTS product copy
 
 ### R-028 ffmpeg missing-path handling
 

@@ -3,6 +3,8 @@
 ## 2026-07-18
 
 ### Added
+- feat(analyze): logical analyze windows for long clips (`window_max_min` / `window_overlap_sec`); temp slices under `output/.analyze_windows/<stem>/`, merge to one absolute-timeline texts JSON
+- feat(identity): `is_legacy_split_*` / `legacy_segment_offset_sec` gate for read-only legacy `_seg*` projects
 - feat(deps): `probe_ffmpeg_deps` + `GET /api/deps/ffmpeg` — report ffmpeg/ffprobe availability without starting jobs
 - feat(ui): runtime-warnings banner when ffmpeg/ffprobe missing (`ffmpeg-missing`, warning level)
 - feat(ui): soft-disable ⋮ menu compress/transcribe (and label if present) when deps missing
@@ -10,7 +12,14 @@
 - feat(ui): waveform short-circuits client-side when deps known missing
 - feat(ui): player audio waveform lazy peaks (separate feature; see design/plan under `docs/superpowers/`)
 
+### Changed
+- compress: physical `_segNN` split removed — always 1 original → 1 compressed; `split_max_min` / `splits_subdir` / `reencode_split` are deprecated no-ops
+- analyze: `max_analyze_duration_min` default `0` (unlimited); hard-skip only applies to **legacy** segment files, not windowed whole files
+- cut / export / plan / transcript_align: apply segment offsets only via `legacy_segment_offset_sec`
+
 ### Fixed
+- fix(analyze): window slice re-encode fallback + shrink when >200MB; per-clip temp dirs; cancel_event on slice; fail-closed multi-window
+- fix(compress): leftover `_seg*` files no longer block creating a whole-file compress; new `.vmeta` never rewrites `split_info`
 - fix(waveform): missing ffmpeg returns `code=missing_binary` without `.generating` lock or error cool-down files
 - fix(waveform): empty `paths.ffmpeg` must PATH-discover (not bare name `"ffmpeg"`)
 - fix(waveform): treat dead-pid and same-process orphan `.generating` locks as stale
@@ -18,8 +27,11 @@
 - fix(ui): after config save / reload, re-probe ffmpeg and refresh banner + video menus (`refreshFfmpegDepsUi`)
 
 ### Docs
+- design: `docs/superpowers/specs/2026-07-18-remove-physical-split-design.md`
+- plan: `docs/superpowers/plans/2026-07-18-remove-physical-split.md`
 - design: `docs/superpowers/specs/2026-07-18-ffmpeg-handling-design.md` (A shipped; B zip setup / C one-click install deferred)
 - plan: `docs/superpowers/plans/2026-07-18-ffmpeg-handling-phase-a.md`
+- README / cli-reference / project.example / ROADMAP R-029: physical split → analyze windows
 
 ## 2026-07-16
 
