@@ -56,6 +56,14 @@ async function refreshRuntimeWarningsBanner() {
   });
 }
 
+/** Re-probe ffmpeg, refresh banner (keeps orphan warnings), re-render menus. */
+async function refreshFfmpegDepsUi() {
+  await loadFfmpegDeps();
+  await refreshRuntimeWarningsBanner();
+  renderVideoList();
+}
+window.refreshFfmpegDepsUi = refreshFfmpegDepsUi;
+
 async function handleRuntimeWarningAction(actionId) {
   if (actionId !== 'restore-cut-backups') return;
   if (!_orphanedCutBackups.length) {
@@ -315,6 +323,7 @@ async function init() {
       const cur = state.currentVideo;
       await loadProject();
       renderSteps();
+      await refreshFfmpegDepsUi();
       await loadVideos();
       if (cur && state.videos.find(x => x.file === cur)) {
         await selectVideo(cur);

@@ -626,12 +626,15 @@ export async function save() {
       const status = configSaveStatusForTab(ct);
       setStatus(status.message, status.level);
       addToast(status.message, status.level === 'ok' ? 'success' : 'warning');
-      // Re-probe ffmpeg after global paths may have changed.
+      // Re-probe ffmpeg + full banner (keeps orphan warnings) + menu re-render.
       try {
-        const { loadFfmpegDeps } = await import('./sidebar-data.js');
-        await loadFfmpegDeps();
-        const { updateRuntimeWarnings } = await import('./runtime-warnings.js');
-        updateRuntimeWarnings(state.config, { ffmpegDeps: state.deps });
+        if (typeof window.refreshFfmpegDepsUi === 'function') {
+          await window.refreshFfmpegDepsUi();
+        } else {
+          const { loadFfmpegDeps, renderVideoList } = await import('./sidebar-data.js');
+          await loadFfmpegDeps();
+          renderVideoList();
+        }
       } catch { /* ignore */ }
       return;
     }
