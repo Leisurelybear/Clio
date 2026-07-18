@@ -258,6 +258,54 @@ def resolve_binary(configured: str, fallback: str) -> str:
     raise FileNotFoundError(f"找不到 {fallback}。请运行 {setup_script} 安装，或在 config.yaml 的 paths 中填写路径。")
 
 
+def probe_ffmpeg_deps(
+    ffmpeg_configured: str = "",
+    ffprobe_configured: str = "",
+) -> dict:
+    """Report ffmpeg/ffprobe availability without raising.
+
+    Returns:
+        ok: True only if both resolve.
+        ffmpeg / ffprobe: resolved path or None.
+        missing: list of missing tool names.
+        detail: Chinese message for UI (empty when ok).
+    """
+    found: dict[str, str | None] = {"ffmpeg": None, "ffprobe": None}
+    missing: list[str] = []
+    for name, configured in (
+        ("ffmpeg", ffmpeg_configured or ""),
+        ("ffprobe", ffprobe_configured or ""),
+    ):
+        try:
+            found[name] = resolve_binary(configured, name)
+        except FileNotFoundError:
+            found[name] = None
+            missing.append(name)
+
+    if not missing:
+        return {
+            "ok": True,
+            "ffmpeg": found["ffmpeg"],
+            "ffprobe": found["ffprobe"],
+            "missing": [],
+            "detail": "",
+        }
+
+    setup = "setup.ps1" if os.name == "nt" else "setup.sh"
+    labels = "、".join(missing)
+    detail = (
+        f"未找到 {labels}。请运行 {setup}，或在 config.yaml 的 paths.ffmpeg / paths.ffprobe 中填写路径。"
+        " 压缩 / 裁剪 / 转录抽音 / 波形等功能不可用。"
+    )
+    return {
+        "ok": False,
+        "ffmpeg": found["ffmpeg"],
+        "ffprobe": found["ffprobe"],
+        "missing": missing,
+        "detail": detail,
+    }
+
+
 def find_videos(directory: Path, recursive: bool = False) -> list[Path]:
     if not directory.is_dir():
         raise NotADirectoryError(f"素材目录不存在: {directory}")
