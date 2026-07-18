@@ -35,7 +35,9 @@ const FIELD_LABELS = {
   'analyze.compressed_subdir': '压缩视频子目录',
   'analyze.texts_subdir': '分析结果子目录',
   'analyze.skip_existing': '跳过已处理文件',
-  'analyze.max_analyze_duration_min': '最长分析时长（分钟）',
+  'analyze.max_analyze_duration_min': '整片分析硬顶（分钟，0=不限制）',
+  'analyze.window_max_min': '分析窗长（分钟）',
+  'analyze.window_overlap_sec': '分析窗重叠（秒）',
   'analyze.max_workers': 'AI 分析并发数',
   // script
   'script.scripts_subdir': '口播子目录',
@@ -44,9 +46,9 @@ const FIELD_LABELS = {
   // compress (project)
   'compress.target_size_mb': '目标体积（MB）',
   'compress.max_width': '最大宽度（像素）',
-  'compress.split_max_min': '超长分段阈值（分钟）',
-  'compress.splits_subdir': '分段子目录',
-  'compress.reencode_split': '分段时重新编码',
+  'compress.split_max_min': '【废弃】物理分段阈值',
+  'compress.splits_subdir': '【废弃】分段子目录',
+  'compress.reencode_split': '【废弃】分段时重新编码',
   // whisper (project)
   'whisper.enabled': '启用 Whisper',
   'whisper.model_size': '模型大小',
