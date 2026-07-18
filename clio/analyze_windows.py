@@ -175,13 +175,33 @@ def merge_window_analyses(
 
     timeline.sort(key=_item_start)
 
+    # Only dedupe inside adjacent-window overlap bands (spec), not globally.
+    zones: list[tuple[float, float]] = []
+    ordered_ws = [w for w, _ in windows]
+    for a, b in zip(ordered_ws, ordered_ws[1:]):
+        lo = max(a.start_sec, b.start_sec)
+        hi = min(a.end_sec, b.end_sec)
+        if hi > lo:
+            zones.append((lo, hi))
+
+    def _in_overlap(t: float) -> bool:
+        return any(lo <= t <= hi for lo, hi in zones)
+
     deduped: list[dict] = []
     for item in timeline:
         if not deduped:
             deduped.append(item)
             continue
         prev = deduped[-1]
-        if abs(_item_start(item) - _item_start(prev)) <= 5 and _item_text(item) == _item_text(prev):
+        t_item = _item_start(item)
+        t_prev = _item_start(prev)
+        if (
+            zones
+            and abs(t_item - t_prev) <= 5
+            and _item_text(item) == _item_text(prev)
+            and _in_overlap(t_item)
+            and _in_overlap(t_prev)
+        ):
             if len(_item_text(item)) > len(_item_text(prev)):
                 deduped[-1] = item
             continue

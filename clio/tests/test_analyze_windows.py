@@ -81,6 +81,22 @@ class TestShiftAndMerge:
         merged = merge_window_analyses([(w0, a0), (w1, a1)], overlap_sec=20)
         assert sum(1 for t in merged["timeline"] if t.get("text") == "dup") == 1
 
+    def test_merge_keeps_similar_events_outside_overlap(self):
+        w0 = AnalyzeWindow(0, 0, 900)
+        w1 = AnalyzeWindow(1, 880, 1800)
+        a0 = {
+            "title": "A",
+            "summary": "s0",
+            "timeline": [{"start": 120, "end": 125, "text": "过马路"}],
+        }
+        a1 = {
+            "title": "B",
+            "summary": "s1",
+            "timeline": [{"start": 124, "end": 130, "text": "过马路"}],
+        }
+        merged = merge_window_analyses([(w0, a0), (w1, a1)], overlap_sec=20)
+        assert sum(1 for t in merged["timeline"] if t.get("text") == "过马路") == 2
+
 
 class TestSliceWindowVideo:
     def test_slice_window_video_invokes_ffmpeg(self, tmp_path: Path):

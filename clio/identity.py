@@ -157,7 +157,7 @@ def resolve_identity(
         seg_num = None
         offset_sec = 0.0
         seg_dur = None
-        m = re.search(r"_seg(\d+)$", compressed_stem)
+        m = SEGMENT_SUFFIX_RE.search(compressed_stem)
         if m:
             seg_num = int(m.group(1))
             for s in vindex.segments:
@@ -179,7 +179,7 @@ def resolve_identity(
     # Priority 3: Filename fallback via videos.json / project_dir
     orig_path = _find_original_by_stem(original_stem, proj)
     seg_num = None
-    m = re.search(r"_seg(\d+)$", compressed_stem)
+    m = SEGMENT_SUFFIX_RE.search(compressed_stem)
     if m:
         seg_num = int(m.group(1))
     return MediaIdentity(

@@ -119,7 +119,8 @@ def _analyze_with_optional_windows(
         return merge_window_analyses([(windows[0], analysis)], overlap) if windows else analysis
 
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
-    dest = config.paths.output_dir / ".analyze_windows"
+    # Per-clip temp dir so concurrent max_workers cannot wipe sibling slices.
+    dest = config.paths.output_dir / ".analyze_windows" / compressed.stem
     dest.mkdir(parents=True, exist_ok=True)
     partials: list = []
     try:
@@ -169,6 +170,13 @@ def _process_video_item(
         duration_sec = get_duration_sec(compressed, ffprobe_bin)
     except Exception:
         pass
+    if duration_sec <= 0:
+        # Fallback: probe original so windowing can still run for long clips.
+        try:
+            ffprobe_bin = resolve_binary(config.paths.ffprobe, "ffprobe")
+            duration_sec = get_duration_sec(original, ffprobe_bin)
+        except Exception:
+            pass
 
     existing = sorted(config.texts_dir.glob(f"{idx_str}_*.json"))
     json_path = None
@@ -208,6 +216,14 @@ def _process_video_item(
             duration_sec=duration_sec,
             identity=identity,
         )
+
+    if duration_sec <= 0 and not is_legacy_split_path(compressed):
+        print(f"  [跳过] {compressed.name} 无法读取时长，跳过分析")
+        if tracker:
+            tracker.next(message=f"跳过 {compressed.name}（无时长）")
+            tracker.log(f"跳过 {compressed.name}（无法读取时长）")
+        state.mark(original.stem, "analyze", "skipped")
+        return None
 
     max_min = config.analyze.max_analyze_duration_min
     if max_min > 0 and duration_sec > max_min * 60:
