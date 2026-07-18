@@ -44,7 +44,9 @@ class AnalyzeConfig:
     compressed_subdir: str = "compressed"
     texts_subdir: str = "texts"
     skip_existing: bool = True
-    max_analyze_duration_min: int = 30
+    max_analyze_duration_min: int = 0
+    window_max_min: int = 15
+    window_overlap_sec: int = 20
     max_workers: int = 1
     # Opt-in: inject GoPro GPMF/sidecar summary into analyze context (R-024b).
     # Default false — most clips have no GPS; missing telemetry is always a no-op.

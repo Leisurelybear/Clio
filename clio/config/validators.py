@@ -43,6 +43,14 @@ def _validate_config(config: AppConfig) -> None:
     if config.proxy.enabled and not config.proxy.url:
         raise ValueError("proxy.enabled=true 但 proxy.url 为空。请填写 proxy.url，或把 proxy.enabled 改成 false。")
     _require_min("analyze.max_workers", config.analyze.max_workers, 1)
+    _require_min("analyze.max_analyze_duration_min", config.analyze.max_analyze_duration_min, 0)
+    _require_min("analyze.window_max_min", config.analyze.window_max_min, 1)
+    _require_min("analyze.window_overlap_sec", config.analyze.window_overlap_sec, 0)
+    if config.analyze.window_overlap_sec >= config.analyze.window_max_min * 60:
+        raise ValueError(
+            f"analyze.window_overlap_sec must be < window_max_min * 60, got: "
+            f"{config.analyze.window_overlap_sec} vs window_max_min={config.analyze.window_max_min}"
+        )
     _require_min("compress.target_size_mb", config.compress.target_size_mb, 0.01)
     _require_min("compress.max_width", config.compress.max_width, 1)
     _require_min("compress.split_max_min", config.compress.split_max_min, 0)

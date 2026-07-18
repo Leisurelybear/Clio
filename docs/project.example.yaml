@@ -33,7 +33,8 @@ ai:
 compress:
   target_size_mb: 5
   max_width: 640
-  split_max_min: 15          # 超过此时长（分钟）自动分段
+  # deprecated — physical split removed; keys ignored on compress
+  split_max_min: 15
   splits_subdir: splits
   # reencode_split: true
 
@@ -41,7 +42,9 @@ analyze:
   compressed_subdir: compressed
   texts_subdir: texts
   skip_existing: true
-  max_analyze_duration_min: 45
+  max_analyze_duration_min: 0   # whole-clip hard cap; 0 = unlimited
+  window_max_min: 15            # single Gemini window length (minutes)
+  window_overlap_sec: 20        # overlap between windows for boundary dedupe
   max_workers: 1
   # Optional: inject GoPro GPMF / sidecar summary into AI analyze context.
   # Default false. Missing GPS/GPMF is always a silent no-op.
