@@ -1,9 +1,22 @@
 # Design: ffmpeg missing-path handling
 
 **Date**: 2026-07-18  
-**Status**: Design approved (Phase A); B/C deferred until A ships  
+**Status**: Phase A **implemented** on `main` (tip through `45e30c2`); B/C deferred  
 **Scope**: Detect missing ffmpeg/ffprobe at serve time, surface a clear UI warning, soft-disable the highest-traffic media entry points, and fail cleanly without lock/error storms. Later phases add setup zip fallback and UI one-click install.  
 **Approach**: Phased A → B → C. Reuse `resolve_binary` / `discover_ffmpeg_bin` and existing `runtime-warnings` banner. No serve-time auto-download in A.
+
+### Implementation notes (Phase A shipped)
+
+| Piece | Location |
+| --- | --- |
+| `probe_ffmpeg_deps` | `clio/utils.py` |
+| `GET /api/deps/ffmpeg` | `clio/ui/routes/deps.py` |
+| Waveform early-fail `code=missing_binary` | `clio/tasks/waveform.py` `ensure_waveform` (before lock) |
+| Banner | `runtime-warnings.js` id `ffmpeg-missing`, level `warning` |
+| State + load | `state.deps`, `loadFfmpegDeps`, `refreshFfmpegDepsUi` (config save + reload) |
+| Soft-disable | `video-menu.js` compress/transcribe/label; `runner.js` start guard; `waveform.js` client short-circuit |
+
+**A+ not done (acceptable):** deps request fail-open (`null` → no banner); runner start button not pre-greyed; no `POST /api/run/start` server preflight; cover/cut UI still backend-only errors.
 
 ## 1. Goals and non-goals
 

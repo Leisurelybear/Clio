@@ -5,12 +5,14 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
-## Remaining Open Items (2026-07-17)
+## Remaining Open Items (2026-07-18)
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
 | R-025 | Multi-language / i18n (UI + CLI user-facing copy) | Large | Medium |
 | R-027 | Session logs filtering (UI) | Small | Medium |
+| R-028b | ffmpeg setup zip fallback (package manager fail → static build) | Medium | Medium |
+| R-028c | UI one-click ffmpeg install (banner action, Whisper-like) | Medium | Medium |
 
 ### Deferred by choice
 
@@ -18,6 +20,34 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | --- | --- |
 | JianYing real draft version compatibility | Version-specific, not generic |
 | Per-segment AI regenerate on plan rows | User declined — structural edit + full re-plan cover the need |
+| Serve-time silent ffmpeg download | Explicit user/setup only (R-028c is click; never auto on serve) |
+
+### R-028 ffmpeg missing-path handling
+
+**Goal:** Users without ffmpeg still open the UI; they see a clear warning and cannot start media work that will hard-fail mid-pipeline. Setup/UI can later install ffmpeg when package managers fail.
+
+**Why:** Media pipeline (compress/cut/label/transcribe extract/waveform/cover) requires ffmpeg/ffprobe. `doctor` already FAILs; serve did not surface this. Waveform missing-binary used to write lock/error cool-down storms.
+
+**Phases:**
+
+| Phase | ID | Status | Notes |
+| --- | --- | --- | --- |
+| A | R-028a | **Done** (2026-07-18) | Probe + banner + narrow soft-disable + waveform early-fail |
+| B | R-028b | Open | setup.ps1/sh zip fallback after winget/apt/… fail |
+| C | R-028c | Open | Banner “安装 ffmpeg” + progress API |
+
+**R-028a delivered:**
+- [x] `probe_ffmpeg_deps` in `clio/utils.py` (both binaries; empty config stays `""`)
+- [x] `GET /api/deps/ffmpeg`
+- [x] UI `state.deps` + `runtime-warnings` `ffmpeg-missing` (warning)
+- [x] Soft-disable ⋮ compress/transcribe; runner start guard for compress/label/transcribe
+- [x] Waveform client short-circuit; backend `missing_binary` without lock/cool-down
+- [x] Config save + reload re-probe via `refreshFfmpegDepsUi`
+- [x] Spec/plan under `docs/superpowers/specs|plans/2026-07-18-ffmpeg-handling*`
+
+**A+ optional later:** deps request fail-closed banner; pre-grey run button; `POST /api/run/start` preflight
+
+**Recently completed (2026-07-18):** R-028a ffmpeg missing-path Phase A; video waveform lazy peaks + orphan lock recovery; cover thumbs on video list; plan reorder feedback.
 
 ### R-027 Session logs filtering
 

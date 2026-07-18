@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-18
+
+### Added
+- feat(deps): `probe_ffmpeg_deps` + `GET /api/deps/ffmpeg` — report ffmpeg/ffprobe availability without starting jobs
+- feat(ui): runtime-warnings banner when ffmpeg/ffprobe missing (`ffmpeg-missing`, warning level)
+- feat(ui): soft-disable ⋮ menu compress/transcribe (and label if present) when deps missing
+- feat(ui): runner blocks start when selected steps include compress/label/transcribe and deps missing
+- feat(ui): waveform short-circuits client-side when deps known missing
+- feat(ui): player audio waveform lazy peaks (separate feature; see design/plan under `docs/superpowers/`)
+
+### Fixed
+- fix(waveform): missing ffmpeg returns `code=missing_binary` without `.generating` lock or error cool-down files
+- fix(waveform): empty `paths.ffmpeg` must PATH-discover (not bare name `"ffmpeg"`)
+- fix(waveform): treat dead-pid and same-process orphan `.generating` locks as stale
+- fix(ui): waveform load on `selectVideo`, clear stale peaks on status, error cool-down handling
+- fix(ui): after config save / reload, re-probe ffmpeg and refresh banner + video menus (`refreshFfmpegDepsUi`)
+
+### Docs
+- design: `docs/superpowers/specs/2026-07-18-ffmpeg-handling-design.md` (A shipped; B zip setup / C one-click install deferred)
+- plan: `docs/superpowers/plans/2026-07-18-ffmpeg-handling-phase-a.md`
+
 ## 2026-07-16
 
 ### Fixed
