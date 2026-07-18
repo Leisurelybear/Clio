@@ -1,0 +1,256 @@
+"""Logical analyze windows: geometry, time shift, merge, temp slices.
+
+Physical video split is deprecated. Long clips are analyzed as sliding
+windows inside analyze only; see
+docs/superpowers/specs/2026-07-18-remove-physical-split-design.md.
+"""
+
+from __future__ import annotations
+
+import copy
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+
+@dataclass(frozen=True)
+class AnalyzeWindow:
+    index: int
+    start_sec: float
+    end_sec: float
+
+    @property
+    def duration_sec(self) -> float:
+        return max(0.0, self.end_sec - self.start_sec)
+
+
+def build_analyze_windows(
+    duration_sec: float,
+    window_max_min: int,
+    overlap_sec: int,
+) -> list[AnalyzeWindow]:
+    if duration_sec <= 0:
+        return [AnalyzeWindow(0, 0.0, 0.0)]
+    window_max = max(1, int(window_max_min)) * 60
+    overlap = max(0, int(overlap_sec))
+    if overlap >= window_max:
+        overlap = max(0, window_max - 1)
+    if duration_sec <= window_max:
+        return [AnalyzeWindow(0, 0.0, float(duration_sec))]
+    step = window_max - overlap
+    windows: list[AnalyzeWindow] = []
+    start = 0.0
+    i = 0
+    while start < duration_sec:
+        end = min(start + window_max, duration_sec)
+        windows.append(AnalyzeWindow(i, float(start), float(end)))
+        if end >= duration_sec:
+            break
+        start += step
+        i += 1
+        if i > 1000:
+            break
+    return windows
+
+
+_TIME_KEYS = ("start", "end", "time", "t", "timestamp", "cover_timestamp")
+
+
+def _parse_ts(value: Any) -> float | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str) or not value.strip():
+        return None
+    parts = value.strip().split(":")
+    try:
+        if len(parts) == 2:
+            return int(parts[0]) * 60 + float(parts[1])
+        if len(parts) == 3:
+            return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+    except ValueError:
+        return None
+    return None
+
+
+def _format_ts(sec: float, original: Any) -> Any:
+    if isinstance(original, bool):
+        return sec
+    if isinstance(original, int) and not isinstance(original, bool):
+        return int(round(sec))
+    if isinstance(original, float):
+        return float(sec)
+    if isinstance(original, str) and ":" in original:
+        sec_i = int(round(sec))
+        m, s = divmod(sec_i, 60)
+        h, m = divmod(m, 60)
+        if h:
+            return f"{h:02d}:{m:02d}:{s:02d}"
+        return f"{m:02d}:{s:02d}"
+    return sec
+
+
+def shift_analysis_times(analysis: dict, offset_sec: float) -> dict:
+    data = copy.deepcopy(analysis)
+    if not offset_sec:
+        return data
+
+    def shift_obj(obj: Any) -> None:
+        if isinstance(obj, dict):
+            for k, v in list(obj.items()):
+                if k in _TIME_KEYS:
+                    parsed = _parse_ts(v)
+                    if parsed is not None:
+                        obj[k] = _format_ts(parsed + offset_sec, v)
+                else:
+                    shift_obj(v)
+        elif isinstance(obj, list):
+            for item in obj:
+                shift_obj(item)
+
+    shift_obj(data)
+    return data
+
+
+def _timeline_list(analysis: dict) -> list:
+    tl = analysis.get("timeline")
+    return list(tl) if isinstance(tl, list) else []
+
+
+def _item_start(item: dict) -> float:
+    for k in ("start", "time", "t", "timestamp"):
+        if k in item:
+            p = _parse_ts(item[k])
+            if p is not None:
+                return p
+    return 0.0
+
+
+def _item_text(item: dict) -> str:
+    for k in ("text", "description", "title", "event"):
+        if isinstance(item.get(k), str):
+            return item[k]
+    return ""
+
+
+def merge_window_analyses(
+    windows: list[tuple[AnalyzeWindow, dict]],
+    overlap_sec: int,
+) -> dict:
+    if not windows:
+        return {"title": "", "summary": "", "timeline": []}
+    if len(windows) == 1:
+        out = copy.deepcopy(windows[0][1])
+        w = windows[0][0]
+        out["analyze_windows"] = [
+            {
+                "i": w.index,
+                "start_sec": w.start_sec,
+                "end_sec": w.end_sec,
+                "overlap_sec": overlap_sec,
+                "status": "ok",
+            }
+        ]
+        return out
+
+    base = copy.deepcopy(windows[0][1])
+    summaries: list[str] = []
+    highlights: list[Any] = []
+    locations: list[str] = []
+    timeline: list[dict] = []
+
+    for _w, raw in windows:
+        if isinstance(raw.get("summary"), str) and raw["summary"]:
+            summaries.append(raw["summary"])
+        if isinstance(raw.get("highlights"), list):
+            highlights.extend(raw["highlights"])
+        loc = raw.get("location")
+        if isinstance(loc, str) and loc and loc != "未知":
+            locations.append(loc)
+        for item in _timeline_list(raw):
+            if isinstance(item, dict):
+                timeline.append(copy.deepcopy(item))
+
+    timeline.sort(key=_item_start)
+
+    deduped: list[dict] = []
+    for item in timeline:
+        if not deduped:
+            deduped.append(item)
+            continue
+        prev = deduped[-1]
+        if abs(_item_start(item) - _item_start(prev)) <= 5 and _item_text(item) == _item_text(prev):
+            if len(_item_text(item)) > len(_item_text(prev)):
+                deduped[-1] = item
+            continue
+        deduped.append(item)
+
+    base["timeline"] = deduped
+    base["summary"] = "\n".join(summaries)
+    seen: set[Any] = set()
+    uniq_h: list[Any] = []
+    for h in highlights:
+        key = h if not isinstance(h, dict) else str(h)
+        if key in seen:
+            continue
+        seen.add(key)
+        uniq_h.append(h)
+    base["highlights"] = uniq_h
+    if locations:
+        uniq_loc = list(dict.fromkeys(locations))
+        base["location"] = uniq_loc[0] if len(uniq_loc) == 1 else " / ".join(uniq_loc)
+    base["analyze_windows"] = [
+        {
+            "i": w.index,
+            "start_sec": w.start_sec,
+            "end_sec": w.end_sec,
+            "overlap_sec": overlap_sec,
+            "status": "ok",
+        }
+        for w, _ in windows
+    ]
+    return base
+
+
+def slice_window_video(
+    *,
+    source: Path,
+    window: AnalyzeWindow,
+    dest_dir: Path,
+    ffmpeg: str,
+    run_ffmpeg: Callable[..., Any] | None = None,
+) -> Path:
+    """Cut a temp slice from an already-compressed file for one analyze window."""
+    from clio.utils import run_ffmpeg as _default_run_ffmpeg
+
+    runner = run_ffmpeg or _default_run_ffmpeg
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    start = max(0.0, float(window.start_sec))
+    dur = max(0.01, float(window.duration_sec))
+    out = dest_dir / f"{source.stem}_w{window.index:02d}_{int(start)}-{int(start + dur)}.mp4"
+    args = [
+        "-ss",
+        str(start),
+        "-i",
+        str(source),
+        "-t",
+        str(dur),
+        "-c",
+        "copy",
+        "-y",
+        str(out),
+    ]
+    runner(args, ffmpeg)
+    return out
+
+
+def cleanup_analyze_windows_dir(dest_dir: Path) -> None:
+    if not dest_dir.is_dir():
+        return
+    for p in dest_dir.glob("*_w*.mp4"):
+        try:
+            p.unlink(missing_ok=True)
+        except OSError:
+            pass
