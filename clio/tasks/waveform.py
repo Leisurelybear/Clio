@@ -14,8 +14,9 @@ import struct
 import tempfile
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable, Literal
+from typing import Any, Literal
 
 WAVEFORM_VERSION = 1
 STALE_SEC = 900
