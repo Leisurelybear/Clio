@@ -97,7 +97,9 @@ def handle_get_waveform(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     peaks_path, audio_source = resolved
     cfg = handler._get_config(proj_dir)
     paths = getattr(cfg, "paths", None)
-    ffmpeg = getattr(paths, "ffmpeg", "") or "ffmpeg"
+    # Keep empty string empty — resolve_binary("") discovers PATH.
+    # Bare "ffmpeg" is treated as a configured path and raises FileNotFoundError.
+    ffmpeg = getattr(paths, "ffmpeg", "") or ""
     ffprobe = getattr(paths, "ffprobe", "") or ""
 
     result = ensure_waveform(

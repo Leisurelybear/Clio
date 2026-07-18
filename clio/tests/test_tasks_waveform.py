@@ -182,3 +182,51 @@ class TestErrorCooldown:
         ):
             out = wf.ensure_waveform(tmp_path, src, ffmpeg="ffmpeg")
         assert out["status"] in ("ready", "pending")
+
+
+class TestResolveBinaryContract:
+    """Waveform must use resolve_binary like compress/cut: empty -> PATH discover.
+
+    Bare name "ffmpeg" is treated as a configured path and raises.
+    """
+
+    def test_extract_uses_path_discovery_when_ffmpeg_empty(self, tmp_path: Path):
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+        calls = {}
+
+        def fake_resolve(configured, fallback):
+            calls["configured"] = configured
+            calls["fallback"] = fallback
+            if configured:
+                raise FileNotFoundError(f"找不到可执行文件: {configured}")
+            return "C:/fake/ffmpeg.exe"
+
+        def fake_run(args, ffmpeg, **kwargs):
+            out = Path(args[-1])
+            out.write_bytes(b"RIFF" + (b"\x00" * 40) + (b"\x00\x00" * 100))
+
+        with (
+            patch("clio.utils.resolve_binary", side_effect=fake_resolve),
+            patch("clio.utils.run_ffmpeg", side_effect=fake_run),
+            patch("clio.utils.get_duration_sec", return_value=1.0),
+        ):
+            out = wf.extract_peaks_for_video(src, ffmpeg="", duration_sec=1.0)
+
+        assert calls.get("configured") == ""
+        assert calls.get("fallback") == "ffmpeg"
+        assert out["status"] == "ready"
+        assert len(out["peaks"]) > 0
+
+    def test_route_must_not_default_empty_config_to_bare_name(self):
+        """Empty paths.ffmpeg must stay '' so resolve_binary discovers PATH."""
+        # Mimic the fixed route: do not coerce empty -> "ffmpeg"
+        paths_ffmpeg = ""
+        ffmpeg = paths_ffmpeg or ""
+        assert ffmpeg == ""
+        from clio.utils import resolve_binary
+
+        discovered = resolve_binary(ffmpeg, "ffmpeg")
+        assert discovered
+        with pytest.raises(FileNotFoundError):
+            resolve_binary("ffmpeg", "ffmpeg")

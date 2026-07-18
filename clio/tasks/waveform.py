@@ -175,12 +175,12 @@ def extract_peaks_for_video(
     from clio.utils import get_duration_sec, resolve_binary, run_ffmpeg
 
     video_path = Path(video_path)
-    ffmpeg_bin = resolve_binary(ffmpeg, "ffmpeg") if ffmpeg else resolve_binary("", "ffmpeg")
+    # Same contract as compress/cut: empty configured → PATH / known install roots.
+    ffmpeg_bin = resolve_binary(ffmpeg or "", "ffmpeg")
     dur = duration_sec
     if dur is None or dur <= 0:
         try:
-            # Prefer configured ffprobe when provided; fall back to PATH discovery.
-            probe = resolve_binary(ffprobe, "ffprobe") if ffprobe else resolve_binary("", "ffprobe")
+            probe = resolve_binary(ffprobe or "", "ffprobe")
             dur = get_duration_sec(video_path, probe)
         except Exception:
             dur = 0.0
