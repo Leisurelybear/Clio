@@ -8,6 +8,10 @@ from clio.identity import (
     MediaIdentity,
     _extract_original_stem,
     _identity_to_dict,
+    is_legacy_split_identity,
+    is_legacy_split_path,
+    is_legacy_split_stem,
+    legacy_segment_offset_sec,
     load_identity,
     resolve_identity,
 )
@@ -240,3 +244,72 @@ class TestIdentityToDict:
         assert d["segment_index"] is None
         assert d["segment_offset_sec"] == 0.0
         assert d["segment_duration_sec"] is None
+
+
+class TestIsLegacySplit:
+    def test_stem_plain(self):
+        assert is_legacy_split_stem("001_GL010683") is False
+
+    def test_stem_seg(self):
+        assert is_legacy_split_stem("001_GL010683_seg01") is True
+
+    def test_stem_part_alias(self):
+        assert is_legacy_split_stem("001_GL010683_part02") is True
+
+    def test_path_vmeta_split_info(self, tmp_path: Path):
+        src = tmp_path / "GL.mp4"
+        src.write_bytes(b"\x00" * 100)
+        compressed = tmp_path / "001_GL.mp4"
+        compressed.write_bytes(b"\x00" * 50)
+        meta = VideoMeta.build(
+            source=src,
+            target=compressed,
+            source_duration=100.0,
+            target_duration=50.0,
+            split_info=SplitInfo(
+                original_stem="GL",
+                segment_index=1,
+                total_segments=2,
+                offset_sec=0.0,
+                segment_duration_sec=50.0,
+            ),
+        )
+        meta.write(compressed)
+        assert is_legacy_split_path(compressed) is True
+
+    def test_path_plain_vmeta(self, tmp_path: Path):
+        src = tmp_path / "GL.mp4"
+        src.write_bytes(b"\x00" * 100)
+        compressed = tmp_path / "001_GL.mp4"
+        compressed.write_bytes(b"\x00" * 50)
+        VideoMeta.build(
+            source=src,
+            target=compressed,
+            source_duration=100.0,
+            target_duration=100.0,
+        ).write(compressed)
+        assert is_legacy_split_path(compressed) is False
+
+    def test_identity_helpers(self):
+        plain = MediaIdentity(
+            original_stem="GL",
+            original_path="/GL.mp4",
+            compressed_stem="001_GL",
+            compressed_path="/c/001_GL.mp4",
+            index="001",
+        )
+        split = MediaIdentity(
+            original_stem="GL",
+            original_path="/GL.mp4",
+            compressed_stem="001_GL_seg02",
+            compressed_path="/c/001_GL_seg02.mp4",
+            index="001",
+            segment_index=2,
+            segment_offset_sec=900.0,
+            segment_duration_sec=900.0,
+        )
+        assert is_legacy_split_identity(plain) is False
+        assert is_legacy_split_identity(split) is True
+        assert legacy_segment_offset_sec(plain) == 0.0
+        assert legacy_segment_offset_sec(split) == 900.0
+        assert legacy_segment_offset_sec(None) == 0.0

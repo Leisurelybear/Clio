@@ -7,6 +7,45 @@ from typing import Any
 
 from clio.vmeta import VideoIndex, VideoMeta
 
+# Align with clio/ui/routes/videos.py segment aliases
+SEGMENT_SUFFIX_RE = re.compile(r"(?i)_(?:seg|part|pt|chunk)(\d+)$")
+
+
+def is_legacy_split_stem(stem: str) -> bool:
+    return SEGMENT_SUFFIX_RE.search(stem) is not None
+
+
+def is_legacy_split_path(compressed_path: Path) -> bool:
+    meta = VideoMeta.read(compressed_path)
+    if meta is not None and meta.split_info is not None:
+        return True
+    if is_legacy_split_stem(compressed_path.stem):
+        return True
+    original_stem = _extract_original_stem(compressed_path.stem)
+    vindex = VideoIndex.read(original_stem, compressed_path.parent)
+    if vindex is not None and vindex.is_split and len(vindex.segments) > 1:
+        name = compressed_path.name
+        if any(s.filename == name for s in vindex.segments):
+            return True
+    return False
+
+
+def is_legacy_split_identity(identity: MediaIdentity | None) -> bool:
+    if identity is None:
+        return False
+    if identity.segment_index is not None:
+        return True
+    if abs(float(identity.segment_offset_sec or 0.0)) > 1e-6:
+        return True
+    return is_legacy_split_stem(identity.compressed_stem)
+
+
+def legacy_segment_offset_sec(identity: MediaIdentity | None) -> float:
+    if not is_legacy_split_identity(identity):
+        return 0.0
+    assert identity is not None
+    return float(identity.segment_offset_sec or 0.0)
+
 
 @dataclass
 class MediaIdentity:
