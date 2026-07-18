@@ -41,6 +41,7 @@ from clio.ui.routes.config_routes import (
     handle_put_config_raw,
     handle_put_provider,
 )
+from clio.ui.routes.deps import handle_get_deps_ffmpeg
 from clio.ui.routes.env_routes import handle_get_env, handle_put_env
 from clio.ui.routes.export import handle_post_export
 from clio.ui.routes.fs import (
@@ -421,6 +422,7 @@ def make_handler(
             Route("POST", "/api/fs/mkdir", "handle_post_fs_mkdir"),
             Route("POST", "/api/fs/reveal", "handle_post_fs_reveal"),
             Route("GET", "/api/transcripts", "handle_get_transcripts"),
+            Route("GET", "/api/deps/ffmpeg", "handle_get_deps_ffmpeg"),
             Route("GET", "/api/whisper/check", "handle_get_whisper_check"),
             Route("GET", "/api/whisper/install/status", "handle_get_whisper_install_status"),
             Route("GET", "/api/whisper/models", "handle_get_whisper_models"),
