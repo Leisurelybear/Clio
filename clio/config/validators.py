@@ -48,8 +48,9 @@ def _validate_config(config: AppConfig) -> None:
     _require_min("analyze.window_overlap_sec", config.analyze.window_overlap_sec, 0)
     if config.analyze.window_overlap_sec >= config.analyze.window_max_min * 60:
         raise ValueError(
-            f"analyze.window_overlap_sec must be < window_max_min * 60, got: "
-            f"{config.analyze.window_overlap_sec} vs window_max_min={config.analyze.window_max_min}"
+            f"analyze.window_overlap_sec 必须小于 window_max_min×60，"
+            f"当前 overlap={config.analyze.window_overlap_sec}，"
+            f"window_max_min={config.analyze.window_max_min}"
         )
     _require_min("compress.target_size_mb", config.compress.target_size_mb, 0.01)
     _require_min("compress.max_width", config.compress.max_width, 1)

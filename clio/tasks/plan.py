@@ -11,7 +11,7 @@ from typing import Any
 from clio.ai.token_usage import FileTokenUsageStore
 from clio.analyze import plan_daily_vlog
 from clio.config import AppConfig
-from clio.identity import load_identity
+from clio.identity import legacy_segment_offset_sec, load_identity
 from clio.log import timed
 from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
@@ -84,7 +84,7 @@ def run_plan_vlog(
         if identity is not None:
             source_stem = identity.original_stem
             match_stem = identity.compressed_stem
-            segment_offset = identity.segment_offset_sec or 0.0
+            segment_offset = legacy_segment_offset_sec(identity)
         else:
             source_stem = Path(data.get("source_file", "")).stem or json_file.stem
             match_stem = source_stem

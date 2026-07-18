@@ -130,16 +130,16 @@ class TestRunCompressAll:
         assert len(records2) == 1
         assert call_count == 1  # still 1 — no new compress calls
 
-    def test_skip_existing_split_fallback(self, monkeypatch, tmp_path: Path):
-        """Compressed dir has _segNN files; items has original (no split) — should skip via fallback."""
+    def test_skip_existing_does_not_treat_segs_as_whole_file(self, monkeypatch, tmp_path: Path):
+        """Leftover _segNN files must not block creating a whole-file compress."""
         cfg = _cfg(tmp_path)
         _add_video(cfg, "test.mp4")
 
         monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
 
-        # Create compressed segment files (as if a previous split+compress ran)
+        # Create compressed segment files (legacy leftovers)
         seg1 = cfg.compressed_dir / "001_test_seg01.mp4"
-        seg1.write_bytes(b"\x00" * 60_000)  # > MIN_VALID_SIZE (50KB)
+        seg1.write_bytes(b"\x00" * 60_000)
         seg2 = cfg.compressed_dir / "002_test_seg02.mp4"
         seg2.write_bytes(b"\x00" * 60_000)
 
@@ -148,18 +148,19 @@ class TestRunCompressAll:
         def _mock_compress(inp, outp, c, **kw):
             nonlocal call_count
             call_count += 1
+            outp.write_bytes(b"\x00" * 300)
             return outp
 
         monkeypatch.setattr("clio.tasks.compress.compress_video", _mock_compress)
+        monkeypatch.setattr("clio.tasks.compress.get_duration_sec", lambda *a, **kw: 10.0)
+        monkeypatch.setattr("clio.tasks.compress._safe_duration", lambda *a, **k: 10.0)
 
         cfg.analyze.skip_existing = True
-        monkeypatch.setattr("clio.tasks.compress.get_duration_sec", lambda *a, **kw: 10.0)
         records = run_compress_all(cfg)
-        assert call_count == 0  # should NOT re-compress
-        # Expect 1 skipped record (original file skipped via fallback)
+        assert call_count == 1
         assert len(records) == 1
-        assert records[0].stem == "test"
-        assert records[0].compressed_path is None
+        assert records[0].compressed_path is not None
+        assert "_seg" not in records[0].compressed_path.name
 
     def test_single_file_param(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)

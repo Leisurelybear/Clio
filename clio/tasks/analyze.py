@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import re
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
@@ -21,7 +20,13 @@ from clio.analyze_windows import (
     slice_window_video,
 )
 from clio.config import AppConfig
-from clio.identity import _identity_to_dict, is_legacy_split_path, load_identity, resolve_identity
+from clio.identity import (
+    SEGMENT_SUFFIX_RE,
+    _identity_to_dict,
+    is_legacy_split_path,
+    load_identity,
+    resolve_identity,
+)
 from clio.log import format_duration, timed
 from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
@@ -73,9 +78,9 @@ def _resolve_original(
     if result is not None:
         return result
 
-    m = re.match(r"^(.+)_seg\d+$", orig_stem)
+    m = SEGMENT_SUFFIX_RE.search(orig_stem)
     if m:
-        return _try_find(m.group(1))
+        return _try_find(SEGMENT_SUFFIX_RE.sub("", orig_stem))
     return None
 
 
@@ -111,18 +116,7 @@ def _analyze_with_optional_windows(
 
     if len(windows) <= 1:
         analysis = _one_call(str(compressed))
-        w0 = windows[0] if windows else None
-        if w0 is not None:
-            analysis["analyze_windows"] = [
-                {
-                    "i": w0.index,
-                    "start_sec": w0.start_sec,
-                    "end_sec": w0.end_sec if w0.end_sec > 0 else duration_sec,
-                    "overlap_sec": overlap,
-                    "status": "ok",
-                }
-            ]
-        return analysis
+        return merge_window_analyses([(windows[0], analysis)], overlap) if windows else analysis
 
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
     dest = config.paths.output_dir / ".analyze_windows"
@@ -137,6 +131,7 @@ def _analyze_with_optional_windows(
                 window=w,
                 dest_dir=dest,
                 ffmpeg=ffmpeg,
+                cancel_event=cancel_event,
             )
             try:
                 part = _one_call(str(slice_path))

@@ -103,6 +103,30 @@ class TestSliceWindowVideo:
         assert out.is_file()
         assert "w00" in out.name
         assert "-ss" in calls[0]
+        assert "-c" in calls[0]
+
+    def test_slice_falls_back_to_reencode_on_copy_fail(self, tmp_path: Path):
+        src = tmp_path / "001_GL.mp4"
+        src.write_bytes(b"\x00" * 10)
+        dest = tmp_path / ".analyze_windows"
+        calls = []
+
+        def fake_run(args, ffmpeg, **kw):
+            calls.append(list(args))
+            if "-c" in args and args[args.index("-c") + 1] == "copy":
+                raise RuntimeError("copy failed")
+            Path(args[-1]).write_bytes(b"reencoded")
+
+        out = slice_window_video(
+            source=src,
+            window=AnalyzeWindow(1, 100, 160),
+            dest_dir=dest,
+            ffmpeg="ffmpeg",
+            run_ffmpeg=fake_run,
+        )
+        assert out.is_file()
+        assert len(calls) == 2
+        assert "libx264" in calls[1]
 
     def test_cleanup_removes_window_files(self, tmp_path: Path):
         dest = tmp_path / ".analyze_windows"

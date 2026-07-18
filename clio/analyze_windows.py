@@ -221,8 +221,13 @@ def slice_window_video(
     dest_dir: Path,
     ffmpeg: str,
     run_ffmpeg: Callable[..., Any] | None = None,
+    cancel_event: Any | None = None,
 ) -> Path:
-    """Cut a temp slice from an already-compressed file for one analyze window."""
+    """Cut a temp slice from an already-compressed file for one analyze window.
+
+    Prefer stream-copy; on failure or empty output, re-encode lightly so
+    keyframe-misaligned cuts still produce a valid Gemini upload.
+    """
     from clio.utils import run_ffmpeg as _default_run_ffmpeg
 
     runner = run_ffmpeg or _default_run_ffmpeg
@@ -230,7 +235,15 @@ def slice_window_video(
     start = max(0.0, float(window.start_sec))
     dur = max(0.01, float(window.duration_sec))
     out = dest_dir / f"{source.stem}_w{window.index:02d}_{int(start)}-{int(start + dur)}.mp4"
-    args = [
+
+    def _run(args: list[str]) -> None:
+        # run_ffmpeg accepts cancel_event; custom test doubles may not.
+        try:
+            runner(args, ffmpeg, cancel_event=cancel_event)
+        except TypeError:
+            runner(args, ffmpeg)
+
+    copy_args = [
         "-ss",
         str(start),
         "-i",
@@ -242,7 +255,33 @@ def slice_window_video(
         "-y",
         str(out),
     ]
-    runner(args, ffmpeg)
+    try:
+        _run(copy_args)
+        if out.is_file() and out.stat().st_size > 0:
+            return out
+    except Exception:
+        out.unlink(missing_ok=True)
+
+    reencode_args = [
+        "-ss",
+        str(start),
+        "-i",
+        str(source),
+        "-t",
+        str(dur),
+        "-c:v",
+        "libx264",
+        "-preset",
+        "ultrafast",
+        "-crf",
+        "28",
+        "-an",
+        "-y",
+        str(out),
+    ]
+    _run(reencode_args)
+    if not out.is_file() or out.stat().st_size <= 0:
+        raise RuntimeError(f"分析窗切片失败或为空: {out.name}")
     return out
 
 

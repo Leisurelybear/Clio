@@ -25,6 +25,9 @@ class TestExtractOriginalStem:
     def test_with_seg_suffix(self):
         assert _extract_original_stem("001_GL010683_seg01") == "GL010683"
 
+    def test_with_part_alias(self):
+        assert _extract_original_stem("001_GL010683_part02") == "GL010683"
+
     def test_no_prefix(self):
         assert _extract_original_stem("GL010683") == "GL010683"
 

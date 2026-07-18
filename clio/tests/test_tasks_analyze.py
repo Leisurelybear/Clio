@@ -276,7 +276,7 @@ class TestRunAnalyzeAll:
         monkeypatch.setattr("clio.tasks.analyze.get_duration_sec", lambda *a: 2400.0)
         monkeypatch.setattr("clio.tasks.analyze.is_legacy_split_path", lambda p: False)
 
-        def fake_slice(*, source, window, dest_dir, ffmpeg, run_ffmpeg=None):
+        def fake_slice(*, source, window, dest_dir, ffmpeg, run_ffmpeg=None, cancel_event=None):
             dest_dir.mkdir(parents=True, exist_ok=True)
             out = dest_dir / f"{source.stem}_w{window.index:02d}.mp4"
             out.write_bytes(b"x")
@@ -322,7 +322,7 @@ class TestRunAnalyzeAll:
         monkeypatch.setattr("clio.tasks.analyze.get_duration_sec", lambda *a: 2400.0)
         monkeypatch.setattr("clio.tasks.analyze.is_legacy_split_path", lambda p: False)
 
-        def fake_slice(*, source, window, dest_dir, ffmpeg, run_ffmpeg=None):
+        def fake_slice(*, source, window, dest_dir, ffmpeg, run_ffmpeg=None, cancel_event=None):
             dest_dir.mkdir(parents=True, exist_ok=True)
             out = dest_dir / f"{source.stem}_w{window.index:02d}.mp4"
             out.write_bytes(b"x")

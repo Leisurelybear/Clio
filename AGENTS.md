@@ -37,7 +37,9 @@ vlog-video-analysis/
 │   ├── cut.py                 Segment cutting (ffmpeg wrapper)
 │   ├── plan_model.py          Plan/PlanSegment domain + save validation (R-026)
 │   ├── plan_readiness.py      Export/cut readiness (error/warning tiers)
-│   ├── split.py               Long video splitter
+│   ├── analyze_windows.py     Long-clip logical windows (slice/merge; no physical split)
+│   ├── split.py               Legacy physical splitter (read-only; new compress ignores)
+│   ├── identity.py            MediaIdentity + is_legacy_split_* gate
 │   ├── vmeta.py               .vmeta/.vindex sidecar metadata
 │   ├── progress.py            Progress tracker (used by UI + CLI)
 │   ├── tasks/                 Pipeline steps (per-step modules)

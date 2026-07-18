@@ -1,4 +1,4 @@
-"""Compression task — compress source videos (with optional auto-split)."""
+"""Compression task — compress source videos (one file per original)."""
 
 from __future__ import annotations
 
@@ -15,33 +15,7 @@ from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
 from clio.tasks._helpers import ClipRecord, _eta_line, _matches_selected_stem, _next_index, _selected_stems
 from clio.utils import format_index, get_duration_sec, resolve_binary
-from clio.vmeta import SegmentEntry, SplitInfo, VideoIndex, VideoMeta
-
-
-def _build_split_info(source: Path, original: Path, config: AppConfig) -> SplitInfo | None:
-    """从 split_manifest.json 读取本分段的 offset_sec 和段号信息。"""
-    if source is original:
-        return None
-    manifest_path = config.compressed_dir / f"{original.stem}_split_manifest.json"
-    if not manifest_path.is_file():
-        return None
-    try:
-        import json
-
-        entries = json.loads(manifest_path.read_text(encoding="utf-8"))
-        total = len(entries)
-        for e in entries:
-            if e.get("filename") == source.name or Path(e.get("filename", "")).stem == source.stem:
-                return SplitInfo(
-                    original_stem=original.stem,
-                    segment_index=e["segment_index"],
-                    total_segments=total,
-                    offset_sec=e["offset_sec"],
-                    segment_duration_sec=e["actual_duration_sec"],
-                )
-    except Exception:
-        pass
-    return None
+from clio.vmeta import SegmentEntry, VideoIndex, VideoMeta
 
 
 def _safe_duration(path: Path, ffprobe: str) -> float:
@@ -67,15 +41,15 @@ def _write_vindex(records: list[ClipRecord], config: AppConfig, ffprobe: str) ->
             if rec.meta is None or rec.compressed_path is None:
                 continue
             source_dur = rec.meta.source_duration_sec
-            si = rec.meta.split_info
+            # New compresses are never physical segments.
             seg_entries.append(
                 SegmentEntry(
                     index=format_index(rec.index, config.naming.index_width),
                     filename=rec.compressed_path.name,
-                    offset_sec=si.offset_sec if si else 0.0,
+                    offset_sec=0.0,
                     duration_sec=rec.meta.target_duration_sec,
-                    segment_number=si.segment_index if si else 1,
-                    total_segments=si.total_segments if si else 1,
+                    segment_number=1,
+                    total_segments=1,
                 )
             )
 
@@ -149,21 +123,6 @@ def run_compress_all(
                 if prefix.isdigit():
                     existing_map[stem_part] = (int(prefix), f)
 
-    # Also build lookup by original stem for split videos (strip _segNN suffix).
-    # Handles the case where split_video fails on re-run (e.g. ffprobe returns 0)
-    # but segments were already compressed before.
-    def _orig_stem_for(stem_part: str) -> str:
-        import re
-
-        m = re.match(r"^(.+?)_seg\d+$", stem_part)
-        return m.group(1) if m else stem_part
-
-    orig_to_compressed: dict[str, set[str]] = {}
-    if not overwrite and config.analyze.skip_existing:
-        for stem_part in existing_map:
-            orig_stem = _orig_stem_for(stem_part)
-            orig_to_compressed.setdefault(orig_stem, set()).add(stem_part)
-
     # Phase 3: assign indices and compress each
     next_idx = _next_index(config.compressed_dir, config.naming.index_width)
     records: list[ClipRecord] = []
@@ -188,21 +147,8 @@ def run_compress_all(
                 )
                 continue
 
-            # Fallback: source == original (no split) but compressed files with _segNN exist.
-            # This happens when split_video failed/is inconsistent on re-run.
-            if (
-                not overwrite
-                and config.analyze.skip_existing
-                and source is original
-                and original.stem in orig_to_compressed
-            ):
-                seg_stems = orig_to_compressed[original.stem]
-                print(f"[跳过压缩] {label_name}: 已存在分割压缩片段 {', '.join(sorted(seg_stems))}")
-                if tracker:
-                    tracker.log(f"⏭️ 跳过 {label_name}（已存在分割文件）")
-                state.mark(original.stem, "compress", "skipped")
-                records.append(ClipRecord(index=0, stem=original.stem, source_path=original, compressed_path=None))
-                continue
+            # Leftover *_segNN files do NOT satisfy whole-file compress; continue to create
+            # a new non-segment compressed file so the project can migrate forward.
 
             use_idx = next_idx + completed
             use_out = config.compressed_dir / f"{format_index(use_idx, config.naming.index_width)}_{source.stem}.mp4"
@@ -224,8 +170,7 @@ def run_compress_all(
             elapsed_total += time.monotonic() - t0
             completed += 1
 
-            # 写 .vmeta
-            split_info = _build_split_info(source, original, config)
+            # Always write non-split identity for new compresses.
             src_dur = _safe_duration(original, ffprobe)
             tgt_dur = _safe_duration(use_out, ffprobe)
             meta = VideoMeta.build(
@@ -238,7 +183,7 @@ def run_compress_all(
                     "fps": config.compress.fps,
                     "target_size_mb": config.compress.target_size_mb,
                 },
-                split_info=split_info,
+                split_info=None,
             )
             meta.write(use_out)
 

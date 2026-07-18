@@ -68,9 +68,9 @@ def _extract_original_stem(compressed_stem: str) -> str:
     """Extract original stem from a compressed file stem.
 
     Handles '001_GL010683' -> 'GL010683', '001_GL010683_seg01' -> 'GL010683',
-    and 'GL010683' -> 'GL010683'.
+    aliases _part/_pt/_chunk, and 'GL010683' -> 'GL010683'.
     """
-    stem = re.sub(r"_seg\d+$", "", compressed_stem)
+    stem = SEGMENT_SUFFIX_RE.sub("", compressed_stem)
     if "_" not in stem:
         return stem
     _, orig_stem = stem.split("_", 1)

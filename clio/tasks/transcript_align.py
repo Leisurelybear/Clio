@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from clio.config import AppConfig
-from clio.identity import load_identity
+from clio.identity import legacy_segment_offset_sec, load_identity
 from clio.tasks._helpers import _write_text_file
 from clio.utils import write_json_atomic
 
@@ -71,7 +71,7 @@ def attach_transcript_data(config: AppConfig, analysis: dict[str, Any], transcri
     identity = load_identity(analysis)
     compress_cfg = getattr(config, "compress", None)
     remove_audio = getattr(compress_cfg, "remove_audio", False)
-    offset = identity.segment_offset_sec if identity and remove_audio else 0.0
+    offset = legacy_segment_offset_sec(identity) if identity and remove_audio else 0.0
     whisper_cfg = getattr(config, "whisper", None)
     max_segments = int(getattr(whisper_cfg, "max_segments_per_clip", 5))
     changed = False
