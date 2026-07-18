@@ -144,6 +144,33 @@ class TestSliceWindowVideo:
         assert len(calls) == 2
         assert "libx264" in calls[1]
 
+    def test_slice_shrinks_when_over_200mb(self, tmp_path: Path):
+        src = tmp_path / "001_GL.mp4"
+        src.write_bytes(b"\x00" * 10)
+        dest = tmp_path / ".analyze_windows"
+        calls = []
+
+        def fake_run(args, ffmpeg, **kw):
+            calls.append(list(args))
+            outp = Path(args[-1])
+            # Stay oversized until shrink path (has -vf scale)
+            joined = " ".join(str(a) for a in args)
+            if "-vf" in args or "scale=" in joined:
+                outp.write_bytes(b"small")
+            else:
+                outp.write_bytes(b"x" * (201 * 1024 * 1024))
+
+        out = slice_window_video(
+            source=src,
+            window=AnalyzeWindow(0, 0, 60),
+            dest_dir=dest,
+            ffmpeg="ffmpeg",
+            run_ffmpeg=fake_run,
+        )
+        assert out.is_file()
+        assert out.stat().st_size < 200 * 1024 * 1024
+        assert any("-vf" in c for c in calls)
+
     def test_cleanup_removes_window_files(self, tmp_path: Path):
         dest = tmp_path / ".analyze_windows"
         dest.mkdir()

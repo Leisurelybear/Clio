@@ -112,17 +112,18 @@ class TestRunAnalyzeAll:
         assert len(records) == 1
         assert analyze_called is False
 
-    def test_duration_gate_skips_long_video(self, monkeypatch, tmp_path: Path):
+    def test_duration_gate_skips_long_legacy_segment(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
         _add_original(cfg, "GL010695.mp4")
-        comp = cfg.compressed_dir / "001_GL010695.mp4"
+        # Legacy segment name so is_legacy_split_path is true
+        comp = cfg.compressed_dir / "001_GL010695_seg01.mp4"
         comp.write_bytes(b"\x00" * 100)
 
         _common_mocks(monkeypatch)
         monkeypatch.setattr("clio.tasks.analyze.get_duration_sec", lambda *a: 3600.0)
         analyze_called = False
 
-        def _analyze(*a):
+        def _analyze(*a, **kw):
             nonlocal analyze_called
             analyze_called = True
             return {"title": "Should not be called"}
@@ -133,6 +134,35 @@ class TestRunAnalyzeAll:
         records = run_analyze_all(cfg)
         assert len(records) == 0
         assert analyze_called is False
+
+    def test_duration_gate_does_not_block_windowed_whole_file(self, monkeypatch, tmp_path: Path):
+        """Old max_analyze_duration_min=30 must not skip non-legacy long clips."""
+        cfg = _cfg(tmp_path)
+        cfg.analyze.max_analyze_duration_min = 30
+        cfg.analyze.window_max_min = 15
+        cfg.analyze.window_overlap_sec = 20
+        _add_original(cfg, "GL010695.mp4")
+        comp = cfg.compressed_dir / "001_GL010695.mp4"
+        comp.write_bytes(b"\x00" * 100)
+
+        _common_mocks(monkeypatch)
+        monkeypatch.setattr("clio.tasks.analyze.get_duration_sec", lambda *a: 2400.0)
+        monkeypatch.setattr("clio.tasks.analyze.is_legacy_split_path", lambda p: False)
+
+        def fake_slice(*, source, window, dest_dir, ffmpeg, run_ffmpeg=None, cancel_event=None):
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            out = dest_dir / f"{source.stem}_w{window.index:02d}.mp4"
+            out.write_bytes(b"x")
+            return out
+
+        monkeypatch.setattr("clio.tasks.analyze.slice_window_video", fake_slice)
+        monkeypatch.setattr(
+            "clio.tasks.analyze.analyze_video",
+            lambda *a, **kw: {"title": "W", "summary": "s", "timeline": [], "location": "X"},
+        )
+
+        records = run_analyze_all(cfg)
+        assert len(records) == 1
 
     def test_duration_gate_allows_short_video(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)

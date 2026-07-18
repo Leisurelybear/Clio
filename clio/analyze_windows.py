@@ -263,6 +263,8 @@ def slice_window_video(
         except TypeError:
             runner(args, ffmpeg)
 
+    max_bytes = 200 * 1024 * 1024
+
     copy_args = [
         "-ss",
         str(start),
@@ -277,8 +279,10 @@ def slice_window_video(
     ]
     try:
         _run(copy_args)
-        if out.is_file() and out.stat().st_size > 0:
+        if out.is_file() and 0 < out.stat().st_size <= max_bytes:
             return out
+        # empty or oversized copy → fall through to re-encode / shrink
+        out.unlink(missing_ok=True)
     except Exception:
         out.unlink(missing_ok=True)
 
@@ -302,6 +306,35 @@ def slice_window_video(
     _run(reencode_args)
     if not out.is_file() or out.stat().st_size <= 0:
         raise RuntimeError(f"分析窗切片失败或为空: {out.name}")
+    if out.stat().st_size > max_bytes:
+        out.unlink(missing_ok=True)
+        shrink_args = [
+            "-ss",
+            str(start),
+            "-i",
+            str(source),
+            "-t",
+            str(dur),
+            "-vf",
+            "scale=min(480\\,iw):-2",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-crf",
+            "32",
+            "-an",
+            "-y",
+            str(out),
+        ]
+        _run(shrink_args)
+        if not out.is_file() or out.stat().st_size <= 0:
+            raise RuntimeError(f"分析窗切片失败或为空: {out.name}")
+        if out.stat().st_size > max_bytes:
+            raise RuntimeError(
+                f"分析窗切片仍超过 200MB（{out.stat().st_size / 1024 / 1024:.0f} MB），"
+                f"请降低 compress 体积或缩短 window_max_min"
+            )
     return out
 
 

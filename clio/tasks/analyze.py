@@ -225,8 +225,11 @@ def _process_video_item(
         state.mark(original.stem, "analyze", "skipped")
         return None
 
+    # Whole-clip hard cap: keep for legacy single-call segments. Non-legacy long
+    # clips are covered by analyze windows — applying the old 30min default here
+    # would skip 40min whole files and defeat remove-physical-split.
     max_min = config.analyze.max_analyze_duration_min
-    if max_min > 0 and duration_sec > max_min * 60:
+    if max_min > 0 and duration_sec > max_min * 60 and is_legacy_split_path(compressed):
         print(f"  [跳过] {compressed.name} 时长 {format_duration(duration_sec)} 超过限制 {max_min} 分钟")
         if tracker:
             tracker.next(message=f"跳过 {compressed.name}（超长）")
