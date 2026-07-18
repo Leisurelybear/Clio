@@ -26,8 +26,41 @@ _MIN_BINS, _MAX_BINS = 400, 2000
 
 _jobs_lock = threading.Lock()
 _active_jobs = 0
+# Keys with a live job thread in *this* process (orphan recovery after restart).
+_active_job_keys: set[str] = set()
 _key_locks: dict[str, threading.Lock] = {}
 _key_locks_guard = threading.Lock()
+
+
+def _pid_alive(pid: int) -> bool:
+    """True if process *pid* appears to still be running."""
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        import ctypes
+
+        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+        STILL_ACTIVE = 259
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, int(pid))
+        if not handle:
+            return False
+        try:
+            code = ctypes.c_ulong()
+            if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+                return False
+            return code.value == STILL_ACTIVE
+        finally:
+            kernel32.CloseHandle(handle)
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+    return True
 
 
 def cache_key(source_path: Path) -> str:
@@ -97,17 +130,33 @@ def write_peaks_atomic(project_output: Path, key: str, payload: dict[str, Any]) 
 
 
 def lock_status(project_output: Path, key: str, *, now: float | None = None) -> Literal["none", "pending", "stale"]:
+    """Classify .generating lock: none | pending | stale.
+
+    Stale when:
+    - lock JSON unreadable
+    - age > STALE_SEC (absolute safety for long/hung ffmpeg)
+    - recorded pid is dead (server restart mid-job — main orphan case)
+    - lock is from *this* pid but no in-process job for *key* (thread died without cleanup)
+    """
     lp = lock_path(project_output, key)
     if not lp.is_file():
         return "none"
     try:
         data = json.loads(lp.read_text(encoding="utf-8"))
         started = float(data.get("started_at") or 0)
+        pid = int(data.get("pid") or 0)
     except (OSError, json.JSONDecodeError, TypeError, ValueError):
         return "stale"
     t = time.time() if now is None else now
     if t - started > STALE_SEC:
         return "stale"
+    if pid and not _pid_alive(pid):
+        return "stale"
+    # Same process: lock exists but no live job → orphaned after thread crash
+    if pid == os.getpid():
+        with _jobs_lock:
+            if key not in _active_job_keys:
+                return "stale"
     return "pending"
 
 
@@ -279,7 +328,17 @@ def ensure_waveform(
             finally:
                 clear_lock(project_output, key)
                 with _jobs_lock:
+                    _active_job_keys.discard(key)
                     _active_jobs = max(0, _active_jobs - 1)
 
-        _spawn_job(_job)
+        # Register key before spawn so concurrent GETs see pending (not same-pid stale).
+        with _jobs_lock:
+            _active_job_keys.add(key)
+        try:
+            _spawn_job(_job)
+        except Exception:
+            with _jobs_lock:
+                _active_job_keys.discard(key)
+            clear_lock(project_output, key)
+            raise
         return {"status": "pending", "started_at": started_at, "key": key}

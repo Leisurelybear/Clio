@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import struct
 import time
 from pathlib import Path
@@ -77,8 +78,15 @@ class TestLockAndReadWrite:
         src.write_bytes(b"v")
         t0 = 1_000_000.0
         wf.write_lock(tmp_path, key, src, now=t0)
-        assert wf.lock_status(tmp_path, key, now=t0 + 10) == "pending"
-        assert wf.lock_status(tmp_path, key, now=t0 + wf.STALE_SEC + 1) == "stale"
+        # same-pid lock with no live job → stale; simulate live job first
+        with wf._jobs_lock:
+            wf._active_job_keys.add(key)
+        try:
+            assert wf.lock_status(tmp_path, key, now=t0 + 10) == "pending"
+            assert wf.lock_status(tmp_path, key, now=t0 + wf.STALE_SEC + 1) == "stale"
+        finally:
+            with wf._jobs_lock:
+                wf._active_job_keys.discard(key)
         wf.clear_lock(tmp_path, key)
         assert wf.lock_status(tmp_path, key, now=t0) == "none"
 
@@ -230,3 +238,51 @@ class TestResolveBinaryContract:
         assert discovered
         with pytest.raises(FileNotFoundError):
             resolve_binary("ffmpeg", "ffmpeg")
+
+
+class TestOrphanLockRecovery:
+    def test_dead_pid_lock_is_stale(self, tmp_path: Path):
+        key = "deadpidlock000001"
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+        # pid 1 is not a reliable "dead" on Unix; use absurd high pid
+        dead_pid = 2_000_000_001
+        lp = wf.lock_path(tmp_path, key)
+        lp.parent.mkdir(parents=True, exist_ok=True)
+        lp.write_text(
+            json.dumps({"started_at": time.time(), "source_path": str(src), "pid": dead_pid}),
+            encoding="utf-8",
+        )
+        assert wf.lock_status(tmp_path, key) == "stale"
+
+    def test_ensure_reattempts_after_orphan_lock(self, tmp_path: Path):
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+        key = wf.cache_key(src)
+        lp = wf.lock_path(tmp_path, key)
+        lp.parent.mkdir(parents=True, exist_ok=True)
+        lp.write_text(
+            json.dumps({"started_at": time.time(), "source_path": str(src), "pid": 2_000_000_002}),
+            encoding="utf-8",
+        )
+
+        def _fake_extract(video_path, ffmpeg, duration_sec=None, audio_source="original", ffprobe=""):
+            return {
+                "version": 1,
+                "source_path": str(video_path),
+                "audio_source": audio_source,
+                "duration_sec": 1.0,
+                "bin_count": 400,
+                "peaks": [0.3],
+                "status": "ready",
+            }
+
+        with (
+            patch.object(wf, "extract_peaks_for_video", side_effect=_fake_extract),
+            patch.object(wf, "_spawn_job", side_effect=lambda fn: fn()),
+        ):
+            out = wf.ensure_waveform(tmp_path, src, ffmpeg="")
+        assert out["status"] in ("ready", "pending")
+        if out["status"] == "pending":
+            out2 = wf.ensure_waveform(tmp_path, src, ffmpeg="")
+            assert out2["status"] == "ready"
