@@ -77,7 +77,6 @@ class TestRunCompressAll:
             return outp
 
         monkeypatch.setattr("clio.tasks.compress.compress_video", _mock_compress)
-        monkeypatch.setattr("clio.tasks.compress.split_video", lambda *a, **kw: [a[0]])
 
         records = run_compress_all(cfg)
         assert len(records) == 1
@@ -94,7 +93,6 @@ class TestRunCompressAll:
             return outp
 
         monkeypatch.setattr("clio.tasks.compress.compress_video", _mock_compress)
-        monkeypatch.setattr("clio.tasks.compress.split_video", lambda *a, **kw: [a[0]])
 
         records = run_compress_all(cfg)
         assert len(records) == 1
@@ -194,40 +192,28 @@ class TestRunCompressAll:
             return outp
 
         monkeypatch.setattr("clio.tasks.compress.compress_video", _mock_compress)
-        monkeypatch.setattr("clio.tasks.compress.split_video", lambda *a, **kw: [a[0]])
 
         records = run_compress_all(cfg, files=["a"])
         assert len(records) == 1
         assert "a" in records[0].stem
 
-    def test_split_staging_uses_splits_subdir(self, monkeypatch, tmp_path: Path):
+    def test_ignores_split_max_min(self, monkeypatch, tmp_path: Path):
+        """Physical split is removed; split_max_min>0 must not create _seg files."""
         cfg = _cfg(tmp_path)
         cfg.compress.split_max_min = 15
-        cfg.compress.splits_subdir = "split-staging"
-        _add_video(cfg, "long.mp4")
+        _add_video(cfg, "long_clip.mp4")
 
         monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
-
-        split_calls = []
-
-        def _mock_split(video, output_dir, *args, **kwargs):
-            split_calls.append(output_dir)
-            seg = output_dir / "long_seg01.mp4"
-            return [seg]
-
-        compressed_inputs = []
-
-        def _mock_compress(inp, outp, c, **kw):
-            compressed_inputs.append(inp)
-            outp.write_bytes(b"\x00" * 300)
-            return outp
-
-        monkeypatch.setattr("clio.tasks.compress.split_video", _mock_split)
-        monkeypatch.setattr("clio.tasks.compress.compress_video", _mock_compress)
+        monkeypatch.setattr(
+            "clio.tasks.compress.compress_video",
+            lambda inp, outp, c, **kw: outp.write_bytes(b"\x00" * 300) or outp,
+        )
+        monkeypatch.setattr("clio.tasks.compress.get_duration_sec", lambda *a, **k: 3600.0)
+        monkeypatch.setattr("clio.tasks.compress._safe_duration", lambda *a, **k: 3600.0)
 
         records = run_compress_all(cfg)
-
-        expected_split_dir = cfg.paths.output_dir / "split-staging"
-        assert split_calls == [expected_split_dir]
-        assert compressed_inputs == [expected_split_dir / "long_seg01.mp4"]
-        assert records[0].compressed_path == cfg.compressed_dir / "001_long_seg01.mp4"
+        assert len(records) == 1
+        assert records[0].compressed_path is not None
+        assert "_seg" not in records[0].compressed_path.name
+        splits_dir = cfg.paths.output_dir / "splits"
+        assert not splits_dir.exists() or not any(splits_dir.glob("*"))

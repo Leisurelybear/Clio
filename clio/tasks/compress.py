@@ -13,7 +13,6 @@ from clio.config import AppConfig
 from clio.log import timed
 from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
-from clio.split import split_video
 from clio.tasks._helpers import ClipRecord, _eta_line, _matches_selected_stem, _next_index, _selected_stems
 from clio.utils import format_index, get_duration_sec, resolve_binary
 from clio.vmeta import SegmentEntry, SplitInfo, VideoIndex, VideoMeta
@@ -100,7 +99,7 @@ def run_compress_all(
     overwrite: bool = False,
     **kwargs: Any,
 ) -> list[ClipRecord]:
-    ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
+    resolve_binary(config.paths.ffmpeg, "ffmpeg")  # fail fast if missing
     ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
 
     if single_file:
@@ -122,26 +121,10 @@ def run_compress_all(
         videos = [v for v in videos if _matches_selected_stem(v, selected)]
     config.compressed_dir.mkdir(parents=True, exist_ok=True)
 
-    # Phase 1: resolve items to compress — split long videos if needed
-    items: list[tuple[Path, Path]] = []  # (original_path, path_to_compress)
-    split_staging_dir = config.paths.output_dir / config.compress.splits_subdir
-    for video in videos:
-        max_min = config.compress.split_max_min
-        if max_min > 0:
-            segments = split_video(
-                video,
-                split_staging_dir,
-                max_min,
-                ffmpeg,
-                ffprobe,
-                reencode=config.compress.reencode_split,
-                manifest_dir=config.compressed_dir,
-                cancel_event=cancel_event,
-            )
-            for seg in segments:
-                items.append((video, seg))
-        else:
-            items.append((video, video))
+    # Phase 1: one compressed file per original (physical split removed — see
+    # docs/superpowers/specs/2026-07-18-remove-physical-split-design.md).
+    # compress.split_max_min is deprecated and ignored.
+    items: list[tuple[Path, Path]] = [(video, video) for video in videos]
 
     # Phase 2: build existing lookup (source_stem -> (index, Path))
     # Only include files >= 50KB to skip partially-written files from interrupted runs.
