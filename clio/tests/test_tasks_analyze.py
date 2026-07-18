@@ -23,6 +23,8 @@ def _cfg(tmp_path: Path) -> SimpleNamespace:
         analyze=SimpleNamespace(
             skip_existing=False,
             max_analyze_duration_min=30,
+            window_max_min=15,
+            window_overlap_sec=20,
             max_workers=1,
         ),
         ai=SimpleNamespace(context=""),
@@ -260,3 +262,87 @@ class TestRunAnalyzeAll:
         records = run_analyze_all(cfg, overwrite=True)
         assert len(records) == 1
         assert analyze_called is True
+
+    def test_multi_window_merges_and_writes_one_json(self, monkeypatch, tmp_path: Path):
+        cfg = _cfg(tmp_path)
+        cfg.analyze.max_analyze_duration_min = 0
+        cfg.analyze.window_max_min = 15
+        cfg.analyze.window_overlap_sec = 20
+        _add_original(cfg, "GL010695.mp4")
+        comp = cfg.compressed_dir / "001_GL010695.mp4"
+        comp.write_bytes(b"\x00" * 100)
+
+        _common_mocks(monkeypatch)
+        monkeypatch.setattr("clio.tasks.analyze.get_duration_sec", lambda *a: 2400.0)
+        monkeypatch.setattr("clio.tasks.analyze.is_legacy_split_path", lambda p: False)
+
+        def fake_slice(*, source, window, dest_dir, ffmpeg, run_ffmpeg=None):
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            out = dest_dir / f"{source.stem}_w{window.index:02d}.mp4"
+            out.write_bytes(b"x")
+            return out
+
+        monkeypatch.setattr("clio.tasks.analyze.slice_window_video", fake_slice)
+
+        call_paths: list[str] = []
+
+        def _analyze(path, *a, **kw):
+            call_paths.append(str(path))
+            return {
+                "title": f"W{len(call_paths)}",
+                "summary": f"sum{len(call_paths)}",
+                "timeline": [{"start": 5, "end": 10, "text": f"e{len(call_paths)}"}],
+                "location": "X",
+            }
+
+        monkeypatch.setattr("clio.tasks.analyze.analyze_video", _analyze)
+
+        records = run_analyze_all(cfg)
+        assert len(records) == 1
+        assert len(call_paths) >= 3
+        assert records[0].analysis is not None
+        assert records[0].analysis["title"] == "W1"
+        assert len(records[0].analysis.get("analyze_windows", [])) >= 3
+        texts = list(cfg.texts_dir.glob("*.json"))
+        assert len(texts) == 1
+        data = json.loads(texts[0].read_text(encoding="utf-8"))
+        assert data["timeline"][0]["start"] == 5
+        assert any(t["start"] >= 880 for t in data["timeline"])
+
+    def test_window_failure_writes_nothing(self, monkeypatch, tmp_path: Path):
+        cfg = _cfg(tmp_path)
+        cfg.analyze.max_analyze_duration_min = 0
+        cfg.analyze.window_max_min = 15
+        cfg.analyze.window_overlap_sec = 20
+        _add_original(cfg, "GL010695.mp4")
+        comp = cfg.compressed_dir / "001_GL010695.mp4"
+        comp.write_bytes(b"\x00" * 100)
+
+        _common_mocks(monkeypatch)
+        monkeypatch.setattr("clio.tasks.analyze.get_duration_sec", lambda *a: 2400.0)
+        monkeypatch.setattr("clio.tasks.analyze.is_legacy_split_path", lambda p: False)
+
+        def fake_slice(*, source, window, dest_dir, ffmpeg, run_ffmpeg=None):
+            dest_dir.mkdir(parents=True, exist_ok=True)
+            out = dest_dir / f"{source.stem}_w{window.index:02d}.mp4"
+            out.write_bytes(b"x")
+            return out
+
+        monkeypatch.setattr("clio.tasks.analyze.slice_window_video", fake_slice)
+
+        n = 0
+
+        def _analyze(path, *a, **kw):
+            nonlocal n
+            n += 1
+            if n >= 2:
+                raise RuntimeError("boom")
+            return {"title": "ok", "summary": "s", "timeline": [], "location": "X"}
+
+        monkeypatch.setattr("clio.tasks.analyze.analyze_video", _analyze)
+
+        import pytest
+
+        with pytest.raises(RuntimeError, match="失败"):
+            run_analyze_all(cfg)
+        assert list(cfg.texts_dir.glob("*.json")) == []

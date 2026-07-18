@@ -13,8 +13,15 @@ from typing import Any
 from clio._constants import VIDEO_EXTS
 from clio.ai.token_usage import FileTokenUsageStore
 from clio.analyze import analyze_video
+from clio.analyze_windows import (
+    build_analyze_windows,
+    cleanup_analyze_windows_dir,
+    merge_window_analyses,
+    shift_analysis_times,
+    slice_window_video,
+)
 from clio.config import AppConfig
-from clio.identity import _identity_to_dict, load_identity, resolve_identity
+from clio.identity import _identity_to_dict, is_legacy_split_path, load_identity, resolve_identity
 from clio.log import format_duration, timed
 from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
@@ -70,6 +77,78 @@ def _resolve_original(
     if m:
         return _try_find(m.group(1))
     return None
+
+
+def _analyze_with_optional_windows(
+    *,
+    compressed: Path,
+    duration_sec: float,
+    config: AppConfig,
+    token_store: FileTokenUsageStore,
+    cancel_event: threading.Event | None,
+    effective_context: str | None,
+    task_prompts: dict[str, str] | None,
+) -> dict:
+    """Run Gemini analyze: legacy split files stay single-call; else use windows."""
+
+    def _one_call(video_path: str) -> dict:
+        return analyze_video(
+            video_path,
+            config,
+            progress_callback=lambda msg: None,
+            token_store=token_store,
+            cancel_event=cancel_event,
+            context_override=effective_context,
+            task_prompts=task_prompts,
+        )
+
+    if is_legacy_split_path(compressed):
+        return _one_call(str(compressed))
+
+    w_max = int(getattr(config.analyze, "window_max_min", 15) or 15)
+    overlap = int(getattr(config.analyze, "window_overlap_sec", 20) or 0)
+    windows = build_analyze_windows(duration_sec, w_max, overlap)
+
+    if len(windows) <= 1:
+        analysis = _one_call(str(compressed))
+        w0 = windows[0] if windows else None
+        if w0 is not None:
+            analysis["analyze_windows"] = [
+                {
+                    "i": w0.index,
+                    "start_sec": w0.start_sec,
+                    "end_sec": w0.end_sec if w0.end_sec > 0 else duration_sec,
+                    "overlap_sec": overlap,
+                    "status": "ok",
+                }
+            ]
+        return analysis
+
+    ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
+    dest = config.paths.output_dir / ".analyze_windows"
+    dest.mkdir(parents=True, exist_ok=True)
+    partials: list = []
+    try:
+        for w in windows:
+            if cancel_event is not None and cancel_event.is_set():
+                raise RuntimeError("分析被用户取消")
+            slice_path = slice_window_video(
+                source=compressed,
+                window=w,
+                dest_dir=dest,
+                ffmpeg=ffmpeg,
+            )
+            try:
+                part = _one_call(str(slice_path))
+                part = shift_analysis_times(part, w.start_sec)
+                partials.append((w, part))
+            finally:
+                slice_path.unlink(missing_ok=True)
+    except Exception:
+        cleanup_analyze_windows_dir(dest)
+        raise
+
+    return merge_window_analyses(partials, overlap)
 
 
 def _process_video_item(
@@ -160,14 +239,13 @@ def _process_video_item(
             original,
             use_gpmf=bool(getattr(config.analyze, "use_gpmf", False)),
         )
-        # Pass cancel_event to analyze_video if supported
-        analysis = analyze_video(
-            str(compressed),
-            config,
-            progress_callback=lambda msg: None,
+        analysis = _analyze_with_optional_windows(
+            compressed=compressed,
+            duration_sec=duration_sec,
+            config=config,
             token_store=token_store,
             cancel_event=cancel_event,
-            context_override=effective_context,
+            effective_context=effective_context,
             task_prompts=task_prompts,
         )
     except Exception as e:
