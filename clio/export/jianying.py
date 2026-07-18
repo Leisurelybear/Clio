@@ -13,7 +13,7 @@ from pathlib import Path
 
 from clio.config.models import CANVAS_PRESETS
 from clio.cut import parse_time_range
-from clio.identity import load_identity
+from clio.identity import legacy_segment_offset_sec, load_identity
 from clio.utils import get_duration_sec
 
 logger = logging.getLogger("clio.export.jianying")
@@ -102,8 +102,9 @@ def _build_index_to_offset(texts_dir: Path) -> dict[str, float]:
         except (json.JSONDecodeError, OSError):
             continue
         identity = load_identity(data)
-        if identity is not None and identity.segment_offset_sec:
-            offsets[identity.index] = identity.segment_offset_sec
+        off = legacy_segment_offset_sec(identity)
+        if off:
+            offsets[identity.index] = off
     return offsets
 
 

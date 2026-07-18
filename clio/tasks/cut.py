@@ -12,7 +12,7 @@ from typing import Any
 from clio._constants import VIDEO_EXTS
 from clio.config import AppConfig
 from clio.cut import cut_one, parse_time_range
-from clio.identity import load_identity
+from clio.identity import legacy_segment_offset_sec, load_identity
 from clio.log import format_duration, timed
 from clio.processing_state import ProcessingState
 from clio.tasks._helpers import _eta_line
@@ -309,17 +309,16 @@ def run_cut_all(
                     state.mark(orig_stem, "cut", "skipped")
                 continue
 
-            # Apply segment offset for original source with split videos
+            # Apply segment offset for original source with legacy split videos
             offset = 0.0
             if source == "original":
-                # Prefer media_identity.segment_offset_sec from analysis JSON
+                # Prefer media_identity via legacy gate (new identities always 0)
                 text_json_paths = sorted(config.texts_dir.glob(f"{idx}_*.json"))
                 if text_json_paths:
                     try:
                         data = json.loads(text_json_paths[0].read_text(encoding="utf-8"))
                         identity = load_identity(data)
-                        if identity is not None and identity.segment_offset_sec:
-                            offset = identity.segment_offset_sec
+                        offset = legacy_segment_offset_sec(identity)
                     except Exception:
                         pass
                 # Fall back to vmeta-based computation for v1 files
