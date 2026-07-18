@@ -18,7 +18,7 @@
 
 | | Feature | AI | Description |
 |---|---------|----|-------------|
-| 馃棞锔?| **Smart Compression** | | 4K 鈫?640p 路 strip audio 路 auto-split (15min) 路 ~5MB per clip |
+| 馃棞锔?| **Smart Compression** | | 4K 鈫?640p 路 strip audio 路 analyze windows for long clips 路 ~5MB per clip |
 | 馃 | **AI Video Understanding** | 鉁?Gemini | Watches footage 鈫?title / location / mood / summary / timeline |
 | 鉁嶏笍 | **AI Voiceover** | 鉁?DeepSeek | Writes narration from template + AI analysis |
 | 馃搵 | **AI Edit Planning** | 鉁?DeepSeek | AI arranges segment order, target duration, theme |
@@ -92,7 +92,7 @@ graph LR
 
 | Step | AI Engine | Command | Input 鈫?Output |
 |------|-----------|---------|---------------|
-| 1锔忊儯 Compress | | `compress` | 4K raw 鈫?640p / ~5MB / no audio / auto-split |
+| 1锔忊儯 Compress | | `compress` | 4K raw 鈫?640p / ~5MB / no audio (1 original -> 1 compressed) |
 | 2锔忊儯 馃 **AI Analysis** | **Gemini** 2.5 Flash | `analyze` | Video 鈫?AI summary + timeline JSON |
 | 3锔忊儯 鉁嶏笍 **AI Voiceover** | **DeepSeek** / OpenAI | `scripts` | Analysis 鈫?AI-generated narration |
 | 4锔忊儯 馃 **AI Transcription** | **Whisper** ASR | `transcribe` | Video 鈫?Offline speech-to-text |

@@ -13,6 +13,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | R-027 | Session logs filtering (UI) | Small | Medium |
 | R-028b | ffmpeg setup zip fallback (package manager fail → static build) | Medium | Medium |
 | R-028c | UI one-click ffmpeg install (banner action, Whisper-like) | Medium | Medium |
+| R-029d | Optional cleanup: delete dead physical-split write path / shrink legacy tests | Medium | Low |
 
 ### Deferred by choice
 
@@ -21,6 +22,33 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | JianYing real draft version compatibility | Version-specific, not generic |
 | Per-segment AI regenerate on plan rows | User declined — structural edit + full re-plan cover the need |
 | Serve-time silent ffmpeg download | Explicit user/setup only (R-028c is click; never auto on serve) |
+| Auto-migrate multi-seg artifacts → single identity | Optional; legacy read-only path covers old projects |
+
+### R-029 Remove physical video split (logical analyze windows)
+
+**Goal:** Stop writing `_segNN` as first-class media identity. Long clips stay analyzable via temp ffmpeg windows inside analyze, merged to one absolute-timeline texts JSON. Legacy split projects remain read-only compatible.
+
+**Why:** Physical split solved Gemini length limits but leaked into compress/UI/cut/export/identity (dual timebase, multi-index, B-060/B-068/B-073/B-097).
+
+**Spec / plan:** `docs/superpowers/specs/2026-07-18-remove-physical-split-design.md`, `docs/superpowers/plans/2026-07-18-remove-physical-split.md`
+
+**Phases:**
+
+| Phase | ID | Status | Notes |
+| --- | --- | --- | --- |
+| P0 | R-029a | **Done** (2026-07-18) | `is_legacy_split_*` gate in `identity.py` |
+| P1 | R-029b | **Done** (2026-07-18) | Compress never calls `split_video` |
+| P2 | R-029c | **Done** (2026-07-18) | `analyze_windows` + multi-window analyze fail-closed |
+| P3 | — | **Done** (2026-07-18) | cut/export legacy offset; UI labels; docs |
+| P4 | R-029d | Open | Optional dead-code cleanup |
+
+**Delivered:**
+- [x] Legacy gate + tests
+- [x] Compress 1 original → 1 file; `split_max_min` ignored
+- [x] Config `window_max_min` / `window_overlap_sec`; default whole-clip hard cap 0
+- [x] Temp slices under `output/.analyze_windows/`; merge absolute timeline
+- [x] cut/export use `legacy_segment_offset_sec`
+- [x] Config UI labels; README / cli-reference product copy
 
 ### R-028 ffmpeg missing-path handling
 

@@ -32,9 +32,8 @@ Outputs `[OK] xxx` or `[FAIL] xxx`, plus how many video files were found.
 Compress videos in the media folder with ffmpeg to 640p / 5MB / audio-stripped mp4 for later use.
 Does **not** invoke AI. Suitable for batch compressing first, then manual review later.
 
-Two phases:
-1. **Split (Phase 1)**: Long videos (default > 15 minutes) are first cut at keyframes into `_segNN` segments
-2. **Compress (Phase 2)**: Each split segment (and short videos that don't need splitting) is compressed individually to `compressed/`
+Compresses each original to one file under `compressed/` as `<index>_<original stem>.mp4`.
+Physical `_segNN` split is removed; long-clip AI coverage uses analyze windows (`analyze.window_max_min`).
 
 ```bash
 python main.py compress -i "E:/Videos/云南"
@@ -44,7 +43,7 @@ python main.py compress -i "E:/Videos/云南/GL010683.mp4"
 ```
 
 Output to `output/<media folder name>/compressed/`, naming format `<index>_<original filename>.mp4` (e.g. `001_GL010683.mp4`).
-Split videos are displayed grouped by original filename, e.g. `001_GL010683.mp4` (with `001_GL010683_seg00.mp4` sub-entries, etc.).
+Legacy split projects may still show grouped `_segNN` rows; new projects list one row per original/compressed file.
 Existing compressed files are automatically skipped (when `skip_existing: true`).
 
 ---
@@ -346,12 +345,10 @@ output/
 ```
 Raw Footage (input_dir)
     │
-    ├── Long videos (>15min) → split ───► _segNN segments (in compressed_dir)
-    │
-    ▼ compress
+    ▼ compress (1 original → 1 file; no physical _seg)
 640p Compressed Videos (compressed/)
     │
-    ▼ analyze (Gemini)
+    ▼ analyze (Gemini; long clips use logical windows)
 Text Analysis (texts/)
     │
     ├──► scripts ──► Voiceover script (one per media file)
