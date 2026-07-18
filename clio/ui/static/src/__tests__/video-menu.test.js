@@ -97,4 +97,22 @@ describe('buildVideoMenuItems', () => {
     );
     expect(item.title).toMatch(/压缩/);
   });
+
+  it('disables compress and transcribe when ffmpeg deps missing', () => {
+    const deps = { ok: false, detail: '未找到 ffmpeg' };
+    const items = buildVideoMenuItems({ missing: false, file: 'a.mp4' }, 'original', deps);
+    expect(items.find((i) => i.action === 'compress')?.disabled).toBe(true);
+    expect(items.find((i) => i.action === 'transcribe')?.disabled).toBe(true);
+    expect(items.find((i) => i.action === 'compress')?.title).toMatch(/ffmpeg|未找到/);
+    expect(items.find((i) => i.action === 'remove')?.disabled).toBe(false);
+  });
+
+  it('leaves compress enabled when deps ok on original online', () => {
+    const items = buildVideoMenuItems(
+      { missing: false, file: 'a.mp4' },
+      'original',
+      { ok: true, missing: [] }
+    );
+    expect(items.find((i) => i.action === 'compress')?.disabled).toBe(false);
+  });
 });

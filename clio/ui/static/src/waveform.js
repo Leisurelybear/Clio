@@ -227,6 +227,10 @@ export async function loadWaveformForCurrentVideo() {
     resetWaveform();
     return;
   }
+  if (state.deps && state.deps.ok === false) {
+    setWaveformStatus(state.deps.detail || '需要 ffmpeg');
+    return;
+  }
   const v = (state.videos || []).find((x) => x.file === file);
   const params = buildWaveformQuery(v || { file }, state.source || 'compressed');
   if (!params) {

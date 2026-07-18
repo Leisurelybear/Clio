@@ -27,6 +27,13 @@ const RUN_STEPS = [
   { key: 'label', label: '烧录序号', hint: '在压缩视频左上角标上序号便于剪映对照' },
 ];
 
+const FFMPEG_RUN_STEPS = new Set(['compress', 'label', 'transcribe']);
+
+/** True if any selected step hard-requires ffmpeg/ffprobe. */
+export function mediaStepsNeedFfmpeg(steps) {
+  return (Array.isArray(steps) ? steps : []).some((s) => FFMPEG_RUN_STEPS.has(s));
+}
+
 function loadStepSelection() {
   try {
     const raw = localStorage.getItem(STEPS_KEY);
@@ -284,6 +291,13 @@ async function startRun() {
   if (!options.steps.length) {
     updateRunStartButtonState();
     setStatus('请至少选择一个步骤', 'warn');
+    return;
+  }
+  if (state.deps && state.deps.ok === false && mediaStepsNeedFfmpeg(options.steps)) {
+    const msg = state.deps.detail || '需要 ffmpeg/ffprobe 才能运行所选步骤';
+    setStatus(msg, 'warn');
+    addToast(msg, 'warning', 6000);
+    updateRunStartButtonState();
     return;
   }
   _lastRunDay = options.day_label;
@@ -621,6 +635,7 @@ export {
   updateRunFilesBadge,
   updateRunStartButtonState,
   collectRunOptions,
+  mediaStepsNeedFfmpeg,
   _completionTargetForSteps,
   renderRunPreviewHtml,
   buildSkippedDiagnostics,

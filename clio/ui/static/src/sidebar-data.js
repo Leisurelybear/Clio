@@ -287,7 +287,7 @@ function renderVideoItem(v) {
   const stepBadges = buildVideoStepBadges(v, state.source)
     .map(s => `<span class="video-step-badge ${s.done ? 'done' : 'pending'}">${s.label}</span>`)
     .join('');
-  const menuHtml = videoMenuItemsToHtml(buildVideoMenuItems(v, state.source));
+  const menuHtml = videoMenuItemsToHtml(buildVideoMenuItems(v, state.source, state.deps));
 
   const durHtml = v.duration_sec ? `<span class="video-duration">${Math.round(v.duration_sec)}s</span>` : '';
 

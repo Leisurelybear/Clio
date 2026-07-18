@@ -23,15 +23,33 @@ export function buildVideoStepBadges(video, source) {
   ];
 }
 
+const FFMPEG_MENU_ACTIONS = new Set(['compress', 'transcribe', 'label']);
+
+/** Force-disable media actions that hard-require ffmpeg when deps.ok is false. */
+export function applyFfmpegMenuDeps(items, deps) {
+  if (!deps || deps.ok !== false || !Array.isArray(items)) return items;
+  const reason = deps.detail || '需要 ffmpeg/ffprobe';
+  return items.map((item) => {
+    if (item.action && FFMPEG_MENU_ACTIONS.has(item.action)) {
+      return { ...item, disabled: true, title: reason };
+    }
+    return item;
+  });
+}
+
 /**
+ * @param {object|null|undefined} video
+ * @param {string} source
+ * @param {{ ok?: boolean, detail?: string }|null} [deps]
  * @returns {Array<{action?: string, label?: string, disabled?: boolean, title?: string, danger?: boolean, divider?: boolean}>}
  */
-export function buildVideoMenuItems(video, source) {
+export function buildVideoMenuItems(video, source, deps = null) {
   const missing = !!video?.missing;
+  let items;
 
   if (source === 'original') {
     if (missing) {
-      return [
+      items = [
         { action: 'compress', label: '压缩视频', disabled: true, title: '文件离线' },
         { action: 'transcribe', label: 'Whisper 转录', disabled: true, title: '文件离线' },
         { divider: true },
@@ -49,52 +67,54 @@ export function buildVideoMenuItems(video, source) {
           title: '从项目中移除该视频',
         },
       ];
+    } else {
+      items = [
+        {
+          action: 'compress',
+          label: '压缩视频',
+          disabled: false,
+          title: '用 ffmpeg 将原视频压缩为 640p',
+        },
+        {
+          action: 'transcribe',
+          label: 'Whisper 转录',
+          disabled: false,
+          title: '用 faster-whisper 提取音频转文字',
+        },
+        {
+          action: 'analyze',
+          label: 'AI分析视频',
+          disabled: true,
+          title: '请先压缩视频，或切换到「压缩」视图后重跑分析',
+        },
+        {
+          action: 'voiceover',
+          label: '重跑口播文案',
+          disabled: true,
+          title: '请先压缩并完成分析，或切换到「压缩」视图',
+        },
+        {
+          action: 'all',
+          label: '重跑全部',
+          disabled: true,
+          title: '请先压缩视频，或切换到「压缩」视图',
+        },
+        { divider: true },
+        {
+          action: 'remove',
+          label: '从项目移除',
+          disabled: false,
+          danger: true,
+          title: '从项目中移除该视频',
+        },
+      ];
     }
-    return [
-      {
-        action: 'compress',
-        label: '压缩视频',
-        disabled: false,
-        title: '用 ffmpeg 将原视频压缩为 640p',
-      },
-      {
-        action: 'transcribe',
-        label: 'Whisper 转录',
-        disabled: false,
-        title: '用 faster-whisper 提取音频转文字',
-      },
-      {
-        action: 'analyze',
-        label: 'AI分析视频',
-        disabled: true,
-        title: '请先压缩视频，或切换到「压缩」视图后重跑分析',
-      },
-      {
-        action: 'voiceover',
-        label: '重跑口播文案',
-        disabled: true,
-        title: '请先压缩并完成分析，或切换到「压缩」视图',
-      },
-      {
-        action: 'all',
-        label: '重跑全部',
-        disabled: true,
-        title: '请先压缩视频，或切换到「压缩」视图',
-      },
-      { divider: true },
-      {
-        action: 'remove',
-        label: '从项目移除',
-        disabled: false,
-        danger: true,
-        title: '从项目中移除该视频',
-      },
-    ];
+    return applyFfmpegMenuDeps(items, deps);
   }
 
   // compressed view
   if (missing) {
-    return [
+    items = [
       {
         action: 'compress',
         label: '压缩视频',
@@ -134,9 +154,10 @@ export function buildVideoMenuItems(video, source) {
         title: '从项目视频列表移除对应原片（若能解析）',
       },
     ];
+    return applyFfmpegMenuDeps(items, deps);
   }
 
-  return [
+  items = [
     {
       action: 'compress',
       label: '压缩视频',
@@ -176,6 +197,7 @@ export function buildVideoMenuItems(video, source) {
       title: '从项目视频列表移除对应原片（若能解析）',
     },
   ];
+  return applyFfmpegMenuDeps(items, deps);
 }
 
 /** Render menu item descriptors to HTML for portal clone. */
