@@ -254,15 +254,20 @@ class TestResolveBinaryContract:
         assert len(out["peaks"]) > 0
 
     def test_route_must_not_default_empty_config_to_bare_name(self):
-        """Empty paths.ffmpeg must stay '' so resolve_binary discovers PATH."""
+        """Empty paths.ffmpeg must stay '' so resolve_binary discovers PATH.
+
+        Must not require a real ffmpeg install (CI runners often have none).
+        """
         # Mimic the fixed route: do not coerce empty -> "ffmpeg"
         paths_ffmpeg = ""
         ffmpeg = paths_ffmpeg or ""
         assert ffmpeg == ""
         from clio.utils import resolve_binary
 
-        discovered = resolve_binary(ffmpeg, "ffmpeg")
-        assert discovered
+        with patch("clio.utils.discover_ffmpeg_bin", return_value="C:/fake/ffmpeg.exe"):
+            discovered = resolve_binary(ffmpeg, "ffmpeg")
+        assert discovered == "C:/fake/ffmpeg.exe"
+        # Bare name is treated as a configured path (file), not PATH discovery.
         with pytest.raises(FileNotFoundError):
             resolve_binary("ffmpeg", "ffmpeg")
 
@@ -304,14 +309,23 @@ class TestOrphanLockRecovery:
                 "status": "ready",
             }
 
+        deps_ok = {
+            "ok": True,
+            "ffmpeg": "C:/fake/ffmpeg.exe",
+            "ffprobe": "C:/fake/ffprobe.exe",
+            "missing": [],
+            "detail": "",
+        }
         with (
+            patch("clio.utils.probe_ffmpeg_deps", return_value=deps_ok),
             patch.object(wf, "extract_peaks_for_video", side_effect=_fake_extract),
             patch.object(wf, "_spawn_job", side_effect=lambda fn: fn()),
         ):
             out = wf.ensure_waveform(tmp_path, src, ffmpeg="")
         assert out["status"] in ("ready", "pending")
         if out["status"] == "pending":
-            out2 = wf.ensure_waveform(tmp_path, src, ffmpeg="")
+            with patch("clio.utils.probe_ffmpeg_deps", return_value=deps_ok):
+                out2 = wf.ensure_waveform(tmp_path, src, ffmpeg="")
             assert out2["status"] == "ready"
 
 
