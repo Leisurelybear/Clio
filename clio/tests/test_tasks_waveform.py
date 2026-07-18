@@ -129,17 +129,26 @@ class TestLockAndReadWrite:
                 "status": "ready",
             }
 
+        deps_ok = {
+            "ok": True,
+            "ffmpeg": "C:/fake/ffmpeg.exe",
+            "ffprobe": "C:/fake/ffprobe.exe",
+            "missing": [],
+            "detail": "",
+        }
         with (
+            patch("clio.utils.probe_ffmpeg_deps", return_value=deps_ok),
             patch.object(wf, "extract_peaks_for_video", side_effect=_fake_extract),
             patch.object(wf, "_spawn_job", side_effect=lambda fn: fn()),  # run inline
         ):
-            out = wf.ensure_waveform(tmp_path, src, ffmpeg="ffmpeg", audio_source="original")
+            out = wf.ensure_waveform(tmp_path, src, ffmpeg="", audio_source="original")
         # After inline job completes, ensure may return ready; if design returns pending first:
         # accept either ready (sync complete) or pending then ready on second call.
         assert out["status"] in ("ready", "pending")
         if out["status"] == "pending":
             assert wf.lock_status(tmp_path, key) in ("pending", "none")
-            out2 = wf.ensure_waveform(tmp_path, src, ffmpeg="ffmpeg")
+            with patch("clio.utils.probe_ffmpeg_deps", return_value=deps_ok):
+                out2 = wf.ensure_waveform(tmp_path, src, ffmpeg="")
             assert out2["status"] == "ready"
             assert out2["peaks"] == [0.1, 0.9]
         else:
@@ -154,8 +163,18 @@ class TestErrorCooldown:
         ep = wf.error_path(tmp_path, key)
         ep.parent.mkdir(parents=True, exist_ok=True)
         ep.write_text("boom", encoding="utf-8")
-        with patch.object(wf, "extract_peaks_for_video") as ex:
-            out = wf.ensure_waveform(tmp_path, src, ffmpeg="ffmpeg")
+        deps_ok = {
+            "ok": True,
+            "ffmpeg": "C:/fake/ffmpeg.exe",
+            "ffprobe": "C:/fake/ffprobe.exe",
+            "missing": [],
+            "detail": "",
+        }
+        with (
+            patch("clio.utils.probe_ffmpeg_deps", return_value=deps_ok),
+            patch.object(wf, "extract_peaks_for_video") as ex,
+        ):
+            out = wf.ensure_waveform(tmp_path, src, ffmpeg="")
         assert out["status"] == "error"
         assert "boom" in out["error"]
         ex.assert_not_called()
@@ -184,11 +203,19 @@ class TestErrorCooldown:
                 "status": "ready",
             }
 
+        deps_ok = {
+            "ok": True,
+            "ffmpeg": "C:/fake/ffmpeg.exe",
+            "ffprobe": "C:/fake/ffprobe.exe",
+            "missing": [],
+            "detail": "",
+        }
         with (
+            patch("clio.utils.probe_ffmpeg_deps", return_value=deps_ok),
             patch.object(wf, "extract_peaks_for_video", side_effect=_fake_extract),
             patch.object(wf, "_spawn_job", side_effect=lambda fn: fn()),
         ):
-            out = wf.ensure_waveform(tmp_path, src, ffmpeg="ffmpeg")
+            out = wf.ensure_waveform(tmp_path, src, ffmpeg="")
         assert out["status"] in ("ready", "pending")
 
 
@@ -286,3 +313,81 @@ class TestOrphanLockRecovery:
         if out["status"] == "pending":
             out2 = wf.ensure_waveform(tmp_path, src, ffmpeg="")
             assert out2["status"] == "ready"
+
+
+class TestMissingBinaryEarlyFail:
+    def test_ensure_missing_binary_no_lock_no_error_file(self, tmp_path: Path):
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+        key = wf.cache_key(src)
+
+        with (
+            patch(
+                "clio.utils.probe_ffmpeg_deps",
+                return_value={
+                    "ok": False,
+                    "ffmpeg": None,
+                    "ffprobe": None,
+                    "missing": ["ffmpeg", "ffprobe"],
+                    "detail": "未找到 ffmpeg、ffprobe。请运行 setup…",
+                },
+            ),
+            patch.object(wf, "extract_peaks_for_video") as ex,
+            patch.object(wf, "_spawn_job") as spawn,
+        ):
+            out = wf.ensure_waveform(tmp_path, src, ffmpeg="", ffprobe="")
+        assert out["status"] == "error"
+        assert out.get("code") == "missing_binary"
+        assert "ffmpeg" in out["error"].lower() or "找不到" in out["error"] or "未找到" in out["error"]
+        assert not wf.lock_path(tmp_path, key).exists()
+        assert not wf.error_path(tmp_path, key).exists()
+        ex.assert_not_called()
+        spawn.assert_not_called()
+
+    def test_ensure_missing_binary_retries_immediately_next_call(self, tmp_path: Path):
+        """No cool-down: second call after install can succeed without waiting 60s."""
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+        key = wf.cache_key(src)
+
+        with patch(
+            "clio.utils.probe_ffmpeg_deps",
+            return_value={
+                "ok": False,
+                "ffmpeg": None,
+                "ffprobe": None,
+                "missing": ["ffmpeg"],
+                "detail": "未找到 ffmpeg",
+            },
+        ):
+            out1 = wf.ensure_waveform(tmp_path, src, ffmpeg="")
+        assert out1["status"] == "error"
+        assert not wf.error_path(tmp_path, key).exists()
+
+        def _fake_extract(video_path, ffmpeg, duration_sec=None, audio_source="original", ffprobe=""):
+            return {
+                "version": 1,
+                "source_path": str(video_path),
+                "audio_source": audio_source,
+                "duration_sec": 1.0,
+                "bin_count": 400,
+                "peaks": [0.5],
+                "status": "ready",
+            }
+
+        with (
+            patch(
+                "clio.utils.probe_ffmpeg_deps",
+                return_value={
+                    "ok": True,
+                    "ffmpeg": "C:/fake/ffmpeg.exe",
+                    "ffprobe": "C:/fake/ffprobe.exe",
+                    "missing": [],
+                    "detail": "",
+                },
+            ),
+            patch.object(wf, "extract_peaks_for_video", side_effect=_fake_extract),
+            patch.object(wf, "_spawn_job", side_effect=lambda fn: fn()),
+        ):
+            out2 = wf.ensure_waveform(tmp_path, src, ffmpeg="")
+        assert out2["status"] in ("ready", "pending")

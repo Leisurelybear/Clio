@@ -285,6 +285,17 @@ def ensure_waveform(
         ready = read_peaks(project_output, key)
         if ready is not None:
             return ready
+        # Missing binary is an environment issue — do not lock or cool-down.
+        from clio.utils import probe_ffmpeg_deps
+
+        deps = probe_ffmpeg_deps(ffmpeg or "", ffprobe or "")
+        if not deps["ok"]:
+            return {
+                "status": "error",
+                "error": deps["detail"] or "找不到 ffmpeg/ffprobe",
+                "code": "missing_binary",
+                "key": key,
+            }
         err_msg = recent_error(project_output, key)
         if err_msg is not None:
             return {"status": "error", "error": err_msg, "key": key}
