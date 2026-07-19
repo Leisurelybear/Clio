@@ -244,6 +244,17 @@ function applyTimelineBound(segIndex, which) {
   const next = setTimelineBound(p.sequence[segIndex].use_timeline || '', which, sec);
   p.sequence[segIndex] = patchSegment(p.sequence[segIndex], { use_timeline: next });
   markDirty();
+  // Prefer in-place DOM update so focus/IME in the expanded panel survive.
+  const li = document.querySelector(`#plan-list [data-preview-index="${segIndex}"]`);
+  if (li) {
+    const headerTl = li.querySelector('.plan-seg-tl');
+    if (headerTl) headerTl.textContent = next || '—';
+    const input = li.querySelector('input[data-k="use_timeline"]');
+    if (input && document.activeElement !== input) input.value = next;
+    else if (input && document.activeElement === input) input.value = next;
+    scheduleReadinessCheck();
+    return;
+  }
   renderPlan();
 }
 

@@ -22,6 +22,16 @@ function _syncPlanExpandFromPreview() {
     const editingLi = ae.closest('[data-preview-index]');
     const editingIdx = editingLi ? parseInt(editingLi.dataset.previewIndex, 10) : NaN;
     if (Number.isFinite(editingIdx) && editingIdx !== state.previewIndex) {
+      // Catch up expand once the user leaves the field (do not leave accordion
+      // permanently lagging previewIndex).
+      if (!ae.dataset.planExpandResyncBound) {
+        ae.dataset.planExpandResyncBound = '1';
+        ae.addEventListener('blur', () => {
+          delete ae.dataset.planExpandResyncBound;
+          // Defer past focus move so activeElement is no longer this field
+          setTimeout(() => _syncPlanExpandFromPreview(), 0);
+        }, { once: true });
+      }
       return;
     }
   }
