@@ -1,7 +1,7 @@
 # Design: Plan preview chrome + composite waveform (R-031a polish / R-031a2)
 
 **Date**: 2026-07-19  
-**Status**: Approved for implementation  
+**Status**: **Implemented** on `main` (2026-07-19)  
 **Scope**: Plan-tab player chrome only — classic progress fill + playhead; composite peaks waveform on the plan global timebase  
 **Roadmap**: Follow-up to **R-031a** (global scrub on source media). Does **not** implement R-031b (cut/concat media).  
 **Depends on**: R-031a shipped (`plan-timeline.js`, `seekToGlobal`, `previewGlobalSec`)

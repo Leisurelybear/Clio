@@ -3,8 +3,13 @@ import { $, fmtTime, setStatus, escapeHtml, clearDirty } from './utils.js';
 import { icon } from './api.js';
 import {
   loadWaveformForCurrentVideo,
+  loadPlanWaveform,
+  recomposePlanWaveformFromCache,
+  setWaveformPlanBridge,
   updateWaveformPlayhead,
   bindWaveformScrub,
+  getPlanWaveformTotal,
+  isPlanWaveformMode,
 } from './waveform.js';
 import {
   buildTimeline,
@@ -33,11 +38,19 @@ function updateCompositeClock() {
   if (el) el.textContent = `成片 ${fmtTime(g)} / ${fmtTime(tl.total)}`;
 }
 
-function _updatePlayheadDom(tl) {
+function softUpdatePreviewChrome(tl) {
+  const timeline = tl || getPlanTimeline();
+  const total = timeline?.total || 0;
+  const g = total > 0 ? clampGlobal(timeline, state.previewGlobalSec) : 0;
+  const pct = total > 0 ? (g / total) * 100 : 0;
   const ph = $('preview-playhead');
-  if (!ph || !tl || tl.total <= 0) return;
-  const g = clampGlobal(tl, state.previewGlobalSec);
-  ph.style.left = `${(g / tl.total) * 100}%`;
+  if (ph) ph.style.left = `${pct}%`;
+  const fill = $('preview-progress-fill');
+  if (fill) fill.style.width = `${pct}%`;
+}
+
+function _updatePlayheadDom(tl) {
+  softUpdatePreviewChrome(tl);
 }
 
 function _syncPlanExpandFromPreview() {
@@ -110,7 +123,9 @@ function _loadAndSeekSource(v, seekSec, wantPlay) {
     const absParam = v?.abs_path ? `&abspath=${encodeURIComponent(v.abs_path)}` : '';
     player.src = `/api/video?file=${encodeURIComponent(v.file)}&source=${state.source}${absParam}${projParam}${extraParam}`;
   }
-  loadWaveformForCurrentVideo();
+  if (!isGlobalTimelineUi()) {
+    loadWaveformForCurrentVideo();
+  }
 }
 
 function playVideoSegment(file, seekTo) {
@@ -143,7 +158,8 @@ function seekToGlobal(globalSec, opts = {}) {
   if (!v) {
     setStatus(`跳过视频 [${loc.videoIndex}]，找不到对应文件`, 'warn');
     updateCompositeClock();
-    renderPreviewBar();
+    softUpdatePreviewChrome(tl);
+    _softUpdateSegBlockClasses(loc.segIndex);
     if (opts.syncExpand !== false) _syncPlanExpandFromPreview();
     return;
   }
@@ -176,8 +192,28 @@ function seekToGlobal(globalSec, opts = {}) {
   }
 
   updateCompositeClock();
-  renderPreviewBar();
+  softUpdatePreviewChrome(tl);
+  _softUpdateSegBlockClasses(loc.segIndex);
+  updateWaveformPlayhead(player);
   if (opts.syncExpand !== false) _syncPlanExpandFromPreview();
+}
+
+function _softUpdateSegBlockClasses(activeIndex) {
+  const segBar = $('preview-seg-bar');
+  if (!segBar) return;
+  segBar.querySelectorAll('.preview-seg-block').forEach((el) => {
+    const i = parseInt(el.dataset.seg, 10);
+    el.classList.remove('done', 'active', 'pending');
+    if (activeIndex < 0 || !Number.isFinite(i)) {
+      el.classList.add('pending');
+    } else if (i < activeIndex) {
+      el.classList.add('done');
+    } else if (i === activeIndex) {
+      el.classList.add('active');
+    } else {
+      el.classList.add('pending');
+    }
+  });
 }
 
 function _advanceToNextPlayable() {
@@ -192,13 +228,27 @@ function _advanceToNextPlayable() {
   seekToGlobal(tl.segments[next].globalStart, { play: true });
 }
 
-// ── Preview bar (R-012 / R-031a global scrub) ──────────────────
+// ── Preview bar (R-012 / R-031a global scrub + R-031a2 chrome) ──
+let _wasPlanBar = false;
+
 function renderPreviewBar() {
   const bar = $('preview-bar');
   if (!bar) return;
   const isPlan = state.currentEntity === 'plan';
   bar.style.display = isPlan ? 'flex' : 'none';
-  if (!isPlan) return;
+
+  if (!isPlan) {
+    if (_wasPlanBar) {
+      _wasPlanBar = false;
+      // Restore single-source waveform when leaving plan entity.
+      loadWaveformForCurrentVideo();
+    }
+    return;
+  }
+
+  const enteringPlan = !_wasPlanBar;
+  _wasPlanBar = true;
+
   const p = state.plan;
   const segBar = $('preview-seg-bar');
   if (!segBar) return;
@@ -226,7 +276,9 @@ function renderPreviewBar() {
   const pct = tl.total > 0
     ? (clampGlobal(tl, state.previewGlobalSec) / tl.total) * 100
     : 0;
-  segBar.innerHTML = `${segHtml}<div class="preview-playhead" id="preview-playhead" style="left:${pct}%"></div>`;
+  segBar.innerHTML = `${segHtml}`
+    + `<div class="preview-progress-fill" id="preview-progress-fill" style="width:${pct}%"></div>`
+    + `<div class="preview-playhead" id="preview-playhead" style="left:${pct}%"></div>`;
 
   segBar.querySelectorAll('.preview-seg-block').forEach((el) => {
     el.onclick = (e) => {
@@ -239,6 +291,9 @@ function renderPreviewBar() {
   });
 
   if (isGlobalTimelineUi()) updateCompositeClock();
+  if (enteringPlan || !isPlanWaveformMode()) {
+    loadPlanWaveform();
+  }
 }
 
 let _scrubbing = false;
@@ -264,8 +319,9 @@ function _setupPreviewBarDrag() {
     const hit = globalFromEvent(e);
     if (!hit) return;
     state.previewGlobalSec = hit.g;
-    _updatePlayheadDom(hit.tl);
+    softUpdatePreviewChrome(hit.tl);
     updateCompositeClock();
+    updateWaveformPlayhead($('player'));
     const now = performance.now();
     if (now - _lastSeekTs >= 50) {
       _lastSeekTs = now;
@@ -468,6 +524,16 @@ function setupPlayer() {
     speedSel.onchange = () => { player.playbackRate = parseFloat(speedSel.value); };
   }
 
+  setWaveformPlanBridge({
+    isPlan: () => isGlobalTimelineUi() && isPlanWaveformMode(),
+    seekGlobal: (sec) => seekToGlobal(sec, { play: false }),
+    getGlobalRatio: () => {
+      const total = getPlanWaveformTotal() || getPlanTimeline().total || 0;
+      if (!(total > 0)) return 0;
+      return Math.max(0, Math.min(1, state.previewGlobalSec / total));
+    },
+    getGlobalSec: () => state.previewGlobalSec || 0,
+  });
   bindWaveformScrub(player);
 
   player.ontimeupdate = () => {
@@ -482,7 +548,7 @@ function setupPlayer() {
         const planSec = Math.max(0, player.currentTime - offset);
         const local = Math.min(seg.duration, Math.max(0, planSec - seg.planStart));
         state.previewGlobalSec = localToGlobal(tl, state.previewIndex, local);
-        _updatePlayheadDom(tl);
+        softUpdatePreviewChrome(tl);
       }
       updateCompositeClock();
     } else {
@@ -567,4 +633,5 @@ export {
   setupPlayer,
   renderPreviewBar,
   seekToGlobal,
+  softUpdatePreviewChrome,
 };

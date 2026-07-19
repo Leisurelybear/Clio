@@ -1,6 +1,8 @@
 import { state } from './state.js';
 import { api } from './api.js';
 import { $ } from './utils.js';
+import { buildTimeline } from './plan-timeline.js';
+import { composePlanPeaks } from './plan-waveform.js';
 
 /** @type {number} */
 let _pollToken = 0;
@@ -8,6 +10,24 @@ let _pollToken = 0;
 let _lastPeaks = [];
 /** @type {ReturnType<typeof setTimeout> | null} */
 let _pollTimer = null;
+
+/** @type {'source' | 'plan'} */
+let _mode = 'source';
+/** @type {number} */
+let _planTotal = 0;
+/**
+ * @type {null | {
+ *   isPlan: () => boolean,
+ *   seekGlobal: (sec: number) => void,
+ *   getGlobalRatio: () => number,
+ *   getGlobalSec: () => number,
+ * }}
+ */
+let _planBridge = null;
+/** @type {Map<string, { peaks: number[], duration_sec: number } | 'pending' | null>} */
+let _planCache = new Map();
+/** @type {number} */
+let _planLoadToken = 0;
 
 export function timeFromClientX(clientX, barRect, duration) {
   const dur = Number(duration);
@@ -101,13 +121,28 @@ function _barEls() {
   };
 }
 
+export function setWaveformPlanBridge(bridge) {
+  _planBridge = bridge || null;
+}
+
+export function isPlanWaveformMode() {
+  return _mode === 'plan';
+}
+
+export function getPlanWaveformTotal() {
+  return _planTotal;
+}
+
 export function resetWaveform() {
   _pollToken += 1;
+  _planLoadToken += 1;
   if (_pollTimer) {
     clearTimeout(_pollTimer);
     _pollTimer = null;
   }
   _lastPeaks = [];
+  _mode = 'source';
+  _planTotal = 0;
   const { bar, canvas, playhead, status } = _barEls();
   if (bar) {
     bar.hidden = true;
@@ -143,7 +178,7 @@ export function setWaveformPeaks(peaksPayload) {
   const { bar, canvas, playhead, status } = _barEls();
   if (!bar || !canvas) return;
   bar.hidden = false;
-  if (status) status.textContent = '';
+  if (status && !peaksPayload?.keepStatus) status.textContent = '';
   if (_lastPeaks.length) bar.classList.add('has-peaks');
   else bar.classList.remove('has-peaks');
   drawWaveform(canvas, _lastPeaks);
@@ -153,9 +188,14 @@ export function setWaveformPeaks(peaksPayload) {
 export function updateWaveformPlayhead(player) {
   const { bar, playhead } = _barEls();
   if (!bar || !playhead || bar.hidden || !_lastPeaks.length) return;
-  const ratio = playheadRatio(player?.currentTime, player?.duration);
+  let ratio = 0;
+  if (_mode === 'plan' && _planBridge?.isPlan?.()) {
+    ratio = _planBridge.getGlobalRatio() || 0;
+  } else {
+    ratio = playheadRatio(player?.currentTime, player?.duration);
+  }
   playhead.hidden = false;
-  playhead.style.left = `${ratio * 100}%`;
+  playhead.style.left = `${Math.max(0, Math.min(1, ratio)) * 100}%`;
 }
 
 export function bindWaveformScrub(player) {
@@ -166,9 +206,17 @@ export function bindWaveformScrub(player) {
   let dragging = false;
 
   const seekFromEvent = (e) => {
-    if (!player || !(player.duration > 0)) return;
     const rect = bar.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+
+    if (_mode === 'plan' && _planBridge?.isPlan?.() && _planTotal > 0) {
+      const g = timeFromClientX(clientX, rect, _planTotal);
+      _planBridge.seekGlobal(g);
+      updateWaveformPlayhead(player);
+      return;
+    }
+
+    if (!player || !(player.duration > 0)) return;
     const t = timeFromClientX(clientX, rect, player.duration);
     try {
       player.currentTime = t;
@@ -211,12 +259,183 @@ async function _fetchWaveform(params, token) {
     if (v != null && v !== '') qs.set(k, v);
   }
   const body = await api('GET', `/api/waveform?${qs.toString()}`);
-  if (token !== _pollToken) return null;
+  if (token !== _pollToken && token !== _planLoadToken) return null;
   return body;
 }
 
+function _applyPlanCompose(statusText) {
+  const seq = state.plan?.sequence || [];
+  const tl = buildTimeline(seq);
+  /** @type {Record<string, any>} */
+  const by = {};
+  for (const [k, v] of _planCache.entries()) by[k] = v;
+  const composed = composePlanPeaks(tl, by);
+  _planTotal = composed.total;
+  setWaveformPeaks({
+    peaks: composed.peaks,
+    keepStatus: Boolean(statusText),
+  });
+  const { status } = _barEls();
+  if (status && statusText) status.textContent = statusText;
+  else if (status && !statusText) status.textContent = '';
+  const player = $('player');
+  if (player) updateWaveformPlayhead(player);
+  return composed;
+}
+
+export function recomposePlanWaveformFromCache() {
+  if (_mode !== 'plan') return;
+  const missing = [];
+  for (const [k, v] of _planCache.entries()) {
+    if (v === 'pending' || v == null) missing.push(k);
+  }
+  const statusText = missing.length ? '部分波形生成中…' : '';
+  _applyPlanCompose(statusText);
+}
+
+/**
+ * Load and stitch peaks for all unique video indexes in the current plan.
+ */
+export async function loadPlanWaveform() {
+  const seq = state.plan?.sequence;
+  if (!Array.isArray(seq) || !seq.length) {
+    resetWaveform();
+    return;
+  }
+  if (state.deps && state.deps.ok === false) {
+    _mode = 'plan';
+    setWaveformStatus(state.deps.detail || '需要 ffmpeg');
+    return;
+  }
+
+  const token = ++_planLoadToken;
+  _pollToken = token; // cancel any source-mode poll
+  if (_pollTimer) {
+    clearTimeout(_pollTimer);
+    _pollTimer = null;
+  }
+  _mode = 'plan';
+
+  const tl = buildTimeline(seq);
+  _planTotal = tl.total;
+  const indexes = [...new Set(
+    tl.segments.map((s) => s.videoIndex).filter(Boolean),
+  )];
+
+  if (!indexes.length || tl.total <= 0) {
+    setWaveformStatus('无可预览波形');
+    return;
+  }
+
+  setWaveformStatus('波形生成中…');
+
+  /** @type {string[]} */
+  let pendingKeys = [];
+
+  await Promise.all(indexes.map(async (idx) => {
+    if (token !== _planLoadToken) return;
+    const v = (state.videos || []).find((x) => String(x.index) === String(idx));
+    if (!v) {
+      _planCache.set(idx, null);
+      return;
+    }
+    const params = buildWaveformQuery(v, state.source || 'compressed');
+    if (!params) {
+      _planCache.set(idx, null);
+      return;
+    }
+    try {
+      const body = await _fetchWaveform(params, token);
+      if (token !== _planLoadToken || !body) return;
+      if (body.status === 'pending') {
+        _planCache.set(idx, 'pending');
+        pendingKeys.push(idx);
+        return;
+      }
+      if (body.status === 'error' || (!Array.isArray(body.peaks) && body.status !== 'ready')) {
+        _planCache.set(idx, null);
+        return;
+      }
+      const peaks = Array.isArray(body.peaks) ? body.peaks : [];
+      _planCache.set(idx, {
+        peaks,
+        duration_sec: Number(body.duration_sec) || 0,
+      });
+    } catch {
+      if (token !== _planLoadToken) return;
+      _planCache.set(idx, null);
+    }
+  }));
+
+  if (token !== _planLoadToken) return;
+
+  // Drop cache keys not in this plan
+  for (const k of [..._planCache.keys()]) {
+    if (!indexes.includes(k)) _planCache.delete(k);
+  }
+
+  pendingKeys = indexes.filter((i) => _planCache.get(i) === 'pending');
+  const readyCount = indexes.filter((i) => {
+    const e = _planCache.get(i);
+    return e && e !== 'pending' && Array.isArray(e.peaks);
+  }).length;
+  const statusText = pendingKeys.length
+    ? (readyCount ? '部分波形生成中…' : '波形生成中…')
+    : (readyCount ? '' : '无可用音频源');
+
+  _applyPlanCompose(statusText);
+
+  if (pendingKeys.length && token === _planLoadToken) {
+    const pollPending = async (attempt) => {
+      if (token !== _planLoadToken) return;
+      let still = [];
+      await Promise.all(pendingKeys.map(async (idx) => {
+        const v = (state.videos || []).find((x) => String(x.index) === String(idx));
+        if (!v) {
+          _planCache.set(idx, null);
+          return;
+        }
+        const params = buildWaveformQuery(v, state.source || 'compressed');
+        if (!params) {
+          _planCache.set(idx, null);
+          return;
+        }
+        try {
+          const body = await _fetchWaveform(params, token);
+          if (token !== _planLoadToken || !body) return;
+          if (body.status === 'pending') {
+            still.push(idx);
+            return;
+          }
+          if (Array.isArray(body.peaks) || body.status === 'ready') {
+            _planCache.set(idx, {
+              peaks: Array.isArray(body.peaks) ? body.peaks : [],
+              duration_sec: Number(body.duration_sec) || 0,
+            });
+            return;
+          }
+          _planCache.set(idx, null);
+        } catch {
+          _planCache.set(idx, null);
+        }
+      }));
+      if (token !== _planLoadToken) return;
+      pendingKeys = still;
+      const st = pendingKeys.length ? '部分波形生成中…' : '';
+      _applyPlanCompose(st);
+      if (pendingKeys.length && attempt < 120) {
+        _pollTimer = setTimeout(() => pollPending(attempt + 1), 2500);
+      }
+    };
+    _pollTimer = setTimeout(() => pollPending(0), 2500);
+  }
+}
+
 export async function loadWaveformForCurrentVideo() {
+  _mode = 'source';
+  _planTotal = 0;
   const token = ++_pollToken;
+  _planLoadToken = token; // cancel plan loads
   if (_pollTimer) {
     clearTimeout(_pollTimer);
     _pollTimer = null;
@@ -269,7 +488,6 @@ export async function loadWaveformForCurrentVideo() {
       if (token !== _pollToken) return;
       const msg = err?.message || '波形加载失败';
       const status = err?.status;
-      // 404 no media; 503 cool-down after extract failure (api() throws on !ok)
       if (status === 404 || String(msg).includes('404') || String(msg).includes('no media')) {
         setWaveformStatus('无可用音频源');
       } else if (status === 503) {

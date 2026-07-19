@@ -3,6 +3,7 @@ import { $, escapeHtml, markDirty, clearDirty, updateSidebarDay, setStatus } fro
 import { api, icon } from './api.js';
 import { renderPreviewBar, startPreview, _playPreviewSegment } from './viewer.js';
 import { buildTimeline, clampGlobal } from './plan-timeline.js';
+import { recomposePlanWaveformFromCache, isPlanWaveformMode } from './waveform.js';
 import { addToast } from './toast.js';
 import { resolveEditorSaveTarget } from './editor-save.js';
 import {
@@ -284,6 +285,7 @@ function _refreshPreviewTimeline() {
   const tl = buildTimeline(seq);
   state.previewGlobalSec = clampGlobal(tl, state.previewGlobalSec);
   renderPreviewBar();
+  if (isPlanWaveformMode()) recomposePlanWaveformFromCache();
 }
 
 function promptInsertAfter(afterIndex) {

@@ -856,42 +856,71 @@ button.match-badge:focus-visible { outline: 2px solid var(--border-focus); outli
   max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .preview-seg-bar {
-  display: flex; flex: 1; height: 24px;
+  display: flex; flex: 1; height: 28px;
   background: var(--bg-surface-2); border-radius: 4px;
-  cursor: ew-resize; overflow: hidden; min-width: 80px;
+  cursor: ew-resize; overflow: visible; min-width: 80px;
   position: relative;
+}
+.preview-progress-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 4px 0 0 4px;
 }
 .preview-playhead {
   position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  margin-left: -1px;
+  top: -3px;
+  bottom: -3px;
+  width: 3px;
+  margin-left: -1.5px;
   background: var(--accent);
-  box-shadow: 0 0 4px var(--accent-glow, rgba(96, 165, 250, 0.6));
+  box-shadow: 0 0 6px var(--accent-glow, rgba(96, 165, 250, 0.75));
   pointer-events: none;
-  z-index: 2;
+  z-index: 3;
+  border-radius: 1px;
+}
+.preview-playhead::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-top: 6px solid var(--accent);
 }
 .preview-seg-block {
   height: 100%; transition: background var(--transition-fast);
   border-right: 1px solid var(--bg-base);
   display: flex; align-items: center; justify-content: center;
   overflow: hidden; position: relative;
+  z-index: 0;
+  background: var(--border);
 }
 .preview-seg-block:last-child { border-right: none; }
-.preview-seg-block:hover { opacity: 0.85; filter: brightness(1.2); }
-.preview-seg-block.done { background: var(--text-tertiary); }
-.preview-seg-block.active { background: var(--accent); }
+.preview-seg-block:hover { filter: brightness(1.15); }
+.preview-seg-block.done { background: color-mix(in srgb, var(--text-tertiary) 55%, var(--bg-surface-2)); }
+.preview-seg-block.active {
+  background: color-mix(in srgb, var(--accent) 18%, var(--bg-surface-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent);
+}
 .preview-seg-block.pending { background: var(--border); }
 .preview-seg-label {
   font-size: 9px; line-height: 1; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; max-width: 100%;
-  color: var(--text-primary); opacity: 0.85; pointer-events: none;
+  color: var(--text-muted); opacity: 0.45; pointer-events: none;
   padding: 0 2px; font-weight: 500;
 }
 .preview-seg-block.done .preview-seg-label,
 .preview-seg-block.pending .preview-seg-label { color: var(--text-muted); }
-.preview-seg-block.active .preview-seg-label { color: #fff; font-weight: 600; }
+.preview-seg-block.active .preview-seg-label { color: var(--accent); opacity: 0.75; font-weight: 600; }
 
 .player-tip { color: var(--text-muted); font-size: var(--text-xs); padding: var(--space-1) var(--space-4); }
 

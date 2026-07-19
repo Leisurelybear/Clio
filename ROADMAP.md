@@ -41,6 +41,13 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] Auto-advance across segments via next playable; accordion follows `previewIndex` without requiring continuous play
 - [x] Spec/plan: `docs/superpowers/specs|plans/2026-07-19-plan-global-preview-timeline*`
 
+**R-031a2 (chrome + composite waveform):**
+- [x] Classic progress fill + cap playhead; muted segment blocks (no solid accent slab)
+- [x] Soft-update fill/playhead during play/scrub
+- [x] Client-stitched plan peaks (`plan-waveform.js`) on Σ `use_timeline`; scrub uses `seekToGlobal`
+- [x] Skip single-file waveform reload on plan source hop; leave Plan restores source waveform
+- Spec/plan: `docs/superpowers/specs|plans/2026-07-19-plan-preview-chrome-waveform*`
+
 **R-031b (open):**
 1. Prefer existing cut clips under `output/cuts/<day>/` when present.
 2. If a day-level concat / export composite exists, prefer that single file.
