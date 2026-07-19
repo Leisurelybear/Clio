@@ -60,7 +60,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Expanded: timeline edit + 起点/终点 · reason | voiceover · ↑↓ / 插入 / 删除 (ghost buttons)
 - Was briefly B; user re-evaluated toward C for scan density
 
-**Status:** Spec approved for planning — `docs/superpowers/specs/2026-07-19-plan-seg-card-density-design.md`
+**Status:** Plan ready — spec `docs/superpowers/specs/2026-07-19-plan-seg-card-density-design.md`, plan `docs/superpowers/plans/2026-07-19-plan-seg-card-density.md`
 
 ### R-029 Remove physical video split (logical analyze windows)
 
