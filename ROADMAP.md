@@ -5,7 +5,7 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
-## Remaining Open Items (2026-07-18)
+## Remaining Open Items (2026-07-19)
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
@@ -14,6 +14,8 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | R-028b | ffmpeg setup zip fallback (package manager fail → static build) | Medium | Medium |
 | R-028c | UI one-click ffmpeg install (banner action, Whisper-like) | Medium | Medium |
 | R-029d | Optional cleanup: delete dead physical-split write path / shrink legacy tests | Medium | Low |
+| R-030 | Plan tab segment card density + action button style alignment | Small | Medium |
+| R-031 | Plan preview: play composite / cut output, not source-video hopping | Medium | High |
 
 ### Deferred by choice
 
@@ -23,6 +25,42 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | Per-segment AI regenerate on plan rows | User declined — structural edit + full re-plan cover the need |
 | Serve-time silent ffmpeg download | Explicit user/setup only (R-028c is click; never auto on serve) |
 | Auto-migrate multi-seg artifacts → single identity | Optional; legacy read-only path covers old projects |
+
+### R-031 Plan preview on composite / cut media
+
+**Goal:** In the plan tab, the preview bar and player should feel like watching the **edited result** (continuous composite timeline), not hopping across source clips.
+
+**Why (UX pain today):**
+- Preview bar is a continuous multi-segment progress strip (looks like one cut).
+- `_playPreviewSegment` actually loads each segment’s **source video** (`state.videos` by `seg.index`) and seeks `use_timeline` — so each segment boundary reloads/jumps media.
+- User perceives “progress is the cut, but playback is raw sources.”
+
+**Current surface:**
+- UI: `clio/ui/static/src/viewer.js` → `startPreview` / `_playPreviewSegment` / `renderPreviewBar`
+- Cut outputs: `output/cuts/<day>/` via `resolve_cut_output_dir` (`clio/tasks/cut.py`) — per-segment clips, not necessarily one concat file
+
+**Proposed direction (to refine in design):**
+1. Prefer playing **existing cut clips** in sequence when present (each clip already trimmed → no in-file seek hop across originals).
+2. If a day-level **concat / export composite** exists, prefer that single file and map preview-bar segments onto its absolute timeline.
+3. Fallback: keep today’s source-video seek preview when no cuts/composite yet; surface a clear hint (“尚未裁剪，预览的是源视频片段”).
+4. Progress UI and player clock should share the same timebase (composite timeline vs per-source).
+
+**Non-goals (initial):**
+- Building a full NLE / real-time ffmpeg filtergraph preview
+- Auto-running cut just to enable preview
+
+**Status:** Open — recorded 2026-07-19 from plan-tab UX feedback. Spec TBD.
+
+### R-030 Plan segment card UI density
+
+**Goal:** Plan sequence cards take less vertical space; toolbar/action buttons match global ghost/`btn-secondary` styling (not bare browser buttons).
+
+**Chosen layout (brainstorm 2026-07-19, revised):** **Option C — collapsed list + expand to edit**
+- Default row: drag · index · title · timeline · video `[idx]` · chevron (~40px)
+- Expanded: timeline edit + 起点/终点 · reason | voiceover · ↑↓ / 插入 / 删除 (ghost buttons)
+- Was briefly B; user re-evaluated toward C for scan density
+
+**Status:** Spec approved for planning — `docs/superpowers/specs/2026-07-19-plan-seg-card-density-design.md`
 
 ### R-029 Remove physical video split (logical analyze windows)
 
