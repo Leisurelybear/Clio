@@ -14,7 +14,6 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | R-028b | ffmpeg setup zip fallback (package manager fail → static build) | Medium | Medium |
 | R-028c | UI one-click ffmpeg install (banner action, Whisper-like) | Medium | Medium |
 | R-029d | Optional cleanup: delete dead physical-split write path / shrink legacy tests | Medium | Low |
-| R-030 | Plan tab segment card density + action button style alignment | Small | Medium |
 | R-031 | Plan preview: play composite / cut output, not source-video hopping | Medium | High |
 
 ### Deferred by choice
@@ -57,10 +56,11 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Chosen layout (brainstorm 2026-07-19, revised):** **Option C — collapsed list + expand to edit**
 - Default row: drag · index · title · timeline · video `[idx]` · chevron (~40px)
-- Expanded: timeline edit + 起点/终点 · reason | voiceover · ↑↓ / 插入 / 删除 (ghost buttons)
+- Expanded: title + timeline edit + 起点/终点 · reason | voiceover textareas · ↑↓ / 插入 / 删除 (ghost buttons)
+- Accordion (one open); preview `previewIndex` auto-expands current segment
 - Was briefly B; user re-evaluated toward C for scan density
 
-**Status:** Plan ready — spec `docs/superpowers/specs/2026-07-19-plan-seg-card-density-design.md`, plan `docs/superpowers/plans/2026-07-19-plan-seg-card-density.md`
+**Status:** **Done** (2026-07-19) — accordion cards + ghost buttons + preview auto-expand. Spec: `docs/superpowers/specs/2026-07-19-plan-seg-card-density-design.md`. Plan: `docs/superpowers/plans/2026-07-19-plan-seg-card-density.md`.
 
 ### R-029 Remove physical video split (logical analyze windows)
 

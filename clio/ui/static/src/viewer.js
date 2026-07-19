@@ -198,7 +198,15 @@ function startPreview(startIndex) {
   if (segNameEl) segNameEl.textContent = `1/${p.sequence.length} ${p.sequence[0]?.title || p.sequence[0]?.index || ''}`;
   _setPlayBtnPause();
 
-  import('./editor.js').then(mod => mod.renderPlan());
+  // Expand before first plan paint so accordion matches previewIndex immediately
+  import('./editor-plan.js').then((mod) => {
+    if (typeof mod.setPlanExpandedIndex === 'function') {
+      mod.setPlanExpandedIndex(state.previewIndex, { render: false });
+    }
+    return import('./editor.js').then((ed) => ed.renderPlan());
+  }).catch(() => {
+    import('./editor.js').then((mod) => mod.renderPlan());
+  });
   _playPreviewSegment();
 }
 
