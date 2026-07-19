@@ -2,6 +2,7 @@ import { state } from './state.js';
 import { $, escapeHtml, markDirty, clearDirty, updateSidebarDay, setStatus } from './utils.js';
 import { api, icon } from './api.js';
 import { renderPreviewBar, startPreview, _playPreviewSegment } from './viewer.js';
+import { buildTimeline, clampGlobal } from './plan-timeline.js';
 import { addToast } from './toast.js';
 import { resolveEditorSaveTarget } from './editor-save.js';
 import {
@@ -262,6 +263,7 @@ function applyTimelineBound(segIndex, which) {
   const next = setTimelineBound(seg.use_timeline || '', which, planSec);
   p.sequence[segIndex] = patchSegment(seg, { use_timeline: next });
   markDirty();
+  _refreshPreviewTimeline();
   // Prefer in-place DOM update so focus/IME in the expanded panel survive.
   const li = document.querySelector(`#plan-list [data-preview-index="${segIndex}"]`);
   if (li) {
@@ -273,6 +275,15 @@ function applyTimelineBound(segIndex, which) {
     return;
   }
   renderPlan();
+}
+
+/** Clamp composite playhead and rebuild preview bar after use_timeline changes. */
+function _refreshPreviewTimeline() {
+  const seq = state.plan?.sequence;
+  if (!Array.isArray(seq)) return;
+  const tl = buildTimeline(seq);
+  state.previewGlobalSec = clampGlobal(tl, state.previewGlobalSec);
+  renderPreviewBar();
 }
 
 function promptInsertAfter(afterIndex) {
@@ -463,6 +474,7 @@ export function renderPlan() {
         } else if (e.target.dataset.k === 'use_timeline') {
           const t = li.querySelector('.plan-seg-tl');
           if (t) t.textContent = e.target.value || '—';
+          _refreshPreviewTimeline();
         }
         markDirty();
         scheduleReadinessCheck();

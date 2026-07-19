@@ -14,7 +14,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | R-028b | ffmpeg setup zip fallback (package manager fail → static build) | Medium | Medium |
 | R-028c | UI one-click ffmpeg install (banner action, Whisper-like) | Medium | Medium |
 | R-029d | Optional cleanup: delete dead physical-split write path / shrink legacy tests | Medium | Low |
-| R-031 | Plan preview: play composite / cut output, not source-video hopping | Medium | High |
+| R-031b | Plan preview: prefer cut / concat media on the global timeline | Medium | Medium |
 
 ### Deferred by choice
 
@@ -25,30 +25,27 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | Serve-time silent ffmpeg download | Explicit user/setup only (R-028c is click; never auto on serve) |
 | Auto-migrate multi-seg artifacts → single identity | Optional; legacy read-only path covers old projects |
 
-### R-031 Plan preview on composite / cut media
+### R-031 Plan global preview timeline
 
-**Goal:** In the plan tab, the preview bar and player should feel like watching the **edited result** (continuous composite timeline), not hopping across source clips.
+**Goal:** Plan-tab player chrome behaves like a continuous **edited** timeline (global scrub + composite clock), not only “click a segment block to hop sources.”
 
-**Why (UX pain today):**
-- Preview bar is a continuous multi-segment progress strip (looks like one cut).
-- `_playPreviewSegment` actually loads each segment’s **source video** (`state.videos` by `seg.index`) and seeks `use_timeline` — so each segment boundary reloads/jumps media.
-- User perceives “progress is the cut, but playback is raw sources.”
+| Phase | ID | Status | Notes |
+| --- | --- | --- | --- |
+| A | R-031a | **Done** (2026-07-19) | Global scrub on Σ `use_timeline`; composite clock; pure `plan-timeline.js`; media still source seek hop |
+| B | R-031b | Open | Prefer cut clips / day concat on the same axis |
 
-**Current surface:**
-- UI: `clio/ui/static/src/viewer.js` → `startPreview` / `_playPreviewSegment` / `renderPreviewBar`
-- Cut outputs: `output/cuts/<day>/` via `resolve_cut_output_dir` (`clio/tasks/cut.py`) — per-segment clips, not necessarily one concat file
+**R-031a delivered:**
+- [x] `plan-timeline.js` pure build/map/widths + unit tests
+- [x] `#preview-seg-bar` drag → global second → source seek; playhead thumb
+- [x] Clock `成片 mm:ss / 总 mm:ss` on Plan entity
+- [x] Auto-advance across segments via next playable; accordion follows `previewIndex` without requiring continuous play
+- [x] Spec/plan: `docs/superpowers/specs|plans/2026-07-19-plan-global-preview-timeline*`
 
-**Proposed direction (to refine in design):**
-1. Prefer playing **existing cut clips** in sequence when present (each clip already trimmed → no in-file seek hop across originals).
-2. If a day-level **concat / export composite** exists, prefer that single file and map preview-bar segments onto its absolute timeline.
-3. Fallback: keep today’s source-video seek preview when no cuts/composite yet; surface a clear hint (“尚未裁剪，预览的是源视频片段”).
-4. Progress UI and player clock should share the same timebase (composite timeline vs per-source).
-
-**Non-goals (initial):**
-- Building a full NLE / real-time ffmpeg filtergraph preview
-- Auto-running cut just to enable preview
-
-**Status:** Open — recorded 2026-07-19 from plan-tab UX feedback. Spec TBD.
+**R-031b (open):**
+1. Prefer existing cut clips under `output/cuts/<day>/` when present.
+2. If a day-level concat / export composite exists, prefer that single file.
+3. Fallback: Phase A source hop; optional hint “尚未裁剪…”.
+4. Non-goals: full NLE / auto-cut for preview only.
 
 ### R-030 Plan segment card UI density
 

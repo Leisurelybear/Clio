@@ -1,7 +1,7 @@
 # Design: Plan global preview timeline (R-031 Phase A)
 
 **Date**: 2026-07-19  
-**Status**: Approved for implementation  
+**Status**: **Implemented** on `main` (2026-07-19) — R-031a global scrub + composite clock on source media  
 **Scope**: Plan-tab video preview UX — continuous **global** progress scrub on the plan composite timebase; media remains **source-video** seek hops  
 **Roadmap**: R-031 Phase A (this). Phase B (cut / concat media) deferred.  
 **Approach**: Pure `plan-timeline.js` timebase + `viewer.js` global scrub UI (option 2)

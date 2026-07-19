@@ -858,7 +858,19 @@ button.match-badge:focus-visible { outline: 2px solid var(--border-focus); outli
 .preview-seg-bar {
   display: flex; flex: 1; height: 24px;
   background: var(--bg-surface-2); border-radius: 4px;
-  cursor: pointer; overflow: hidden; min-width: 80px;
+  cursor: ew-resize; overflow: hidden; min-width: 80px;
+  position: relative;
+}
+.preview-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--accent);
+  box-shadow: 0 0 4px var(--accent-glow, rgba(96, 165, 250, 0.6));
+  pointer-events: none;
+  z-index: 2;
 }
 .preview-seg-block {
   height: 100%; transition: background var(--transition-fast);

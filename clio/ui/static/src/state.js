@@ -33,6 +33,7 @@ const state = {
   // preview playback
   previewActive: false,
   previewIndex: -1,
+  previewGlobalSec: 0,
   _previewEndTime: null,
   selectionMode: false,
   selectedFiles: [],
