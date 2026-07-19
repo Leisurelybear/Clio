@@ -9,6 +9,22 @@ import {
 
 function _syncPlanExpandFromPreview() {
   if (!state.previewActive || state.previewIndex < 0) return;
+  // Don't collapse/switch expand while the user is mid-edit in another row
+  // (full renderPlan would destroy focus and IME composition).
+  const ae = document.activeElement;
+  const planList = document.getElementById('plan-list');
+  if (
+    ae
+    && planList
+    && planList.contains(ae)
+    && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA')
+  ) {
+    const editingLi = ae.closest('[data-preview-index]');
+    const editingIdx = editingLi ? parseInt(editingLi.dataset.previewIndex, 10) : NaN;
+    if (Number.isFinite(editingIdx) && editingIdx !== state.previewIndex) {
+      return;
+    }
+  }
   import('./editor-plan.js').then((mod) => {
     if (typeof mod.setPlanExpandedIndex === 'function') {
       mod.setPlanExpandedIndex(state.previewIndex);
@@ -194,8 +210,11 @@ function startPreview(startIndex) {
   setStatus(`预览播放`, 'ok');
 
   renderPreviewBar();
+  const seg = p.sequence[state.previewIndex];
   const segNameEl = $('preview-seg-name');
-  if (segNameEl) segNameEl.textContent = `1/${p.sequence.length} ${p.sequence[0]?.title || p.sequence[0]?.index || ''}`;
+  if (segNameEl) {
+    segNameEl.textContent = `${state.previewIndex + 1}/${p.sequence.length} ${seg?.title || seg?.index || ''}`;
+  }
   _setPlayBtnPause();
 
   // Expand before first plan paint so accordion matches previewIndex immediately
