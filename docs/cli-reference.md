@@ -309,8 +309,7 @@ python main.py serve --no-browser       # Don't auto-open browser (for remote ma
 | `--port` | `8765` | Port |
 | `--no-browser` | — | If set, does not auto-open browser |
 
-Page after startup: left side video list (auto-scans `output/compressed/`), center is video player (supports seek / Range requests), right side three tabs: Analysis (texts), Voiceover (scripts), Vlog Editing Plan (plan). Clicking timeline / plan segments automatically seeks to the corresponding time; `Ctrl+S` to save.
-See `vlog_tool/ui/README.md` for details.
+Page after startup: left project/video sidebar, center video player (Range requests), right editor (texts / voiceover / plan / config / run / logs). Plan tab uses a collapsed sequence list (expand a row to edit); playhead **起点/终点** writes plan-local `use_timeline` (minus any `offset_sec`). Preview still hops source clips by timeline (composite preview is roadmap R-031). `Ctrl+S` saves. Details: `clio/ui/README.md`.
 
 ### External Trigger
 

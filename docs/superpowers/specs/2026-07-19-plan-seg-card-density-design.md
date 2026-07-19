@@ -1,7 +1,7 @@
 # Design: Plan segment card density (R-030)
 
 **Date**: 2026-07-19  
-**Status**: Approved for implementation planning  
+**Status**: **Implemented** on `main` (2026-07-19) — accordion cards, ghost buttons, preview auto-expand, review hardening, playhead↔plan timebase fix  
 **Scope**: Plan entity UI only — sequence card layout + action button chrome  
 **Approach**: C — collapsed list + expand to edit; accordion (one open); preview auto-expands current segment  
 **Roadmap**: R-030 (this). Related open item R-031 (composite preview) is **out of scope**.
@@ -221,3 +221,13 @@ One feature commit preferred (R-030); split only if preview wiring needs a follo
 
 - R-031 composite/cut preview timebase (ROADMAP entry only until its own design).
 - Plan meta fields (theme / opening / ending) density — unchanged this pass.
+
+## 10. Post-ship notes (2026-07-19)
+
+Implemented as planned; review hardening landed same day:
+
+- Preview auto-expand skips full re-render while focus is in another segment’s input; resync on blur.
+- Header click no-ops when already expanded on the active preview segment; panel chrome does not seek.
+- Readiness issue click sets expand + scroll.
+- Defer expand DOM rebuild while drag is active.
+- **Playhead bounds timebase:** `applyTimelineBound` uses `planSecFromPlayer(player.currentTime, video.offset_sec)` so `use_timeline` stays plan-local (symmetric with preview `seek = plan + offset`). Requires the open player file to match the segment’s video.

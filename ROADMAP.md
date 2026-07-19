@@ -60,7 +60,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Accordion (one open); preview `previewIndex` auto-expands current segment
 - Was briefly B; user re-evaluated toward C for scan density
 
-**Status:** **Done** (2026-07-19) — accordion cards + ghost buttons + preview auto-expand. Spec: `docs/superpowers/specs/2026-07-19-plan-seg-card-density-design.md`. Plan: `docs/superpowers/plans/2026-07-19-plan-seg-card-density.md`.
+**Status:** **Done** (2026-07-19) — accordion cards + ghost buttons + preview auto-expand; follow-up review fixes (focus-safe expand, readiness expand-on-click, list markers, playhead→`use_timeline` via `planSecFromPlayer` / `offset_sec`). Spec: `docs/superpowers/specs/2026-07-19-plan-seg-card-density-design.md`. Plan: `docs/superpowers/plans/2026-07-19-plan-seg-card-density.md`.
 
 ### R-029 Remove physical video split (logical analyze windows)
 

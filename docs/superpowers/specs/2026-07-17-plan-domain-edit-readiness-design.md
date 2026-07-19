@@ -248,8 +248,10 @@ Commit style: one feature/fix per commit; Chinese UI copy, English commits (proj
 
 | Item | Status |
 | --- | --- |
-| Player playhead → `use_timeline` start/end buttons | **Done** (same day follow-up) |
+| Player playhead → `use_timeline` start/end buttons | **Done** (same day follow-up). **Timebase (2026-07-19):** write path uses `planSecFromPlayer(player.currentTime, offset_sec)` so values match preview seek (`plan + offset`); require open clip = segment video |
 | Insert segment (prompt index / end insert) | **Done** (same day follow-up) |
+| Accordion card density (R-030) | **Done** (2026-07-19) — collapsed list + expand-to-edit; see `2026-07-19-plan-seg-card-density-design.md` |
+| Composite / cut-output plan preview (R-031) | Open — still source-video hopping |
 | Per-segment AI regenerate | **Declined** (2026-07-17) — use structural edit + full `plan` re-run |
 | Incremental PATCH segment APIs | Out of scope (local edit + full PUT is enough) |
 | EDL / FCPXML / other NLE intermediates | Out of scope |
