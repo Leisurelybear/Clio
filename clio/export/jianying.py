@@ -102,6 +102,8 @@ def _build_index_to_offset(texts_dir: Path) -> dict[str, float]:
         except (json.JSONDecodeError, OSError):
             continue
         identity = load_identity(data)
+        if identity is None:
+            continue
         off = legacy_segment_offset_sec(identity)
         if off:
             offsets[identity.index] = off
