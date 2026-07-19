@@ -32,6 +32,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | Phase | ID | Status | Notes |
 | --- | --- | --- | --- |
 | A | R-031a | **Done** (2026-07-19) | Global scrub on Σ `use_timeline`; composite clock; pure `plan-timeline.js`; media still source seek hop |
+| A2 | R-031a2 | **Done** (2026-07-19) | Progress fill + cap playhead; client-stitched plan peaks; hop skip single-file waveform |
 | B | R-031b | Open | Prefer cut clips / day concat on the same axis |
 
 **R-031a delivered:**
@@ -46,6 +47,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - [x] Soft-update fill/playhead during play/scrub
 - [x] Client-stitched plan peaks (`plan-waveform.js`) on Σ `use_timeline`; scrub uses `seekToGlobal`
 - [x] Skip single-file waveform reload on plan source hop; leave Plan restores source waveform
+- [x] Review harden: String(index) match; recompose on timeline edit (not only enter Plan); skip missing-index segments in continuous play
 - Spec/plan: `docs/superpowers/specs|plans/2026-07-19-plan-preview-chrome-waveform*`
 
 **R-031b (open):**

@@ -154,13 +154,25 @@ function seekToGlobal(globalSec, opts = {}) {
   state.previewIndex = loc.segIndex;
   state.previewGlobalSec = clampGlobal(tl, globalSec);
 
-  const v = state.videos.find((x) => x.index === loc.videoIndex);
+  const v = state.videos.find(
+    (x) => String(x.index) === String(loc.videoIndex),
+  );
   if (!v) {
     setStatus(`跳过视频 [${loc.videoIndex}]，找不到对应文件`, 'warn');
     updateCompositeClock();
     softUpdatePreviewChrome(tl);
     _softUpdateSegBlockClasses(loc.segIndex);
     if (opts.syncExpand !== false) _syncPlanExpandFromPreview();
+    // Continuous preview: skip to next segment that has a resolvable video file.
+    if (state.previewActive && opts.play !== false) {
+      const next = _nextPlayableWithVideo(tl, loc.segIndex);
+      if (next != null && next !== loc.segIndex) {
+        seekToGlobal(tl.segments[next].globalStart, { play: true, syncExpand: opts.syncExpand });
+      } else if (next == null) {
+        stopPreview();
+        setStatus('预览播放完毕', 'ok');
+      }
+    }
     return;
   }
 
@@ -216,9 +228,26 @@ function _softUpdateSegBlockClasses(activeIndex) {
   });
 }
 
+/** Next positive-duration segment that resolves to a file in state.videos. */
+function _nextPlayableWithVideo(tl, fromIndex) {
+  let i = fromIndex;
+  const guard = (tl.segments || []).length + 1;
+  for (let n = 0; n < guard; n++) {
+    const next = nextPlayableSegIndex(tl, i);
+    if (next == null) return null;
+    const seg = tl.segments[next];
+    const found = state.videos.find(
+      (x) => String(x.index) === String(seg.videoIndex),
+    );
+    if (found) return next;
+    i = next;
+  }
+  return null;
+}
+
 function _advanceToNextPlayable() {
   const tl = getPlanTimeline();
-  const next = nextPlayableSegIndex(tl, state.previewIndex);
+  const next = _nextPlayableWithVideo(tl, state.previewIndex);
   if (next == null) {
     stopPreview();
     setStatus('预览播放完毕', 'ok');
@@ -230,6 +259,15 @@ function _advanceToNextPlayable() {
 
 // ── Preview bar (R-012 / R-031a global scrub + R-031a2 chrome) ──
 let _wasPlanBar = false;
+/** Fingerprint of plan video indexes + source for waveform reload decisions. */
+let _planWaveformIdxKey = '';
+
+function _planIndexesKey(tl) {
+  const idxs = [...new Set(
+    (tl?.segments || []).map((s) => String(s.videoIndex || '')).filter(Boolean),
+  )].sort();
+  return `${state.source || 'compressed'}|${idxs.join(',')}`;
+}
 
 function renderPreviewBar() {
   const bar = $('preview-bar');
@@ -240,6 +278,7 @@ function renderPreviewBar() {
   if (!isPlan) {
     if (_wasPlanBar) {
       _wasPlanBar = false;
+      _planWaveformIdxKey = '';
       // Restore single-source waveform when leaving plan entity.
       loadWaveformForCurrentVideo();
     }
@@ -291,8 +330,15 @@ function renderPreviewBar() {
   });
 
   if (isGlobalTimelineUi()) updateCompositeClock();
-  if (enteringPlan || !isPlanWaveformMode()) {
+
+  // Full peaks fetch when entering plan, leaving plan-mode, or unique video indexes/source change.
+  // Otherwise recompose from cache (use_timeline / order edits).
+  const idxKey = _planIndexesKey(tl);
+  if (enteringPlan || !isPlanWaveformMode() || idxKey !== _planWaveformIdxKey) {
+    _planWaveformIdxKey = idxKey;
     loadPlanWaveform();
+  } else {
+    recomposePlanWaveformFromCache();
   }
 }
 
@@ -542,7 +588,9 @@ function setupPlayer() {
     if (isGlobalTimelineUi() && state.previewIndex >= 0) {
       const tl = getPlanTimeline();
       const seg = tl.segments[state.previewIndex];
-      const v = state.videos.find((x) => x.index === seg?.videoIndex);
+      const v = state.videos.find(
+        (x) => String(x.index) === String(seg?.videoIndex),
+      );
       const offset = v?.offset_sec || 0;
       if (seg && seg.duration > 0) {
         const planSec = Math.max(0, player.currentTime - offset);

@@ -309,7 +309,7 @@ python main.py serve --no-browser       # Don't auto-open browser (for remote ma
 | `--port` | `8765` | Port |
 | `--no-browser` | — | If set, does not auto-open browser |
 
-Page after startup: left project/video sidebar, center video player (Range requests), right editor (texts / voiceover / plan / config / run / logs). Plan tab uses a collapsed sequence list (expand a row to edit); playhead **起点/终点** writes plan-local `use_timeline` (minus any `offset_sec`). Plan preview bar is a **global scrub timeline** (Σ `use_timeline`) with composite clock; media is still source-video seek hop (cut/composite media is roadmap R-031b). `Ctrl+S` saves. Details: `clio/ui/README.md`.
+Page after startup: left project/video sidebar, center video player (Range requests), right editor (texts / voiceover / plan / config / run / logs). Plan tab uses a collapsed sequence list (expand a row to edit); playhead **起点/终点** writes plan-local `use_timeline` (minus any `offset_sec`). Plan preview bar is a **global scrub timeline** (Σ `use_timeline`) with progress fill + composite clock; waveform is **stitched multi-source peaks** on that axis (R-031a/a2). Media is still source-video seek hop (cut/concat media is roadmap R-031b). `Ctrl+S` saves. Details: `clio/ui/README.md`.
 
 ### External Trigger
 

@@ -285,11 +285,15 @@ function _applyPlanCompose(statusText) {
 
 export function recomposePlanWaveformFromCache() {
   if (_mode !== 'plan') return;
-  const missing = [];
-  for (const [k, v] of _planCache.entries()) {
-    if (v === 'pending' || v == null) missing.push(k);
+  // Only 'pending' means generation in flight; null is a failed/missing fetch.
+  let pending = false;
+  for (const v of _planCache.values()) {
+    if (v === 'pending') {
+      pending = true;
+      break;
+    }
   }
-  const statusText = missing.length ? '部分波形生成中…' : '';
+  const statusText = pending ? '部分波形生成中…' : '';
   _applyPlanCompose(statusText);
 }
 

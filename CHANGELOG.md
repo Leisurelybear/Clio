@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-07-19
+
+### Added
+- feat(ui): plan **global preview timeline** (R-031a) — bar scrub maps to Σ `use_timeline` seconds; composite clock `成片 mm:ss / 总`; pure `plan-timeline.js`
+- feat(ui): plan **progress fill + cap playhead** and **composite peaks waveform** (R-031a2) — client stitch of per-source `/api/waveform` peaks onto the plan axis; pure `plan-waveform.js`
+- Unit tests: `plan-timeline.test.js`, `plan-waveform.test.js`
+
+### Changed
+- Plan preview no longer forces “click segment block to hop only”; drag is the primary seek
+- Plan waveform scrub uses `seekToGlobal` (same timebase as the progress bar)
+- Leaving Plan entity restores single-source waveform load
+
+### Fixed
+- fix(ui): do not reload single-file waveform on every plan segment hop (kept composite peaks)
+- fix(ui): soft-update fill/playhead during play/scrub (avoid full bar `innerHTML` thrash)
+- fix(ui): recompose plan waveform when `use_timeline` / order changes without re-entering Plan
+- fix(ui): resolve plan `videoIndex` with `String()` equality; continuous play skips missing indexes
+
+### Docs
+- design/plan: `docs/superpowers/specs|plans/2026-07-19-plan-global-preview-timeline*`
+- design/plan: `docs/superpowers/specs|plans/2026-07-19-plan-preview-chrome-waveform*`
+- ROADMAP R-031a / R-031a2 done; R-031b cut/concat media open
+- `clio/ui/README.md`, `docs/cli-reference.md` serve blurb
+
 ## 2026-07-18
 
 ### Added
