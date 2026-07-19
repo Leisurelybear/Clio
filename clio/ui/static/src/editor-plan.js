@@ -43,6 +43,11 @@ export function setPlanExpandedIndex(index, opts = {}) {
     next = null;
   }
   if (next === _expandedSegIndex) return;
+  // Avoid replacing the list DOM mid-drag (drop indicators / drag source vanish).
+  if (_dragFromIndex != null && render) {
+    _expandedSegIndex = next;
+    return;
+  }
   _expandedSegIndex = next;
   if (render && document.getElementById('plan-list')) {
     renderPlan();
@@ -176,9 +181,13 @@ function renderReadinessList(panel, errors, warnings) {
   panel.innerHTML = parts.join('');
   panel.querySelectorAll('[data-seg]').forEach((el) => {
     el.onclick = () => {
-      const i = el.getAttribute('data-seg');
-      if (i === '' || i == null) return;
-      document.querySelector(`[data-preview-index="${i}"]`)?.scrollIntoView({ block: 'nearest' });
+      const raw = el.getAttribute('data-seg');
+      if (raw === '' || raw == null) return;
+      const idx = parseInt(raw, 10);
+      if (!Number.isFinite(idx) || idx < 0) return;
+      _expandedSegIndex = idx;
+      if (document.getElementById('plan-list')) renderPlan();
+      document.querySelector(`[data-preview-index="${idx}"]`)?.scrollIntoView({ block: 'nearest' });
     };
   });
 }
@@ -374,8 +383,19 @@ export function renderPlan() {
         </div>
       </div>` : ''}
     `;
-    li.onclick = (e) => {
-      if (e.target.closest('input, textarea, button, .plan-drag-handle')) return;
+    // Panel chrome clicks must not seek preview / rebuild (only header does).
+    li.querySelector('.plan-seg-panel')?.addEventListener('click', (e) => {
+      if (e.target.closest('input, textarea, button')) return;
+      e.stopPropagation();
+    });
+    li.querySelector('.plan-seg-header')?.addEventListener('click', (e) => {
+      if (e.target.closest('button, .plan-drag-handle')) return;
+      const sameExpanded = _expandedSegIndex === i;
+      const samePreview = state.previewActive && state.previewIndex === i;
+      // Already open on this segment while it is the preview target: no-op
+      // (avoids wiping caret if user clicks header chrome mid-edit).
+      if (sameExpanded && samePreview) return;
+
       _expandedSegIndex = i;
       const v = state.videos.find(x => x.index === seg.index);
       if (!v) {
@@ -384,13 +404,18 @@ export function renderPlan() {
         return;
       }
       if (state.previewActive) {
+        if (state.previewIndex === i) {
+          // Expand-only (preview already here)
+          if (!sameExpanded) renderPlan();
+          return;
+        }
         state.previewIndex = i;
         _playPreviewSegment();
         renderPlan();
       } else {
         startPreview(i);
       }
-    };
+    });
     li.querySelector('[data-chevron]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       _expandedSegIndex = _expandedSegIndex === i ? null : i;
@@ -457,6 +482,12 @@ export function renderPlan() {
       li.classList.remove('plan-seg-dragging');
       clearDropIndicator();
       _dragFromIndex = null;
+      // Apply any expand change that was deferred while dragging
+      if (document.getElementById('plan-list')) {
+        const open = document.querySelector('#plan-list .plan-seg-expanded');
+        const openIdx = open ? parseInt(open.dataset.previewIndex, 10) : null;
+        if (openIdx !== _expandedSegIndex) renderPlan();
+      }
     });
     li.addEventListener('dragover', (e) => {
       e.preventDefault();
