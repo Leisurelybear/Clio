@@ -11,6 +11,7 @@ import {
   nextExpandedAfterDelete,
   nextExpandedAfterInsert,
   nextExpandedAfterMove,
+  planSecFromPlayer,
 } from '../plan-edit.js';
 
 describe('plan-edit', () => {
@@ -52,6 +53,19 @@ describe('plan-edit', () => {
     expect(setTimelineBound('00:10-00:40', 'end', 50)).toBe('00:10-00:50');
     expect(setTimelineBound('', 'end', 20)).toBe('00:15-00:20');
     expect(setTimelineBound('00:30-00:20', 'end', 10)).toBe('00:05-00:10');
+  });
+
+  it('planSecFromPlayer subtracts offset used by preview seek', () => {
+    expect(planSecFromPlayer(55, 40)).toBe(15);
+    expect(planSecFromPlayer(12, 0)).toBe(12);
+    expect(planSecFromPlayer(5, 40)).toBe(0); // clamp
+    expect(planSecFromPlayer(NaN, 0)).toBeNull();
+  });
+
+  it('setTimelineBound with planSecFromPlayer matches preview round-trip', () => {
+    // Preview: seek = plan + offset. User at player 55 with offset 40 → plan 15.
+    const planSec = planSecFromPlayer(55, 40);
+    expect(setTimelineBound('00:00-00:20', 'start', planSec)).toBe('00:15-00:20');
   });
 
   it('insertSegment inserts after atIndex without mutating', () => {

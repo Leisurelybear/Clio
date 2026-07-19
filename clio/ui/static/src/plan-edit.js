@@ -111,11 +111,11 @@ function timecodeToSec(tc) {
  * Set start or end of use_timeline from player seconds.
  * @param {string} currentRange existing "MM:SS-MM:SS" or empty
  * @param {'start'|'end'} which
- * @param {number} sec player currentTime
+ * @param {number} sec timeline seconds in the same timebase as use_timeline
+ *   (segment-local / plan-local — NOT raw player.currentTime when offset_sec applies)
  * @returns {string}
  */
 export function setTimelineBound(currentRange, which, sec) {
-  const t = formatTimelineSec(sec);
   const parts = parseTimelineParts(currentRange);
   let startSec = parts ? timecodeToSec(parts.start) : null;
   let endSec = parts ? timecodeToSec(parts.end) : null;
@@ -129,6 +129,21 @@ export function setTimelineBound(currentRange, which, sec) {
     if (startSec == null || startSec >= endSec) startSec = Math.max(0, endSec - 5);
   }
   return `${formatTimelineSec(startSec)}-${formatTimelineSec(endSec)}`;
+}
+
+/**
+ * Convert player.currentTime to plan use_timeline seconds.
+ * Preview seeks with plan_sec + offset_sec; write path must subtract the same offset.
+ * @param {number} playerSec player.currentTime
+ * @param {number} [offsetSec=0] video.offset_sec (legacy split / original absolute)
+ * @returns {number|null} null if playerSec invalid
+ */
+export function planSecFromPlayer(playerSec, offsetSec = 0) {
+  const t = Number(playerSec);
+  if (!Number.isFinite(t)) return null;
+  const off = Number(offsetSec);
+  const o = Number.isFinite(off) && off > 0 ? off : 0;
+  return Math.max(0, t - o);
 }
 
 /**

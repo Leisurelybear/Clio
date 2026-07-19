@@ -15,6 +15,7 @@ import {
   nextExpandedAfterDelete,
   nextExpandedAfterInsert,
   nextExpandedAfterMove,
+  planSecFromPlayer,
 } from './plan-edit.js';
 
 let _readinessTimer = null;
@@ -236,13 +237,30 @@ function playerCurrentTimeSec() {
 function applyTimelineBound(segIndex, which) {
   const p = state.plan;
   if (!p?.sequence?.[segIndex]) return;
-  const sec = playerCurrentTimeSec();
-  if (sec == null) {
+  const seg = p.sequence[segIndex];
+  const v = (state.videos || []).find((x) => String(x.index) === String(seg.index));
+  if (!v) {
+    addToast(`找不到视频 [${seg.index || '?'}]，无法写入时间轴`, 'warning');
+    return;
+  }
+  // Must be scrubbing the same clip this segment references (file match).
+  if (state.currentVideo && v.file && state.currentVideo !== v.file) {
+    addToast('请先点击该片段预览，再设起点/终点（当前播放的不是这段视频）', 'warning');
+    return;
+  }
+  const playerSec = playerCurrentTimeSec();
+  if (playerSec == null) {
     addToast('请先在播放器中打开对应视频', 'warning');
     return;
   }
-  const next = setTimelineBound(p.sequence[segIndex].use_timeline || '', which, sec);
-  p.sequence[segIndex] = patchSegment(p.sequence[segIndex], { use_timeline: next });
+  // use_timeline is plan/segment-local; preview seeks with +offset_sec.
+  const planSec = planSecFromPlayer(playerSec, v.offset_sec || 0);
+  if (planSec == null) {
+    addToast('无法读取播放器时间', 'warning');
+    return;
+  }
+  const next = setTimelineBound(seg.use_timeline || '', which, planSec);
+  p.sequence[segIndex] = patchSegment(seg, { use_timeline: next });
   markDirty();
   // Prefer in-place DOM update so focus/IME in the expanded panel survive.
   const li = document.querySelector(`#plan-list [data-preview-index="${segIndex}"]`);
@@ -250,8 +268,7 @@ function applyTimelineBound(segIndex, which) {
     const headerTl = li.querySelector('.plan-seg-tl');
     if (headerTl) headerTl.textContent = next || '—';
     const input = li.querySelector('input[data-k="use_timeline"]');
-    if (input && document.activeElement !== input) input.value = next;
-    else if (input && document.activeElement === input) input.value = next;
+    if (input) input.value = next;
     scheduleReadinessCheck();
     return;
   }
