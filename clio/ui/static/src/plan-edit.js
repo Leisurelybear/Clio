@@ -150,3 +150,52 @@ export function insertSegment(sequence, atIndex, fields) {
   arr.splice(insertAt, 0, seg);
   return arr;
 }
+
+/**
+ * Expanded index after deleting deletedIndex; newLength is length after delete.
+ * @param {number|null|undefined} expanded
+ * @param {number} deletedIndex
+ * @param {number} newLength
+ * @returns {number|null}
+ */
+export function nextExpandedAfterDelete(expanded, deletedIndex, newLength) {
+  if (expanded == null || !Number.isFinite(Number(expanded))) return null;
+  const n = Number(newLength) | 0;
+  if (n <= 0) return null;
+  let e = Number(expanded);
+  const d = Number(deletedIndex);
+  if (Number.isFinite(d) && e > d) e -= 1;
+  if (e < 0) return null;
+  if (e >= n) e = n - 1;
+  return e;
+}
+
+/**
+ * Expanded index for a segment inserted after afterIndex (-1 = prepend → index 0).
+ * @param {number} afterIndex
+ * @returns {number}
+ */
+export function nextExpandedAfterInsert(afterIndex) {
+  const a = Number(afterIndex);
+  if (!Number.isFinite(a) || a < -1) return 0;
+  return a + 1;
+}
+
+/**
+ * Expanded index after reorderSequence(from, to).
+ * @param {number} fromIndex
+ * @param {number} toIndex
+ * @param {number|null|undefined} expanded
+ * @returns {number|null}
+ */
+export function nextExpandedAfterMove(fromIndex, toIndex, expanded) {
+  if (expanded == null || !Number.isFinite(Number(expanded))) return null;
+  const from = Number(fromIndex);
+  const to = Number(toIndex);
+  let e = Number(expanded);
+  if (!Number.isFinite(from) || !Number.isFinite(to)) return e;
+  if (e === from) return to;
+  if (e > from) e -= 1;
+  if (e >= to) e += 1;
+  return e;
+}

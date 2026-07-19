@@ -8,6 +8,9 @@ import {
   insertSegment,
   computeDropToIndex,
   computeDragAutoScrollDelta,
+  nextExpandedAfterDelete,
+  nextExpandedAfterInsert,
+  nextExpandedAfterMove,
 } from '../plan-edit.js';
 
 describe('plan-edit', () => {
@@ -134,5 +137,50 @@ describe('computeDragAutoScrollDelta', () => {
     const near = Math.abs(computeDragAutoScrollDelta(140, top, bottom, 48, 18));
     const far = Math.abs(computeDragAutoScrollDelta(105, top, bottom, 48, 18));
     expect(far).toBeGreaterThanOrEqual(near);
+  });
+});
+
+describe('nextExpandedAfterDelete', () => {
+  it('returns null when list becomes empty', () => {
+    expect(nextExpandedAfterDelete(0, 0, 0)).toBeNull();
+  });
+
+  it('keeps same index when deleting after expanded', () => {
+    expect(nextExpandedAfterDelete(1, 2, 3)).toBe(1);
+  });
+
+  it('decrements when deleting before expanded', () => {
+    expect(nextExpandedAfterDelete(2, 0, 3)).toBe(1);
+  });
+
+  it('clamps to last when deleting the expanded last item', () => {
+    expect(nextExpandedAfterDelete(2, 2, 2)).toBe(1);
+  });
+
+  it('returns null when expanded was null', () => {
+    expect(nextExpandedAfterDelete(null, 1, 2)).toBeNull();
+  });
+});
+
+describe('nextExpandedAfterInsert', () => {
+  it('expands the newly inserted index (afterIndex + 1)', () => {
+    expect(nextExpandedAfterInsert(0)).toBe(1);
+    expect(nextExpandedAfterInsert(-1)).toBe(0);
+    expect(nextExpandedAfterInsert(2)).toBe(3);
+  });
+});
+
+describe('nextExpandedAfterMove', () => {
+  it('follows the moved item when it was expanded', () => {
+    expect(nextExpandedAfterMove(0, 2, 0)).toBe(2);
+    expect(nextExpandedAfterMove(2, 0, 2)).toBe(0);
+  });
+
+  it('shifts expanded when another item moves across it', () => {
+    expect(nextExpandedAfterMove(0, 2, 2)).toBe(1);
+  });
+
+  it('returns null when nothing expanded', () => {
+    expect(nextExpandedAfterMove(0, 2, null)).toBeNull();
   });
 });
