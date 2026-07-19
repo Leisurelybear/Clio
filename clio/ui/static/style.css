@@ -1032,8 +1032,9 @@ button.match-badge:focus-visible { outline: 2px solid var(--border-focus); outli
 }
 .seg-title { font-weight: 500; margin: 2px 0; color: var(--text-primary); }
 .timeline-seg textarea { margin-top: var(--space-1); min-height: 40px; }
-.plan-seg { cursor: pointer; }
-.plan-seg label { margin-top: var(--space-2); }
+.plan-seg { cursor: pointer; padding: 0; overflow: hidden; }
+.plan-seg > label { margin-top: var(--space-2); }
+
 
 /* ── Editor Actions ────────────────────────────────────────── */
 .editor-actions {
@@ -2125,19 +2126,13 @@ select.form-input { cursor: pointer; }
 }
 .br-match-list li { margin-bottom: 6px; }
 
-/* Plan structural edit (R-026) */
-.plan-seg-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-  flex-wrap: wrap;
-}
+/* Plan structural edit (R-026) + density (R-030) */
 .plan-drag-handle {
   cursor: grab;
   user-select: none;
   opacity: 0.7;
   padding: 0 4px;
+  color: var(--text-muted);
 }
 .plan-seg-dragging {
   opacity: 0.5;
@@ -2179,15 +2174,6 @@ select.form-input { cursor: pointer; }
     /* return to stylesheet defaults for .plan-seg */
   }
 }
-.plan-move-btn,
-.plan-del-btn {
-  font-size: var(--text-sm, 12px);
-  padding: 2px 8px;
-  cursor: pointer;
-}
-.plan-del-btn {
-  color: var(--err, #c44);
-}
 .plan-seg-error {
   outline: 1px solid var(--err, #c44);
 }
@@ -2204,21 +2190,158 @@ select.form-input { cursor: pointer; }
   cursor: pointer;
 }
 
+.plan-seg-header {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto auto auto;
+  gap: 6px 8px;
+  align-items: center;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+.plan-seg-header:hover {
+  background: var(--bg-hover);
+}
+.plan-seg-ord {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  min-width: 1.4em;
+}
+.plan-seg-title-text {
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.plan-seg-tl {
+  font-family: var(--font-mono);
+  color: var(--accent);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+.plan-seg-vid {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.plan-seg-chevron {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1;
+  transition: all var(--transition-fast);
+}
+.plan-seg-chevron:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+.plan-seg-panel {
+  border-top: 1px solid var(--border);
+  padding: 8px 10px 10px;
+  background: var(--bg-surface);
+}
+.plan-seg-panel label {
+  display: block;
+  margin-top: 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+.plan-seg-panel .plan-title-input {
+  width: 100%;
+  margin-bottom: 6px;
+  margin-top: 3px;
+}
+.plan-seg-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 6px 0 8px;
+}
+.plan-seg-fields textarea {
+  min-height: 64px;
+  resize: vertical;
+  margin-top: 3px;
+  line-height: 1.45;
+}
+@media (max-width: 1100px) {
+  .plan-seg-fields {
+    grid-template-columns: 1fr;
+  }
+}
+.plan-seg-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+  align-items: center;
+}
+.plan-ghost-btn,
+.plan-icon-btn {
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  padding: 3px 8px;
+  cursor: pointer;
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  line-height: 1.2;
+  transition: all var(--transition-fast);
+}
+.plan-ghost-btn:hover,
+.plan-icon-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  border-color: var(--border-light);
+}
+.plan-ghost-btn:disabled,
+.plan-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.plan-icon-btn {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+}
+.plan-ghost-btn--danger {
+  color: var(--error, var(--err, #ef4444));
+  border-color: transparent;
+}
+.plan-ghost-btn--danger:hover {
+  background: var(--error-bg, rgba(239, 68, 68, 0.12));
+  border-color: var(--error, #ef4444);
+  color: var(--error, #ef4444);
+}
 .plan-timeline-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px;
+  margin-bottom: 6px;
 }
 .plan-timeline-row input {
   flex: 1 1 8rem;
   min-width: 6rem;
-}
-.plan-tl-btn,
-.plan-ins-btn {
-  font-size: var(--text-sm, 12px);
-  padding: 2px 8px;
-  cursor: pointer;
+  margin-top: 0;
 }
 .plan-insert-bar {
   margin: 8px 0 12px;

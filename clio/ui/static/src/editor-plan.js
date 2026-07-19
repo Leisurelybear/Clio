@@ -12,6 +12,9 @@ import {
   insertSegment,
   computeDropToIndex,
   computeDragAutoScrollDelta,
+  nextExpandedAfterDelete,
+  nextExpandedAfterInsert,
+  nextExpandedAfterMove,
 } from './plan-edit.js';
 
 let _readinessTimer = null;
@@ -19,6 +22,32 @@ let _lastReadiness = { ok: true, errors: [], warnings: [] };
 let _dragFromIndex = null;
 let _dropToIndex = null;
 let _highlightTimer = null;
+let _expandedSegIndex = null;
+
+export function getPlanExpandedIndex() {
+  return _expandedSegIndex;
+}
+
+/**
+ * @param {number|null} index
+ * @param {{ render?: boolean }} [opts]
+ */
+export function setPlanExpandedIndex(index, opts = {}) {
+  const render = opts.render !== false;
+  let next = index;
+  if (next != null) {
+    const n = Number(next);
+    if (!Number.isFinite(n) || n < 0) next = null;
+    else next = n | 0;
+  } else {
+    next = null;
+  }
+  if (next === _expandedSegIndex) return;
+  _expandedSegIndex = next;
+  if (render && document.getElementById('plan-list')) {
+    renderPlan();
+  }
+}
 
 function planScrollParent() {
   return document.querySelector('#tab-plan');
@@ -228,7 +257,9 @@ function promptInsertAfter(afterIndex) {
   }
   const v = videos.find((x) => String(x.index) === index);
   const title = v?.title || v?.file || '';
-  applySequence(insertSegment(p.sequence, afterIndex, { index, title }));
+  const next = insertSegment(p.sequence, afterIndex, { index, title });
+  _expandedSegIndex = nextExpandedAfterInsert(afterIndex);
+  applySequence(next, { highlightIndex: _expandedSegIndex });
 }
 
 export function renderPlan() {
@@ -291,43 +322,95 @@ export function renderPlan() {
     };
   }
   const ol = pane.querySelector('#plan-list');
+  if (_expandedSegIndex != null) {
+    if (!p.sequence.length) _expandedSegIndex = null;
+    else if (_expandedSegIndex >= p.sequence.length) _expandedSegIndex = p.sequence.length - 1;
+  }
   p.sequence.forEach((seg, i) => {
     const li = document.createElement('li');
-    li.className = 'plan-seg' + (state.previewActive && state.previewIndex === i ? ' preview-active' : '');
+    const expanded = _expandedSegIndex === i;
+    const titleText = seg.title || '';
+    const tlText = seg.use_timeline || '';
+    const vid = seg.index || '?';
+    li.className = 'plan-seg'
+      + (state.previewActive && state.previewIndex === i ? ' preview-active' : '')
+      + (expanded ? ' plan-seg-expanded' : '');
     li.dataset.previewIndex = String(i);
     li.draggable = true;
     li.innerHTML = `
-      <div class="plan-seg-toolbar">
+      <div class="plan-seg-header">
         <span class="plan-drag-handle" title="拖拽排序" aria-hidden="true">⠿</span>
-        <button type="button" class="plan-move-btn" data-move="up" title="上移" ${i === 0 ? 'disabled' : ''}>↑</button>
-        <button type="button" class="plan-move-btn" data-move="down" title="下移" ${i === p.sequence.length - 1 ? 'disabled' : ''}>↓</button>
-        <button type="button" class="plan-ins-btn" data-ins title="在此后插入片段">+插入</button>
-        <button type="button" class="plan-del-btn" data-del title="删除片段">删除</button>
-        <span class="muted">视频 [${escapeHtml(seg.index || '?')}]</span>
+        <span class="plan-seg-ord">${i + 1}.</span>
+        <span class="plan-seg-title-text" title="${escapeHtml(titleText)}">${escapeHtml(titleText || '(无标题)')}</span>
+        <span class="plan-seg-tl">${escapeHtml(tlText || '—')}</span>
+        <span class="plan-seg-vid">[${escapeHtml(String(vid))}]</span>
+        <button type="button" class="plan-seg-chevron" data-chevron
+          aria-expanded="${expanded ? 'true' : 'false'}"
+          aria-label="${expanded ? '收起片段' : '展开片段'}">${expanded ? '▾' : '▸'}</button>
       </div>
-      <label>标题 <input value="${escapeHtml(seg.title || '')}" data-k="title"></label>
-      <label class="plan-timeline-row">时间轴
-        <input value="${escapeHtml(seg.use_timeline || '')}" data-k="use_timeline" placeholder="00:10-00:45">
-        <button type="button" class="plan-tl-btn" data-tl="start" title="用播放器当前位置作为起点">起点</button>
-        <button type="button" class="plan-tl-btn" data-tl="end" title="用播放器当前位置作为终点">终点</button>
-      </label>
-      <label>理由 <input value="${escapeHtml(seg.reason || '')}" data-k="reason"></label>
-      <label>口播提示 <textarea rows="2" data-k="voiceover_hint">${escapeHtml(seg.voiceover_hint || '')}</textarea></label>
+      ${expanded ? `
+      <div class="plan-seg-panel">
+        <label class="plan-title-field">标题
+          <input class="plan-title-input" value="${escapeHtml(titleText)}" data-k="title">
+        </label>
+        <label class="plan-timeline-row">时间轴
+          <input value="${escapeHtml(tlText)}" data-k="use_timeline" placeholder="00:10-00:45">
+          <button type="button" class="plan-ghost-btn" data-tl="start" title="用播放器当前位置作为起点">起点</button>
+          <button type="button" class="plan-ghost-btn" data-tl="end" title="用播放器当前位置作为终点">终点</button>
+        </label>
+        <div class="plan-seg-fields">
+          <label>理由
+            <textarea rows="3" data-k="reason">${escapeHtml(seg.reason || '')}</textarea>
+          </label>
+          <label>口播
+            <textarea rows="3" data-k="voiceover_hint">${escapeHtml(seg.voiceover_hint || '')}</textarea>
+          </label>
+        </div>
+        <div class="plan-seg-actions">
+          <button type="button" class="plan-icon-btn" data-move="up" title="上移" ${i === 0 ? 'disabled' : ''}>↑</button>
+          <button type="button" class="plan-icon-btn" data-move="down" title="下移" ${i === p.sequence.length - 1 ? 'disabled' : ''}>↓</button>
+          <button type="button" class="plan-ghost-btn" data-ins title="在此后插入片段">+ 插入</button>
+          <button type="button" class="plan-ghost-btn plan-ghost-btn--danger" data-del title="删除片段">删除</button>
+        </div>
+      </div>` : ''}
     `;
     li.onclick = (e) => {
       if (e.target.closest('input, textarea, button, .plan-drag-handle')) return;
+      _expandedSegIndex = i;
       const v = state.videos.find(x => x.index === seg.index);
-      if (!v) { setStatus(`找不到视频 [${seg.index}]，请重新生成规划`, 'warn'); return; }
+      if (!v) {
+        setStatus(`找不到视频 [${seg.index}]，请重新生成规划`, 'warn');
+        renderPlan();
+        return;
+      }
       if (state.previewActive) {
         state.previewIndex = i;
         _playPreviewSegment();
+        renderPlan();
       } else {
         startPreview(i);
       }
     };
+    li.querySelector('[data-chevron]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      _expandedSegIndex = _expandedSegIndex === i ? null : i;
+      renderPlan();
+    });
     li.querySelectorAll('[data-k]').forEach(inp => {
       inp.oninput = (e) => {
         p.sequence[i] = patchSegment(p.sequence[i], { [e.target.dataset.k]: e.target.value });
+        // Keep collapsed header title/timeline in sync without full re-render on every keystroke
+        if (e.target.dataset.k === 'title') {
+          const t = li.querySelector('.plan-seg-title-text');
+          if (t) {
+            const val = e.target.value || '';
+            t.textContent = val || '(无标题)';
+            t.title = val;
+          }
+        } else if (e.target.dataset.k === 'use_timeline') {
+          const t = li.querySelector('.plan-seg-tl');
+          if (t) t.textContent = e.target.value || '—';
+        }
         markDirty();
         scheduleReadinessCheck();
       };
@@ -335,11 +418,13 @@ export function renderPlan() {
     li.querySelector('[data-move="up"]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       if (i <= 0) return;
+      _expandedSegIndex = nextExpandedAfterMove(i, i - 1, i);
       applySequence(reorderSequence(p.sequence, i, i - 1), { highlightIndex: i - 1 });
     });
     li.querySelector('[data-move="down"]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       if (i >= p.sequence.length - 1) return;
+      _expandedSegIndex = nextExpandedAfterMove(i, i + 1, i);
       applySequence(reorderSequence(p.sequence, i, i + 1), { highlightIndex: i + 1 });
     });
     li.querySelector('[data-ins]')?.addEventListener('click', (e) => {
@@ -349,7 +434,9 @@ export function renderPlan() {
     li.querySelector('[data-del]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!confirm(`删除第 ${i + 1} 段「${seg.title || seg.index || ''}」？`)) return;
-      applySequence(removeSegment(p.sequence, i));
+      const nextSeq = removeSegment(p.sequence, i);
+      _expandedSegIndex = nextExpandedAfterDelete(_expandedSegIndex, i, nextSeq.length);
+      applySequence(nextSeq);
     });
     li.querySelectorAll('[data-tl]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
@@ -397,6 +484,7 @@ export function renderPlan() {
       _dragFromIndex = null;
       li.classList.remove('plan-seg-dragging');
       if (to == null) return;
+      _expandedSegIndex = nextExpandedAfterMove(from, to, _expandedSegIndex);
       applySequence(reorderSequence(p.sequence, from, to), { highlightIndex: to });
     });
     ol.appendChild(li);

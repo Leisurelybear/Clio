@@ -7,6 +7,15 @@ import {
   bindWaveformScrub,
 } from './waveform.js';
 
+function _syncPlanExpandFromPreview() {
+  if (!state.previewActive || state.previewIndex < 0) return;
+  import('./editor-plan.js').then((mod) => {
+    if (typeof mod.setPlanExpandedIndex === 'function') {
+      mod.setPlanExpandedIndex(state.previewIndex);
+    }
+  }).catch(() => { /* ignore */ });
+}
+
 function playVideoSegment(file, seekTo) {
   state.currentVideo = file;
   const player = $('player');
@@ -242,6 +251,7 @@ function _playPreviewSegment() {
   if (segNameEl) segNameEl.textContent = `${state.previewIndex + 1}/${p.sequence.length} ${seg.title || seg.index}`;
 
   _setPlayBtnPause();
+  _syncPlanExpandFromPreview();
 }
 
 function _autoSwitchSegment(file) {
