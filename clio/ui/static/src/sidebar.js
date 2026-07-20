@@ -84,8 +84,7 @@ async function selectPlan(dayOverride) {
   state.currentEntity = 'plan';
   clearDirty();
   if (dayOverride) state.currentDay = dayOverride;
-  const runner = await import('./runner.js');
-  runner._stopRunPoll();
+  // Keep run SSE alive across entity switches so done/cancel handlers still fire.
   try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); }
   catch (e) { state.plan = null; }
   updateSidebarDay();
