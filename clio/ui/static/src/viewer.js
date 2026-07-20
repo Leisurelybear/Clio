@@ -689,7 +689,6 @@ function setupPlayer() {
 }
 
 export {
-  playerSrcMatchesFile,
   playVideoSegment,
   startPreview,
   stopPreview,
