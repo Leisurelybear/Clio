@@ -1,6 +1,11 @@
 import { state } from './state.js';
 import { $, $$, escapeHtml, markDirty, clearDirty, setStatus, setDeep } from './utils.js';
 import { api, icon } from './api.js';
+import {
+  filterLogLines,
+  inferLogLevel,
+  logLineClass,
+} from './logs-filter.js';
 // Dynamic import avoids static cycle: editor.js → editor-config.js → editor.js (A-006)
 
 const DEFAULT_PROVIDERS = ['gemini', 'openai', 'deepseek'];
@@ -1311,51 +1316,160 @@ export function renderConfig() {
 let _logsTimer = null;
 let _logsOffset = 0;
 let _logsAutoScroll = true;
+/** @type {string[]} full buffer for client filter re-apply (R-027) */
+let _logsBuffer = [];
+/** Persist across re-open of the logs panel (prefer keep filters after clear). */
+let _logsFilterQuery = '';
+/** @type {''|'all'|'info'|'warn'|'error'} */
+let _logsFilterLevel = 'all';
+
+const _LEVEL_LABELS = {
+  info: '信息',
+  warn: '警告',
+  error: '错误',
+};
+
+function _logsFilterOpts() {
+  return { query: _logsFilterQuery, level: _logsFilterLevel };
+}
+
+function _appendLogLineEl(view, line) {
+  const d = document.createElement('div');
+  d.className = `log-line ${logLineClass(line)}`;
+  d.dataset.level = inferLogLevel(line);
+  const badge = document.createElement('span');
+  badge.className = 'log-level-badge';
+  badge.textContent = _LEVEL_LABELS[inferLogLevel(line)] || '信息';
+  const text = document.createElement('span');
+  text.className = 'log-line-text';
+  text.textContent = line;
+  d.appendChild(badge);
+  d.appendChild(text);
+  view.appendChild(d);
+}
+
+function _paintLogsView(view) {
+  if (!view) return;
+  const visible = filterLogLines(_logsBuffer, _logsFilterOpts());
+  view.innerHTML = '';
+  for (const line of visible) {
+    _appendLogLineEl(view, line);
+  }
+  const empty = $('logs-empty-hint');
+  if (empty) {
+    const filteredOut = _logsBuffer.length > 0 && visible.length === 0;
+    empty.hidden = !filteredOut;
+  }
+  const countEl = $('logs-match-count');
+  if (countEl) {
+    countEl.textContent = _logsBuffer.length
+      ? `显示 ${visible.length} / ${_logsBuffer.length}`
+      : '';
+  }
+  if (_logsAutoScroll) view.scrollTop = view.scrollHeight;
+}
+
+function _syncLogsLevelChips() {
+  document.querySelectorAll('[data-log-level]').forEach((btn) => {
+    const on = (btn.dataset.logLevel || '') === _logsFilterLevel;
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
 
 export function renderLogs() {
   const pane = $('tab-logs');
   _logsOffset = 0;
+  _logsBuffer = [];
   if (_logsTimer) { clearInterval(_logsTimer); _logsTimer = null; }
   pane.innerHTML = `
-    <div style="display:flex;gap:8px;align-items:center;padding:8px;border-bottom:1px solid var(--border);flex-shrink:0">
-      <span style="font-weight:600">会话日志</span>
-      <label style="margin-left:auto;display:flex;align-items:center;gap:4px;cursor:pointer">
-        <input type="checkbox" id="logs-autoscroll" checked> 自动滚动
+    <div class="logs-toolbar">
+      <span class="logs-toolbar-title">会话日志</span>
+      <input type="search" id="logs-filter-query" class="logs-filter-input"
+        placeholder="过滤关键字…" autocomplete="off"
+        value="${escapeHtml(_logsFilterQuery)}"
+        aria-label="日志关键字过滤">
+      <div class="logs-level-chips" role="group" aria-label="日志等级">
+        <button type="button" class="logs-chip" data-log-level="all">全部</button>
+        <button type="button" class="logs-chip" data-log-level="info">信息</button>
+        <button type="button" class="logs-chip" data-log-level="warn">警告</button>
+        <button type="button" class="logs-chip" data-log-level="error">错误</button>
+      </div>
+      <span id="logs-match-count" class="logs-match-count muted"></span>
+      <label class="logs-autoscroll-label">
+        <input type="checkbox" id="logs-autoscroll" ${_logsAutoScroll ? 'checked' : ''}> 自动滚动
       </label>
-      <button class="btn-secondary" id="btn-logs-clear">清空</button>
+      <button type="button" class="btn-secondary" id="btn-logs-clear">清空</button>
     </div>
-    <div id="logs-view" style="flex:1;overflow-y:auto;padding:8px;font-family:var(--font-mono,monospace);font-size:var(--text-xs,12px);line-height:1.6;background:var(--bg-surface);white-space:pre-wrap;word-break:break-all"></div>
+    <p id="logs-empty-hint" class="logs-empty-hint muted" hidden>没有匹配当前过滤条件的日志</p>
+    <div id="logs-view" class="logs-view" role="log" aria-live="polite"></div>
   `;
   const view = $('logs-view');
   const cb = $('logs-autoscroll');
   if (cb) cb.onchange = () => { _logsAutoScroll = cb.checked; };
+  const queryInput = $('logs-filter-query');
+  if (queryInput) {
+    queryInput.oninput = () => {
+      _logsFilterQuery = queryInput.value || '';
+      _paintLogsView(view);
+    };
+  }
+  pane.querySelectorAll('[data-log-level]').forEach((btn) => {
+    btn.onclick = () => {
+      _logsFilterLevel = btn.dataset.logLevel || 'all';
+      _syncLogsLevelChips();
+      _paintLogsView(view);
+    };
+  });
+  _syncLogsLevelChips();
+
   $('btn-logs-clear').onclick = async () => {
     try {
       await api('POST', '/api/logs/clear', {});
-      view.innerHTML = '';
+      _logsBuffer = [];
       _logsOffset = 0;
+      _paintLogsView(view);
     } catch { /* ignore */ }
   };
+
+  const ingest = (lines) => {
+    if (!Array.isArray(lines) || !lines.length) return;
+    for (const line of lines) {
+      _logsBuffer.push(line);
+      // Append only when it matches current filter (avoids full repaint on every tick)
+      if (filterLogLines([line], _logsFilterOpts()).length) {
+        _appendLogLineEl(view, line);
+      }
+    }
+    const empty = $('logs-empty-hint');
+    if (empty) {
+      const visible = filterLogLines(_logsBuffer, _logsFilterOpts());
+      empty.hidden = !(_logsBuffer.length > 0 && visible.length === 0);
+    }
+    const countEl = $('logs-match-count');
+    if (countEl) {
+      const visible = filterLogLines(_logsBuffer, _logsFilterOpts());
+      countEl.textContent = `显示 ${visible.length} / ${_logsBuffer.length}`;
+    }
+    if (_logsAutoScroll) view.scrollTop = view.scrollHeight;
+  };
+
   _logsTimer = setInterval(async () => {
     try {
       const r = await api('GET', `/api/logs?offset=${_logsOffset}`);
       if (!r || !r.logs) return;
-      for (const line of r.logs) {
-        const d = document.createElement('div');
-        d.textContent = line;
-        view.appendChild(d);
-      }
+      ingest(r.logs);
       _logsOffset = r.total;
-      if (_logsAutoScroll) view.scrollTop = view.scrollHeight;
     } catch { /* ignore */ }
   }, 2000);
+
   (async () => {
     try {
       const r = await api('GET', '/api/logs?offset=0');
       if (r && r.logs) {
-        view.innerHTML = r.logs.map(l => `<div>${escapeHtml(l)}</div>`).join('');
+        _logsBuffer = r.logs.slice();
         _logsOffset = r.total;
-        if (_logsAutoScroll) view.scrollTop = view.scrollHeight;
+        _paintLogsView(view);
       }
     } catch { /* ignore */ }
   })();
