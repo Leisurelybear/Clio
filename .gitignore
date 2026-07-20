@@ -32,6 +32,12 @@ node_modules/
 # Ruff cache
 .ruff_cache/
 
+# Coverage artifacts
+.coverage
+coverage.xml
+htmlcov/
+.mypy_cache/
+
 # Test mock artifacts
 MagicMock/
 
