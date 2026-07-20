@@ -272,14 +272,10 @@ R-031a composite clock coexists with native video controls source timebase. Docu
 | R-028b/c | ffmpeg zip / UI install | Complements R-028a deps probe already shipped |
 | R-029d | Dead physical-split cleanup | Aligns with I10; reduces hazard of reintroduction |
 | R-031b | Prefer cut/composite media on plan timeline | Addresses dual-timebase residual partially |
+| **R-032** | **Desktop app packaging** (pywebview + PyInstaller lean) | Migrate browser+`serve` → double-click desktop shell; Windows-first |
+| **R-033** | Post-review hardening | Remaining C6/C7/C3/C5 + body limits + selected-file unit realism |
 
-**Suggested inserts (not yet on ROADMAP):**
-
-- Plan readiness index normalize + offline collection (C1/C2)  
-- Provider cache clear on config/env write (C4)  
-- Cut/run path sandbox under project roots (C6/C7)  
-- Run SSE app-lifetime (C10)  
-- Untrack `.coverage` + selected-file unit tests (I27/I30)
+**Shipped from this review (2026-07-20 fix wave):** C1/C2, C4, C10, C11, C12, I30 — see CHANGELOG / commits `e9de542`…`4548230`.
 
 ---
 

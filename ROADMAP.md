@@ -5,7 +5,7 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
-## Remaining Open Items (2026-07-19)
+## Remaining Open Items (2026-07-21)
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
@@ -15,6 +15,8 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | R-028c | UI one-click ffmpeg install (banner action, Whisper-like) | Medium | Medium |
 | R-029d | Optional cleanup: delete dead physical-split write path / shrink legacy tests | Medium | Low |
 | R-031b | Plan preview: prefer cut / concat media on the global timeline | Medium | Medium |
+| R-032 | **Desktop app packaging** (Windows-first shell around local serve) | Large | High |
+| R-033 | Post-review hardening (LAN sandboxes, yaml api_key, global validate) | Medium | Medium |
 
 ### Deferred by choice
 
@@ -24,6 +26,83 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | Per-segment AI regenerate on plan rows | User declined — structural edit + full re-plan cover the need |
 | Serve-time silent ffmpeg download | Explicit user/setup only (R-028c is click; never auto on serve) |
 | Auto-migrate multi-seg artifacts → single identity | Optional; legacy read-only path covers old projects |
+
+### Recently completed (2026-07-20 full review + P0 fixes)
+
+**Review:** `docs/analysis/2026-07-20-full-project-review.md` — full static review; prior 2026-07-04 P0s mostly FIXED (auth default-on, selected-file filter, cancel core, physical split).
+
+**Shipped fixes** (`e9de542`…`4548230` on `main`):
+
+| ID | Commit scope | Notes |
+| --- | --- | --- |
+| C1/C2 | `fix(plan): normalize index keys and collect offline originals` | `"1"`/`"001"` membership; offline via `media_identity` / stems |
+| C4 | `fix(ai): clear provider cache after env and config writes` | `_clear_provider_cache` on env/config/provider PUT; richer cache key |
+| C10 | `fix(ui): keep run SSE alive across plan entity switch` | No tear-down on Plan; terminal status without Run DOM |
+| C11 | `fix(ui): exact-match video player source file query` | `playerSrcMatchesFile` + vitest |
+| C12 | `fix(ui): escape plan day labels and normalize index lookup` | XSS + `String(index)` |
+| I30 | `chore: stop tracking .coverage…` | gitignore coverage/mypy caches |
+
+**Still open from that review** (tracked as **R-033**): cut `output_dir` / run `project_dir` sandbox; reject/strip yaml `api_key`; `load_global_config` full validate; body size limits; selected-file unit realism.
+
+### R-032 Desktop app packaging (migrate local Web UI → desktop)
+
+**Goal:** Ship Clio as a **double-click desktop app** (Windows-first), not only `python main.py serve` + browser. Users get a window, bundled/runtime Python deps story, optional tray, and no manual terminal.
+
+**Why now:** Product is a personal local pipeline; browser+CLI is friction for non-dev users. Full review residual LAN/token model also fits better behind a **localhost-only desktop shell** than ad-hoc `--host 0.0.0.0`.
+
+**Current surface (to wrap, not rewrite):**
+- Entry: `python main.py serve` / `serve.ps1` / `serve.sh` → `clio.ui.server.run` (stdlib `ThreadingHTTPServer` + static ES modules)
+- UI: `clio/ui/static/**` (no SPA build step)
+- Config: `config.yaml` + project dirs + `.env`
+
+**Recommended direction (to confirm in design doc):**
+
+| Option | Pros | Cons |
+| --- | --- | --- |
+| **A. pywebview + PyInstaller** | Thin native window; same HTTP UI; Python-native | Packaging size; ffmpeg/Whisper still external or fat |
+| **B. Electron / Tauri shell** | Mature desktop UX | Second runtime; IPC complexity |
+| **C. Briefcase / BeeWare** | Cross-platform packaging brand | Heavier learning curve for this stack |
+
+**Default lean: Option A** (pywebview host → auto-start local server on `127.0.0.1` random/fixed port → open WebView; package with PyInstaller onedir for Windows). Revisit if macOS/Linux parity becomes a hard requirement.
+
+**Phases:**
+
+| Phase | ID | Status | Scope |
+| --- | --- | --- | --- |
+| 0 | R-032a | Open | Design: process model (server thread vs child), port, token, single-instance, ffmpeg discovery, upgrade path |
+| 1 | R-032b | Open | Dev desktop launcher: `python -m clio.desktop` starts server + pywebview window (no installer yet) |
+| 2 | R-032c | Open | Windows PyInstaller (or equivalent) onedir/onefile; scripts for build; document unsigned-run caveats |
+| 3 | R-032d | Open | UX: tray / quit stops server; open data/log folders; first-run wizard (config / ffmpeg / Whisper) |
+| 4 | R-032e | Open | Optional: auto-bundle or download ffmpeg (ties R-028b/c); optional code-sign / InnoSetup installer |
+
+**Non-goals (initial):**
+- Rewrite UI in Qt/WPF native widgets
+- Cloud-hosted multi-user SaaS
+- Replacing CLI (`main.py analyze|plan|…` stays for power users)
+- Silent auto-update channel (document manual upgrade first)
+
+**Conventions:**
+- Desktop shell is a thin host; business logic stays in `clio/`
+- Default bind remains **localhost only**; no LAN unless user explicitly enables
+- One feature per commit; design before packaging binary
+- Spec/plan when Phase 0 starts: `docs/superpowers/specs|plans/…-desktop-packaging*`
+
+**Dependencies / related:**
+- R-028b/c (ffmpeg install story improves first-run)
+- R-033 (sandbox + secrets hardening still matter if user ever exposes host)
+- Existing `setup.ps1` / `serve.ps1` can feed the packaged runtime checklist
+
+### R-033 Post-review hardening (2026-07-20 residuals)
+
+**Goal:** Close remaining Critical/Important items from `docs/analysis/2026-07-20-full-project-review.md` that were not shipped in the 2026-07-20 fix wave.
+
+| Phase | ID | Status | Scope |
+| --- | --- | --- | --- |
+| A | R-033a | Open | Sandbox `POST /api/cut` `output_dir` + `POST /api/run/start` body `project_dir` to registry / project roots |
+| B | R-033b | Open | Strip/reject non-empty yaml `api_key`; mask keys on GET providers/config; env-only error copy |
+| C | R-033c | Open | `load_global_config` / global PUT full `_validate_config` (or `validate_global_config`) |
+| D | R-033d | Open | JSON body size / Content-Length caps; optional `hmac.compare_digest` for token |
+| E | R-033e | Open | Unit tests for `_matches_selected_*` with realistic identity-only JSON names |
 
 ### R-031 Plan global preview timeline
 
@@ -1051,6 +1130,8 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 | Commit / Branch | Description | Date |
 | --- | --- | --- |
+| `e9de542`…`4548230` (7 commits) | Full project review doc + P0 fixes: plan index/offline, provider cache clear, run SSE, player src match, day_label escape, untrack `.coverage` | 2026-07-20 |
+| R-031a / R-031a2 | Global plan preview timeline + composite waveform chrome | 2026-07-19 |
 | R-026 (`3cfba1e`…`694b3f9`) | Plan domain edit + export readiness + playhead/insert follow-up | 2026-07-17 |
 | `feat/project-video-manager` | Decouple project from media: `project_dir` + `videos.json`, pipeline cutover, UI video manager (mkdir / drag-drop / relink), `migrate` CLI, route registry A-007, dead-code cleanup | 2026-07-11 → 07-15 |
 | `c7bc732` (PR #18) | Merge feat/ui-redesign → main: prompt management (R-010d/e), confidence scoring (R-010b), model comparison CLI (R-010c), cover frame extraction (R-022), transcript alignment (R-023), webhook trigger (R-025), all-days planning (R-021), verify sidecar (R-020), progress debounce, toast notifications, provider connection test (CR-008), skipped diagnostics (CR-008), layout resize (R-016), video counterpart navigation, context_override tests (R-019f), and 41 other commits | 2026-07-10 |
@@ -1059,4 +1140,4 @@ Sorted by priority: P0 (immediate) → P1 (near-term) → P2 (mid-term) → P3 (
 
 Older completed sections (commit log, test coverage verification, code review audit) archived to [`docs/archive/2026-07-01-roadmap-archive.md`](docs/archive/2026-07-01-roadmap-archive.md).
 
-### Test count: 1202 pytest + 184 vitest (as of 2026-07-17 R-026 on `main`)
+### Test count: 1275 pytest + 265 vitest (as of 2026-07-20 review fixes on `main`)

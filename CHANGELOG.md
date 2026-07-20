@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-20
+
+### Fixed
+- fix(plan): normalize plan/media **index keys** (`"1"` ≡ `"001"`) so export/cut readiness no longer false-blocks when texts store int indices
+- fix(plan): **collect offline originals** from `videos.json` via `media_identity` / stem maps → `video_offline` warnings
+- fix(ai): **clear provider cache** after `.env` / config / provider writes so rotated API keys take effect immediately (not after TTL)
+- fix(ai): include `timeout_sec` / `max_tokens` / `retry_attempts` / `requests_per_minute` in provider cache key
+- fix(ui): keep **run SSE** alive when switching to Plan; process done/cancel without Run pane DOM
+- fix(ui): **exact-match** player source `file=` query (no basename substring false positives)
+- fix(ui): escape plan **day_label** in day select; `String(index)` match on segment click
+
+### Changed
+- chore: stop tracking `.coverage`; ignore `.coverage` / `coverage.xml` / `htmlcov/` / `.mypy_cache/`
+
+### Docs
+- Full project review: `docs/analysis/2026-07-20-full-project-review.md`
+- ROADMAP: open R-032 (desktop packaging), R-033 (post-review hardening); record 2026-07-20 P0 fix wave
+
 ## 2026-07-19
 
 ### Added
