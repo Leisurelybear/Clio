@@ -333,7 +333,7 @@ export function renderPlan() {
     <label>分集
       <select id="plan-day-select">
         ${state.availablePlans.map(dp =>
-          `<option value="${dp.day_label}" ${dp.day_label === state.currentDay ? 'selected' : ''}>${dp.day_label}</option>`
+          `<option value="${escapeHtml(dp.day_label)}" ${dp.day_label === state.currentDay ? 'selected' : ''}>${escapeHtml(dp.day_label)}</option>`
         ).join('')}
       </select>
     </label>
@@ -438,7 +438,7 @@ export function renderPlan() {
       if (sameExpanded && samePreview) return;
 
       _expandedSegIndex = i;
-      const v = state.videos.find(x => x.index === seg.index);
+      const v = state.videos.find(x => String(x.index) === String(seg.index));
       if (!v) {
         setStatus(`找不到视频 [${seg.index}]，请重新生成规划`, 'warn');
         renderPlan();
