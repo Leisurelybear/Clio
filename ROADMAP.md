@@ -223,6 +223,14 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Explicit `[ERROR]` / `[WARN]` / `[INFO]` / `[DEBUG]` tags first
 - Else: traceback / ✗ / 失败 / Exception → error; ⚠ / 跳过 / skip → warn; default info
 
+**Optional follow-ups (not scheduled):**
+- Copy / export filtered lines as `.txt`
+- Pause live polling
+- Step chips (compress/analyze/plan…) on top of free-text filter
+- Min-level filter (show ≥ warn)
+- R-027c server `?q=` only if client buffer becomes too large
+- Open on-disk `logs/` folder; per-project session buckets
+
 **Non-goals (still):**
 - Structured JSON log schema rewrite
 - Full regex engine UI
