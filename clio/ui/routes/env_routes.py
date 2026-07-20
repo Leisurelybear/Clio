@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from clio.ai.factory import _clear_provider_cache
 from clio.config import _load_dotenv
 from clio.utils import write_text_atomic
 
@@ -44,4 +45,6 @@ def handle_put_env(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> N
     _load_dotenv(env_path.parent, override=True)
     # Clear config cache so next request rebuilds with the new API keys
     handler.__class__._config_cache.invalidate_all()
+    # Drop live AI clients so new keys/proxy take effect immediately (not after TTL)
+    _clear_provider_cache()
     handler._send_json({"ok": True, "path": str(env_path)})

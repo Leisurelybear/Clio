@@ -50,21 +50,6 @@ class TestHandleGetEnv:
 
 
 class TestHandlePutEnv:
-    def test_saves_to_dotenv(self, tmp_path: Path):
-        handler = MagicMock()
-        cfg = tmp_path / "config.yaml"
-        cfg.write_text("key: val\n", encoding="utf-8")
-        handler.config_path = cfg
-        handler.__class__._config_cache = MagicMock()
-        handler._send_json = MagicMock()
-
-        with patch("clio.ui.routes.env_routes._load_dotenv") as mock_load:
-            handle_put_env(handler, {}, {"content": "NEW_KEY=val\n"})
-
-        dotenv = tmp_path / ".env"
-        assert dotenv.read_text(encoding="utf-8") == "NEW_KEY=val\n"
-        mock_load.assert_called_once()
-
     def test_invalidates_cache_after_save(self, tmp_path: Path):
         handler = MagicMock()
         cfg = tmp_path / "config.yaml"
@@ -73,10 +58,32 @@ class TestHandlePutEnv:
         handler.__class__._config_cache = MagicMock()
         handler._send_json = MagicMock()
 
-        with patch("clio.ui.routes.env_routes._load_dotenv"):
+        with (
+            patch("clio.ui.routes.env_routes._load_dotenv"),
+            patch("clio.ui.routes.env_routes._clear_provider_cache") as mock_clear,
+        ):
             handle_put_env(handler, {}, {"content": "K=v\n"})
 
         handler.__class__._config_cache.invalidate_all.assert_called_once()
+        mock_clear.assert_called_once()
+
+    def test_saves_to_dotenv(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_text("key: val\n", encoding="utf-8")
+        handler.config_path = cfg
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+
+        with (
+            patch("clio.ui.routes.env_routes._load_dotenv") as mock_load,
+            patch("clio.ui.routes.env_routes._clear_provider_cache"),
+        ):
+            handle_put_env(handler, {}, {"content": "NEW_KEY=val\n"})
+
+        dotenv = tmp_path / ".env"
+        assert dotenv.read_text(encoding="utf-8") == "NEW_KEY=val\n"
+        mock_load.assert_called_once()
 
     def test_returns_path_in_response(self, tmp_path: Path):
         handler = MagicMock()

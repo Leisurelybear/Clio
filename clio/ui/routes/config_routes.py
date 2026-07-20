@@ -11,6 +11,7 @@ from urllib.parse import unquote
 
 import yaml
 
+from clio.ai.factory import _clear_provider_cache
 from clio.config import CONFIG_DESCRIPTIONS, deep_merge, load_config, load_global_config
 from clio.config.models import (
     AnalyzeConfig,
@@ -132,6 +133,7 @@ def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
                 target_path.unlink(missing_ok=True)
             return handler._send_json({"ok": False, "error": f"config validation failed: {e}"}, 400)
         handler.__class__._config_cache.invalidate_key(str(proj_dir.resolve()))
+        _clear_provider_cache()
         return handler._send_json({"ok": True, "path": str(target_path)})
     # Global config.yaml write (original logic)
     try:
@@ -158,6 +160,7 @@ def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
     if tmp_path and tmp_path.exists():
         tmp_path.unlink()
     handler.__class__._config_cache.invalidate_all()
+    _clear_provider_cache()
     handler._send_json({"ok": True, "path": str(config_path)})
 
 
@@ -363,6 +366,7 @@ def handle_put_config_global(handler: HandlerProtocol, qs: dict[str, Any], obj: 
     if tmp_path and tmp_path.exists():
         tmp_path.unlink()
     handler.__class__._config_cache.invalidate_all()
+    _clear_provider_cache()
     handler._send_json({"ok": True, "path": str(config_path)})
 
 
@@ -393,6 +397,7 @@ def handle_put_config_project(handler: HandlerProtocol, qs: dict[str, Any], obj:
             proj_yaml.unlink()
         return handler._send_json({"ok": False, "error": f"config validation failed: {e}"}, 400)
     handler.__class__._config_cache.invalidate_key(str(proj_dir.resolve()))
+    _clear_provider_cache()
     handler._send_json({"ok": True, "path": str(proj_yaml)})
 
 
@@ -473,6 +478,7 @@ def _write_global_config_raw(handler: HandlerProtocol, raw: dict[str, Any]) -> t
     if tmp_path and tmp_path.exists():
         tmp_path.unlink()
     handler.__class__._config_cache.invalidate_all()
+    _clear_provider_cache()
     return True, None
 
 

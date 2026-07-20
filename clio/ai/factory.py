@@ -37,6 +37,10 @@ def _build_provider(config: AppConfig, provider_name: str) -> TextAIProvider:
         provider_cfg.base_url,
         provider_cfg.type,
         provider_cfg.poll_interval_sec,
+        provider_cfg.timeout_sec,
+        provider_cfg.max_tokens,
+        provider_cfg.retry_attempts,
+        provider_cfg.requests_per_minute,
         config.proxy.url,
         config.proxy.enabled,
     )
