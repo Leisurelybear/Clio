@@ -88,6 +88,21 @@ function _syncPlanExpandFromPreview() {
   }).catch(() => { /* ignore */ });
 }
 
+/** Exact match of /api/video?file=…&source=… (avoids basename substring false positives). */
+export function playerSrcMatchesFile(playerSrc, file, source) {
+  if (!playerSrc || !file) return false;
+  try {
+    const u = new URL(playerSrc, 'http://local.invalid');
+    const qFile = u.searchParams.get('file') || '';
+    const qSource = u.searchParams.get('source') || 'compressed';
+    if (qFile !== String(file)) return false;
+    if (source != null && qSource !== String(source)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Load source video and seek. Does not always force play.
  * @param {{ file: string, abs_path?: string }} v
@@ -105,7 +120,7 @@ function _loadAndSeekSource(v, seekSec, wantPlay) {
   $('player-name').textContent = v.file;
   const same =
     player.src
-    && player.src.includes(encodeURIComponent(v.file))
+    && playerSrcMatchesFile(player.src, v.file, state.source)
     && player.readyState >= 1;
   if (same) {
     doSeek();
@@ -674,6 +689,7 @@ function setupPlayer() {
 }
 
 export {
+  playerSrcMatchesFile,
   playVideoSegment,
   startPreview,
   stopPreview,
