@@ -9,7 +9,9 @@ from typing import Any
 
 from clio._constants import VIDEO_EXTS
 from clio.cut import parse_time_range
+from clio.identity import load_identity
 from clio.plan_model import Plan, PlanIssue
+from clio.utils import format_index
 
 
 @dataclass
@@ -29,12 +31,51 @@ class ReadinessResult:
         }
 
 
+def expand_index_keys(raw: Any, *, index_width: int = 3) -> set[str]:
+    """All membership forms for a plan/media index (raw, int, zero-padded).
+
+    Plan sequence uses format_index → "001"; texts often store index as int → "1".
+    Exact string equality between those forms produced false index_missing errors.
+    """
+    if raw is None:
+        return set()
+    s = str(raw).strip()
+    if not s:
+        return set()
+    keys = {s}
+    if s.isdigit():
+        n = int(s)
+        keys.add(str(n))
+        width = max(1, int(index_width or 3))
+        keys.add(format_index(n, width))
+        # Also admit common pad widths so "01" matches "001" / "1"
+        for w in (2, 3, 4):
+            keys.add(format_index(n, w))
+    return keys
+
+
+def index_in_set(idx: str, candidates: set[str] | None, *, index_width: int = 3) -> bool:
+    if not candidates:
+        return False
+    return bool(expand_index_keys(idx, index_width=index_width) & candidates)
+
+
+def _index_width_from_cfg(cfg: Any) -> int:
+    naming = getattr(cfg, "naming", None)
+    width = getattr(naming, "index_width", 3) if naming is not None else 3
+    try:
+        return max(1, int(width or 3))
+    except (TypeError, ValueError):
+        return 3
+
+
 def check_plan_export_readiness(
     plan: Plan,
     *,
     known_indices: set[str] | None = None,
     offline_indices: set[str] | None = None,
     source: str = "compressed",
+    index_width: int = 3,
 ) -> ReadinessResult:
     del source  # reserved for original-vs-compressed nuance in callers
     result = ReadinessResult()
@@ -53,8 +94,20 @@ def check_plan_export_readiness(
     if tes > 1800:
         result.warnings.append(PlanIssue(level="warning", code="duration_long", message=f"预估总时长过长（{tes} 秒）"))
 
-    known = {str(x).strip() for x in known_indices} if known_indices else None
-    offline = {str(x).strip() for x in offline_indices} if offline_indices else set()
+    # Expand known/offline so "1" and "001" compare equal.
+    # None OR empty set → skip index_missing checks (legacy: empty discovery = unknown).
+    known: set[str] | None
+    if not known_indices:
+        known = None
+    else:
+        known = set()
+        for x in known_indices:
+            known.update(expand_index_keys(x, index_width=index_width))
+
+    offline: set[str] = set()
+    if offline_indices:
+        for x in offline_indices:
+            offline.update(expand_index_keys(x, index_width=index_width))
 
     for i, seg in enumerate(plan.sequence):
         idx = (seg.index or "").strip()
@@ -62,7 +115,7 @@ def check_plan_export_readiness(
             result.errors.append(
                 PlanIssue(level="error", code="index_empty", message=f"第 {i + 1} 段缺少 index", segment_index=i)
             )
-        elif known is not None and idx not in known:
+        elif known is not None and not index_in_set(idx, known, index_width=index_width):
             result.errors.append(
                 PlanIssue(
                     level="error",
@@ -71,7 +124,7 @@ def check_plan_export_readiness(
                     segment_index=i,
                 )
             )
-        elif idx in offline:
+        elif index_in_set(idx, offline, index_width=index_width):
             result.warnings.append(
                 PlanIssue(
                     level="warning",
@@ -116,10 +169,31 @@ def check_plan_export_readiness(
     return result
 
 
+def _register_stem_indices(
+    stem_to_indices: dict[str, set[str]],
+    stem: str | None,
+    idx_keys: set[str],
+) -> None:
+    if not stem or not idx_keys:
+        return
+    key = stem.strip().lower()
+    if not key:
+        return
+    stem_to_indices.setdefault(key, set()).update(idx_keys)
+
+
 def collect_project_indices(cfg: Any) -> tuple[set[str], set[str]]:
-    """Build (known_indices, offline_indices) from compressed + texts + videos.json."""
+    """Build (known_indices, offline_indices) from compressed + texts + videos.json.
+
+    known/offline sets include expanded index key forms ("1", "001", …).
+    offline_indices are plan indexes whose original media is listed in videos.json
+    but currently missing on disk (mapped via texts media_identity / source_file
+    or compressed filename stems).
+    """
+    width = _index_width_from_cfg(cfg)
     known: set[str] = set()
     offline: set[str] = set()
+    stem_to_indices: dict[str, set[str]] = {}
 
     comp = getattr(cfg, "compressed_dir", None)
     if isinstance(comp, Path) and comp.is_dir():
@@ -129,7 +203,19 @@ def collect_project_indices(cfg: Any) -> tuple[set[str], set[str]]:
                     stem = p.stem
                     idx = stem.split("_", 1)[0]
                     if idx:
-                        known.add(idx)
+                        keys = expand_index_keys(idx, index_width=width)
+                        known.update(keys)
+                        # Map original-like suffix after index prefix: 001_GL010683 → GL010683
+                        rest = stem.split("_", 1)[1] if "_" in stem else ""
+                        if rest:
+                            # Drop legacy _segNN tail for stem matching
+                            base = rest
+                            for marker in ("_seg", "_part", "_pt", "_chunk"):
+                                pos = base.lower().rfind(marker)
+                                if pos > 0 and base[pos + len(marker) :].isdigit():
+                                    base = base[:pos]
+                                    break
+                            _register_stem_indices(stem_to_indices, base, keys)
         except OSError:
             pass
 
@@ -141,8 +227,20 @@ def collect_project_indices(cfg: Any) -> tuple[set[str], set[str]]:
                     data = json.loads(jf.read_text(encoding="utf-8"))
                 except (json.JSONDecodeError, OSError):
                     continue
-                if data.get("index") is not None:
-                    known.add(str(data["index"]).strip())
+                raw_idx = data.get("index")
+                if raw_idx is None:
+                    continue
+                keys = expand_index_keys(raw_idx, index_width=width)
+                known.update(keys)
+                identity = load_identity(data)
+                if identity is not None:
+                    _register_stem_indices(stem_to_indices, identity.original_stem, keys)
+                    _register_stem_indices(stem_to_indices, identity.compressed_stem, keys)
+                    if identity.index:
+                        known.update(expand_index_keys(identity.index, index_width=width))
+                source = data.get("source_file") or data.get("compressed_file")
+                if source:
+                    _register_stem_indices(stem_to_indices, Path(str(source)).stem, keys)
         except OSError:
             pass
 
@@ -152,10 +250,14 @@ def collect_project_indices(cfg: Any) -> tuple[set[str], set[str]]:
             from clio.tasks._video_loader import load_selected_videos
 
             for p in load_selected_videos(project_dir):
-                # Prefer numeric prefix if compressed-style naming; else skip stem-as-index
-                if not p.exists():
-                    # Cannot map path→plan index reliably; skip false offline
+                if p.is_file():
                     continue
+                # Offline: map path stem → plan indices
+                for stem_candidate in (p.stem, Path(str(p)).stem):
+                    mapped = stem_to_indices.get(stem_candidate.lower())
+                    if mapped:
+                        offline.update(mapped)
+                        break
         except Exception:
             pass
 
