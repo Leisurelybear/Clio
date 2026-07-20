@@ -88,11 +88,42 @@ UI 只读 / 写 `config.yaml` 里 `paths.output_dir` 下的文件：
 | 设置 (config) | sidebar → ⚙ 设置 → 项目 tab | `project.yaml` | 项目级字段，嵌套表单渲染 |
 | 设置 (config) | sidebar → ⚙ 设置 → 全局 tab | `config.yaml`（global-only 字段） | 保存后需重启服务 |
 | 设置 (config) | sidebar → ⚙ 设置 → 合并视图 tab | 合并后配置 | 只读查看全局+项目字段来源 |
-| 日志 (logs) | sidebar → 日志 | `logs/YYYY-MM-DD-HH.log` | 服务运行日志，支持自动刷新 |
+| 日志 (logs) | sidebar → **日志** | 内存会话缓冲（`session_log`）+ 磁盘 `logs/YYYY-MM-DD-HH.log` | 见下方「会话日志」 |
 | 统计 (tokens) | sidebar → 统计 | `output/token_usage.json` | 总 token、按模型、按任务、最近 100 条历史 |
 | 多项目 | sidebar 顶部选择器 / URL `?project=name` | 自动发现 `project.json` | 支持新建、打开、切换 |
 
 `texts*` 通配同时匹配 `texts/` 和 `texts - 巴黎/` 之类的目录。
+
+## 会话日志 (R-027)
+
+侧栏 **日志** 读服务端内存会话缓冲（`GET /api/logs?offset=`），与磁盘 `logs/YYYY-MM-DD-HH.log` 同源写入（`print` / pipeline 进度经 Tee 进入缓冲）。
+
+**已有能力：**
+
+| 能力 | 说明 |
+| --- | --- |
+| 自动刷新 | 每 2s 增量拉取；自动滚动可关 |
+| 清空 | `POST /api/logs/clear` 清空服务端缓冲；本地过滤条件保留 |
+| 关键字过滤 | 工具栏搜索框，不区分大小写子串（客户端） |
+| 等级 chips | 全部 / 信息 / 警告 / 错误 |
+| 等级徽章 | 每行推断 severity 并着色 |
+| 匹配计数 | `显示 N / M` |
+
+**等级推断**（纯客户端 `logs-filter.js`，非结构化 JSON 日志）：
+
+1. 显式 `[ERROR]` / `[WARN]` / `[INFO]` / `[DEBUG]`
+2. Traceback / ✗ / 失败 / Exception / `HTTP 5xx` → 错误
+3. ⚠ / 跳过 / skip → 警告
+4. 其它 → 信息
+
+**可选后续（未做，按需排期）：**
+
+- 复制 / 导出当前过滤结果为 `.txt`
+- 暂停实时刷新
+- 步骤 chips（compress / analyze / plan …）
+- 仅显示 ≥ 某等级（info+）
+- 服务端 `?q=` / level（R-027c，缓冲极大时再做）
+- 打开磁盘日志目录；跨项目分桶
 
 ## 视频源切换 (Source Toggle)
 

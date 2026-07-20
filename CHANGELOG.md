@@ -7,8 +7,12 @@
 - feat(ui): per-line **level badges** with color (heuristic from tags / ✗ / 跳过 / Traceback / …)
 - Pure helpers: `clio/ui/static/src/logs-filter.js` + Vitest `logs-filter.test.js`
 
+### Fixed
+- fix(ui): debug-level session log badge label was missing (showed 信息)
+
 ### Docs
 - ROADMAP R-027 marked done; R-027c server query deferred
+- `clio/ui/README.md`: session logs filter / levels / optional follow-ups
 
 ## 2026-07-20
 

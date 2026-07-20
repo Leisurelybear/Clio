@@ -1324,6 +1324,7 @@ let _logsFilterQuery = '';
 let _logsFilterLevel = 'all';
 
 const _LEVEL_LABELS = {
+  debug: '调试',
   info: '信息',
   warn: '警告',
   error: '错误',
