@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-07-21
+
+### Added
+- feat(ui): session logs **keyword filter** + **level chips** (R-027) — 全部/信息/警告/错误; client buffer re-filter; match count
+- feat(ui): per-line **level badges** with color (heuristic from tags / ✗ / 跳过 / Traceback / …)
+- Pure helpers: `clio/ui/static/src/logs-filter.js` + Vitest `logs-filter.test.js`
+
+### Docs
+- ROADMAP R-027 marked done; R-027c server query deferred
+
 ## 2026-07-20
 
 ### Fixed
