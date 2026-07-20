@@ -11,8 +11,8 @@
 - fix(ui): debug-level session log badge label was missing (showed 信息)
 
 ### Docs
-- ROADMAP R-027 marked done; R-027c server query deferred
-- `clio/ui/README.md`: session logs filter / levels / optional follow-ups
+- ROADMAP R-027a/b marked done; open **R-027d** (timestamps + time filter) and **R-027e** (load `logs/*.log` history)
+- `clio/ui/README.md`: session logs filter / levels + scheduled follow-ups
 
 ## 2026-07-20
 

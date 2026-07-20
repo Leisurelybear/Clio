@@ -10,6 +10,8 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
 | R-025 | Multi-language / i18n (UI + CLI user-facing copy) | Large | Medium |
+| R-027d | Session logs: **timestamps + time-range filter** | Small | Medium |
+| R-027e | Session logs: **load historical files** from `logs/YYYY-MM-DD-HH.log` | Medium | Medium |
 | R-028b | ffmpeg setup zip fallback (package manager fail → static build) | Medium | Medium |
 | R-028c | UI one-click ffmpeg install (banner action, Whisper-like) | Medium | Medium |
 | R-029d | Optional cleanup: delete dead physical-split write path / shrink legacy tests | Medium | Low |
@@ -206,13 +208,23 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Recently completed (2026-07-18):** R-028a ffmpeg missing-path Phase A; video waveform lazy peaks + orphan lock recovery; cover thumbs on video list; plan reorder feedback.
 
-### R-027 Session logs filtering + levels
+### R-027 Session logs filtering + levels (+ history)
 
-**Goal:** In the **会话日志** panel (`renderLogs` / `entity-logs`), users can narrow the live log stream so long runs are readable, with inferred severity badges.
+**Goal:** In the **会话日志** panel (`renderLogs` / `entity-logs`), users can narrow the live log stream so long runs are readable, with inferred severity badges; later load past hours from disk and filter by time.
 
-**Status:** **Done** (2026-07-21) — client-first filter + level chips (R-027a/b). Server-side `?q=` (R-027c) deferred until buffer size needs it.
+**Status:** **R-027a/b Done** (2026-07-21). **R-027d/e open** (timestamps, time filter, historical files). R-027c server `?q=` still deferred.
 
-**Delivered:**
+#### Phases
+
+| Phase | ID | Status | Scope |
+| --- | --- | --- | --- |
+| A | R-027a | **Done** | Client keyword filter |
+| B | R-027b | **Done** | Level chips + badges (heuristic severity) |
+| C | R-027c | Deferred | Server `?q=` / level only if client buffer too large |
+| D | R-027d | **Open** | **Show timestamps** per line + **time-range filter** (from / to / last N min) |
+| E | R-027e | **Open** | **Load historical logs** from on-disk `logs/YYYY-MM-DD-HH.log` (list hours, open one or merge range) |
+
+**Delivered (a/b):**
 - [x] Pure helpers `logs-filter.js`: `inferLogLevel`, `filterLogLines`, `lineMatchesLogFilter` + Vitest
 - [x] Toolbar: keyword search (case-insensitive substring); chips 全部 / 信息 / 警告 / 错误
 - [x] Level badges + color on each line; match count `显示 N / M`
@@ -223,18 +235,47 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Explicit `[ERROR]` / `[WARN]` / `[INFO]` / `[DEBUG]` tags first
 - Else: traceback / ✗ / 失败 / Exception → error; ⚠ / 跳过 / skip → warn; default info
 
-**Optional follow-ups (not scheduled):**
-- Copy / export filtered lines as `.txt`
-- Pause live polling
-- Step chips (compress/analyze/plan…) on top of free-text filter
-- Min-level filter (show ≥ warn)
-- R-027c server `?q=` only if client buffer becomes too large
-- Open on-disk `logs/` folder; per-project session buckets
+#### R-027d — Timestamps + time-range filter (open)
+
+**Why:** Live lines often lack a visible clock; hard to correlate “when did analyze fail?” Disk file logs already use `YYYY-MM-DD HH:MM:SS [LEVEL] …` via `clio.log` Tee; session buffer today is raw `print` strings without a consistent prefix.
+
+**Proposed scope:**
+1. **Capture time at write** — when appending to `session_log`, store `{ts, text}` (or prefix ISO/local time) without breaking plain-string consumers; API may return objects or keep string with guaranteed prefix.
+2. **UI column / muted prefix** — each row shows `HH:MM:SS` (full date on hover if not today).
+3. **Time filter controls** — quick chips: 最近 5/15/60 分钟；optional from–to datetime; combine with keyword + level (AND).
+4. **Parse disk-style lines** — if line already starts with `YYYY-MM-DD HH:MM:SS`, use that as ts when loading history (R-027e).
+
+**Non-goals for d:** timezone picker; absolute wall-clock sync across machines.
+
+#### R-027e — Load historical logs from `logs/` (open)
+
+**Why:** Session buffer is in-memory (max ~10k lines, cleared on restart/clear). Disk already has hourly files under `paths.logs_dir` (`logs/YYYY-MM-DD-HH.log`). Users need “昨天晚上那次失败” without grepping the filesystem.
+
+**Proposed scope:**
+1. **API** — e.g. `GET /api/logs/files` list available hour files (name, size, mtime); `GET /api/logs/file?name=…` or `?from=&to=` stream/read tail of one or more files (size-capped, path-sanitized under logs_dir only).
+2. **UI** — dropdown / date+hour picker: “当前会话” | “2026-07-20 22:00” | …; optional “加载更多历史”.
+3. **Mode** — historical view: pause live poll (or badge “历史”); switch back to live resumes offset tail.
+4. **Reuse filters** — same keyword / level / time-range over loaded lines.
+5. **Safety** — basename-only names; reject `..`; optional max bytes (e.g. last 2–5 MB per request).
+
+**Depends on:** R-027d timestamp display makes historical lines readable; can ship e with parse-from-line-prefix first if d not done.
+
+#### Nice-to-have (unscheduled, after d/e)
+
+| Idea | Notes |
+| --- | --- |
+| Copy / export filtered lines as `.txt` | High UX value; pure client |
+| Pause live polling (manual) | Overlaps e’s historical mode |
+| Step chips (compress / analyze / plan …) | Heuristic on line text / phase markers |
+| Min-level filter (show ≥ warn) | Small extension of level chips |
+| Open `logs/` in file manager | Reuse `/api/fs/reveal` |
+| Per-project session buckets | Multi-project serve mixes process-global buffer today |
+| Persist filter to `localStorage` | Optional; not required for d/e |
 
 **Non-goals (still):**
-- Structured JSON log schema rewrite
+- Structured JSON log schema rewrite (keep free-form + light metadata)
 - Full regex engine UI
-- Persisting filter to `localStorage` across browser sessions
+- Shipping full multi-GB log browsers (always cap / tail)
 
 **Recently completed (2026-07-17 R-026 + follow-up, on `origin/main`):**
 
