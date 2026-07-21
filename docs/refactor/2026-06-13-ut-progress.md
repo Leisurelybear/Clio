@@ -1,6 +1,6 @@
 # UT 进度跟踪
 
-> 按 `docs/refactor/UT-improvement.md` 优先级系统补充单元测试。
+> 按 `docs/refactor/2026-06-13-ut-improvement.md` 优先级系统补充单元测试。
 > 每完成一个模块记录：新增测试数、mock 方式、发现的潜在问题。
 
 ---

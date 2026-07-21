@@ -4,7 +4,7 @@
 
 ## 11. Optimization Plan (2026-06-20 Code Review)
 
-Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cross-referenced against actual project state.
+Based on external code review (`docs/analysis/2026-06-20-review-part1.md`), cross-referenced against actual project state.
 
 ### What both reviews got right (still actionable / already addressed)
 

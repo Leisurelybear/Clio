@@ -986,7 +986,7 @@ npx vitest run clio/ui/static/src/__tests__
 
 ## Execution handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-07-19-plan-global-preview-timeline.md`.
+Plan complete and saved to `docs/superpowers/plans/2026-07-19-plan-global-preview-timeline-plan.md`.
 
 **Two execution options:**
 

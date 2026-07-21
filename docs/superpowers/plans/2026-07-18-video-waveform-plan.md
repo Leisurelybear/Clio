@@ -980,7 +980,7 @@ git commit -m "feat(ui): regenerate waveform action and docs note"
 
 ## Execution handoff
 
-Plan saved to `docs/superpowers/plans/2026-07-18-video-waveform.md`.
+Plan saved to `docs/superpowers/plans/2026-07-18-video-waveform-plan.md`.
 
 **Two execution options:**
 

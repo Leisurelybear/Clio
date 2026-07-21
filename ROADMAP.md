@@ -152,7 +152,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Accordion (one open); preview `previewIndex` auto-expands current segment
 - Was briefly B; user re-evaluated toward C for scan density
 
-**Status:** **Done** (2026-07-19) — accordion cards + ghost buttons + preview auto-expand; follow-up review fixes (focus-safe expand, readiness expand-on-click, list markers, playhead→`use_timeline` via `planSecFromPlayer` / `offset_sec`). Spec: `docs/superpowers/specs/2026-07-19-plan-seg-card-density-design.md`. Plan: `docs/superpowers/plans/2026-07-19-plan-seg-card-density.md`.
+**Status:** **Done** (2026-07-19) — accordion cards + ghost buttons + preview auto-expand; follow-up review fixes (focus-safe expand, readiness expand-on-click, list markers, playhead→`use_timeline` via `planSecFromPlayer` / `offset_sec`). Spec: `docs/superpowers/specs/2026-07-19-plan-seg-card-density-design.md`. Plan: `docs/superpowers/plans/2026-07-19-plan-seg-card-density-plan.md`.
 
 ### R-029 Remove physical video split (logical analyze windows)
 
@@ -160,7 +160,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Why:** Physical split solved Gemini length limits but leaked into compress/UI/cut/export/identity (dual timebase, multi-index, B-060/B-068/B-073/B-097).
 
-**Spec / plan:** `docs/superpowers/specs/2026-07-18-remove-physical-split-design.md`, `docs/superpowers/plans/2026-07-18-remove-physical-split.md`
+**Spec / plan:** `docs/superpowers/specs/2026-07-18-remove-physical-split-design.md`, `docs/superpowers/plans/2026-07-18-remove-physical-split-plan.md`
 
 **Phases:**
 
@@ -284,7 +284,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - UI: reorder / delete / title+timeline edit, readiness panel, dirty-before-export
 - Follow-up: playhead **起点/终点**, **+插入** segment; fix empty `known_indices` false positives
 - Spec: `docs/superpowers/specs/2026-07-17-plan-domain-edit-readiness-design.md`
-- Plan: `docs/superpowers/plans/2026-07-17-plan-domain-edit-readiness.md`
+- Plan: `docs/superpowers/plans/2026-07-17-plan-domain-edit-readiness-plan.md`
 
 ### R-025 Multi-language (i18n)
 
@@ -479,7 +479,7 @@ High-value open items that are not already covered by completed fixes:
 
 ### U-002: ProviderManager (Phase 2 — Short-term)
 
-**Source**: 2026-06-20 code review (`docs/analysis/2026-06-20-REVIEW-part1.md`)
+**Source**: 2026-06-20 code review (`docs/analysis/2026-06-20-review-part1.md`)
 
 **Background**: Current `_provider_cache` in `factory.py` already has composite key + thread safety (C2/C4 fixed), but no TTL/expiration/hot-reload. Long-running server accumulates HTTP sessions.
 
@@ -494,7 +494,7 @@ High-value open items that are not already covered by completed fixes:
 
 ### U-007: Whisper Cancel Safety (Phase 2)
 
-**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
+**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review-part2.md`)
 
 **Background**: `whisper_routes.py` uses `ctypes.pythonapi.PyThreadState_SetAsyncExc` to kill download thread — unsafe (C extensions block injection, resource leaks). Replace with chunked download that checks cancel flag per-chunk.
 
@@ -508,7 +508,7 @@ High-value open items that are not already covered by completed fixes:
 
 ### U-010: Server + fs.py Test Coverage (Phase 3 — Testing)
 
-**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
+**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review-part2.md`)
 
 **Background**: `server.py` has 6% coverage, `fs.py` has 12% coverage. These are security-sensitive and critical files with minimal testing.
 
@@ -521,7 +521,7 @@ High-value open items that are not already covered by completed fixes:
 
 ### U-008: fs.py Path Restriction + Auth for LAN Mode (Phase 1 — Security)
 
-**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review_part2.md`)
+**Source**: 2026-06-21 review part2 (`docs/analysis/2026-06-21-review-part2.md`)
 
 **Background**: `/api/fs/dirs` has no path restriction, exposing full filesystem when `--host 0.0.0.0` is used. All write endpoints lack auth. Requires lightweight token-based protection.
 
@@ -856,7 +856,7 @@ High-value open items that are not already covered by completed fixes:
 
 ## Feature R-015: Config Hot Reload
 
-**Background**: Currently, after saving `config.yaml` (global config) in the UI, the cache is not invalidated — the service must be restarted. When `project.yaml` is saved, although the cache is evicted, the frontend always shows "Service restart required." External (CLI / text editor) modifications to config files are entirely undetected. Research in `docs/superpowers/specs/2026-06-13-config-hot-reload-audit.md`.
+**Background**: Currently, after saving `config.yaml` (global config) in the UI, the cache is not invalidated — the service must be restarted. When `project.yaml` is saved, although the cache is evicted, the frontend always shows "Service restart required." External (CLI / text editor) modifications to config files are entirely undetected. Research in `docs/superpowers/specs/2026-06-13-config-hot-reload-audit-design.md`.
 
 **Acceptance Criteria**:
 - Global `config.yaml` save clears `_config_cache`
@@ -874,7 +874,7 @@ High-value open items that are not already covered by completed fixes:
 
 ### N-01: JianYing Draft Export (剪映草稿导出)
 
-**Source**: 2026-06-24 code review (`docs/analysis/2026-06-24-claude_review.md`)
+**Source**: 2026-06-24 code review (`docs/analysis/2026-06-24-claude-review.md`)
 
 **Background**: plan.json → draft_content.json → JianYing Pro directly importable draft. Core pipeline built but video resolution not working for original files (missing source_file to filepath mapping).
 

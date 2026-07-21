@@ -486,7 +486,7 @@ No TBD/TODO steps; code blocks are complete.
 
 ## Execution handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-07-17-plan-reorder-feedback.md`.
+Plan complete and saved to `docs/superpowers/plans/2026-07-17-plan-reorder-feedback-plan.md`.
 
 **Two execution options:**
 

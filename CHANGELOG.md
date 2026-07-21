@@ -84,9 +84,9 @@
 
 ### Docs
 - design: `docs/superpowers/specs/2026-07-18-remove-physical-split-design.md`
-- plan: `docs/superpowers/plans/2026-07-18-remove-physical-split.md`
+- plan: `docs/superpowers/plans/2026-07-18-remove-physical-split-plan.md`
 - design: `docs/superpowers/specs/2026-07-18-ffmpeg-handling-design.md` (A shipped; B zip setup / C one-click install deferred)
-- plan: `docs/superpowers/plans/2026-07-18-ffmpeg-handling-phase-a.md`
+- plan: `docs/superpowers/plans/2026-07-18-ffmpeg-handling-phase-a-plan.md`
 - README / cli-reference / project.example / ROADMAP R-029: physical split → analyze windows
 
 ## 2026-07-16

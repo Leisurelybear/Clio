@@ -1,6 +1,6 @@
 # 2026-06-18 审查修复结果
 
-> 基于 `2026-06-18-vlog-editing-helper-review.md` 的修复记录。
+> 基于 `2026-06-18-clio-review.md` 的修复记录。
 
 ## 已修改文件（7 files, +65/-12 lines）
 

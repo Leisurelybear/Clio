@@ -65,6 +65,10 @@ vlog-video-analysis/
 
 ## 4. Key Conventions
 
+### 4.0 Docs naming
+
+- All files under `docs/` follow `docs/CONVENTIONS.md` (date + kebab-case; specs `-design`, plans `-plan`).
+
 ### 4.1 Commit
 
 - English message, Conventional Commits: `type(scope): subject`
@@ -195,7 +199,7 @@ python main.py serve --no-browser
 | Evaluate repeatable workflows for skill extraction | `docs/superpowers/agents/skill-candidates.md` |
 | See full directory tree with annotations | `docs/superpowers/agents/directory-tree.md` |
 | Understand the model registry (provider list + task binding) | `AGENTS.md section 4.7` |
-| Understand R-017 implementation details | `docs/superpowers/plans/2026-07-02-model-registry.md` |
+| Understand R-017 implementation details | `docs/superpowers/plans/2026-07-02-model-registry-plan.md` |
 | Add a new AI provider | Skill: `adding-ai-provider` |
 | Add a new AI task | Skill: `adding-new-task` |
 | Add a new CLI subcommand | Skill: `adding-cli-subcommand` |

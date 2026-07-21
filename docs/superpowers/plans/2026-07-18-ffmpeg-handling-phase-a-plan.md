@@ -828,7 +828,7 @@ rg "deps/ffmpeg/install|Gyan|btbn" clio -i || true
 
 ## Execution handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-07-18-ffmpeg-handling-phase-a.md`.
+Plan complete and saved to `docs/superpowers/plans/2026-07-18-ffmpeg-handling-phase-a-plan.md`.
 
 **Two execution options:**
 

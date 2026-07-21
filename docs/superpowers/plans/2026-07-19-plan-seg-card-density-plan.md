@@ -804,7 +804,7 @@ Expected: all pass.
 In `ROADMAP.md` R-030 section:
 
 ```markdown
-**Status:** Done (2026-07-19) — collapsed accordion cards + ghost buttons + preview auto-expand. Spec: `docs/superpowers/specs/2026-07-19-plan-seg-card-density-design.md`. Plan: `docs/superpowers/plans/2026-07-19-plan-seg-card-density.md`.
+**Status:** Done (2026-07-19) — collapsed accordion cards + ghost buttons + preview auto-expand. Spec: `docs/superpowers/specs/2026-07-19-plan-seg-card-density-design.md`. Plan: `docs/superpowers/plans/2026-07-19-plan-seg-card-density-plan.md`.
 ```
 
 Remove R-030 from the open items table (or mark done in table if project keeps historical rows — match style of R-028a: leave detail section Done, remove from top open table).
@@ -846,7 +846,7 @@ git commit -m "docs: mark R-030 plan segment card density done"
 
 ## Execution handoff
 
-Plan complete and saved to `docs/superpowers/plans/2026-07-19-plan-seg-card-density.md`.
+Plan complete and saved to `docs/superpowers/plans/2026-07-19-plan-seg-card-density-plan.md`.
 
 **Two execution options:**
 

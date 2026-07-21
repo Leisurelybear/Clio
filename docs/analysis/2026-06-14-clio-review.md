@@ -32,7 +32,7 @@
 
 **问题**：当写入的是全局 `config.yaml`（非 `project.yaml`）时，代码写盘后未对 `_config_cache` 做任何清理。后续所有的流水线调用（`/api/run/start` 等）仍然拿到旧配置，新 API key、新 provider 设置全部无效，直到服务重启。
 
-此 bug 在 `docs/superpowers/specs/2026-06-13-config-hot-reload-audit.md` 中已有记录但尚未修复。
+此 bug 在 `docs/superpowers/specs/2026-06-13-config-hot-reload-audit-design.md` 中已有记录但尚未修复。
 
 **修复方案**：
 

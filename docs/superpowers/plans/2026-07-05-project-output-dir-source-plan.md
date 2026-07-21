@@ -68,14 +68,14 @@ Expected: only `project_service.py`, `ROADMAP.md`, and this plan file changed.
 **Files:**
 - Commit: `clio/ui/services/project_service.py`
 - Commit: `ROADMAP.md`
-- Commit: `docs/superpowers/plans/2026-07-05-project-output-dir-source.md`
+- Commit: `docs/superpowers/plans/2026-07-05-project-output-dir-source-plan.md`
 
 - [ ] **Step 1: Commit one focused change**
 
 Run:
 
 ```bash
-git add clio/ui/services/project_service.py ROADMAP.md docs/superpowers/plans/2026-07-05-project-output-dir-source.md
+git add clio/ui/services/project_service.py ROADMAP.md docs/superpowers/plans/2026-07-05-project-output-dir-source-plan.md
 git commit -m "fix(project): prefer project yaml output dir"
 ```
 

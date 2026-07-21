@@ -351,7 +351,7 @@ Copy from old AGENTS.md §11 (lines 636–680). Add context header.
 
 > Extracted from AGENTS.md §11. Reference document — load on demand when planning refactoring work.
 
-Based on external code review (`docs/analysis/2026-06-20-REVIEW-part1.md`), cross-referenced against actual project state.
+Based on external code review (`docs/analysis/2026-06-20-review-part1.md`), cross-referenced against actual project state.
 
 ## What Both Reviews Got Right (Still Actionable)
 
