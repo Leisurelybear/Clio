@@ -45,6 +45,7 @@ def auto_reindex_if_needed(config: AppConfig, ffprobe: str | None = None) -> boo
 
     import re as _re
 
+    t_scan = _time.perf_counter()
     # 找所有带数字前缀的压缩视频
     groups: dict[str, list[Path]] = {}
     for p in sorted(compressed_dir.iterdir()):
@@ -61,7 +62,10 @@ def auto_reindex_if_needed(config: AppConfig, ffprobe: str | None = None) -> boo
 
     # 检查哪些没有 .vindex
     missing = [s for s in groups if not VideoIndex.read(s, compressed_dir)]
+    scan_ms = (_time.perf_counter() - t_scan) * 1000
     if not missing:
+        if groups:
+            print(f"[startup] video indexes ok ({len(groups)} stems in {compressed_dir.name}, {scan_ms:.0f}ms)")
         return False
 
     # 显示重建提示（不清屏，避免在服务/CI 场景丢失日志）
@@ -70,15 +74,18 @@ def auto_reindex_if_needed(config: AppConfig, ffprobe: str | None = None) -> boo
     print("=" * _W)
     print("  视频索引重建中...".center(_W))
     print(f"  检测到 {len(missing)}/{len(groups)} 个原视频缺少索引文件".center(_W))
-    print("  请勿中断操作".center(_W))
+    print(f"  扫描耗时 {scan_ms:.0f}ms — 请勿中断".center(_W))
     print("=" * _W)
     print()
+    t_rebuild = _time.perf_counter()
     run_reindex(config, ffprobe)
+    rebuild_s = _time.perf_counter() - t_rebuild
     print()
     print("=" * _W)
-    print("  ✅ 索引重建完成，继续执行...".center(_W))
+    print(f"  ✅ 索引重建完成 ({rebuild_s:.1f}s)，继续执行...".center(_W))
     print("=" * _W)
-    _time.sleep(1.5)
+    # Brief pause so the banner is readable in interactive terminals
+    _time.sleep(0.4)
     return True
 
 

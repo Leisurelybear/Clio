@@ -480,6 +480,12 @@ def make_handler(
     return Handler
 
 
+def _startup_ms(t0: float) -> str:
+    import time
+
+    return f"{(time.perf_counter() - t0) * 1000:.0f}ms"
+
+
 def run(
     config: AppConfig,
     config_path: Path | None = None,
@@ -488,8 +494,15 @@ def run(
     open_browser: bool = True,
     api_token: str | None = None,
 ) -> int:
-    install_hooks()
     import secrets
+    import time
+
+    t_run = time.perf_counter()
+    print("[startup] UI serve: begin")
+
+    t = time.perf_counter()
+    install_hooks()
+    print(f"[startup] hooks installed ({_startup_ms(t)})")
 
     TOKEN = api_token
     _is_local = host in ("127.0.0.1", "localhost", "")
@@ -501,15 +514,32 @@ def run(
     if TOKEN:
         print(f"  API Token: {TOKEN}")
         print(f"  Token URL: http://{host}:{port}/?token={TOKEN}")
-    # Try loading last used project config
+
+    # Try loading last used project config (may re-read project.yaml)
+    t = time.perf_counter()
     active_config = resolve_last_project_config(config, config_path)
-    auto_reindex_if_needed(active_config)
+    proj = active_config.project_dir
+    print(f"[startup] last project resolved → {proj if proj else '(none)'} ({_startup_ms(t)})")
+
+    # Scan compressed_dir for missing .vindex; may reindex (can be seconds+)
+    t = time.perf_counter()
+    print("[startup] checking video indexes…")
+    did_reindex = auto_reindex_if_needed(active_config)
+    print(f"[startup] index check done ({'rebuilt' if did_reindex else 'ok'}, {_startup_ms(t)})")
+
+    t = time.perf_counter()
     handler = make_handler(active_config, config_path, api_token=TOKEN)
+    print(f"[startup] HTTP handler ready ({_startup_ms(t)})")
+
+    t = time.perf_counter()
     server = ThreadingHTTPServer((host, port), handler)
+    print(f"[startup] bound {host}:{port} ({_startup_ms(t)})")
+
     url = f"http://{host}:{port}/"
     print(f"  UI started: {url}")
     print(f"  Project directory: {active_config.project_dir or '(none)'}")
     print(f"  Output directory: {active_config.paths.output_dir}")
+    print(f"[startup] ready in {_startup_ms(t_run)} (from run())")
     if not _is_local:
         if not TOKEN:
             print(f"  ⚠  Listening on {host} — exposed to LAN without auth!")

@@ -13,8 +13,6 @@ from clio.config import apply_run_paths, load_config
 from clio.doctor import is_virtualenv_python, run_doctor
 from clio.log import setup_logging
 from clio.shutdown import before_stop, install_hooks
-from clio.ui import run as run_ui
-from clio.ui.services.file_service import _migrate_project_configs
 from clio.utils import discover_ffmpeg_bin
 
 PLACEHOLDER_KEYS = {"your_api_key_here", "YOUR_API_KEY", ""}
@@ -332,9 +330,26 @@ def main(argv: list[str] | None = None) -> int:
         project = getattr(args, "project", None) or getattr(args, "input", None)
         return run_doctor(config_path, project)
 
+    # serve: timed startup breadcrumbs (cold import cost is before main())
+    _serve_t0: float | None = None
+    if args.command == "serve":
+        import time as _time
+
+        _serve_t0 = _time.perf_counter()
+        print("[startup] python main.py serve — loading config…")
+
     base_config = load_config(config_path)
-    setup_logging(base_config.paths.logs_dir)
-    install_hooks()
+    if _serve_t0 is not None:
+        import time as _time
+
+        print(f"[startup] config loaded ({(_time.perf_counter() - _serve_t0) * 1000:.0f}ms)")
+        t_log = _time.perf_counter()
+        setup_logging(base_config.paths.logs_dir)
+        install_hooks()
+        print(f"[startup] logging + hooks ({(_time.perf_counter() - t_log) * 1000:.0f}ms)")
+    else:
+        setup_logging(base_config.paths.logs_dir)
+        install_hooks()
 
     if args.command == "check":
         project = getattr(args, "project", None) or getattr(args, "input", None)
@@ -380,6 +395,10 @@ def main(argv: list[str] | None = None) -> int:
             args.input = None  # null out so _prepare_config doesn't use it
 
     config = _prepare_config(config_path, args)
+    if _serve_t0 is not None:
+        import time as _time
+
+        print(f"[startup] project config prepared ({(_time.perf_counter() - _serve_t0) * 1000:.0f}ms from serve start)")
     if args.force:
         config.analyze.skip_existing = False
 
@@ -488,6 +507,8 @@ def main(argv: list[str] | None = None) -> int:
                 source=args.source,
             )
         elif args.command == "migrate-config":
+            from clio.ui.services.file_service import _migrate_project_configs
+
             root = args.projects_root or (config.project_dir or config_path.parent)
             updated, errors = _migrate_project_configs(root)
             print(f"已更新 {updated} 个 project.yaml")
@@ -505,6 +526,13 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"  错误: {err}")
             return 0 if not errors or updated else 1
         elif args.command == "serve":
+            import time as _time
+
+            t_ui = _time.perf_counter()
+            print("[startup] importing UI modules…")
+            from clio.ui import run as run_ui
+
+            print(f"[startup] UI modules ready ({(_time.perf_counter() - t_ui) * 1000:.0f}ms)")
             return run_ui(
                 config,
                 config_path=config_path,
