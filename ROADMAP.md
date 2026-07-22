@@ -5,12 +5,11 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
-## Remaining Open Items (2026-07-21)
+## Remaining Open Items (2026-07-22)
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
 | R-025 | Multi-language / i18n (UI + CLI user-facing copy) | Large | Medium |
-| R-027d | Session logs: **timestamps + time-range filter** | Small | Medium |
 | R-027e | Session logs: **load historical files** from `logs/YYYY-MM-DD-HH.log` | Medium | Medium |
 | R-028b | ffmpeg setup zip fallback (package manager fail → static build) | Medium | Medium |
 | R-028c | UI one-click ffmpeg install (banner action, Whisper-like) | Medium | Medium |
@@ -18,6 +17,12 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | R-031b | Plan preview: prefer cut / concat media on the global timeline | Medium | Medium |
 | R-032 | **Desktop app packaging** (Windows-first shell around local serve) | Large | High |
 | R-033 | Post-review hardening (LAN sandboxes, yaml api_key, global validate) | Medium | Medium |
+
+### Recently completed (2026-07-22)
+
+| ID | Item | Notes |
+| --- | --- | --- |
+| R-027d | Session log timestamps + recent chips (slim) | Structured `{ts,text}`; UI HH:MM:SS; 5/15/60 min; no R-027e |
 
 ### Deferred by choice
 
@@ -212,7 +217,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 **Goal:** In the **会话日志** panel (`renderLogs` / `entity-logs`), users can narrow the live log stream so long runs are readable, with inferred severity badges; later load past hours from disk and filter by time.
 
-**Status:** **R-027a/b Done** (2026-07-21). **R-027d/e open** (timestamps, time filter, historical files). R-027c server `?q=` still deferred.
+**Status:** **R-027a/b/d Done** (2026-07-22). **R-027e open** (historical files). R-027c server `?q=` still deferred.
 
 #### Phases
 
@@ -221,7 +226,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | A | R-027a | **Done** | Client keyword filter |
 | B | R-027b | **Done** | Level chips + badges (heuristic severity) |
 | C | R-027c | Deferred | Server `?q=` / level only if client buffer too large |
-| D | R-027d | **Open** | **Show timestamps** per line + **time-range filter** (from / to / last N min) |
+| D | R-027d | **Done** (2026-07-22) | Show timestamps + recent 5/15/60 min chips (slim; no from–to) |
 | E | R-027e | **Open** | **Load historical logs** from on-disk `logs/YYYY-MM-DD-HH.log` (list hours, open one or merge range) |
 
 **Delivered (a/b):**
@@ -235,17 +240,13 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 - Explicit `[ERROR]` / `[WARN]` / `[INFO]` / `[DEBUG]` tags first
 - Else: traceback / ✗ / 失败 / Exception → error; ⚠ / 跳过 / skip → warn; default info
 
-#### R-027d — Timestamps + time-range filter (open)
+#### R-027d — Timestamps + recent-time filter (**Done** slim, 2026-07-22)
 
-**Why:** Live lines often lack a visible clock; hard to correlate “when did analyze fail?” Disk file logs already use `YYYY-MM-DD HH:MM:SS [LEVEL] …` via `clio.log` Tee; session buffer today is raw `print` strings without a consistent prefix.
+**Delivered:** session entries `{ts,text}`; UI `HH:MM:SS`; chips 全部/5/15/60 分钟 AND keyword/level. Spec/plan: `docs/superpowers/specs|plans/2026-07-22-r027d-session-log-timestamps*`. No from–to; no history files (see R-027e).
 
-**Proposed scope:**
-1. **Capture time at write** — when appending to `session_log`, store `{ts, text}` (or prefix ISO/local time) without breaking plain-string consumers; API may return objects or keep string with guaranteed prefix.
-2. **UI column / muted prefix** — each row shows `HH:MM:SS` (full date on hover if not today).
-3. **Time filter controls** — quick chips: 最近 5/15/60 分钟；optional from–to datetime; combine with keyword + level (AND).
-4. **Parse disk-style lines** — if line already starts with `YYYY-MM-DD HH:MM:SS`, use that as ts when loading history (R-027e).
+**Why (context):** Live lines lacked a visible clock; hard to correlate “when did analyze fail?”
 
-**Non-goals for d:** timezone picker; absolute wall-clock sync across machines.
+**Non-goals for d:** timezone picker; absolute wall-clock sync; R-027e historical files.
 
 #### R-027e — Load historical logs from `logs/` (open)
 
