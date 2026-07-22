@@ -2,9 +2,12 @@ import { state } from './state.js';
 import { $, $$, escapeHtml, markDirty, clearDirty, setStatus, setDeep } from './utils.js';
 import { api, icon } from './api.js';
 import {
-  filterLogLines,
+  filterLogEntries,
+  entryMatchesLogFilter,
   inferLogLevel,
   logLineClass,
+  normalizeLogEntry,
+  formatLogTime,
 } from './logs-filter.js';
 // Dynamic import avoids static cycle: editor.js → editor-config.js → editor.js (A-006)
 
@@ -1316,12 +1319,14 @@ export function renderConfig() {
 let _logsTimer = null;
 let _logsOffset = 0;
 let _logsAutoScroll = true;
-/** @type {string[]} full buffer for client filter re-apply (R-027) */
+/** @type {Array<{ts: number|null, text: string}>} */
 let _logsBuffer = [];
 /** Persist across re-open of the logs panel (prefer keep filters after clear). */
 let _logsFilterQuery = '';
 /** @type {''|'all'|'info'|'warn'|'error'} */
 let _logsFilterLevel = 'all';
+/** 0 = all; else window in ms */
+let _logsFilterSinceMs = 0;
 
 const _LEVEL_LABELS = {
   debug: '调试',
@@ -1330,31 +1335,52 @@ const _LEVEL_LABELS = {
   error: '错误',
 };
 
+const _SINCE_CHIPS = [
+  { ms: 0, label: '全部' },
+  { ms: 5 * 60 * 1000, label: '5分钟' },
+  { ms: 15 * 60 * 1000, label: '15分钟' },
+  { ms: 60 * 60 * 1000, label: '60分钟' },
+];
+
 function _logsFilterOpts() {
-  return { query: _logsFilterQuery, level: _logsFilterLevel };
+  return {
+    query: _logsFilterQuery,
+    level: _logsFilterLevel,
+    sinceMs: _logsFilterSinceMs || undefined,
+  };
 }
 
-function _appendLogLineEl(view, line) {
+function _appendLogLineEl(view, entryOrLine) {
+  const entry = normalizeLogEntry(entryOrLine);
+  const level = inferLogLevel(entry.text);
   const d = document.createElement('div');
-  d.className = `log-line ${logLineClass(line)}`;
-  d.dataset.level = inferLogLevel(line);
+  d.className = `log-line ${logLineClass(entry)}`;
+  d.dataset.level = level;
   const badge = document.createElement('span');
   badge.className = 'log-level-badge';
-  badge.textContent = _LEVEL_LABELS[inferLogLevel(line)] || '信息';
+  badge.textContent = _LEVEL_LABELS[level] || '信息';
+  const timeEl = document.createElement('span');
+  timeEl.className = 'log-line-time';
+  const clock = formatLogTime(entry.ts);
+  timeEl.textContent = clock || '--:--:--';
+  if (entry.ts != null) {
+    timeEl.title = new Date(entry.ts * 1000).toLocaleString();
+  }
   const text = document.createElement('span');
   text.className = 'log-line-text';
-  text.textContent = line;
+  text.textContent = entry.text;
   d.appendChild(badge);
+  d.appendChild(timeEl);
   d.appendChild(text);
   view.appendChild(d);
 }
 
 function _paintLogsView(view) {
   if (!view) return;
-  const visible = filterLogLines(_logsBuffer, _logsFilterOpts());
+  const visible = filterLogEntries(_logsBuffer, _logsFilterOpts());
   view.innerHTML = '';
-  for (const line of visible) {
-    _appendLogLineEl(view, line);
+  for (const entry of visible) {
+    _appendLogLineEl(view, entry);
   }
   const empty = $('logs-empty-hint');
   if (empty) {
@@ -1378,11 +1404,23 @@ function _syncLogsLevelChips() {
   });
 }
 
+function _syncLogsSinceChips() {
+  document.querySelectorAll('[data-log-since]').forEach((btn) => {
+    const ms = Number(btn.dataset.logSince || 0);
+    const on = ms === _logsFilterSinceMs;
+    btn.classList.toggle('is-active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+}
+
 export function renderLogs() {
   const pane = $('tab-logs');
   _logsOffset = 0;
   _logsBuffer = [];
   if (_logsTimer) { clearInterval(_logsTimer); _logsTimer = null; }
+  const sinceChipsHtml = _SINCE_CHIPS.map((c) =>
+    `<button type="button" class="logs-chip" data-log-since="${c.ms}">${c.label}</button>`
+  ).join('');
   pane.innerHTML = `
     <div class="logs-toolbar">
       <span class="logs-toolbar-title">会话日志</span>
@@ -1395,6 +1433,9 @@ export function renderLogs() {
         <button type="button" class="logs-chip" data-log-level="info">信息</button>
         <button type="button" class="logs-chip" data-log-level="warn">警告</button>
         <button type="button" class="logs-chip" data-log-level="error">错误</button>
+      </div>
+      <div class="logs-since-chips" role="group" aria-label="时间范围">
+        ${sinceChipsHtml}
       </div>
       <span id="logs-match-count" class="logs-match-count muted"></span>
       <label class="logs-autoscroll-label">
@@ -1422,7 +1463,15 @@ export function renderLogs() {
       _paintLogsView(view);
     };
   });
+  pane.querySelectorAll('[data-log-since]').forEach((btn) => {
+    btn.onclick = () => {
+      _logsFilterSinceMs = Number(btn.dataset.logSince || 0);
+      _syncLogsSinceChips();
+      _paintLogsView(view);
+    };
+  });
   _syncLogsLevelChips();
+  _syncLogsSinceChips();
 
   $('btn-logs-clear').onclick = async () => {
     try {
@@ -1435,21 +1484,21 @@ export function renderLogs() {
 
   const ingest = (lines) => {
     if (!Array.isArray(lines) || !lines.length) return;
-    for (const line of lines) {
-      _logsBuffer.push(line);
-      // Append only when it matches current filter (avoids full repaint on every tick)
-      if (filterLogLines([line], _logsFilterOpts()).length) {
-        _appendLogLineEl(view, line);
+    for (const raw of lines) {
+      const entry = normalizeLogEntry(raw);
+      _logsBuffer.push(entry);
+      if (entryMatchesLogFilter(entry, _logsFilterOpts())) {
+        _appendLogLineEl(view, entry);
       }
     }
     const empty = $('logs-empty-hint');
     if (empty) {
-      const visible = filterLogLines(_logsBuffer, _logsFilterOpts());
+      const visible = filterLogEntries(_logsBuffer, _logsFilterOpts());
       empty.hidden = !(_logsBuffer.length > 0 && visible.length === 0);
     }
     const countEl = $('logs-match-count');
     if (countEl) {
-      const visible = filterLogLines(_logsBuffer, _logsFilterOpts());
+      const visible = filterLogEntries(_logsBuffer, _logsFilterOpts());
       countEl.textContent = `显示 ${visible.length} / ${_logsBuffer.length}`;
     }
     if (_logsAutoScroll) view.scrollTop = view.scrollHeight;
@@ -1468,7 +1517,7 @@ export function renderLogs() {
     try {
       const r = await api('GET', '/api/logs?offset=0');
       if (r && r.logs) {
-        _logsBuffer = r.logs.slice();
+        _logsBuffer = r.logs.map(normalizeLogEntry);
         _logsOffset = r.total;
         _paintLogsView(view);
       }

@@ -1063,6 +1063,15 @@ button.match-badge:focus-visible { outline: 2px solid var(--border-focus); outli
   opacity: 0.9;
 }
 .log-line-text { flex: 1 1 auto; min-width: 0; }
+.log-line-time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  opacity: 0.85;
+  min-width: 4.5em;
+}
+.logs-since-chips { display: flex; gap: 4px; flex-wrap: wrap; }
 .log-level-info .log-level-badge {
   background: color-mix(in srgb, var(--text-secondary) 18%, transparent);
   color: var(--text-secondary);
