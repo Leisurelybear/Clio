@@ -18,6 +18,7 @@ import {
   localToGlobal,
   nextPlayableSegIndex,
   segmentWidths,
+  locateSegmentByPlanSec,
 } from './plan-timeline.js';
 
 function isGlobalTimelineUi() {
@@ -270,6 +271,68 @@ function _advanceToNextPlayable() {
   }
   state.previewActive = true;
   seekToGlobal(tl.segments[next].globalStart, { play: true });
+  _setPlayBtnPause();
+}
+
+/**
+ * After native <video> seek/play, re-bind previewIndex / _previewEndTime / playhead
+ * from the current source time so auto-advance still works.
+ * @param {HTMLVideoElement} player
+ * @param {{ maybeAdvance?: boolean }} [opts]
+ * @returns {boolean} true if past current segment end (and maybe advanced)
+ */
+function _resyncPlanPreviewFromPlayer(player, opts = {}) {
+  if (!isGlobalTimelineUi() || !player) return false;
+  const tl = getPlanTimeline();
+  if (!tl.segments.length) return false;
+
+  const curFile = state.currentVideo;
+  const v = (state.videos || []).find((x) => x.file === curFile)
+    || (state.previewIndex >= 0
+      ? state.videos.find(
+        (x) => String(x.index) === String(tl.segments[state.previewIndex]?.videoIndex),
+      )
+      : null);
+  if (!v) return false;
+
+  const offset = v.offset_sec || 0;
+  const planSec = Math.max(0, player.currentTime - offset);
+  const loc = locateSegmentByPlanSec(tl, v.index, planSec);
+  if (!loc) return false;
+
+  state.previewIndex = loc.segIndex;
+  state.previewGlobalSec = localToGlobal(tl, loc.segIndex, loc.localSec);
+  const seg = tl.segments[loc.segIndex];
+  state._previewEndTime = seg
+    ? seg.planEnd + offset
+    : null;
+
+  softUpdatePreviewChrome(tl);
+  _softUpdateSegBlockClasses(loc.segIndex);
+  updateCompositeClock();
+  if (opts.syncExpand !== false) _syncPlanExpandFromPreview();
+
+  if (loc.pastEnd && opts.maybeAdvance !== false && state.previewActive && !player.paused) {
+    _advanceToNextPlayable();
+    return true;
+  }
+  return loc.pastEnd;
+}
+
+/** Ensure continuous plan auto-advance is armed when user plays media on Plan. */
+function _ensurePreviewSessionFromPlayback() {
+  if (!isGlobalTimelineUi()) return;
+  if (!state.previewActive) {
+    state.previewActive = true;
+  }
+  _setPlayBtnPause();
+}
+
+function _markPreviewPausedUi() {
+  if (!isGlobalTimelineUi()) return;
+  // Keep previewActive so resume / reaching segment end still auto-advances.
+  // Only the chrome play button shows "继续".
+  if (state.previewActive) _setPlayBtnPlay('继续');
 }
 
 // ── Preview bar (R-012 / R-031a global scrub + R-031a2 chrome) ──
@@ -340,7 +403,8 @@ function renderPreviewBar() {
       const i = parseInt(el.dataset.seg, 10);
       if (!Number.isFinite(i) || i < 0 || i >= p.sequence.length) return;
       const g = tl.segments[i].globalStart;
-      seekToGlobal(g, { play: false });
+      // Omit play: keep current play/pause (do not kill continuous preview).
+      seekToGlobal(g);
     };
   });
 
@@ -386,7 +450,8 @@ function _setupPreviewBarDrag() {
     const now = performance.now();
     if (now - _lastSeekTs >= 50) {
       _lastSeekTs = now;
-      seekToGlobal(hit.g, { play: false, syncExpand: false });
+      // Omit play during drag so we don't thrash play/pause; wasPlaying preserved.
+      seekToGlobal(hit.g, { syncExpand: false });
     }
   };
 
@@ -396,7 +461,8 @@ function _setupPreviewBarDrag() {
     document.removeEventListener('mousemove', onMove);
     document.removeEventListener('mouseup', onUp);
     const hit = globalFromEvent(e);
-    if (hit) seekToGlobal(hit.g, { play: false, syncExpand: true });
+    // Omit play: keep continuous preview if it was playing (R-031 drag rule).
+    if (hit) seekToGlobal(hit.g, { syncExpand: true });
   };
 
   segBar.onmousedown = (e) => {
@@ -587,7 +653,8 @@ function setupPlayer() {
 
   setWaveformPlanBridge({
     isPlan: () => isGlobalTimelineUi() && isPlanWaveformMode(),
-    seekGlobal: (sec) => seekToGlobal(sec, { play: false }),
+    // Omit play so waveform scrub keeps current play/pause (same as global bar).
+    seekGlobal: (sec) => seekToGlobal(sec),
     getGlobalRatio: () => {
       const total = getPlanWaveformTotal() || getPlanTimeline().total || 0;
       if (!(total > 0)) return 0;
@@ -636,9 +703,27 @@ function setupPlayer() {
     else $('player-time').textContent = `${fmtTime(0)} / ${fmtTime(player.duration)}`;
   };
   player.onended = () => {
-    if (state.previewActive) {
+    if (state.previewActive || isGlobalTimelineUi()) {
+      if (!state.previewActive) state.previewActive = true;
       _advanceToNextPlayable();
     }
+  };
+  // Native controls: keep continuous plan session + rebind end after seek.
+  player.onplay = () => {
+    if (!isGlobalTimelineUi()) return;
+    _ensurePreviewSessionFromPlayback();
+    _resyncPlanPreviewFromPlayer(player, { maybeAdvance: true });
+  };
+  player.onpause = () => {
+    if (!isGlobalTimelineUi()) return;
+    // Ignore pause caused by our own seekToGlobal({play:false}) during scrub? still OK.
+    _markPreviewPausedUi();
+  };
+  player.onseeked = () => {
+    if (!isGlobalTimelineUi()) return;
+    _resyncPlanPreviewFromPlayer(player, {
+      maybeAdvance: state.previewActive && !player.paused,
+    });
   };
   player.onerror = () => setStatus('视频加载失败', 'err');
 

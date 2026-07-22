@@ -6,6 +6,7 @@ import {
   localToGlobal,
   nextPlayableSegIndex,
   segmentWidths,
+  locateSegmentByPlanSec,
 } from '../plan-timeline.js';
 
 const seq3 = [
@@ -116,5 +117,55 @@ describe('nextPlayableSegIndex / widths', () => {
       { index: 'b', use_timeline: '00:10-00:05' },
     ]);
     expect(segmentWidths(t)).toEqual([0.5, 0.5]);
+  });
+});
+
+describe('locateSegmentByPlanSec', () => {
+  const multiSameVideo = [
+    { index: '001', use_timeline: '00:10-00:20' }, // plan 10-20
+    { index: '002', use_timeline: '01:00-01:05' },
+    { index: '001', use_timeline: '00:30-00:40' }, // plan 30-40, same video again
+  ];
+
+  it('returns null for empty / no video match', () => {
+    expect(locateSegmentByPlanSec(buildTimeline([]), '001', 0)).toBeNull();
+    const t = buildTimeline(seq3);
+    expect(locateSegmentByPlanSec(t, '999', 0)).toBeNull();
+  });
+
+  it('hits interior of segment', () => {
+    const t = buildTimeline(seq3);
+    const loc = locateSegmentByPlanSec(t, '002', 62); // 01:00 + 2
+    expect(loc).toMatchObject({
+      segIndex: 1,
+      localSec: 2,
+      planSec: 62,
+      videoIndex: '002',
+      pastEnd: false,
+    });
+  });
+
+  it('clamps before first window of that video', () => {
+    const t = buildTimeline(seq3);
+    const loc = locateSegmentByPlanSec(t, '001', 5);
+    expect(loc.segIndex).toBe(0);
+    expect(loc.localSec).toBe(0);
+    expect(loc.pastEnd).toBe(false);
+  });
+
+  it('marks pastEnd when at/after segment end', () => {
+    const t = buildTimeline(seq3);
+    const loc = locateSegmentByPlanSec(t, '001', 20);
+    expect(loc.segIndex).toBe(0);
+    expect(loc.pastEnd).toBe(true);
+    expect(loc.localSec).toBe(10);
+  });
+
+  it('picks later window when same video appears twice', () => {
+    const t = buildTimeline(multiSameVideo);
+    const loc = locateSegmentByPlanSec(t, '001', 35);
+    expect(loc.segIndex).toBe(2);
+    expect(loc.localSec).toBe(5);
+    expect(loc.pastEnd).toBe(false);
   });
 });
