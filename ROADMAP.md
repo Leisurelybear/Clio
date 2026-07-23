@@ -5,7 +5,7 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
-## Remaining Open Items (2026-07-22)
+## Remaining Open Items (2026-07-23)
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
@@ -16,7 +16,18 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | R-029d | Optional cleanup: delete dead physical-split write path / shrink legacy tests | Medium | Low |
 | R-031b | Plan preview: prefer cut / concat media on the global timeline | Medium | Medium |
 | R-032 | **Desktop app packaging** (Windows-first shell around local serve) | Large | High |
-| R-033 | Post-review hardening (LAN sandboxes, yaml api_key, global validate) | Medium | Medium |
+
+### Recently completed (2026-07-23)
+
+| ID | Item | Notes |
+| --- | --- | --- |
+| R-033 | Post-review hardening a–e | Sandbox cut/run paths; strip/mask api_key; `validate_global_config`; 8MiB body + `compare_digest`; `_matches_selected_*` tests |
+| — | Pipeline robustness | I1 plan `files=`; I3 label state stem; I4 serial voiceover; I7 refine count; I8 ETA phase reset |
+| — | Critical/media | Export/run day basename; run config deepcopy; session_log blank rows; cancel partial cleanup; waveform abspath strict |
+
+Spec/plan: `docs/superpowers/specs|plans/2026-07-23-r033-hardening-and-pipeline-robustness*`
+
+**Residual (not in R-033 wave):** I9/I11–I15, I22/I23/I25; cut index prefix glob; Jianying expand_index; project create `output_dir` sandbox; query-token media URLs.
 
 ### Recently completed (2026-07-22)
 
@@ -54,7 +65,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | C12 | `fix(ui): escape plan day labels and normalize index lookup` | XSS + `String(index)` |
 | I30 | `chore: stop tracking .coverage…` | gitignore coverage/mypy caches |
 
-**Still open from that review** (tracked as **R-033**): cut `output_dir` / run `project_dir` sandbox; reject/strip yaml `api_key`; `load_global_config` full validate; body size limits; selected-file unit realism.
+**Still open from that review** (were **R-033** — **Done** 2026-07-23; see above).
 
 ### R-032 Desktop app packaging (migrate local Web UI → desktop)
 
@@ -110,11 +121,11 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 | Phase | ID | Status | Scope |
 | --- | --- | --- | --- |
-| A | R-033a | Open | Sandbox `POST /api/cut` `output_dir` + `POST /api/run/start` body `project_dir` to registry / project roots |
-| B | R-033b | Open | Strip/reject non-empty yaml `api_key`; mask keys on GET providers/config; env-only error copy |
-| C | R-033c | Open | `load_global_config` / global PUT full `_validate_config` (or `validate_global_config`) |
-| D | R-033d | Open | JSON body size / Content-Length caps; optional `hmac.compare_digest` for token |
-| E | R-033e | Open | Unit tests for `_matches_selected_*` with realistic identity-only JSON names |
+| A | R-033a | **Done** (2026-07-23) | Sandbox `POST /api/cut` `output_dir` + `POST /api/run/start` body `project_dir` to registry / project roots |
+| B | R-033b | **Done** (2026-07-23) | Strip yaml `api_key` on write; mask keys on GET providers/config; env-only error copy |
+| C | R-033c | **Done** (2026-07-23) | `validate_global_config` on `load_global_config` / global PUT |
+| D | R-033d | **Done** (2026-07-23) | JSON body 8 MiB cap; `hmac.compare_digest` for token |
+| E | R-033e | **Done** (2026-07-23) | Unit tests for `_matches_selected_*` identity-only JSON names |
 
 ### R-031 Plan global preview timeline
 
