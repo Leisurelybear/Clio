@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import logging
 
+from clio import session_log
 from clio.log import _TeeWriter, format_duration, format_size, setup_logging, teardown_logging
 
 # ── format_size ─────────────────────────────────────────────────────
@@ -100,6 +101,25 @@ class TestTeeWriter:
         tw.write("data")
         tw.flush()
         assert buf.getvalue() == "data"
+
+    def test_print_style_split_write_skips_blank_session_log(self):
+        """print() writes content then end='\\n' separately; blank end must not
+        become an empty session_log entry (UI shows a second blank '信息' row).
+        """
+        session_log.clear()
+        buf = io.StringIO()
+        logger = logging.getLogger("test_tee_blank_session")
+        logger.setLevel(logging.INFO)
+        logger.handlers.clear()
+        logger.addHandler(logging.NullHandler())
+        tw = _TeeWriter(buf, logger, logging.INFO)
+        # Simulate print("[serve] ...")
+        tw.write('[serve] 127.0.0.1 - "GET /api/logs" 200 -')
+        tw.write("\n")
+        result = session_log.read()
+        assert result["total"] == 1
+        assert result["logs"][0]["text"] == '[serve] 127.0.0.1 - "GET /api/logs" 200 -'
+        assert buf.getvalue() == '[serve] 127.0.0.1 - "GET /api/logs" 200 -\n'
 
 
 # ── setup_logging / teardown_logging ───────────────────────────

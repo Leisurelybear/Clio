@@ -82,7 +82,11 @@ class _TeeWriter:
             for line in message.splitlines():
                 if line:
                     self._logger.log(self._level, line)
-        session_log.write(message.rstrip())
+        # print() often splits content + trailing "\n" into two write()s;
+        # blank ends must not create empty session_log rows in the UI.
+        stripped = message.rstrip()
+        if stripped:
+            session_log.write(stripped)
         try:
             self._original.flush()
         except Exception:
