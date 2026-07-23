@@ -34,7 +34,7 @@ Product is a personal local pipeline. Auth gates *who*; R-033 tightens *what* an
 
 ```text
 Wave0  fix(log): blank session_log rows from print split writes
-Wave1  Critical: export day basename · run deepcopy before body mutation
+Wave1  Critical: export day + run day_label basename · run deepcopy before body mutation
 Wave2  R-033a sandbox · R-033d body cap + hmac.compare_digest
 Wave3  R-033b api_key · R-033c validate_global_config
 Wave4  R-033e unit tests for _matches_selected_*
@@ -48,7 +48,7 @@ One feature per commit (English messages). Prefer small, revertible commits on `
 ### Success criteria
 
 1. R-033a–e behaviors match this spec and have automated tests.
-2. `POST /api/export` rejects unsafe `day` (400).
+2. `POST /api/export` `day` and run `day_label` reject unsafe basenames (400).
 3. `POST /api/run/start` body flags do not mutate shared cached `AppConfig`.
 4. I1/I3/I4/I7/I8 behave as specified below.
 5. Full `pytest` + `vitest` green; no new intentional mypy debt in touched code.
@@ -65,21 +65,23 @@ One feature per commit (English messages). Prefer small, revertible commits on `
 
 ## Wave1 — Critical fast fixes
 
-### 1a Export `day` basename
+### 1a Export `day` + run `day_label` basename
 
-**Where:** `clio/ui/routes/export.py` (`day = obj.get("day", "day1")` used in plan path and `output/export/{day}_{fmt}`).
+**Where:**
+- `clio/ui/routes/export.py` — `day` joins plan path and `output/export/{day}_{fmt}`
+- `clio/ui/routes/run.py` — `day_label` is passed into the pipeline / plan filenames (same class of join); currently **unsanitized** (scan residual)
 
-**Behavior:** Reuse the same safe-basename rule as plan/cut (`_is_safe_basename` or shared helper): non-empty; no `..`; no `/` or `\`. Fail → **400**, no write.
+**Behavior:** Use `file_service._is_safe_basename` (already: non-empty, len≤200, no `/` `\` `..`, no control chars). Fail → **400** with `invalid day` / `invalid day_label` (same status as `POST /api/cut` day_label, not GET plan’s 403).
 
-**Tests:** `day: "../x"`, `day: "a/b"` → 400; `day1` still works.
+**Tests:** `day`/`day_label` of `"../x"`, `"a/b"` → 400; `day1` still works.
 
 ### 1b Run config deepcopy
 
-**Where:** `clio/ui/routes/run.py` — body fields such as `use_transcripts` currently mutate cached config when `project_dir` override is absent.
+**Where:** `clio/ui/routes/run.py` — body fields such as `use_transcripts` currently mutate cached config when `project_dir` override is absent (`cfg.plan.use_transcripts = …` on the object from `_get_config`).
 
-**Behavior:** Before any body-driven field write, `cfg = copy.deepcopy(cfg)` (always for start path, or whenever mutation is possible). `project_dir` override already deepcopies; unify so no path mutates the cache.
+**Behavior:** Before any body-driven field write, `cfg = copy.deepcopy(cfg)` (always on the start path, or whenever mutation is possible). `project_dir` override already deepcopies; unify so no path mutates the cache.
 
-**Tests:** Two starts — first sets `use_transcripts: false`; second omits flag; second must not inherit first mutation (assert on config object identity / field).
+**Tests:** Shared cache mock / two sequential starts — first sets `use_transcripts: false`; second omits the flag; second run’s cfg must keep the **default** `use_transcripts` from a fresh load (assert **field value**, not object identity — deepcopy always changes identity).
 
 ---
 
@@ -107,14 +109,15 @@ One feature per commit (English messages). Prefer small, revertible commits on `
 **JSON PUT/POST** (`clio/ui/server.py`)
 
 - Constant `MAX_JSON_BODY_BYTES = 8 * 1024 * 1024` (8 MiB).
-- Parse `Content-Length`; missing → 0; invalid/negative → **400**.
-- `length > MAX` → **413** without reading unbounded body.
+- Parse `Content-Length`; missing → treat as **0** (empty body; same as today). Invalid/negative / non-int → **400**.
+- Chunked / no Content-Length: out of scope — stdlib handler continues to require Content-Length for non-empty JSON (document only).
+- `length > MAX` → **413** without reading unbounded body (do not `rfile.read(length)` when over cap).
 - Else `rfile.read(length)` + JSON parse as today.
 
 **Auth token**
 
-- Bearer and `?token=` compared with `hmac.compare_digest`.
-- Length mismatch: do not raise; reject with **401** consistently (e.g. compare against empty/dummy only after length check, or pad-safe pattern).
+- Bearer and `?token=` compared with `hmac.compare_digest` **only when both sides are `str` and `len` equal**.
+- Length mismatch or missing token: return **401** without calling `compare_digest` (Python requires equal-length inputs).
 - Keep `?token=` for media URL compatibility (I26 out of scope).
 
 ---
@@ -125,17 +128,22 @@ One feature per commit (English messages). Prefer small, revertible commits on `
 
 | Path | Behavior |
 | --- | --- |
-| Runtime resolve | Prefer env via `api_key_env`; **ignore non-empty yaml `api_key` for live clients** (compat with old files). |
-| Write / `_normalize_provider` | **Strip on write:** do not persist body/yaml `api_key` (force empty or omit field). No hard-fail required if client still sends a key. |
-| GET providers / config | Mask secrets: non-empty key → `"********"` or omit value with `has_api_key`-style signal; keep `api_key_env` name. |
-| Error copy | `gemini` / `doctor` / `main`: stop telling users to put keys in yaml; point to `.env` / env var only. |
+| Runtime resolve | **Keep env-first, yaml fallback** (`_resolve_api_key` today): if `api_key_env` set and env non-empty → env; else yaml `api_key`. Avoids hard-breaking yaml-only installs mid-session. |
+| Write / `_normalize_provider` / raw PUT | **Strip on write:** never persist a non-empty `api_key` into yaml (force `""` or omit). Client may still POST a key; it is discarded. |
+| GET providers / config / raw | **Mask** any non-empty `api_key` as `"********"` before JSON response. Apply to `handle_get_providers`, provider create/update **response body**, and any GET that dumps provider dicts from yaml (`handle_get_config_raw` / global raw). Keep `api_key_env` name. |
+| Error copy | `gemini` / `doctor` / `main`: point only to `.env` / env var; do not suggest yaml `api_key`. |
 
-**Default policy:** load compat (ignore yaml key); write strip; GET mask; errors env-only.
+**Policy summary:** runtime still accepts legacy yaml keys; **new writes never store keys**; **reads never return cleartext keys**; messaging is env-only. Follow-up (out of scope): fail validation if yaml key non-empty after a deprecation window.
 
 ### R-033c `validate_global_config`
 
-- New `validate_global_config(GlobalConfig) -> None` covering global-relevant rules: provider `type`, `timeout_sec > 0`, `retry_attempts >= 0`, `provider_ttl_min >= 0`, `poll_interval_sec >= 0`, etc. aligned with existing `_validate_config` global subset (no project `tasks` required).
-- Call from end of `load_global_config` and any global PUT path that currently only “load to parse”.
+- New `validate_global_config(GlobalConfig) -> None` covering **global-layer** rules only (no project `tasks`):
+  - provider `type` ∈ supported set (same as `_require_supported_provider_type`)
+  - per provider: `requests_per_minute`, `retry_attempts`, `max_tokens`, `timeout_sec`, `poll_interval_sec` all **`>= 0`** (match `_validate_config`: **0 is allowed**, e.g. unlimited / default-style — **not** `timeout_sec > 0`)
+  - `ai.provider_ttl_min >= 0`
+  - proxy: if `enabled` then `url` non-empty (same as full validate)
+  - `naming.index_width >= 1` if present on global naming
+- Call from end of `load_global_config` and any global PUT / provider write path that currently only “load to parse”.
 - Failure → do not commit bad yaml; API **400** / raise `ValueError`.
 
 ---
@@ -160,12 +168,12 @@ No production change unless a test exposes a clear bug.
 
 ### I1 Plan respects `files=`
 
-**Where:** `clio/tasks/plan.py`.
+**Where:** `clio/tasks/plan.py` (pipeline already forwards `files=` from run/CLI).
 
-- `files is None`: all texts (plus existing day filter).
-- `files` set: filter texts with `_selected_stems` + `_matches_selected_artifact`.
-- Non-empty `files` but zero matches: log clearly and skip/return without silently planning on empty (align with scripts/refine style).
-- Log text: report filtered count; remove “ignore selection” messaging.
+- `files is None`: all texts (plus existing day filter) — **unchanged full-project plan**.
+- `files is not None` (including **`[]`**): filter texts with `_selected_stems` + `_matches_selected_artifact`. Empty list → zero clips after filter.
+- After filter, zero clips: log clearly and return/skip **without** writing a success plan from empty context (align with scripts/refine early-exit style).
+- Log text: report filtered count; remove “ignore selection / 使用所有素材” messaging.
 
 ### I3 Label `ProcessingState` key
 
@@ -206,9 +214,15 @@ No production change unless a test exposes a clear bug.
 
 ### 6b Waveform abspath allowlist
 
-Align `clio/ui/routes/waveform.py` `_original_allowed` with `/api/video`: empty selection / missing allow set → **deny** abspath originals; only selected/allowed paths pass. Prefer shared predicate if cheap.
+Align `clio/ui/routes/waveform.py` `_original_allowed` with `videos.py` original abspath gate (`handle_get_video` ~525–538):
 
-If time-boxed, ship 6a only and list 6b under residual.
+| Case | Today (waveform) | Target (= video) |
+| --- | --- | --- |
+| No `videos.json` / empty selection | **allow any** abspath | **deny** abspath (`False` / 403-class) |
+| Path exact-resolved ∈ selected | allow | allow |
+| Basename-only match (`s.name == vp.name`) | **allow** | **deny** (video requires exact resolved path) |
+
+Prefer shared predicate if cheap. If time-boxed, ship 6a only and list 6b under residual.
 
 ---
 
@@ -228,7 +242,7 @@ npm test -- --run
 | Risk | Mitigation |
 | --- | --- |
 | Cut sandbox too strict | Allow entire `output_dir` tree; default cuts path unchanged |
-| Old yaml `api_key` users | Load ignore + mask GET + env-only errors; strip on save |
+| Old yaml `api_key` users | Runtime still reads yaml key; GET mask + strip on save + env-only errors |
 | 8 MiB body cap | Config/plan JSON well under; constant adjustable; 413 message |
 | Plan `files=` stricter | Unspecified files still full scan; UI already sends selection on other steps |
 | Label state key migration | New marks use source stem; orphan old keys OK |
@@ -243,6 +257,9 @@ Independent commits on `main` → per-commit `git revert`. No DB migrations. Str
 - I9, I11–I15, I22, I23, I25  
 - Cut index prefix glob; Jianying index expand; project create `output_dir`  
 - Query-token media URLs  
+- Deprecate/fail non-empty yaml `api_key` at load after migration window  
+- Export `jianying_draft_dir` write target sandbox (copy destination)  
+- Chunked request bodies without Content-Length  
 
 ## Docs after implementation
 
