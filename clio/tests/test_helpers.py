@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,6 +11,8 @@ from clio.tasks._helpers import (
     _build_stem,
     _eta_line,
     _get_video_info,
+    _matches_selected_artifact,
+    _matches_selected_stem,
     _next_index,
     _rewrite_script_md,
     _rewrite_text_file,
@@ -232,3 +235,37 @@ class TestGetVideoInfo:
         rec = ClipRecord(index=1, stem="001_src", source_path=src)
         result = _get_video_info(rec, "ffprobe")
         assert result["duration_sec"] == 50.0
+
+
+class TestMatchesSelected:
+    def test_matches_media_identity_stems(self, tmp_path: Path):
+        p = tmp_path / "unrelated_name.json"
+        p.write_text(
+            json.dumps(
+                {
+                    "media_identity": {
+                        "compressed_stem": "001_GL010684",
+                        "original_stem": "GL010684",
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        assert _matches_selected_artifact(p, {"001_gl010684"}) is True
+        assert _matches_selected_artifact(p, {"gl010684"}) is True
+        assert _matches_selected_artifact(p, {"other"}) is False
+
+    def test_matches_source_file_only(self, tmp_path: Path):
+        p = tmp_path / "001_street.json"
+        p.write_text(json.dumps({"source_file": "GL010684.MP4"}), encoding="utf-8")
+        assert _matches_selected_artifact(p, {"gl010684"}) is True
+
+    def test_corrupt_json_false(self, tmp_path: Path):
+        p = tmp_path / "bad.json"
+        p.write_text("{", encoding="utf-8")
+        assert _matches_selected_artifact(p, {"x"}) is False
+
+    def test_stem_direct_match(self, tmp_path: Path):
+        p = tmp_path / "001_foo.json"
+        p.write_text("{}", encoding="utf-8")
+        assert _matches_selected_stem(p, {"001_foo"}) is True
