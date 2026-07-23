@@ -56,7 +56,8 @@ class TestProgressTracker:
         assert data["message"] == "something went wrong"
 
     def test_eta_computed(self, tmp_path):
-        with mock.patch("clio.progress.time.monotonic", side_effect=[0, 2, 4]):
+        # monotonic: __init__, phase-change reset, current=1 compute, current=2 compute
+        with mock.patch("clio.progress.time.monotonic", side_effect=[0, 0, 2, 4]):
             t = ProgressTracker(tmp_path)
             t.update(phase="compress", total=10, current=1)
             t.update(current=2)
@@ -132,3 +133,21 @@ class TestProgressTracker:
         assert len(data["logs"]) == 100
         assert data["logs"][0] == "line 5"  # first 5 were dropped
         assert data["logs"][-1] == "line 104"
+
+    def test_phase_change_resets_eta_clock(self, tmp_path):
+        times = [100.0]  # __init__
+        # update phase a: change from "" -> a resets start
+        times += [100.0, 110.0]  # reset + compute current=5
+        # update phase b: reset start
+        times += [200.0]
+        # update current=2: compute with start=200
+        times += [202.0]
+        it = iter(times)
+        with mock.patch("clio.progress.time.monotonic", side_effect=lambda: next(it)):
+            t = ProgressTracker(tmp_path)
+            t.update(phase="a", total=10, current=5)
+            t.update(phase="b", total=10)
+            t.update(current=2)
+            data = json.loads(t._path.read_text(encoding="utf-8"))
+            # elapsed 2, rate=1, remaining 8
+            assert data["eta_sec"] == 8

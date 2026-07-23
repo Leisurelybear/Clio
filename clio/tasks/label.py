@@ -117,7 +117,7 @@ def run_label_videos(
             for f in config.compressed_dir.glob(f"{idx}_*"):
                 compressed = f
                 break
-            orig_stem = json_file.stem.split("_", 1)[-1]
+            orig_stem = Path(data.get("source_file") or data.get("compressed_file") or json_file.stem).stem
             if not compressed or not compressed.exists():
                 print(f"[跳过] 找不到压缩文件: {idx}")
                 state.mark(orig_stem, "label", "skipped")

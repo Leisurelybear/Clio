@@ -16,6 +16,7 @@ from clio.log import timed
 from clio.processing_state import ProcessingState
 from clio.progress import ProgressTracker
 from clio.schema import add_schema_version
+from clio.tasks._helpers import _matches_selected_artifact, _selected_stems
 from clio.utils import format_index, write_json_atomic, write_text_atomic
 
 
@@ -50,8 +51,9 @@ def run_plan_vlog(
     config.plans_dir.mkdir(parents=True, exist_ok=True)
     token_store = FileTokenUsageStore(str(config.paths.output_dir))
 
-    if files is not None:
-        print("[规划] 使用所有素材生成全局规划（视频筛选仅影响前序步骤）")
+    selected = _selected_stems(files) if files is not None else None
+    if selected is not None:
+        print(f"[规划] 按选片过滤素材（{len(selected)} 个 stem）")
 
     out_json = config.plans_dir / f"{day_label}_plan.json"
     out_md = config.plans_dir / f"{day_label}_plan.md"
@@ -69,6 +71,8 @@ def run_plan_vlog(
         if cancel_event and cancel_event.is_set():
             print("[取消] plan 步骤被用户终止")
             return
+        if selected is not None and not _matches_selected_artifact(json_file, selected):
+            continue
         data = json.loads(json_file.read_text(encoding="utf-8"))
         if filter_by_day and _analysis_day_label(data) != day_label:
             continue
@@ -105,7 +109,7 @@ def run_plan_vlog(
         )
 
     if not clips:
-        print("没有可用的分析结果，请先运行 analyze")
+        print("[规划] 无可用素材（选片过滤后为空或尚未 analyze）")
         return None
 
     transcripts_map: dict[str, dict] = {}

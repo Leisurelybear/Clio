@@ -102,7 +102,7 @@ def run_refine_texts(
                 print(f"  改动 ({len(changelog)}): {'; '.join(changelog)[:120]}")
             else:
                 print("  无改动")
-    return len(target_files)
+    return completed
 
 
 def run_refine_scripts(
@@ -164,4 +164,4 @@ def run_refine_scripts(
                 print(f"  改动 ({len(changelog)}): {'; '.join(changelog)[:120]}")
             else:
                 print("  无改动")
-    return len(target_files)
+    return completed

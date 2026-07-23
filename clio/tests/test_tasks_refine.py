@@ -153,7 +153,7 @@ class TestRunRefineTexts:
         from clio.tasks.refine import run_refine_texts
 
         result = run_refine_texts(cfg)
-        assert result == 2
+        assert result == 1  # only successful files count
 
     @patch("clio.tasks.refine.refine_text")
     def test_fix_mode_passes_fix_param(self, mock_refine, cfg):
