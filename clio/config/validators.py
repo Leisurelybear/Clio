@@ -1,4 +1,4 @@
-from clio.config.models import AppConfig
+from clio.config.models import AppConfig, GlobalConfig
 
 _SUPPORTED_PROVIDER_TYPES = {"gemini", "openai", "openai_compat"}
 
@@ -78,3 +78,18 @@ def _validate_config(config: AppConfig) -> None:
         provider_cfg = config.ai.providers[task_cfg.provider]
         _require_video_provider_compatible(task_name, task_cfg.provider, provider_cfg.type)
         _require_known_model(task_name, task_cfg.provider, task_cfg.model, provider_cfg.models)
+
+
+def validate_global_config(config: GlobalConfig) -> None:
+    """Validate global-layer config only (no project tasks). Numeric floors match _validate_config (>= 0)."""
+    if config.proxy.enabled and not config.proxy.url:
+        raise ValueError("proxy.enabled=true 但 proxy.url 为空。请填写 proxy.url，或把 proxy.enabled 改成 false。")
+    _require_min("ai.provider_ttl_min", config.ai.provider_ttl_min, 0)
+    _require_min("naming.index_width", config.naming.index_width, 1)
+    for provider_name, provider_cfg in config.ai.providers.items():
+        _require_supported_provider_type(provider_name, provider_cfg.type)
+        _require_min(f"ai.providers.{provider_name}.requests_per_minute", provider_cfg.requests_per_minute, 0)
+        _require_min(f"ai.providers.{provider_name}.retry_attempts", provider_cfg.retry_attempts, 0)
+        _require_min(f"ai.providers.{provider_name}.max_tokens", provider_cfg.max_tokens, 0)
+        _require_min(f"ai.providers.{provider_name}.timeout_sec", provider_cfg.timeout_sec, 0)
+        _require_min(f"ai.providers.{provider_name}.poll_interval_sec", provider_cfg.poll_interval_sec, 0)

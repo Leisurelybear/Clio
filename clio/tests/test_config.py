@@ -440,3 +440,27 @@ def create_global_ai(
         for name, ptype in providers.items():
             ai.providers[name] = ProviderConfig(name=name, type=ptype, api_key="k")
     return ai
+
+
+def test_validate_global_rejects_bad_provider_type():
+    import pytest
+
+    from clio.config.models import GlobalAIConfig, GlobalConfig, ProviderConfig
+    from clio.config.validators import validate_global_config
+
+    gc = GlobalConfig(ai=GlobalAIConfig(providers={"x": ProviderConfig(name="x", type="nope")}))
+    with pytest.raises(ValueError, match="type"):
+        validate_global_config(gc)
+
+
+def test_validate_global_allows_zero_timeout():
+    from clio.config.models import GlobalAIConfig, GlobalConfig, ProviderConfig
+    from clio.config.validators import validate_global_config
+
+    gc = GlobalConfig(
+        ai=GlobalAIConfig(
+            providers={"g": ProviderConfig(name="g", type="gemini", timeout_sec=0)},
+            provider_ttl_min=0,
+        )
+    )
+    validate_global_config(gc)

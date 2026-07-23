@@ -47,7 +47,7 @@ from clio.config.parsers import (
     _parse_whisper,
     _resolve_api_key,
 )
-from clio.config.validators import _filter_dc, _validate_config
+from clio.config.validators import _filter_dc, _validate_config, validate_global_config
 
 __all__ = [
     "CONFIG_DESCRIPTIONS",
@@ -97,4 +97,5 @@ __all__ = [
     "_resolve_api_key",
     "_filter_dc",
     "_validate_config",
+    "validate_global_config",
 ]

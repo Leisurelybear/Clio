@@ -36,7 +36,7 @@ from clio.config.parsers import (
     _parse_providers,
     _parse_tasks,
 )
-from clio.config.validators import _filter_dc, _validate_config
+from clio.config.validators import _filter_dc, _validate_config, validate_global_config
 
 _GLOBAL_SECTION_DC_MAP: dict[str, type] = {
     "paths": GlobalPathsConfig,
@@ -446,7 +446,7 @@ def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
         provider_ttl_min=ai_raw.get("provider_ttl_min", 60),
     )
 
-    return GlobalConfig(
+    gc = GlobalConfig(
         proxy=ProxyConfig(**_filter_dc(raw.get("proxy", {}), ProxyConfig)),
         server=ServerConfig(**_filter_dc(raw.get("server", {}), ServerConfig)),
         naming=NamingConfig(**_filter_dc(raw.get("naming", {}), NamingConfig)),
@@ -467,6 +467,8 @@ def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
             hf_endpoint=raw.get("whisper", {}).get("hf_endpoint", ""),
         ),
     )
+    validate_global_config(gc)
+    return gc
 
 
 def load_project_config(
