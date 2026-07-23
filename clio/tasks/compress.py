@@ -157,15 +157,20 @@ def run_compress_all(
                 tracker.log(f"▶ 压缩 {label_name}")
             print(_eta_line("压缩", i, len(items), label_name, completed, elapsed_total))
             t0 = time.monotonic()
-            if tracker:
+            try:
+                if tracker:
 
-                def _on_progress(_sec: float, total_dur: float, _i: int = i, _name: str = label_name):
-                    pct = int(_sec / total_dur * 100) if total_dur > 0 else 0
-                    tracker.update(phase="compress", current=_i, total=len(items), message=f"压缩 {_name} ({pct}%)")
+                    def _on_progress(_sec: float, total_dur: float, _i: int = i, _name: str = label_name):
+                        pct = int(_sec / total_dur * 100) if total_dur > 0 else 0
+                        tracker.update(phase="compress", current=_i, total=len(items), message=f"压缩 {_name} ({pct}%)")
 
-                compress_video(source, use_out, config, progress_callback=_on_progress, cancel_event=cancel_event)
-            else:
-                compress_video(source, use_out, config, cancel_event=cancel_event)
+                    compress_video(source, use_out, config, progress_callback=_on_progress, cancel_event=cancel_event)
+                else:
+                    compress_video(source, use_out, config, cancel_event=cancel_event)
+            except BaseException:
+                if use_out.exists():
+                    use_out.unlink(missing_ok=True)
+                raise
             state.mark(original.stem, "compress", "done")
             elapsed_total += time.monotonic() - t0
             completed += 1

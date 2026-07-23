@@ -137,6 +137,19 @@ class TestReplaceFileSafely:
         assert dest.read_bytes() == b"new"
         assert not (tmp_path / "out.mp4.clio_bak").exists()
 
+    def test_unlinks_partial_without_bak(self, tmp_path):
+        from clio.tasks.cut import replace_file_safely
+
+        dest = tmp_path / "out.mp4"
+
+        def boom(p):
+            p.write_bytes(b"partial")
+            raise InterruptedError("cancel")
+
+        with pytest.raises(InterruptedError):
+            replace_file_safely(dest, boom)
+        assert not dest.exists()
+
 
 class TestListExistingCutVideos:
     def test_lists_video_basenames(self, tmp_path):

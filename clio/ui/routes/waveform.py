@@ -19,22 +19,17 @@ def _truthy(val: str | None) -> bool:
 
 
 def _original_allowed(proj_dir: Path, vp: Path) -> bool:
-    """True if abspath may be used (in videos.json, or no selection file)."""
-    videos_json = proj_dir / "videos.json"
-    if not videos_json.is_file():
-        return True
+    """True if abspath may be used — exact path must be in videos.json selection."""
     selected = load_selected_videos(proj_dir)
     if not selected:
-        return True
+        return False
     allowed: set[Path] = set()
     for p in selected:
         try:
             allowed.add(p.resolve())
         except OSError:
             allowed.add(p)
-    if vp in allowed:
-        return True
-    return any(s.name.lower() == vp.name.lower() for s in allowed)
+    return vp in allowed
 
 
 def _resolve_waveform_media(

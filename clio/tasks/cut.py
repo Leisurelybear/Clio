@@ -84,6 +84,11 @@ def replace_file_safely(dest: Path, write_fn) -> None:
                 except OSError:
                     pass
             bak.replace(dest)
+        elif dest.exists():
+            try:
+                dest.unlink()
+            except OSError:
+                pass
         raise
     if bak is not None and bak.exists():
         bak.unlink()
