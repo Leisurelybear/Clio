@@ -337,6 +337,38 @@ def _project_yaml_has_input_dir(project_dir: Path) -> bool:
         return False
 
 
+def collect_allowed_project_paths(default_input: Path, config_path: Path | None) -> set[str]:
+    """Absolute path strings allowed as project roots (serve root + registry)."""
+    allowed: set[str] = {str(Path(default_input).resolve())}
+    if config_path is None or not isinstance(config_path, Path):
+        return allowed
+    registry_file = _registry_path(config_path)
+    if not registry_file.is_file():
+        return allowed
+    try:
+        text = registry_file.read_text(encoding="utf-8")
+        reg = json.loads(text) if isinstance(text, str) else {}
+    except (json.JSONDecodeError, OSError, TypeError):
+        return allowed
+    for p in _registry_project_paths(reg if isinstance(reg, dict) else {}):
+        try:
+            allowed.add(str(Path(p).resolve()))
+        except OSError:
+            allowed.add(p)
+    return allowed
+
+
+def is_under_root(path: Path, root: Path) -> bool:
+    """True if *path* is *root* or a descendant (both resolved)."""
+    try:
+        path_r = path.expanduser().resolve()
+        root_r = root.expanduser().resolve()
+        path_r.relative_to(root_r)
+        return True
+    except (OSError, ValueError):
+        return False
+
+
 def resolve_project_input(qs: dict, input_dir: Path, config_path: Path | None) -> Path:
     """Resolve project directory from query params; default to current project_dir.
 
@@ -347,18 +379,7 @@ def resolve_project_input(qs: dict, input_dir: Path, config_path: Path | None) -
     input_dir_raw = qs.get("project_dir", [None])[0] or qs.get("input_dir", [None])[0]
     if input_dir_raw:
         candidate = Path(input_dir_raw).resolve()
-        allowed_paths = {str(input_dir.resolve())}
-        registry_file = _registry_path(config_path)
-        if registry_file.is_file():
-            try:
-                reg = json.loads(registry_file.read_text(encoding="utf-8"))
-            except (json.JSONDecodeError, OSError):
-                reg = {}
-            for p in _registry_project_paths(reg):
-                try:
-                    allowed_paths.add(str(Path(p).resolve()))
-                except OSError:
-                    allowed_paths.add(p)
+        allowed_paths = collect_allowed_project_paths(input_dir, config_path)
         if candidate.is_dir() and str(candidate) in allowed_paths:
             return candidate
 

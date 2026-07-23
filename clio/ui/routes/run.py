@@ -18,7 +18,7 @@ from clio.progress import ProgressTracker
 from clio.tasks._video_loader import load_selected_videos
 from clio.tasks.transcribe import run_transcribe_one
 from clio.ui.services.file_service import _find_original_for_compressed, _find_texts_dirs, _is_safe_basename
-from clio.ui.services.project_service import _project_output_dir
+from clio.ui.services.project_service import _project_output_dir, collect_allowed_project_paths
 from clio.ui.services.run_preview import build_run_preview
 from clio.vmeta import VideoMeta
 
@@ -26,11 +26,16 @@ if TYPE_CHECKING:
     from clio.ui.handler_protocol import HandlerProtocol
 
 
-def _apply_run_project_dir_override(cfg, project_dir_raw: str | None) -> tuple[Any, str | None]:
+def _apply_run_project_dir_override(
+    cfg,
+    project_dir_raw: str | None,
+    *,
+    allowed_paths: set[str] | None = None,
+) -> tuple[Any, str | None]:
     """Return a run-local config copy when the request overrides project_dir.
 
-    Accepts body.project_dir or legacy body.input_dir. The path must be a project
-    directory containing videos.json (or empty selection = no work).
+    Accepts body.project_dir or legacy body.input_dir. When *allowed_paths* is set,
+    the path must be in that registry/serve allowlist (R-033a).
     """
     if project_dir_raw is None:
         return cfg, None
@@ -42,14 +47,19 @@ def _apply_run_project_dir_override(cfg, project_dir_raw: str | None) -> tuple[A
     project_dir = Path(project_dir_raw).expanduser()
     if not project_dir.is_dir():
         return cfg, f"project_dir not found: {project_dir_raw}"
+    resolved = project_dir.resolve()
+    if allowed_paths is not None and str(resolved) not in allowed_paths:
+        return cfg, f"project_dir not allowed: {project_dir_raw}"
     run_cfg = copy.deepcopy(cfg)
-    run_cfg._project_dir = project_dir.resolve()
+    run_cfg._project_dir = resolved
     return run_cfg, None
 
 
 # Backward-compatible alias used by tests
-def _apply_run_input_dir_override(cfg, input_dir_raw: str | None) -> tuple[Any, str | None]:
-    return _apply_run_project_dir_override(cfg, input_dir_raw)
+def _apply_run_input_dir_override(
+    cfg, input_dir_raw: str | None, *, allowed_paths: set[str] | None = None
+) -> tuple[Any, str | None]:
+    return _apply_run_project_dir_override(cfg, input_dir_raw, allowed_paths=allowed_paths)
 
 
 def _resolve_found_original(orig: str | None, proj_dir: Path) -> Path | None:
@@ -159,8 +169,14 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
     steps = obj.get("steps")
     proj_dir = handler._resolve_project_dir(qs)
     cfg = handler._get_config(proj_dir)
+    config_path = getattr(handler, "config_path", None)
+    if not isinstance(config_path, Path):
+        config_path = None
+    allowed = collect_allowed_project_paths(proj_dir, config_path)
     cfg, cfg_error = _apply_run_project_dir_override(
-        cfg, obj.get("project_dir") if obj.get("project_dir") is not None else obj.get("input_dir")
+        cfg,
+        obj.get("project_dir") if obj.get("project_dir") is not None else obj.get("input_dir"),
+        allowed_paths=allowed,
     )
     if cfg_error:
         return handler._send_json({"ok": False, "error": cfg_error}, 400)

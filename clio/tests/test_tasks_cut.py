@@ -382,3 +382,27 @@ class TestRunCutAll:
 
             result = run_cut_all(cfg, "day1", source="original")
             assert len(result) == 1
+
+
+class TestResolveCutOutputDir:
+    def test_default_under_output(self, cfg):
+        from clio.tasks.cut import resolve_cut_output_dir
+
+        out = resolve_cut_output_dir(cfg, "day1")
+        assert out == (cfg.paths.output_dir / "cuts" / "day1").resolve()
+
+    def test_rejects_outside(self, cfg, tmp_path):
+        from clio.tasks.cut import resolve_cut_output_dir
+
+        outside = tmp_path.parent / "elsewhere_cuts"
+        outside.mkdir(exist_ok=True)
+        with pytest.raises(ValueError, match="output_dir"):
+            resolve_cut_output_dir(cfg, "day1", outside)
+
+    def test_accepts_under_output(self, cfg):
+        from clio.tasks.cut import resolve_cut_output_dir
+
+        sub = cfg.paths.output_dir / "custom_cuts"
+        sub.mkdir(parents=True, exist_ok=True)
+        out = resolve_cut_output_dir(cfg, "day1", sub)
+        assert out == sub.resolve()

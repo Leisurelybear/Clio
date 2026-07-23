@@ -31,10 +31,20 @@ CUT_BAK_SUFFIX = ".clio_bak"
 
 
 def resolve_cut_output_dir(config: AppConfig, day_label: str, output_dir: Path | None = None) -> Path:
-    """Resolve where cut clips are written for a day."""
+    """Resolve where cut clips are written for a day.
+
+    When *output_dir* is provided it must resolve under ``config.paths.output_dir``
+    (R-033a). Raises ValueError if outside that root.
+    """
+    root = Path(config.paths.output_dir).expanduser().resolve()
     if output_dir is not None:
-        return Path(output_dir).expanduser().resolve()
-    return (config.paths.output_dir / "cuts" / day_label).resolve()
+        out = Path(output_dir).expanduser().resolve()
+        try:
+            out.relative_to(root)
+        except ValueError as e:
+            raise ValueError(f"output_dir outside project output: {out}") from e
+        return out
+    return (root / "cuts" / day_label).resolve()
 
 
 def list_existing_cut_videos(out_root: Path) -> list[str]:

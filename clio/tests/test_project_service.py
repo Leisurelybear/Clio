@@ -233,3 +233,22 @@ class TestResolveProjectInput:
         result = resolve_project_input({"input_dir": [str(registered)]}, default_input, cfg)
 
         assert result == registered
+
+
+def test_collect_allowed_includes_default_and_registry(tmp_path):
+    from clio.ui.services.project_service import collect_allowed_project_paths, is_under_root
+
+    default = tmp_path / "default"
+    default.mkdir()
+    other = tmp_path / "other"
+    other.mkdir()
+    reg = tmp_path / "projects.json"
+    reg.write_text(json.dumps({"projects": [str(other)]}), encoding="utf-8")
+    # config_path parent holds projects.json
+    cfg_path = tmp_path / "config.yaml"
+    cfg_path.write_text("{}", encoding="utf-8")
+    allowed = collect_allowed_project_paths(default, cfg_path)
+    assert str(default.resolve()) in allowed
+    assert str(other.resolve()) in allowed
+    assert is_under_root(other / "nested", other) is True
+    assert is_under_root(default, other) is False

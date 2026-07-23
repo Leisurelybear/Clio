@@ -109,6 +109,28 @@ class TestApplyRunInputDirOverride:
         assert result is cfg
         assert "project_dir not found" in error or "input_dir not found" in error
 
+    def test_outside_allowlist_returns_error(self, tmp_path: Path):
+        cfg = SimpleNamespace(paths=SimpleNamespace(input_dir=tmp_path))
+        allowed_root = tmp_path / "proj"
+        allowed_root.mkdir()
+        other = tmp_path / "other"
+        other.mkdir()
+        result, error = _apply_run_input_dir_override(cfg, str(other), allowed_paths={str(allowed_root.resolve())})
+        assert result is cfg
+        assert error is not None
+        assert "not allowed" in error
+
+    def test_allowlist_accepts_registered_path(self, tmp_path: Path):
+        cfg = SimpleNamespace(paths=SimpleNamespace(input_dir=tmp_path))
+        allowed_root = tmp_path / "proj"
+        allowed_root.mkdir()
+        result, error = _apply_run_input_dir_override(
+            cfg, str(allowed_root), allowed_paths={str(allowed_root.resolve())}
+        )
+        assert error is None
+        assert result is not cfg
+        assert result._project_dir == allowed_root.resolve()
+
 
 class TestHandlePostRunStart:
     def test_already_running(self, _handler):

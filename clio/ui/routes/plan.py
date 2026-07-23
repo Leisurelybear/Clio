@@ -136,7 +136,10 @@ def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dic
     out_path = Path(out_dir_raw) if out_dir_raw else None
     proj_dir = handler._resolve_project_dir(qs)
     cfg = handler._get_config(proj_dir)
-    actual_out_path = resolve_cut_output_dir(cfg, day_label, out_path)
+    try:
+        actual_out_path = resolve_cut_output_dir(cfg, day_label, out_path)
+    except ValueError as e:
+        return handler._send_json({"ok": False, "error": str(e)}, 400)
 
     plan_path = cfg.plans_dir / f"{day_label}_plan.json"
     if not plan_path.is_file():
