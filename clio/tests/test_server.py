@@ -11,7 +11,13 @@ from unittest.mock import MagicMock, call, patch
 
 import pytest
 
-from clio.ui.server import STATIC_DIR, _ServerState, make_handler
+from clio.ui.server import (
+    MAX_JSON_BODY_BYTES,
+    STATIC_DIR,
+    _parse_json_content_length,
+    _ServerState,
+    make_handler,
+)
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -924,3 +930,20 @@ class TestAuth:
             handler = _build_handler(handler_cls, path="/api/env")
             handler.do_GET()
             mock_fn.assert_called_once()
+
+
+class TestParseJsonContentLength:
+    def test_missing_is_zero(self):
+        assert _parse_json_content_length(None) == (0, None)
+        assert _parse_json_content_length("") == (0, None)
+
+    def test_valid(self):
+        assert _parse_json_content_length("12") == (12, None)
+
+    def test_invalid(self):
+        assert _parse_json_content_length("abc") == (None, 400)
+        assert _parse_json_content_length("-1") == (None, 400)
+
+    def test_too_large(self):
+        assert _parse_json_content_length(str(MAX_JSON_BODY_BYTES + 1)) == (None, 413)
+        assert _parse_json_content_length(str(MAX_JSON_BODY_BYTES)) == (MAX_JSON_BODY_BYTES, None)

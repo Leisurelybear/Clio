@@ -9,6 +9,7 @@
 # ruff: noqa: F401 — all handler imports used by router resolver (lazy lookup)
 from __future__ import annotations
 
+import hmac
 import json
 import mimetypes
 import shutil
@@ -145,6 +146,27 @@ class _ServerState:
     cancel_event: threading.Event = field(default_factory=threading.Event)
 
 
+# Max JSON body for PUT/POST (R-033d). Chunked bodies without Content-Length out of scope.
+MAX_JSON_BODY_BYTES = 8 * 1024 * 1024
+
+
+def _parse_json_content_length(
+    raw_len: str | None, max_bytes: int = MAX_JSON_BODY_BYTES
+) -> tuple[int | None, int | None]:
+    """Return (length, error_status). error_status is 400/413 or None if length is OK."""
+    if raw_len is None or raw_len == "":
+        return 0, None
+    try:
+        length = int(raw_len)
+    except (TypeError, ValueError):
+        return None, 400
+    if length < 0:
+        return None, 400
+    if length > max_bytes:
+        return None, 413
+    return length, None
+
+
 def make_handler(
     config: AppConfig, config_path: Path | None = None, api_token: str = ""
 ) -> type[BaseHTTPRequestHandler]:
@@ -210,14 +232,37 @@ def make_handler(
             if not token:
                 return True
             auth = self.headers.get("Authorization", "")
-            if auth.startswith("Bearer ") and auth[7:] == token:
-                return True
+            if auth.startswith("Bearer "):
+                provided = auth[7:]
+                if isinstance(provided, str) and len(provided) == len(token) and hmac.compare_digest(provided, token):
+                    return True
             url = urlparse(self.path)
             qs = parse_qs(url.query)
-            if qs.get("token", [None])[0] == token:
+            provided = qs.get("token", [None])[0]
+            if isinstance(provided, str) and len(provided) == len(token) and hmac.compare_digest(provided, token):
                 return True
             self._send_json({"error": "未授权访问，需要有效的 API Token"}, 401)
             return False
+
+        def _read_json_body(self) -> tuple[dict | None, int | None]:
+            """Parse JSON object body. Returns (obj, None) or (None, http_status).
+
+            Caller must send the error response for non-None status (except invalid
+            JSON, which is already written).
+            """
+            length, err_status = _parse_json_content_length(self.headers.get("Content-Length", "0"))
+            if err_status is not None:
+                return None, err_status
+            assert length is not None
+            raw = self.rfile.read(length) if length else b""
+            try:
+                obj = json.loads(raw.decode("utf-8"))
+                if not isinstance(obj, dict):
+                    raise ValueError("expected a JSON object")
+            except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
+                self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, 400)
+                return None, -400  # already sent
+            return obj, None
 
         def _send_json(self, obj, status: int = 200) -> None:
             body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
@@ -311,14 +356,15 @@ def make_handler(
             path = url.path
             if router.get_policy("PUT", path).auth_required and not self._require_auth():
                 return
-            length = int(self.headers.get("Content-Length", 0))
-            raw = self.rfile.read(length) if length else b""
-            try:
-                obj = json.loads(raw.decode("utf-8"))
-                if not isinstance(obj, dict):
-                    raise ValueError("expected a JSON object")
-            except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
-                return self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, 400)
+            obj, err_status = self._read_json_body()
+            if err_status == -400:
+                return  # invalid JSON already sent
+            if err_status == 413:
+                return self._send_json({"ok": False, "error": "request body too large"}, 413)
+            if err_status == 400:
+                return self._send_json({"ok": False, "error": "invalid Content-Length"}, 400)
+            if err_status is not None:
+                return
 
             handler_fn, path_kwargs, route = router.dispatch("PUT", path)
             if handler_fn is None:
@@ -334,14 +380,15 @@ def make_handler(
             path = url.path
             if router.get_policy("POST", path).auth_required and not self._require_auth():
                 return
-            length = int(self.headers.get("Content-Length", 0))
-            raw = self.rfile.read(length) if length else b""
-            try:
-                obj = json.loads(raw.decode("utf-8"))
-                if not isinstance(obj, dict):
-                    raise ValueError("expected a JSON object")
-            except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as e:
-                return self._send_json({"ok": False, "error": f"invalid JSON: {e}"}, 400)
+            obj, err_status = self._read_json_body()
+            if err_status == -400:
+                return  # invalid JSON already sent
+            if err_status == 413:
+                return self._send_json({"ok": False, "error": "request body too large"}, 413)
+            if err_status == 400:
+                return self._send_json({"ok": False, "error": "invalid Content-Length"}, 400)
+            if err_status is not None:
+                return
 
             handler_fn, path_kwargs, route = router.dispatch("POST", path)
             if handler_fn is None:
