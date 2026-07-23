@@ -31,9 +31,8 @@ class GeminiProvider:
             env_name = mask_if_looks_like_key(cfg.api_key_env) or "<未设置>"
             raise ValueError(
                 f"Provider '{cfg.name}' 缺少 API Key。\n"
-                f"  方法 1: 在 .env 中设置环境变量 {env_name}=你的key\n"
-                f"  方法 2: 在 config.yaml 的 providers.{cfg.name}.api_key 字段直接填入 key\n"
-                f"  （如果误把 key 填到了 api_key_env 字段，请改回环境变量名）"
+                f"  请在 .env 中设置环境变量 {env_name}=你的key\n"
+                f"  （api_key_env 填环境变量名，不要把密钥写进 config.yaml）"
             )
         http_options = None
         if proxy.enabled and proxy.url:

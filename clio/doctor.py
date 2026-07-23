@@ -93,8 +93,8 @@ def _provider_has_key(provider, environ: Mapping[str, str]) -> bool:
 
 def _provider_key_detail(provider) -> str:
     if provider.api_key_env:
-        return f"缺少环境变量 {provider.api_key_env}，或在 api_key 字段填入 key"
-    return "缺少 api_key_env 或 api_key"
+        return f"缺少环境变量 {provider.api_key_env}（在 .env 中设置，不要写入 yaml api_key）"
+    return "缺少 api_key_env（请配置环境变量名，密钥放在 .env）"
 
 
 def collect_doctor_checks(

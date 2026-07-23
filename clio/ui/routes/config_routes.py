@@ -92,7 +92,7 @@ def handle_get_config_raw(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     raw.setdefault("ai", {})
     raw["ai"].setdefault("context", "")
     raw["_descriptions"] = CONFIG_DESCRIPTIONS
-    handler._send_json(raw)
+    handler._send_json(_mask_secrets_in_raw(raw))
 
 
 def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
@@ -305,7 +305,7 @@ def handle_get_config_global(handler: HandlerProtocol, qs: dict[str, Any]) -> No
                 result[section] = kept
         elif _is_global_section(section):
             result[section] = val
-    handler._send_json(result)
+    handler._send_json(_mask_secrets_in_raw(result))
 
 
 def handle_get_config_project(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
@@ -441,7 +441,8 @@ def _normalize_provider(name: str, obj: dict[str, Any]) -> dict[str, Any]:
     data = {
         "type": provider_type,
         "api_key_env": obj.get("api_key_env", ""),
-        "api_key": obj.get("api_key", ""),
+        # Never persist API keys in yaml (R-033b); runtime still reads legacy via env-first fallback.
+        "api_key": "",
         "base_url": obj.get("base_url", ""),
         "poll_interval_sec": obj.get("poll_interval_sec", 5),
         "retry_attempts": obj.get("retry_attempts", 2),
@@ -456,10 +457,37 @@ def _normalize_provider(name: str, obj: dict[str, Any]) -> dict[str, Any]:
     return data
 
 
+def _mask_provider_dict(provider: dict[str, Any]) -> dict[str, Any]:
+    """Return a shallow copy with non-empty api_key masked for API responses."""
+    out = dict(provider)
+    if out.get("api_key"):
+        out["api_key"] = "********"
+    return out
+
+
+def _mask_secrets_in_raw(raw: dict[str, Any]) -> dict[str, Any]:
+    """Deep-copy raw config and mask provider api_key fields."""
+    import copy
+
+    out = copy.deepcopy(raw)
+    providers = (out.get("ai") or {}).get("providers") or {}
+    if isinstance(providers, dict):
+        for name, p in list(providers.items()):
+            if isinstance(p, dict) and p.get("api_key"):
+                providers[name] = _mask_provider_dict(p)
+    return out
+
+
 def _write_global_config_raw(handler: HandlerProtocol, raw: dict[str, Any]) -> tuple[bool, str | None]:
     config_path = handler.config_path
     if not config_path:
         return False, "config_path not available"
+    # Never persist non-empty api_key values into yaml
+    providers = (raw.get("ai") or {}).get("providers")
+    if isinstance(providers, dict):
+        for p in providers.values():
+            if isinstance(p, dict) and p.get("api_key"):
+                p["api_key"] = ""
     try:
         yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
     except Exception as e:
@@ -487,7 +515,8 @@ def handle_get_providers(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     if error:
         return handler._send_json({"ok": False, "error": error}, 500)
     providers = raw.get("ai", {}).get("providers", {}) if raw else {}
-    return handler._send_json({"ok": True, "providers": providers})
+    masked = {n: _mask_provider_dict(p) if isinstance(p, dict) else p for n, p in providers.items()}
+    return handler._send_json({"ok": True, "providers": masked})
 
 
 def handle_post_provider(handler: HandlerProtocol, qs: dict[str, Any], obj: dict[str, Any]) -> None:
@@ -509,7 +538,7 @@ def handle_post_provider(handler: HandlerProtocol, qs: dict[str, Any], obj: dict
     ok, error = _write_global_config_raw(handler, raw)
     if not ok:
         return handler._send_json({"ok": False, "error": error}, 400)
-    return handler._send_json({"ok": True, "name": name, "provider": provider})
+    return handler._send_json({"ok": True, "name": name, "provider": _mask_provider_dict(provider)})
 
 
 def handle_put_provider(handler: HandlerProtocol, qs: dict[str, Any], obj: dict[str, Any], name: str) -> None:
@@ -527,7 +556,7 @@ def handle_put_provider(handler: HandlerProtocol, qs: dict[str, Any], obj: dict[
     ok, error = _write_global_config_raw(handler, raw)
     if not ok:
         return handler._send_json({"ok": False, "error": error}, 400)
-    return handler._send_json({"ok": True, "name": name, "provider": provider})
+    return handler._send_json({"ok": True, "name": name, "provider": _mask_provider_dict(provider)})
 
 
 def handle_delete_provider(handler: HandlerProtocol, qs: dict[str, Any], name: str) -> None:

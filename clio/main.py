@@ -104,7 +104,7 @@ def run_check(config_path: Path, project_dir: Path | None = None) -> int:
         detail = f"{task_cfg.provider}/{task_cfg.model}"
         if provider and not key_ok:
             env_name = provider.api_key_env or "<未设置 api_key_env>"
-            detail += f" (需设置 {env_name}，或在 api_key 字段填入 key)"
+            detail += f" (需设置 {env_name} 于 .env / 环境变量)"
         status(f"  {task_name}", bool(provider) and key_ok, detail)
 
     status(
