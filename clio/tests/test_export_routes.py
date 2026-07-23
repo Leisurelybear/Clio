@@ -46,6 +46,16 @@ def handler(tmp_path: Path) -> MagicMock:
 
 
 class TestHandlePostExport:
+    def test_unsafe_day_rejected(self, handler: MagicMock) -> None:
+        handle_post_export(handler, {}, {"day": "../evil", "format": "jianying"})
+        args = handler._send_json.call_args[0]
+        assert args[1] == 400
+        assert "day" in args[0]["error"].lower() or "invalid" in args[0]["error"].lower()
+
+    def test_day_with_slash_rejected(self, handler: MagicMock) -> None:
+        handle_post_export(handler, {}, {"day": "a/b", "format": "jianying"})
+        assert handler._send_json.call_args[0][1] == 400
+
     def test_missing_plan_returns_404(self, handler: MagicMock) -> None:
         handle_post_export(handler, {}, {"day": "day1", "format": "jianying"})
 

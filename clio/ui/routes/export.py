@@ -14,6 +14,7 @@ from clio.plan_readiness import (
     readiness_block_payload,
 )
 from clio.ui.handler_protocol import HandlerProtocol
+from clio.ui.services.file_service import _is_safe_basename
 
 
 def _copy_draft_to_jianying(
@@ -51,6 +52,9 @@ def handle_post_export(
 ) -> None:
     """POST /api/export — export plan to JianYing draft."""
     day = obj.get("day", "day1")
+    if not isinstance(day, str) or not _is_safe_basename(day):
+        handler._send_json({"ok": False, "error": "invalid day"}, 400)
+        return
     fmt = obj.get("format", "jianying")
     force = bool(obj.get("force"))
 

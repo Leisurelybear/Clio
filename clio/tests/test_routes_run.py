@@ -164,6 +164,32 @@ class TestHandlePostRunStart:
         err = handler._send_json.call_args.args[0]["error"]
         assert "project_dir not found" in err or "input_dir not found" in err
 
+    def test_unsafe_day_label_rejected(self, tmp_path: Path, _handler, _no_thread):
+        handler = _handler
+        handler._resolve_project_dir.return_value = tmp_path
+        cfg = MagicMock()
+        cfg.paths.output_dir = tmp_path / "out"
+        cfg.paths.output_dir.mkdir()
+        cfg.plan.use_transcripts = True
+        handler._get_config.return_value = cfg
+        handle_post_run_start(handler, {}, {"day_label": "../x", "steps": ["plan"]})
+        assert handler._send_json.call_args[0][1] == 400
+        assert "day_label" in handler._send_json.call_args[0][0]["error"]
+
+    def test_use_transcripts_does_not_mutate_cached_config(self, tmp_path: Path, _handler, _no_thread):
+        handler = _handler
+        handler._resolve_project_dir.return_value = tmp_path
+        out = tmp_path / "out"
+        out.mkdir()
+        plan = SimpleNamespace(use_transcripts=True)
+        cfg = SimpleNamespace(paths=SimpleNamespace(output_dir=out), plan=plan)
+        handler._get_config.return_value = cfg
+
+        handle_post_run_start(handler, {}, {"day_label": "day1", "steps": ["plan"], "use_transcripts": False})
+        # Shared cfg must remain default True (handler deepcopies before assign)
+        assert cfg.plan.use_transcripts is True
+        assert handler._send_json.call_args[0][0]["ok"] is True
+
 
 class TestHandlePostRunPreview:
     def test_builds_preview_from_request(self, tmp_path: Path, _handler, monkeypatch):

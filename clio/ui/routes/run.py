@@ -154,6 +154,8 @@ def handle_get_run_status(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
 def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle POST /api/run/start."""
     day_label = obj.get("day_label", "day1")
+    if not isinstance(day_label, str) or not _is_safe_basename(day_label):
+        return handler._send_json({"ok": False, "error": "invalid day_label"}, 400)
     steps = obj.get("steps")
     proj_dir = handler._resolve_project_dir(qs)
     cfg = handler._get_config(proj_dir)
@@ -162,6 +164,8 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
     )
     if cfg_error:
         return handler._send_json({"ok": False, "error": cfg_error}, 400)
+    # Isolate run-local config so body flags never mutate the shared cache entry.
+    cfg = copy.deepcopy(cfg)
     state = handler._get_state(str(proj_dir.resolve()))
     if "use_transcripts" in obj:
         cfg.plan.use_transcripts = obj["use_transcripts"]
@@ -212,6 +216,8 @@ def handle_post_run_start(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
 def handle_post_run_preview(handler: HandlerProtocol, qs: dict[str, Any], obj: dict) -> None:
     """Handle POST /api/run/preview."""
     day_label = obj.get("day_label", "day1")
+    if not isinstance(day_label, str) or not _is_safe_basename(day_label):
+        return handler._send_json({"ok": False, "error": "invalid day_label"}, 400)
     steps = obj.get("steps")
     files_list = obj.get("files")
     if files_list is not None and not isinstance(files_list, list):
