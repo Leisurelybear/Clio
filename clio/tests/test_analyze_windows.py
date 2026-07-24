@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from clio.analyze_windows import (
     AnalyzeWindow,
     build_analyze_windows,
@@ -143,6 +145,33 @@ class TestSliceWindowVideo:
         assert out.is_file()
         assert len(calls) == 2
         assert "libx264" in calls[1]
+
+    def test_slice_cancel_during_copy_does_not_reencode(self, tmp_path: Path):
+        """InterruptedError on stream-copy must not fall through to re-encode (C1)."""
+        src = tmp_path / "001_GL.mp4"
+        src.write_bytes(b"\x00" * 10)
+        dest = tmp_path / ".analyze_windows"
+        calls: list[list] = []
+
+        def fake_run(args, ffmpeg, **kw):
+            calls.append(list(args))
+            Path(args[-1]).write_bytes(b"partial")
+            if "-c" in args and args[args.index("-c") + 1] == "copy":
+                raise InterruptedError("ffmpeg 被用户取消")
+            # If re-encode is wrongly attempted, leave a marker file content.
+            Path(args[-1]).write_bytes(b"reencoded-after-cancel")
+
+        with pytest.raises(InterruptedError, match="用户取消"):
+            slice_window_video(
+                source=src,
+                window=AnalyzeWindow(0, 0, 60),
+                dest_dir=dest,
+                ffmpeg="ffmpeg",
+                run_ffmpeg=fake_run,
+            )
+
+        assert len(calls) == 1, f"expected only copy call, got {len(calls)}: {calls}"
+        assert not any(dest.glob("*.mp4")), "partial slice must be unlinked on cancel"
 
     def test_slice_shrinks_when_over_200mb(self, tmp_path: Path):
         src = tmp_path / "001_GL.mp4"

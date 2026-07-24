@@ -283,6 +283,10 @@ def slice_window_video(
             return out
         # empty or oversized copy → fall through to re-encode / shrink
         out.unlink(missing_ok=True)
+    except InterruptedError:
+        # User cancel must not fall through to re-encode (C1).
+        out.unlink(missing_ok=True)
+        raise
     except Exception:
         out.unlink(missing_ok=True)
 
