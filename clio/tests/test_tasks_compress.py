@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from clio.tasks.compress import run_compress_all
 
 
@@ -197,6 +199,51 @@ class TestRunCompressAll:
         records = run_compress_all(cfg, files=["a"])
         assert len(records) == 1
         assert "a" in records[0].stem
+
+    def test_cancel_unlinks_partial_output(self, monkeypatch, tmp_path: Path):
+        """InterruptedError during encode must remove the partial output file."""
+        cfg = _cfg(tmp_path)
+        _add_video(cfg, "clip.mp4")
+        monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
+
+        written: list[Path] = []
+
+        def _mock_compress(inp, outp, c, **kw):
+            outp.write_bytes(b"partial")
+            written.append(outp)
+            raise InterruptedError("ffmpeg 被用户取消")
+
+        monkeypatch.setattr("clio.tasks.compress.compress_video", _mock_compress)
+
+        with pytest.raises(InterruptedError):
+            run_compress_all(cfg)
+
+        assert written
+        assert not written[0].exists()
+
+    def test_keyboard_interrupt_does_not_unlink_finished_output(self, monkeypatch, tmp_path: Path):
+        """KeyboardInterrupt after a successful write must not delete the good file.
+
+        encode try only catches Exception; BaseException (KeyboardInterrupt/SystemExit)
+        must not run the partial-cleanup unlink.
+        """
+        cfg = _cfg(tmp_path)
+        _add_video(cfg, "clip.mp4")
+        monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
+
+        def _mock_compress(inp, outp, c, **kw):
+            outp.write_bytes(b"good-content")
+            # Simulate interrupt after encode completed (file is valid).
+            raise KeyboardInterrupt()
+
+        monkeypatch.setattr("clio.tasks.compress.compress_video", _mock_compress)
+
+        with pytest.raises(KeyboardInterrupt):
+            run_compress_all(cfg)
+
+        outs = list(cfg.compressed_dir.glob("*.mp4"))
+        assert len(outs) == 1
+        assert outs[0].read_bytes() == b"good-content"
 
     def test_ignores_split_max_min(self, monkeypatch, tmp_path: Path):
         """Physical split is removed; split_max_min>0 must not create _seg files."""

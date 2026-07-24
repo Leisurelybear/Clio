@@ -142,6 +142,7 @@ def handle_put_config_raw(handler: HandlerProtocol, qs: dict[str, Any], obj: dic
     except Exception as e:
         return handler._send_json({"ok": False, "error": f"cannot read current config: {e}"}, 500)
     coerced = _coerce_config_types(obj, ref_raw)
+    _strip_provider_api_keys(coerced)
     try:
         yml = yaml.dump(coerced, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
     except Exception as e:
@@ -348,6 +349,7 @@ def handle_put_config_global(handler: HandlerProtocol, qs: dict[str, Any], obj: 
     except Exception as e:
         return handler._send_json({"ok": False, "error": f"cannot read current config: {e}"}, 500)
     coerced = _coerce_config_types(obj, ref_raw)
+    _strip_provider_api_keys(coerced)
     try:
         yml = yaml.dump(coerced, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
     except Exception as e:
@@ -478,16 +480,25 @@ def _mask_secrets_in_raw(raw: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _strip_provider_api_keys(raw: dict[str, Any]) -> None:
+    """Force all provider api_key fields to empty so secrets never persist in yaml (R-033b).
+
+    Covers real keys, UI-masked '********', and any non-empty client value.
+    Mutates raw in place.
+    """
+    providers = (raw.get("ai") or {}).get("providers")
+    if not isinstance(providers, dict):
+        return
+    for p in providers.values():
+        if isinstance(p, dict) and p.get("api_key"):
+            p["api_key"] = ""
+
+
 def _write_global_config_raw(handler: HandlerProtocol, raw: dict[str, Any]) -> tuple[bool, str | None]:
     config_path = handler.config_path
     if not config_path:
         return False, "config_path not available"
-    # Never persist non-empty api_key values into yaml
-    providers = (raw.get("ai") or {}).get("providers")
-    if isinstance(providers, dict):
-        for p in providers.values():
-            if isinstance(p, dict) and p.get("api_key"):
-                p["api_key"] = ""
+    _strip_provider_api_keys(raw)
     try:
         yml = yaml.dump(raw, allow_unicode=True, default_flow_style=False, sort_keys=False, indent=2)
     except Exception as e:

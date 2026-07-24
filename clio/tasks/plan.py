@@ -57,7 +57,8 @@ def run_plan_vlog(
 
     out_json = config.plans_dir / f"{day_label}_plan.json"
     out_md = config.plans_dir / f"{day_label}_plan.md"
-    if not overwrite and config.analyze.skip_existing and out_json.exists() and out_md.exists():
+    # files= means a selection-scoped plan; never short-circuit with a prior full plan (I1).
+    if files is None and not overwrite and config.analyze.skip_existing and out_json.exists() and out_md.exists():
         try:
             json.loads(out_json.read_text(encoding="utf-8"))
         except (json.JSONDecodeError, OSError):

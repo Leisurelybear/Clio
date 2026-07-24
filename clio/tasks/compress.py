@@ -167,7 +167,7 @@ def run_compress_all(
                     compress_video(source, use_out, config, progress_callback=_on_progress, cancel_event=cancel_event)
                 else:
                     compress_video(source, use_out, config, cancel_event=cancel_event)
-            except BaseException:
+            except Exception:
                 if use_out.exists():
                     use_out.unlink(missing_ok=True)
                 raise

@@ -520,6 +520,103 @@ class TestHandlePutConfigGlobal:
         assert data["proxy"]["enabled"] is True
         assert data["proxy"]["url"] == "socks5://localhost:1080"
 
+    def test_strips_masked_api_key_on_write(self, tmp_path: Path):
+        """UI round-trip: GET masks keys as ********; PUT must not persist that mask (R-033b)."""
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        on_disk = {
+            "proxy": {"enabled": False, "url": ""},
+            "ai": {
+                "providers": {
+                    "gemini": {
+                        "type": "gemini",
+                        "api_key": "sk-live-real-secret",
+                        "api_key_env": "GEMINI_API_KEY",
+                        "models": ["gemini-2.5-flash"],
+                    }
+                }
+            },
+        }
+        cfg.write_text(yaml.dump(on_disk), encoding="utf-8")
+        handler.config_path = cfg
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+
+        # Body as returned by masked GET (and what editor-plan.js re-PUTs)
+        body = {
+            "proxy": {"enabled": False, "url": ""},
+            "ai": {
+                "providers": {
+                    "gemini": {
+                        "type": "gemini",
+                        "api_key": "********",
+                        "api_key_env": "GEMINI_API_KEY",
+                        "models": ["gemini-2.5-flash"],
+                    }
+                }
+            },
+        }
+        handle_put_config_global(handler, {}, body)
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args
+        assert args[0][0].get("ok") is True, args
+        data = yaml.safe_load(cfg.read_text(encoding="utf-8"))
+        stored = data["ai"]["providers"]["gemini"].get("api_key", "")
+        assert stored != "********"
+        assert stored != "sk-live-real-secret"
+        assert stored in ("", None)
+
+
+class TestHandlePutConfigRawApiKey:
+    def test_put_raw_global_strips_masked_api_key(self, tmp_path: Path):
+        """PUT /api/config/raw global branch must also strip masked api_key (R-033b)."""
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        on_disk = {
+            "proxy": {"enabled": False, "url": ""},
+            "ai": {
+                "providers": {
+                    "gemini": {
+                        "type": "gemini",
+                        "api_key": "sk-live-real-secret",
+                        "api_key_env": "GEMINI_API_KEY",
+                        "models": ["gemini-2.5-flash"],
+                    }
+                }
+            },
+        }
+        cfg.write_text(yaml.dump(on_disk), encoding="utf-8")
+        handler.config_path = cfg
+        handler.project_dir = tmp_path
+        handler._resolve_project_dir.return_value = tmp_path
+        handler.__class__._config_cache = MagicMock()
+        handler._send_json = MagicMock()
+
+        body = {
+            "proxy": {"enabled": False, "url": ""},
+            "ai": {
+                "providers": {
+                    "gemini": {
+                        "type": "gemini",
+                        "api_key": "********",
+                        "api_key_env": "GEMINI_API_KEY",
+                        "models": ["gemini-2.5-flash"],
+                    }
+                }
+            },
+        }
+        handle_put_config_raw(handler, {}, body)
+
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args
+        assert args[0][0].get("ok") is True, args
+        data = yaml.safe_load(cfg.read_text(encoding="utf-8"))
+        stored = data["ai"]["providers"]["gemini"].get("api_key", "")
+        assert stored != "********"
+        assert stored != "sk-live-real-secret"
+        assert stored in ("", None)
+
 
 class TestHandlePutConfigProject:
     """PUT /api/config/project — writes to project.yaml, rejects global fields."""
