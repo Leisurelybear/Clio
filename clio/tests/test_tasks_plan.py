@@ -120,3 +120,61 @@ class TestRunPlanVlogFilesFilter:
         assert result is not None
         assert result["theme"] == "all"
         assert len(result["sequence"]) == 2
+
+
+def _fake_plan_payload(clips, config=None, day_label="day1", **kwargs):
+    return {
+        "day_title": "Selected",
+        "theme": "subset",
+        "total_estimated_sec": 60,
+        "opening_tip": "",
+        "ending_tip": "",
+        "sequence": [{"index": c["index"], "title": c["title"], "use_timeline": "00:00-00:10"} for c in clips],
+    }
+
+
+class TestPlanSourceInputs:
+    def test_full_plan_writes_source_inputs(self, cfg: AppConfig):
+        from clio.tasks.plan import run_plan_vlog
+
+        _write_text(cfg, "001_A.json", "A", 1)
+        _write_text(cfg, "002_B.json", "B", 2)
+
+        with patch("clio.tasks.plan.plan_daily_vlog", side_effect=_fake_plan_payload):
+            result = run_plan_vlog(cfg, day_label="day1", files=None, overwrite=True)
+
+        assert result is not None
+        si = result["source_inputs"]
+        assert si == [
+            {"index": "001", "source_stem": "A"},
+            {"index": "002", "source_stem": "B"},
+        ]
+        on_disk = json.loads((cfg.plans_dir / "day1_plan.json").read_text(encoding="utf-8"))
+        assert on_disk["source_inputs"] == si
+
+    def test_files_selection_subset_in_source_inputs(self, cfg: AppConfig):
+        from clio.tasks.plan import run_plan_vlog
+
+        _write_text(cfg, "001_A.json", "A", 1)
+        _write_text(cfg, "002_B.json", "B", 2)
+
+        with patch("clio.tasks.plan.plan_daily_vlog", side_effect=_fake_plan_payload):
+            result = run_plan_vlog(cfg, day_label="day1", files=["A"], overwrite=True)
+
+        assert result is not None
+        assert result["source_inputs"] == [{"index": "001", "source_stem": "A"}]
+
+    def test_ai_supplied_source_inputs_are_overwritten(self, cfg: AppConfig):
+        from clio.tasks.plan import run_plan_vlog
+
+        _write_text(cfg, "001_A.json", "A", 1)
+
+        def _poisoned(clips, config, day_label="day1", **kwargs):
+            payload = _fake_plan_payload(clips)
+            payload["source_inputs"] = [{"index": "999", "source_stem": "FAKE"}]
+            return payload
+
+        with patch("clio.tasks.plan.plan_daily_vlog", side_effect=_poisoned):
+            result = run_plan_vlog(cfg, day_label="day1", overwrite=True)
+
+        assert result["source_inputs"] == [{"index": "001", "source_stem": "A"}]

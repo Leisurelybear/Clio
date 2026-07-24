@@ -26,6 +26,17 @@ def _analysis_day_label(data: dict) -> str:
     return label or "day1"
 
 
+def _source_inputs_from_clips(clips: list[dict]) -> list[dict[str, str]]:
+    """Build authoritative input-pool provenance for a generated plan."""
+    return [
+        {
+            "index": str(c.get("index") or ""),
+            "source_stem": str(c.get("source_stem") or ""),
+        }
+        for c in clips
+    ]
+
+
 def _discover_day_labels(config: AppConfig) -> list[str]:
     labels: set[str] = set()
     for json_file in sorted(config.texts_dir.glob("*.json")):
@@ -153,6 +164,7 @@ def run_plan_vlog(
 
     plan_obj = Plan.from_dict(plan)
     plan = plan_obj.to_dict()
+    plan["source_inputs"] = _source_inputs_from_clips(clips)
     if config.plan.use_transcripts:
         plan["_transcripts_missing"] = not transcripts_map
     plan = add_schema_version(plan)
