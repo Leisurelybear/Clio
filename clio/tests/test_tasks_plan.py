@@ -194,3 +194,24 @@ class TestPlanSourceInputs:
         assert "`002` B" in md
         # section before sequence
         assert md.index("## 规划素材") < md.index("## 推荐剪辑顺序")
+
+    def test_skip_existing_preserves_plan_without_source_inputs(self, cfg: AppConfig):
+        """Legacy plan without the field is returned as-is on skip."""
+        from clio.tasks.plan import run_plan_vlog
+
+        _write_text(cfg, "001_A.json", "A", 1)
+        legacy = {
+            "day_title": "Legacy",
+            "theme": "old",
+            "total_estimated_sec": 10,
+            "sequence": [{"index": "001", "title": "A", "use_timeline": "00:00-00:05"}],
+        }
+        (cfg.plans_dir / "day1_plan.json").write_text(json.dumps(legacy), encoding="utf-8")
+        (cfg.plans_dir / "day1_plan.md").write_text("# legacy", encoding="utf-8")
+
+        with patch("clio.tasks.plan.plan_daily_vlog") as mock_plan:
+            result = run_plan_vlog(cfg, day_label="day1", files=None, overwrite=False)
+
+        mock_plan.assert_not_called()
+        assert result is not None
+        assert "source_inputs" not in result

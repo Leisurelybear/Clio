@@ -88,3 +88,13 @@ def test_reorder_out_of_range_raises():
     plan = Plan.from_dict({"sequence": [{"index": "001"}]})
     with pytest.raises(IndexError):
         plan.reorder(0, 5)
+
+
+def test_source_inputs_roundtrip_via_extras():
+    raw = {
+        "day_title": "d",
+        "sequence": [{"index": "001", "use_timeline": "00:00-00:10"}],
+        "source_inputs": [{"index": "001", "source_stem": "A"}],
+    }
+    out = Plan.from_dict(raw).to_dict()
+    assert out["source_inputs"] == [{"index": "001", "source_stem": "A"}]
