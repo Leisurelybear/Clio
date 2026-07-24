@@ -178,3 +178,19 @@ class TestPlanSourceInputs:
             result = run_plan_vlog(cfg, day_label="day1", overwrite=True)
 
         assert result["source_inputs"] == [{"index": "001", "source_stem": "A"}]
+
+    def test_plan_md_lists_source_inputs(self, cfg: AppConfig):
+        from clio.tasks.plan import run_plan_vlog
+
+        _write_text(cfg, "001_A.json", "A", 1)
+        _write_text(cfg, "002_B.json", "B", 2)
+
+        with patch("clio.tasks.plan.plan_daily_vlog", side_effect=_fake_plan_payload):
+            run_plan_vlog(cfg, day_label="day1", overwrite=True)
+
+        md = (cfg.plans_dir / "day1_plan.md").read_text(encoding="utf-8")
+        assert "## 规划素材" in md
+        assert "`001` A" in md
+        assert "`002` B" in md
+        # section before sequence
+        assert md.index("## 规划素材") < md.index("## 推荐剪辑顺序")

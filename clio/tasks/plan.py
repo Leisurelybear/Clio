@@ -178,8 +178,17 @@ def run_plan_vlog(
         f"**主题**: {plan.get('theme', '')}",
         f"**预估总时长**: {plan.get('total_estimated_sec', '')} 秒",
         "",
-        "## 推荐剪辑顺序",
     ]
+    source_inputs = plan.get("source_inputs") or []
+    if source_inputs:
+        lines.append("## 规划素材")
+        lines.append("")
+        for entry in source_inputs:
+            idx = entry.get("index", "?")
+            stem = entry.get("source_stem", "")
+            lines.append(f"- `{idx}` {stem}")
+        lines.append("")
+    lines.append("## 推荐剪辑顺序")
     for item in plan.get("sequence", []):
         lines.extend(
             [
