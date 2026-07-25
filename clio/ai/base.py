@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
@@ -44,5 +45,10 @@ class VideoAIProvider(TextAIProvider, Protocol):
     """支持视频理解的 AI 能力。"""
 
     def analyze_video(
-        self, video_path: str, prompt: str, model: str, progress_callback: Callable[[str], None] | None = None
+        self,
+        video_path: str,
+        prompt: str,
+        model: str,
+        progress_callback: Callable[[str], None] | None = None,
+        cancel_event: threading.Event | None = None,
     ) -> AIResponse: ...
