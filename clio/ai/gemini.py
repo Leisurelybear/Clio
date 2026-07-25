@@ -34,16 +34,18 @@ class GeminiProvider:
                 f"  请在 .env 中设置环境变量 {env_name}=你的key\n"
                 f"  （api_key_env 填环境变量名，不要把密钥写进 config.yaml）"
             )
-        http_options = None
+        http_options_kwargs: dict = {"timeout": max(1, int(float(cfg.timeout_sec) * 1000))}
         if proxy.enabled and proxy.url:
-            http_options = types.HttpOptions(
-                client_args={"transport": httpx.HTTPTransport(proxy=proxy.url)},
-                async_client_args={"transport": httpx.AsyncHTTPTransport(proxy=proxy.url)},
-            )
+            http_options_kwargs["client_args"] = {"transport": httpx.HTTPTransport(proxy=proxy.url)}
+            http_options_kwargs["async_client_args"] = {"transport": httpx.AsyncHTTPTransport(proxy=proxy.url)}
+        http_options = types.HttpOptions(**http_options_kwargs)
         self._client = genai.Client(api_key=cfg.api_key, http_options=http_options)
         self._rl = make_rate_limiter(cfg.requests_per_minute)
         self._poll_interval = cfg.poll_interval_sec
         self._retry_attempts = max(1, cfg.retry_attempts + 1)
+        self._generation_config = (
+            types.GenerateContentConfig(max_output_tokens=cfg.max_tokens) if cfg.max_tokens > 0 else None
+        )
 
     def _is_retryable(self, exc: BaseException) -> bool:
         """判断异常是否应该重试。"""
@@ -141,7 +143,14 @@ class GeminiProvider:
     def generate_text(self, prompt: str, model: str) -> AIResponse:
         def _do() -> AIResponse:
             self._maybe_wait()
-            response = self._client.models.generate_content(model=model, contents=prompt)
+            if self._generation_config is None:
+                response = self._client.models.generate_content(model=model, contents=prompt)
+            else:
+                response = self._client.models.generate_content(
+                    model=model,
+                    contents=prompt,
+                    config=self._generation_config,
+                )
             return AIResponse(text=response.text or "", token_usage=self._extract_usage(response))
 
         return self._call_with_retry(_do, model, model)
@@ -156,9 +165,6 @@ class GeminiProvider:
     ) -> AIResponse:
         uploaded = None
         try:
-            # Store cancel_event for use in helper methods
-            self._cancel_event = cancel_event
-
             if progress_callback:
                 progress_callback("上传视频到 Gemini...")
             self._maybe_wait()
@@ -188,10 +194,14 @@ class GeminiProvider:
 
             def _do() -> AIResponse:
                 self._maybe_wait()
-                response = self._client.models.generate_content(
-                    model=model,
-                    contents=[uploaded, prompt],
-                )
+                if self._generation_config is None:
+                    response = self._client.models.generate_content(model=model, contents=[uploaded, prompt])
+                else:
+                    response = self._client.models.generate_content(
+                        model=model,
+                        contents=[uploaded, prompt],
+                        config=self._generation_config,
+                    )
                 return AIResponse(text=response.text or "", token_usage=self._extract_usage(response))
 
             return self._call_with_retry(_do, f"视频 {model}", model)

@@ -46,7 +46,8 @@ class TestInit:
             from clio.ai.gemini import GeminiProvider
 
             p = GeminiProvider(_make_cfg(), proxy_disabled)
-            mock_client_cls.assert_called_once_with(api_key="test-key", http_options=None)
+            http_options = mock_client_cls.call_args.kwargs["http_options"]
+            assert http_options.timeout == 120_000
             assert p._poll_interval == 5
             assert p._retry_attempts == 3  # retry_attempts+1
 
@@ -261,6 +262,20 @@ class TestGenerateText:
 
         result = self._prov.generate_text("hi", "gemini-2.5-flash")
         assert result.text == ""
+
+    def test_positive_max_tokens_is_sent(self, proxy_disabled):
+        with patch("clio.ai.gemini.genai.Client") as mock_cls:
+            from clio.ai.gemini import GeminiProvider
+
+            client = MagicMock()
+            mock_cls.return_value = client
+            client.models.generate_content.return_value = MagicMock(text="ok", usage_metadata=None)
+            provider = GeminiProvider(_make_cfg(max_tokens=2048), proxy_disabled)
+
+            provider.generate_text("hi", "gemini-2.5-flash")
+
+            config = client.models.generate_content.call_args.kwargs["config"]
+            assert config.max_output_tokens == 2048
 
 
 class TestAnalyzeVideo:
