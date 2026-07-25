@@ -4,7 +4,7 @@ import {
   updateSidebarDay, updateEntityUI, clearDirty,
 } from './utils.js';
 import { api } from './api.js';
-import { playVideoSegment, stopPreview } from './viewer.js';
+import { seekToGlobal, stopPreview } from './viewer.js';
 import { loadWaveformForCurrentVideo } from './waveform.js';
 import { showRerunProgress, hideRerunProgress } from './sidebar-rerun.js';
 import { openBrowseDir, loadBrowseDir } from './sidebar-browse.js';
@@ -19,7 +19,7 @@ let _selectVideoRequestId = 0;
 
 // ── Selection ──────────────────────────────────────────────────
 
-async function selectVideo(file) {
+async function selectVideo(file, options = {}) {
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换视频吗？')) return;
   }
@@ -47,9 +47,13 @@ async function selectVideo(file) {
 
   player.onloadedmetadata = () => {
     $('player-time').textContent = `${fmtTime(0)} / ${fmtTime(player.duration)}`;
-    if (state.source === 'original' && (v.offset_sec || 0) > 0) {
-      player.currentTime = v.offset_sec;
-    }
+    const defaultSeek = state.source === 'original' ? (v.offset_sec || 0) : 0;
+    const requestedSeek = Number.isFinite(options.seekSec) ? options.seekSec : defaultSeek;
+    const seekSec = Number.isFinite(player.duration) && player.duration > 0
+      ? Math.min(Math.max(0, requestedSeek), player.duration)
+      : Math.max(0, requestedSeek);
+    player.currentTime = seekSec;
+    if (options.play) player.play().catch(() => {});
   };
   loadWaveformForCurrentVideo();
 
@@ -204,16 +208,45 @@ function sameVideoIndex(a, b) {
   return Number.isFinite(leftNum) && Number.isFinite(rightNum) && leftNum === rightNum;
 }
 
+function _sourceSwitchSeekTime(currentTime, fromSource, oldVideo, toSource, targetVideo) {
+  const time = Number.isFinite(currentTime) ? currentTime : 0;
+  const oldOffset = fromSource === 'original' ? Number(oldVideo?.offset_sec) || 0 : 0;
+  const targetOffset = toSource === 'original' ? Number(targetVideo?.offset_sec) || 0 : 0;
+  return Math.max(0, time - oldOffset) + targetOffset;
+}
+
+function _sourceSwitchResumePoint(
+  wasPlanView,
+  currentTime,
+  globalSec,
+  fromSource,
+  oldVideo,
+  toSource,
+  targetVideo,
+) {
+  if (wasPlanView) {
+    return { globalSec: Number.isFinite(globalSec) ? Math.max(0, globalSec) : 0 };
+  }
+  return {
+    seekSec: _sourceSwitchSeekTime(currentTime, fromSource, oldVideo, toSource, targetVideo),
+  };
+}
+
 async function setSource(source, options = {}) {
   if (source === state.source) return;
   if (state.dirty) {
     if (!confirm('当前 tab 有未保存的修改，确定切换源吗？')) return;
   }
-  if (state.previewActive) stopPreview();
+  const player = $('player');
+  const currentTime = Number.isFinite(player?.currentTime) ? player.currentTime : 0;
+  const wasPlaying = Boolean(player && !player.paused && !player.ended);
+  const oldSource = state.source;
   const oldVideo = options.fromVideo || state.videos.find(x => x.file === state.currentVideo);
   const oldMatchFile = options.matchFile ?? oldVideo?.match?.file;
   const oldMatchAbsPath = options.matchAbsPath ?? oldVideo?.match?.abs_path ?? null;
   const wasPlanView = state.currentEntity === 'plan';
+  const globalSec = Number.isFinite(state.previewGlobalSec) ? state.previewGlobalSec : 0;
+  if (state.previewActive) stopPreview();
   if (!wasPlanView) {
     $('player-pane').classList.remove('plan-mode');
   }
@@ -237,7 +270,16 @@ async function setSource(source, options = {}) {
             $('player-name').textContent = '对应原视频当前离线';
             setStatus(`已切换到${source}视图（对应原视频离线）`, 'warn');
           } else {
-            playVideoSegment(target.file, target.offset_sec || 0);
+            const resume = _sourceSwitchResumePoint(
+              true,
+              currentTime,
+              globalSec,
+              oldSource,
+              oldVideo,
+              source,
+              target,
+            );
+            seekToGlobal(resume.globalSec, { play: wasPlaying });
             setStatus(`已切换到${source}视图`, 'ok');
           }
         } else {
@@ -252,7 +294,21 @@ async function setSource(source, options = {}) {
           renderVideoList();
           saveProject();
         } else {
-          await selectVideo(target ? target.file : state.videos[0].file);
+          const nextVideo = target || state.videos[0];
+          if (target) {
+            const resume = _sourceSwitchResumePoint(
+              false,
+              currentTime,
+              globalSec,
+              oldSource,
+              oldVideo,
+              source,
+              nextVideo,
+            );
+            await selectVideo(nextVideo.file, { seekSec: resume.seekSec, play: wasPlaying });
+          } else {
+            await selectVideo(nextVideo.file);
+          }
         }
       }
     } else {
@@ -332,6 +388,8 @@ export {
   setSource,
   jumpToCounterpart,
   _findSourceSwitchTarget,
+  _sourceSwitchSeekTime,
+  _sourceSwitchResumePoint,
   openBrowseDir,
   loadBrowseDir,
   switchToOriginalThenCompress,

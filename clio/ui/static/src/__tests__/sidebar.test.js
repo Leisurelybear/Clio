@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { _findSourceSwitchTarget } from '../sidebar.js';
+import {
+  _findSourceSwitchTarget,
+  _sourceSwitchResumePoint,
+  _sourceSwitchSeekTime,
+} from '../sidebar.js';
 
 describe('_findSourceSwitchTarget', () => {
   it('matches the explicit counterpart file', () => {
@@ -44,5 +48,39 @@ describe('_findSourceSwitchTarget', () => {
     expect(
       _findSourceSwitchTarget(oldVideo, videos, oldVideo.match.file, oldVideo.match.abs_path).file
     ).toBe('A.MP4');
+  });
+});
+
+describe('source switch progress', () => {
+  it('adds the original segment offset when switching from compressed media', () => {
+    expect(_sourceSwitchSeekTime(
+      12,
+      'compressed',
+      { offset_sec: 120 },
+      'original',
+      { offset_sec: 120 },
+    )).toBe(132);
+  });
+
+  it('removes the original segment offset when switching to compressed media', () => {
+    expect(_sourceSwitchSeekTime(
+      132,
+      'original',
+      { offset_sec: 120 },
+      'compressed',
+      { offset_sec: 120 },
+    )).toBe(12);
+  });
+
+  it('uses the plan global second instead of source media time', () => {
+    expect(_sourceSwitchResumePoint(
+      true,
+      132,
+      47.5,
+      'original',
+      { offset_sec: 120 },
+      'compressed',
+      { offset_sec: 120 },
+    )).toEqual({ globalSec: 47.5 });
   });
 });

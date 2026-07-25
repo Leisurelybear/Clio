@@ -88,4 +88,20 @@ describe('selectVideo request ordering', () => {
     expect(state.currentVideo).toBe('b.mp4');
     expect(state.texts).toEqual({ title: 'B' });
   });
+
+  it('restores the requested time and playback after metadata loads', async () => {
+    const { state } = await import('../state.js');
+    state.source = 'original';
+    state.videos = [{ file: 'a.mp4', offset_sec: 120 }];
+
+    const { selectVideo } = await import('../sidebar.js');
+    await selectVideo('a.mp4', { seekSec: 135, play: true });
+
+    const player = element('player');
+    player.duration = 300;
+    player.onloadedmetadata();
+
+    expect(player.currentTime).toBe(135);
+    expect(player.play).toHaveBeenCalledOnce();
+  });
 });
