@@ -143,6 +143,8 @@ def run_label_videos(
                 run_ffmpeg(["-i", str(compressed), "-vf", vf, "-an", "-y", str(out)], ffmpeg, cancel_event=cancel_event)
                 state.mark(orig_stem, "label", "done")
             except Exception:
+                if out.exists():
+                    out.unlink(missing_ok=True)
                 state.mark(orig_stem, "label", "error")
                 raise
             elapsed_total += time.monotonic() - t0

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -234,3 +236,34 @@ class TestRunLabelVideos:
 
         run_label_videos(cfg, overwrite=True)
         mock_ffmpeg.assert_called_once()
+
+    @patch("clio.tasks.label.resolve_drawtext_font")
+    @patch("clio.tasks.label.run_ffmpeg")
+    @patch("clio.tasks.label.resolve_binary")
+    def test_cancel_unlinks_partial_output(self, mock_resolve, mock_ffmpeg, mock_font, cfg, tmp_path):
+        """InterruptedError during label encode must remove partial labeled mp4."""
+        font = tmp_path / "arial.ttf"
+        font.write_bytes(b"\x00")
+        mock_font.return_value = font
+        (cfg.texts_dir / "001_clip.json").write_text(
+            json.dumps({"index": 1, "source_file": "clip.mp4"}),
+            encoding="utf-8",
+        )
+        (cfg.compressed_dir / "001_clip.mp4").write_bytes(b"\x00")
+        mock_resolve.return_value = "ffmpeg"
+
+        def _ffmpeg(args, *a, **kw):
+            # last arg is output path with -y
+            out = Path(args[-1])
+            out.write_bytes(b"partial")
+            raise InterruptedError("ffmpeg 被用户取消")
+
+        mock_ffmpeg.side_effect = _ffmpeg
+
+        from clio.tasks.label import run_label_videos
+
+        with pytest.raises(InterruptedError):
+            run_label_videos(cfg)
+
+        labeled = list((cfg.paths.output_dir / "labeled").glob("*_labeled.mp4"))
+        assert labeled == []
