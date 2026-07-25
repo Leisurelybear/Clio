@@ -18,10 +18,13 @@ from clio.config import (
 )
 from clio.config.models import (
     AppConfig,
+    ExportConfig,
     GlobalAIConfig,
+    GlobalCompressConfig,
     GlobalConfig,
     ProjectAIConfig,
     ProjectConfig,
+    ProjectWhisperConfig,
     ProviderConfig,
     ProxyConfig,
     TaskConfig,
@@ -227,6 +230,41 @@ class TestValidateConfig:
             ),
         )
         with pytest.raises(ValueError, match="<无>"):
+            _validate_config(cfg)
+
+    @pytest.mark.parametrize("fps,crf", [(0, 32), (15, -1), (15, 52)])
+    def test_rejects_invalid_global_compress_values(self, fps, crf):
+        cfg = AppConfig(global_cfg=GlobalConfig(compress=GlobalCompressConfig(fps=fps, crf=crf)))
+        with pytest.raises(ValueError, match="compress"):
+            _validate_config(cfg)
+
+    @pytest.mark.parametrize("timeout,poll", [(0, 5), (120, 0)])
+    def test_rejects_non_positive_gemini_timing(self, timeout, poll):
+        provider = ProviderConfig(
+            name="gemini",
+            type="gemini",
+            api_key="k",
+            timeout_sec=timeout,
+            poll_interval_sec=poll,
+        )
+        cfg = AppConfig(global_cfg=GlobalConfig(ai=GlobalAIConfig(providers={"gemini": provider})))
+        with pytest.raises(ValueError, match="ai.providers.gemini"):
+            _validate_config(cfg)
+
+    def test_rejects_unknown_canvas_ratio(self):
+        cfg = AppConfig(
+            global_cfg=GlobalConfig(),
+            project_cfg=ProjectConfig(export=ExportConfig(canvas_ratio="4:3")),
+        )
+        with pytest.raises(ValueError, match="canvas_ratio"):
+            _validate_config(cfg)
+
+    def test_validates_project_whisper_values(self):
+        cfg = AppConfig(
+            global_cfg=GlobalConfig(),
+            project_cfg=ProjectConfig(whisper=ProjectWhisperConfig(device="gpu")),
+        )
+        with pytest.raises(ValueError, match="whisper.device"):
             _validate_config(cfg)
 
     # ── load_config ─────────────────────────────────────────────────────
@@ -453,7 +491,7 @@ def test_validate_global_rejects_bad_provider_type():
         validate_global_config(gc)
 
 
-def test_validate_global_allows_zero_timeout():
+def test_validate_global_rejects_zero_timeout():
     from clio.config.models import GlobalAIConfig, GlobalConfig, ProviderConfig
     from clio.config.validators import validate_global_config
 
@@ -463,4 +501,5 @@ def test_validate_global_allows_zero_timeout():
             provider_ttl_min=0,
         )
     )
-    validate_global_config(gc)
+    with pytest.raises(ValueError, match="timeout_sec"):
+        validate_global_config(gc)

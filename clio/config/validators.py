@@ -1,4 +1,4 @@
-from clio.config.models import AppConfig, GlobalConfig
+from clio.config.models import CANVAS_PRESETS, AppConfig, GlobalConfig
 
 _SUPPORTED_PROVIDER_TYPES = {"gemini", "openai", "openai_compat"}
 
@@ -13,6 +13,16 @@ def _filter_dc(raw: dict, dc: type) -> dict:
 def _require_min(field_name: str, value: int | float, minimum: int | float) -> None:
     if value < minimum:
         raise ValueError(f"{field_name} must be >= {minimum}, got: {value}")
+
+
+def _require_max(field_name: str, value: int | float, maximum: int | float) -> None:
+    if value > maximum:
+        raise ValueError(f"{field_name} must be <= {maximum}, got: {value}")
+
+
+def _require_positive(field_name: str, value: int | float) -> None:
+    if value <= 0:
+        raise ValueError(f"{field_name} must be > 0, got: {value}")
 
 
 def _require_supported_provider_type(provider_name: str, provider_type: str) -> None:
@@ -55,8 +65,19 @@ def _validate_config(config: AppConfig) -> None:
     _require_min("compress.target_size_mb", config.compress.target_size_mb, 0.01)
     _require_min("compress.max_width", config.compress.max_width, 1)
     _require_min("compress.split_max_min", config.compress.split_max_min, 0)
+    _require_min("compress.fps", config.compress.fps, 1)
+    _require_min("compress.crf", config.compress.crf, 0)
+    _require_max("compress.crf", config.compress.crf, 51)
+    _require_min("script.target_words", config.script.target_words, 1)
+    _require_min("plan.max_clips_per_day", config.plan.max_clips_per_day, 1)
+    _require_min("plan.target_duration_sec", config.plan.target_duration_sec, 1)
     _require_min("naming.index_width", config.naming.index_width, 1)
     _require_min("ai.provider_ttl_min", config.ai.provider_ttl_min, 0)
+    if config.export.canvas_ratio not in CANVAS_PRESETS:
+        available = ", ".join(CANVAS_PRESETS)
+        raise ValueError(f"export.canvas_ratio must be one of {available}, got: {config.export.canvas_ratio}")
+    if config.project_cfg is not None:
+        config.project_cfg.whisper.sanitize()
 
     provider_names = set(config.ai.providers)
     for provider_name, provider_cfg in config.ai.providers.items():
@@ -65,8 +86,9 @@ def _validate_config(config: AppConfig) -> None:
         _require_min(f"ai.providers.{provider_name}.retry_attempts", provider_cfg.retry_attempts, 0)
         # 0 means unlimited; only reject negative values
         _require_min(f"ai.providers.{provider_name}.max_tokens", provider_cfg.max_tokens, 0)
-        _require_min(f"ai.providers.{provider_name}.timeout_sec", provider_cfg.timeout_sec, 0)
-        _require_min(f"ai.providers.{provider_name}.poll_interval_sec", provider_cfg.poll_interval_sec, 0)
+        _require_positive(f"ai.providers.{provider_name}.timeout_sec", provider_cfg.timeout_sec)
+        if provider_cfg.type == "gemini":
+            _require_positive(f"ai.providers.{provider_name}.poll_interval_sec", provider_cfg.poll_interval_sec)
 
     for task_name, task_cfg in config.ai.tasks.items():
         if task_cfg.provider not in provider_names:
@@ -86,10 +108,14 @@ def validate_global_config(config: GlobalConfig) -> None:
         raise ValueError("proxy.enabled=true 但 proxy.url 为空。请填写 proxy.url，或把 proxy.enabled 改成 false。")
     _require_min("ai.provider_ttl_min", config.ai.provider_ttl_min, 0)
     _require_min("naming.index_width", config.naming.index_width, 1)
+    _require_min("compress.fps", config.compress.fps, 1)
+    _require_min("compress.crf", config.compress.crf, 0)
+    _require_max("compress.crf", config.compress.crf, 51)
     for provider_name, provider_cfg in config.ai.providers.items():
         _require_supported_provider_type(provider_name, provider_cfg.type)
         _require_min(f"ai.providers.{provider_name}.requests_per_minute", provider_cfg.requests_per_minute, 0)
         _require_min(f"ai.providers.{provider_name}.retry_attempts", provider_cfg.retry_attempts, 0)
         _require_min(f"ai.providers.{provider_name}.max_tokens", provider_cfg.max_tokens, 0)
-        _require_min(f"ai.providers.{provider_name}.timeout_sec", provider_cfg.timeout_sec, 0)
-        _require_min(f"ai.providers.{provider_name}.poll_interval_sec", provider_cfg.poll_interval_sec, 0)
+        _require_positive(f"ai.providers.{provider_name}.timeout_sec", provider_cfg.timeout_sec)
+        if provider_cfg.type == "gemini":
+            _require_positive(f"ai.providers.{provider_name}.poll_interval_sec", provider_cfg.poll_interval_sec)
