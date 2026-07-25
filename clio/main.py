@@ -579,6 +579,8 @@ def main(argv: list[str] | None = None) -> int:
                 project_dir=config.project_dir,
                 ffprobe=config.paths.ffprobe,
                 texts_dir=config.texts_dir,
+                canvas_ratio=config.export.canvas_ratio,
+                index_width=config.naming.index_width,
             )
             return 0
     except FileNotFoundError as e:

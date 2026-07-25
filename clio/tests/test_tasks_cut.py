@@ -307,6 +307,22 @@ class TestRunCutAll:
 
     @patch("clio.tasks.cut.cut_one")
     @patch("clio.tasks.cut.resolve_binary")
+    def test_resolves_unpadded_plan_index_with_custom_width(self, mock_resolve, mock_cut, cfg):
+        cfg.global_cfg.naming.index_width = 4
+        _write_plan(cfg, seq=[{"index": "1", "title": "Intro", "use_timeline": "00:00-00:10"}])
+        video = cfg.compressed_dir / "0001_src.mp4"
+        video.write_bytes(b"\x00")
+        mock_resolve.return_value = "ffmpeg"
+
+        from clio.tasks.cut import run_cut_all
+
+        result = run_cut_all(cfg, "day1")
+
+        assert len(result) == 1
+        assert mock_cut.call_args.args[0] == video
+
+    @patch("clio.tasks.cut.cut_one")
+    @patch("clio.tasks.cut.resolve_binary")
     def test_skips_invalid_timeline(self, mock_resolve, mock_cut, cfg):
         _write_plan(cfg, seq=[{"index": "001", "title": "X", "use_timeline": "invalid"}])
         (cfg.compressed_dir / "001_src.mp4").write_bytes(b"\x00")

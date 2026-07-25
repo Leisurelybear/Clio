@@ -14,6 +14,7 @@ from pathlib import Path
 from clio.config.models import CANVAS_PRESETS
 from clio.cut import parse_time_range
 from clio.identity import legacy_segment_offset_sec, load_identity
+from clio.plan_readiness import expand_index_keys
 from clio.utils import get_duration_sec
 
 logger = logging.getLogger("clio.export.jianying")
@@ -27,6 +28,7 @@ def _resolve_video_by_prefix(
     index: str,
     videos: list[Path],
     ffprobe: str | None = None,
+    index_width: int = 3,
 ) -> tuple[Path, int] | None:
     """Fallback: find video by {index}_ prefix (e.g. '001' → '001_GL010683.mp4').
 
@@ -34,9 +36,9 @@ def _resolve_video_by_prefix(
     """
     if ffprobe is None:
         return None
-    pattern = f"{index}_"
+    index_keys = expand_index_keys(index, index_width=index_width)
     for v in videos:
-        if v.stem.startswith(pattern):
+        if v.stem.split("_", 1)[0] in index_keys:
             try:
                 duration = get_duration_sec(v, ffprobe)
             except Exception:
@@ -45,7 +47,7 @@ def _resolve_video_by_prefix(
     return None
 
 
-def _build_index_to_source(texts_dir: Path) -> dict[str, str]:
+def _build_index_to_source(texts_dir: Path, *, index_width: int = 3) -> dict[str, str]:
     """Read text JSONs to build {index_str: source_stem} mapping.
 
     Text JSON contains 'index' (int or str) and 'source_file' (e.g. 'GL010695.mp4').
@@ -81,10 +83,9 @@ def _build_index_to_source(texts_dir: Path) -> dict[str, str]:
                 continue
             stem = Path(source).stem
 
-        idx_str = str(raw_idx)
-        mapping[idx_str] = stem
-        mapping[idx_str.zfill(3)] = stem
-        logger.debug("映射: %s -> %s, %s -> %s", idx_str, stem, idx_str.zfill(3), stem)
+        for key in expand_index_keys(raw_idx, index_width=index_width):
+            mapping[key] = stem
+        logger.debug("映射: %s -> %s", sorted(expand_index_keys(raw_idx, index_width=index_width)), stem)
     return mapping
 
 
@@ -139,6 +140,7 @@ def _build_materials(
     source_videos: list[Path],
     ffprobe: str | None = None,
     index_to_source: dict[str, str] | None = None,
+    index_width: int = 3,
 ) -> tuple[dict, dict[str, str], dict[int, str]]:
     """Build materials.videos and materials.texts.
 
@@ -168,7 +170,7 @@ def _build_materials(
                 resolved = _resolve_video(source_stem, source_videos, ffprobe)
             else:
                 # Fallback: try matching by {index}_ prefix (works for compressed files)
-                resolved = _resolve_video_by_prefix(idx, source_videos, ffprobe)
+                resolved = _resolve_video_by_prefix(idx, source_videos, ffprobe, index_width=index_width)
             if resolved is None:
                 print(f"  [跳过] 视频素材 [{idx}] 未找到，跳过相关片段")
                 continue
@@ -324,6 +326,7 @@ def export_plan_to_jianying(
     ffprobe: str | None = None,
     texts_dir: Path | None = None,
     canvas_ratio: str = "16:9",
+    index_width: int = 3,
     *,
     project_dir: Path | None = None,
     input_dir: Path | None = None,
@@ -346,7 +349,7 @@ def export_plan_to_jianying(
     if not sequence:
         print(f"  [警告] plan 文件为空序列: {plan_path}")
 
-    index_to_source = _build_index_to_source(texts_dir) if texts_dir else {}
+    index_to_source = _build_index_to_source(texts_dir, index_width=index_width) if texts_dir else {}
     index_to_offset = _build_index_to_offset(texts_dir) if texts_dir else {}
     logger.debug("texts_dir=%s, index_to_source=%s", texts_dir, index_to_source)
     if texts_dir:
@@ -368,7 +371,9 @@ def export_plan_to_jianying(
         videos = list(find_videos(legacy_media, recursive=True)) if legacy_media else []
         if not videos:
             print("  [警告] 未找到源视频（未设置 project_dir 且 media 扫描为空）")
-    materials, index_to_material_id, seq_text_ids = _build_materials(plan_data, videos, ffprobe, index_to_source)
+    materials, index_to_material_id, seq_text_ids = _build_materials(
+        plan_data, videos, ffprobe, index_to_source, index_width=index_width
+    )
     tracks = _build_tracks(plan_data, index_to_material_id, seq_text_ids, index_to_offset)
 
     total_duration_us = 0

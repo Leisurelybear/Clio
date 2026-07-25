@@ -14,6 +14,7 @@ from clio.config import AppConfig
 from clio.cut import cut_one, parse_time_range
 from clio.identity import legacy_segment_offset_sec, load_identity
 from clio.log import format_duration, timed
+from clio.plan_readiness import expand_index_keys
 from clio.processing_state import ProcessingState
 from clio.tasks._helpers import _eta_line
 from clio.utils import (
@@ -28,6 +29,17 @@ from clio.vmeta import VideoMeta
 _SEG_RE = re.compile(r"^(.+)_seg(\d+)$")
 _VIDEO_OUT_EXTS = {".mp4", ".mov", ".mkv", ".m4v", ".webm"}
 CUT_BAK_SUFFIX = ".clio_bak"
+
+
+def _indexed_files(directory: Path, raw_index: str, *, index_width: int, suffix: str | None = None) -> list[Path]:
+    keys = expand_index_keys(raw_index, index_width=index_width)
+    if not directory.is_dir() or not keys:
+        return []
+    return sorted(
+        path
+        for path in directory.iterdir()
+        if path.is_file() and path.stem.split("_", 1)[0] in keys and (suffix is None or path.suffix.lower() == suffix)
+    )
 
 
 def resolve_cut_output_dir(config: AppConfig, day_label: str, output_dir: Path | None = None) -> Path:
@@ -267,10 +279,18 @@ def run_cut_all(
 
     def _resolve_video_path(idx: str) -> Path | None:
         if source == "compressed":
-            candidates = sorted(comp_dir.glob(f"{idx}_*"))
+            candidates = [
+                path
+                for path in _indexed_files(comp_dir, idx, index_width=config.naming.index_width)
+                if path.suffix.lower() in VIDEO_EXTS
+            ]
             return candidates[0] if candidates else None
         else:
-            comp_candidates = sorted(comp_dir.glob(f"{idx}_*"))
+            comp_candidates = [
+                path
+                for path in _indexed_files(comp_dir, idx, index_width=config.naming.index_width)
+                if path.suffix.lower() in VIDEO_EXTS
+            ]
             if not comp_candidates:
                 return None
             compressed = comp_candidates[0]
@@ -328,7 +348,9 @@ def run_cut_all(
             offset = 0.0
             if source == "original":
                 # Prefer media_identity via legacy gate (new identities always 0)
-                text_json_paths = sorted(config.texts_dir.glob(f"{idx}_*.json"))
+                text_json_paths = _indexed_files(
+                    config.texts_dir, idx, index_width=config.naming.index_width, suffix=".json"
+                )
                 if text_json_paths:
                     try:
                         data = json.loads(text_json_paths[0].read_text(encoding="utf-8"))
@@ -338,7 +360,11 @@ def run_cut_all(
                         pass
                 # Fall back to vmeta-based computation for v1 files
                 if offset == 0.0:
-                    comp_candidates = sorted(comp_dir.glob(f"{idx}_*"))
+                    comp_candidates = [
+                        path
+                        for path in _indexed_files(comp_dir, idx, index_width=config.naming.index_width)
+                        if path.suffix.lower() in VIDEO_EXTS
+                    ]
                     if comp_candidates:
                         stem = comp_candidates[0].stem
                         offset = _compute_segment_offset(stem, comp_dir, video_path, ffprobe)
@@ -374,7 +400,9 @@ def run_cut_all(
 
             # 复制对应的 texts JSON，附加 _cut_info 标明片段来源
             text_json = None
-            matching_texts = sorted(config.texts_dir.glob(f"{idx}_*.json"))
+            matching_texts = _indexed_files(
+                config.texts_dir, idx, index_width=config.naming.index_width, suffix=".json"
+            )
             if matching_texts:
                 text_path = matching_texts[0]
                 data = json.loads(text_path.read_text(encoding="utf-8"))

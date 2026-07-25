@@ -90,6 +90,7 @@ def handle_post_export(
             ffprobe=cfg.paths.ffprobe,
             texts_dir=cfg.texts_dir,
             canvas_ratio=cfg.export.canvas_ratio,
+            index_width=cfg.naming.index_width,
         )
     except (FileNotFoundError, ValueError) as e:
         handler._send_json({"ok": False, "error": str(e)}, 400)

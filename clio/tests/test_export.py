@@ -74,6 +74,14 @@ class TestResolveVideoByPrefix:
         result = _resolve_video_by_prefix("001", [], "ffprobe")
         assert result is None
 
+    def test_matches_unpadded_index_with_custom_width(self, tmp_path: Path) -> None:
+        video = tmp_path / "0001_GL010683.mp4"
+        video.write_text("fake")
+        with patch("clio.export.jianying.get_duration_sec", return_value=60.0):
+            result = _resolve_video_by_prefix("1", [video], "ffprobe", index_width=4)
+        assert result is not None
+        assert result[0] == video.resolve()
+
 
 class TestBuildIndexToSource:
     def test_missing_dir_returns_empty_dict(self, tmp_path: Path) -> None:
@@ -89,6 +97,16 @@ class TestBuildIndexToSource:
 
         assert mapping.get("1") == "GL010683"
         assert mapping.get("001") == "GL010683"
+
+    def test_builds_mapping_for_custom_index_width(self, tmp_path: Path) -> None:
+        texts_dir = tmp_path / "texts"
+        texts_dir.mkdir()
+        (texts_dir / "0001.json").write_text(json.dumps({"index": 1, "source_file": "GL010683.mp4"}), encoding="utf-8")
+
+        mapping = _build_index_to_source(texts_dir, index_width=4)
+
+        assert mapping["1"] == "GL010683"
+        assert mapping["0001"] == "GL010683"
 
     def test_skips_invalid_json(self, tmp_path: Path) -> None:
         texts_dir = tmp_path / "texts"
@@ -185,7 +203,7 @@ class TestBuildMaterials:
             materials, idx_map, text_ids = _build_materials(plan_data, [], "ffprobe", {})
 
         assert len(materials["videos"]) == 1
-        mock_prefix.assert_called_once_with("001", [], "ffprobe")
+        mock_prefix.assert_called_once_with("001", [], "ffprobe", index_width=3)
 
 
 class TestBuildTracks:
