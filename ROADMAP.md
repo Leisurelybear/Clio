@@ -5,7 +5,21 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
-## Remaining Open Items (2026-07-23)
+## Remaining Open Items (2026-07-25)
+
+### R-034 Full project logic review and fixes
+
+**Status:** Done (2026-07-25)
+
+- [x] Re-run Python/frontend/static-analysis baselines on current `main`
+- [x] Review backend pipeline, configuration, AI, media, and persistence logic
+- [x] Review Web UI routes, services, frontend state, and async behavior
+- [x] Publish verified findings in `docs/analysis/2026-07-25-full-project-review-and-fixes.md`
+- [x] Fix actionable defects with focused regression tests
+- [x] Run targeted and full validation, then close the review
+
+Plan: `docs/superpowers/plans/2026-07-25-r034-full-project-review-and-fixes-plan.md`
+Review: `docs/analysis/2026-07-25-full-project-review-and-fixes.md`
 
 | ID | Item | Effort | Priority |
 | --- | --- | --- | --- |
@@ -17,6 +31,12 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 | R-031b | Plan preview: prefer cut / concat media on the global timeline | Medium | Medium |
 | R-032 | **Desktop app packaging** (Windows-first shell around local serve) | Large | High |
 
+### Recently completed (2026-07-25)
+
+| ID | Item | Notes |
+| --- | --- | --- |
+| R-034 | Full project logic review and fixes | 7 verified fixes; config/Gemini/index matching/frontend async and timeline hardening; 1326 pytest + 310 Vitest pass |
+
 ### Recently completed (2026-07-23)
 
 | ID | Item | Notes |
@@ -27,7 +47,7 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 Spec/plan: `docs/superpowers/specs|plans/2026-07-23-r033-hardening-and-pipeline-robustness*`
 
-**Residual (not in R-033 wave):** I9/I11–I15, I22/I23/I25; cut index prefix glob; Jianying expand_index; project create `output_dir` sandbox; query-token media URLs.
+**R-034 follow-up:** Closed I9/I11/I14/I15/I23/I25 plus cut/JianYing index normalization; I22 was re-verified as covered by current native-control resync. Remaining design debt: I12/I13, project-create `output_dir` sandbox policy, and query-token media URLs.
 
 ### Recently completed (2026-07-22)
 
