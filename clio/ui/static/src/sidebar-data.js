@@ -10,6 +10,7 @@ import {
   buildVideoMenuItems,
   videoMenuItemsToHtml,
 } from './video-menu.js';
+import { selectVideosButtonHtml } from './select-btn.js';
 
 // ── Video relink helper ───────────────────────────────────────
 
@@ -130,6 +131,9 @@ export function updateSelectBtnVisibility() {
     state.selectedFiles = [];
     renderVideoList();
   }
+  // Always resync label: leaving run clears selectionMode but used to leave "取消选择".
+  btn.innerHTML = selectVideosButtonHtml(state.selectionMode);
+  btn.style.border = state.selectionMode ? '1px solid var(--warn)' : '';
 }
 
 export async function loadVideos() {

@@ -397,16 +397,8 @@ function renderPreviewBar() {
     + `<div class="preview-progress-fill" id="preview-progress-fill" style="width:${pct}%"></div>`
     + `<div class="preview-playhead" id="preview-playhead" style="left:${pct}%"></div>`;
 
-  segBar.querySelectorAll('.preview-seg-block').forEach((el) => {
-    el.onclick = (e) => {
-      e.stopPropagation();
-      const i = parseInt(el.dataset.seg, 10);
-      if (!Number.isFinite(i) || i < 0 || i >= p.sequence.length) return;
-      const g = tl.segments[i].globalStart;
-      // Omit play: keep current play/pause (do not kill continuous preview).
-      seekToGlobal(g);
-    };
-  });
+  // Segment blocks are visual only. Seek/scrub is via bar drag (mousedown on segBar);
+  // jump-to-segment-start lives on the plan list accordion, not here.
 
   if (isGlobalTimelineUi()) updateCompositeClock();
 
@@ -462,6 +454,7 @@ function _setupPreviewBarDrag() {
     document.removeEventListener('mouseup', onUp);
     const hit = globalFromEvent(e);
     // Omit play: keep continuous preview if it was playing (R-031 drag rule).
+    // Final seek to release position only — no segment-start jump (list handles that).
     if (hit) seekToGlobal(hit.g, { syncExpand: true });
   };
 

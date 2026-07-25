@@ -13,6 +13,7 @@ import {
   loadProjects, loadConfig, loadFfmpegDeps, loadPlans, loadProject, loadVideos, saveProject,
   updateSelectBtnVisibility, renderSteps, renderVideoList,
 } from './sidebar-data.js';
+import { selectVideosButtonHtml } from './select-btn.js';
 
 // ── Selection ──────────────────────────────────────────────────
 
@@ -182,13 +183,8 @@ function toggleSelection() {
   renderVideoList();
   const btn = document.getElementById('btn-select-videos');
   if (btn) {
-    if (state.selectionMode) {
-      btn.innerHTML = '<span class="icon">✕</span> 取消选择';
-      btn.style.border = '1px solid var(--warn)';
-    } else {
-      btn.innerHTML = '<span class="icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg></span> 选择视频';
-      btn.style.border = '';
-    }
+    btn.innerHTML = selectVideosButtonHtml(state.selectionMode);
+    btn.style.border = state.selectionMode ? '1px solid var(--warn)' : '';
   }
 }
 

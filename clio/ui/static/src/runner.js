@@ -387,7 +387,10 @@ async function _handleRunStatus(s) {
     if (s.status === 'idle' || s.status === 'unknown') {
       _lastProgressSnapshot = null;
       _runActive = false;
-      if (btn) { btn.disabled = false; btn.innerHTML = `${icon('play', 16)} 运行选中步骤`; }
+      if (btn) {
+        btn.disabled = false;
+        updateRunStartButtonState();
+      }
       const cancelBtn = $('btn-run-cancel');
       if (cancelBtn) cancelBtn.style.display = 'none';
       if (hasRunDom && !s.running) {
