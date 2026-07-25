@@ -58,6 +58,10 @@ function _jumpToTranscriptTime(timeSec) {
   }
 }
 
+function _transcriptTimeFromPlayer(playerTime, offsetSec = 0) {
+  return Math.max(0, Number(playerTime || 0) - Number(offsetSec || 0));
+}
+
 async function _rerunCurrentVideo(task) {
   const file = state.currentVideo;
   if (!file) {
@@ -263,7 +267,8 @@ export function renderTranscript() {
   addForm.querySelectorAll('.btn-ts-now').forEach(btn => {
     btn.onclick = () => {
       const player = $('player');
-      const sec = player.currentTime || 0;
+      const currentVideo = state.videos.find(v => v.file === state.currentVideo);
+      const sec = _transcriptTimeFromPlayer(player.currentTime, state.source === 'original' ? currentVideo?.offset_sec : 0);
       const target = $(btn.dataset.target);
       if (target) target.value = fmtTime(sec);
     };
@@ -454,3 +459,5 @@ export async function renderWhisperInstallPrompt(pane) {
     settingsLink.onclick = function(e) { e.preventDefault(); import('./sidebar.js').then(function(s) { s.selectConfig(); }); };
   }
 }
+
+export { _transcriptTimeFromPlayer };
