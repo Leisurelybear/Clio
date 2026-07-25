@@ -35,6 +35,12 @@ function setupResizeHandles() {
 
 let _dragDistance = 0;
 
+function _calculateResizeWidth(startWidth, startX, currentX, isSidebar, minWidth, maxWidth) {
+  const displacement = currentX - startX;
+  const width = isSidebar ? startWidth + displacement : startWidth - displacement;
+  return Math.max(minWidth, Math.min(maxWidth, width));
+}
+
 function onResizeStart(e) {
   e.preventDefault();
   _dragDistance = 0;
@@ -47,13 +53,13 @@ function onResizeStart(e) {
   const prop = isSidebar ? '--sidebar-w' : '--editor-w';
   const minW = isSidebar ? SIDEBAR_MIN : EDITOR_MIN;
   const maxW = isSidebar ? SIDEBAR_MAX : EDITOR_MAX;
+  const startWidth = parseFloat(root.style.getPropertyValue(prop))
+    || parseFloat(getComputedStyle(root).getPropertyValue(prop))
+    || (isSidebar ? 240 : 400);
 
   function onMove(ev) {
-    _dragDistance += Math.abs(ev.clientX - startX);
-    const dx = ev.clientX - startX;
-    const current = parseFloat(root.style.getPropertyValue(prop)) || parseInt(getComputedStyle(root).getPropertyValue(prop)) || (isSidebar ? 240 : 400);
-    let newW = isSidebar ? current + dx : current - dx;
-    newW = Math.max(minW, Math.min(maxW, newW));
+    _dragDistance = Math.max(_dragDistance, Math.abs(ev.clientX - startX));
+    const newW = _calculateResizeWidth(startWidth, startX, ev.clientX, isSidebar, minW, maxW);
     root.style.setProperty(prop, newW + 'px');
   }
 
@@ -118,4 +124,4 @@ function loadLayout() {
   }
 }
 
-export { initLayout };
+export { initLayout, _calculateResizeWidth };
