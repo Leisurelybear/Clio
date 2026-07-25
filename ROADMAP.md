@@ -7,6 +7,18 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ## Remaining Open Items (2026-07-25)
 
+### R-035 Stable plan preview and linear panel resizing
+
+**Status:** Done (2026-07-25)
+
+- [x] Identify player resize flicker during plan segment source switches
+- [x] Identify non-linear sidebar/editor drag calculations
+- [x] Keep the preview viewport dimensions stable while video metadata reloads
+- [x] Calculate panel width from the drag-start width and pointer displacement
+- [x] Add frontend regression coverage and run Vitest
+
+Plan: `docs/superpowers/plans/2026-07-25-r035-stable-preview-and-linear-resize-plan.md`
+
 ### R-034 Full project logic review and fixes
 
 **Status:** Done (2026-07-25)
@@ -35,6 +47,7 @@ Review: `docs/analysis/2026-07-25-full-project-review-and-fixes.md`
 
 | ID | Item | Notes |
 | --- | --- | --- |
+| R-035 | Stable plan preview and linear panel resizing | Fixed 16:9 preview viewport; non-accumulating panel drag math; 314 Vitest pass |
 | R-034 | Full project logic review and fixes | 7 verified fixes; config/Gemini/index matching/frontend async and timeline hardening; 1326 pytest + 310 Vitest pass |
 
 ### Recently completed (2026-07-23)
