@@ -168,6 +168,19 @@ class TestHandlePostCut:
         handle_post_cut(handler, {}, {"source": "invalid"})
         handler._send_json.assert_called_once_with({"ok": False, "error": "source must be compressed|original"}, 400)
 
+    def test_non_string_day_label_returns_400(self):
+        """day_label must be str (same as run routes); list/dict must not TypeError → 500."""
+        handler = MagicMock()
+        handler._send_json = MagicMock()
+        handle_post_cut(handler, {}, {"day_label": ["day1"], "source": "compressed"})
+        handler._send_json.assert_called_once()
+        args = handler._send_json.call_args
+        payload = args[0][0]
+        status = args[0][1] if len(args[0]) > 1 else None
+        assert status == 400
+        assert payload.get("ok") is False
+        assert "day_label" in payload.get("error", "")
+
     def test_existing_output_returns_409_without_overwrite(self, tmp_path: Path):
         from clio.config import AppConfig
         from clio.config.models import (

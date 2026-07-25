@@ -121,7 +121,7 @@ def handle_post_plan_readiness(handler: HandlerProtocol, qs: dict[str, Any], obj
 def handle_post_cut(handler: HandlerProtocol, qs: dict[str, list[str]], obj: dict) -> None:
     """Handle POST /api/cut."""
     day_label = obj.get("day_label", "day1")
-    if not _is_safe_basename(day_label):
+    if not isinstance(day_label, str) or not _is_safe_basename(day_label):
         return handler._send_json({"ok": False, "error": "invalid day_label"}, 400)
     source = obj.get("source", "compressed")
     reencode = obj.get("reencode", False)
