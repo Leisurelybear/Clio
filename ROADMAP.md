@@ -7,6 +7,18 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ## Remaining Open Items (2026-07-25)
 
+### R-036 Preserve playback progress across source switches
+
+**Status:** Done (2026-07-25)
+
+- [x] Trace compressed/original switching in video and plan views
+- [x] Preserve segment-local progress when switching a normal video
+- [x] Preserve global timeline progress when switching in plan view
+- [x] Resume playback only when the previous source was playing
+- [x] Add frontend regression coverage and run Vitest
+
+Plan: `docs/superpowers/plans/2026-07-25-r036-preserve-source-switch-progress-plan.md`
+
 ### R-035 Stable plan preview and linear panel resizing
 
 **Status:** Done (2026-07-25)
@@ -47,6 +59,7 @@ Review: `docs/analysis/2026-07-25-full-project-review-and-fixes.md`
 
 | ID | Item | Notes |
 | --- | --- | --- |
+| R-036 | Preserve playback progress across source switches | Video offset conversion + plan global-time restore; playback state preserved; 318 Vitest pass |
 | R-035 | Stable plan preview and linear panel resizing | Fixed 16:9 preview viewport; non-accumulating panel drag math; 314 Vitest pass |
 | R-034 | Full project logic review and fixes | 7 verified fixes; config/Gemini/index matching/frontend async and timeline hardening; 1326 pytest + 310 Vitest pass |
 
