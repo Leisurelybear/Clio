@@ -224,6 +224,37 @@ class TestRunAnalyzeAll:
         assert len(records) == 1
         assert records[0].compressed_path.name == "002_GL010684.mp4"
 
+    def test_files_filter_merges_summary_csv_not_truncate(self, monkeypatch, tmp_path: Path):
+        """Selection re-analyze must not drop other rows from summary.csv (I3 family)."""
+        import csv
+
+        cfg = _cfg(tmp_path)
+        pairs = [("GL010683", "001_GL010683"), ("GL010684", "002_GL010684")]
+        for orig_stem, comp_stem in pairs:
+            _add_original(cfg, f"{orig_stem}.mp4")
+            (cfg.compressed_dir / f"{comp_stem}.mp4").write_bytes(b"\x00" * 100)
+        _common_mocks(monkeypatch)
+        monkeypatch.setattr("clio.tasks.analyze.get_duration_sec", lambda *a: 60.0)
+        monkeypatch.setattr(
+            "clio.tasks.analyze.analyze_video",
+            lambda *a, **kw: {"title": "x", "summary": "x", "location": "x"},
+        )
+
+        # Full analyze → 2 CSV rows
+        run_analyze_all(cfg)
+        with cfg.summary_csv.open(encoding="utf-8-sig") as f:
+            rows = list(csv.DictReader(f))
+        assert len(rows) == 2
+        stems_before = {r["stem"] for r in rows}
+
+        # Re-analyze one file only
+        run_analyze_all(cfg, files=["002_GL010684"])
+        with cfg.summary_csv.open(encoding="utf-8-sig") as f:
+            rows2 = list(csv.DictReader(f))
+        stems_after = {r["stem"] for r in rows2}
+        assert len(rows2) == 2, f"expected merge keep 2 rows, got {len(rows2)}: {stems_after}"
+        assert stems_before == stems_after
+
     def test_single_file_with_vindex_includes_all_segments(self, monkeypatch, tmp_path: Path):
         cfg = _cfg(tmp_path)
         src = _add_original(cfg, "GL010695.mp4")

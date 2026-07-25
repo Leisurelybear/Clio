@@ -210,6 +210,56 @@ def _get_video_info(rec: ClipRecord, ffprobe: str) -> dict:
     return probe_video_info(rec.source_path, ffprobe) if rec.source_path.exists() else {}
 
 
+def _clip_records_from_csv(path: Path) -> list[ClipRecord]:
+    """Load summary.csv rows back into ClipRecords (for selection re-analyze merge)."""
+    if not path.is_file():
+        return []
+    records: list[ClipRecord] = []
+    with path.open(encoding="utf-8-sig", newline="") as f:
+        for row in csv.DictReader(f):
+            raw_idx = (row.get("index") or "").strip()
+            try:
+                idx = int(raw_idx)
+            except ValueError:
+                continue
+            stem = (row.get("stem") or "").strip()
+            if not stem:
+                continue
+            try:
+                duration_sec = float(row.get("duration_sec") or 0) or 0.0
+            except ValueError:
+                duration_sec = 0.0
+            source = Path(row["source_file"]) if row.get("source_file") else Path()
+            compressed_raw = (row.get("compressed_file") or "").strip()
+            text_raw = (row.get("text_file") or "").strip()
+            records.append(
+                ClipRecord(
+                    index=idx,
+                    stem=stem,
+                    source_path=source,
+                    compressed_path=Path(compressed_raw) if compressed_raw else None,
+                    text_path=Path(text_raw) if text_raw else None,
+                    analysis={
+                        "title": row.get("title", ""),
+                        "summary": row.get("summary", ""),
+                        "location": row.get("location", ""),
+                        "mood": row.get("mood", ""),
+                        "suggested_use": row.get("suggested_use", ""),
+                    },
+                    duration_sec=duration_sec,
+                )
+            )
+    return records
+
+
+def _merge_summary_records(existing: list[ClipRecord], new: list[ClipRecord]) -> list[ClipRecord]:
+    """Replace/append by index so selection re-analyze keeps untouched rows."""
+    by_index = {r.index: r for r in existing}
+    for r in new:
+        by_index[r.index] = r
+    return sorted(by_index.values(), key=lambda r: r.index)
+
+
 def _write_csv(path: Path, records: list[ClipRecord], config: AppConfig) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")

@@ -34,7 +34,9 @@ from clio.schema import add_schema_version
 from clio.tasks._helpers import (
     ClipRecord,
     _build_stem,
+    _clip_records_from_csv,
     _matches_selected_stem,
+    _merge_summary_records,
     _selected_stems,
     _write_csv,
     _write_text_file,
@@ -448,8 +450,11 @@ def run_analyze_all(
                     break
 
     records.sort(key=lambda r: r.index)
-
-    _write_csv(config.summary_csv, records, config)
+    # Selection re-analyze must merge into summary.csv (not truncate other rows).
+    to_write = (
+        _merge_summary_records(_clip_records_from_csv(config.summary_csv), records) if files is not None else records
+    )
+    _write_csv(config.summary_csv, to_write, config)
     print(f"\nCSV 已保存: {config.summary_csv}")
 
     completed = len(records)
