@@ -5,6 +5,7 @@ import {
   renderSkippedDiagnosticsHtml,
   collectRunOptions,
   getRunButtonText,
+  _shouldResetRunNavigationOnRender,
   updateRunStartButtonState,
 } from '../runner.js';
 import { state } from '../state.js';
@@ -55,6 +56,16 @@ describe('renderRunPreviewHtml', () => {
 
   it('renders a neutral state without preview data', () => {
     expect(renderRunPreviewHtml(null)).toContain('选择步骤后显示预览');
+  });
+});
+
+describe('_shouldResetRunNavigationOnRender', () => {
+  it('preserves completion navigation while a run is active', () => {
+    expect(_shouldResetRunNavigationOnRender(true)).toBe(false);
+  });
+
+  it('resets stale navigation flags when idle', () => {
+    expect(_shouldResetRunNavigationOnRender(false)).toBe(true);
   });
 });
 

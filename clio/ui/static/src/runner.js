@@ -48,8 +48,10 @@ function saveStepSelection(checks, useTranscripts) {
 }
 
 function renderRun() {
-  _expectDoneNavigation = false;
-  _seenNonTerminal = false;
+  if (_shouldResetRunNavigationOnRender(_runActive)) {
+    _expectDoneNavigation = false;
+    _seenNonTerminal = false;
+  }
   _lastRunDay = state.currentDay || 'day1';
   const pane = $('tab-run');
   const saved = loadStepSelection();
@@ -148,6 +150,10 @@ function renderRun() {
   const cancelBtn = $('btn-run-cancel');
   if (cancelBtn) cancelBtn.onclick = cancelRun;
   _startRunSSE();
+}
+
+function _shouldResetRunNavigationOnRender(runActive) {
+  return !runActive;
 }
 
 function togglePlanSubOptions() {
@@ -654,6 +660,7 @@ export {
   getRunButtonText,
   collectRunOptions,
   _completionTargetForSteps,
+  _shouldResetRunNavigationOnRender,
   renderRunPreviewHtml,
   buildSkippedDiagnostics,
   renderSkippedDiagnosticsHtml,
