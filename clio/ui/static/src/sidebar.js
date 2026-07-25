@@ -15,6 +15,8 @@ import {
 } from './sidebar-data.js';
 import { selectVideosButtonHtml } from './select-btn.js';
 
+let _selectVideoRequestId = 0;
+
 // ── Selection ──────────────────────────────────────────────────
 
 async function selectVideo(file) {
@@ -30,6 +32,7 @@ async function selectVideo(file) {
   state.voiceover = null;
   state.transcript = null;
   state._refineError = null;
+  const requestId = ++_selectVideoRequestId;
 
   const v = state.videos.find(x => x.file === file);
   if (!v) return;
@@ -50,25 +53,27 @@ async function selectVideo(file) {
   };
   loadWaveformForCurrentVideo();
 
-  if (v.text_json) {
-    try {
-      state.texts = await api('GET', `/api/texts?file=${encodeURIComponent(v.text_json)}`);
-    } catch (e) { setStatus('texts 加载失败: ' + e.message, 'err'); }
-  }
-  if (v.script_json) {
-    try {
-      state.voiceover = await api('GET', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`);
-    } catch (e) { setStatus('voiceover 加载失败: ' + e.message, 'err'); }
-  }
-  if (v.transcript_file) {
-    try {
-      state.transcript = await api('GET', `/api/transcripts?video=${encodeURIComponent(v.file)}`);
-    } catch (e) { setStatus('transcript 加载失败: ' + e.message, 'err'); }
-  }
-  if (!state.plan) {
-    try { state.plan = await api('GET', `/api/plan?day=${state.currentDay}`); }
-    catch (e) { /* plan 可选, 加载失败不报错 */ }
-  }
+  const loadArtifact = async (url, label) => {
+    if (!url) return null;
+    try { return await api('GET', url); }
+    catch (e) {
+      if (requestId === _selectVideoRequestId && state.currentVideo === file) {
+        setStatus(`${label} 加载失败: ${e.message}`, 'err');
+      }
+      return null;
+    }
+  };
+  const [texts, voiceover, transcript, plan] = await Promise.all([
+    loadArtifact(v.text_json ? `/api/texts?file=${encodeURIComponent(v.text_json)}` : null, 'texts'),
+    loadArtifact(v.script_json ? `/api/voiceover?file=${encodeURIComponent(v.script_json)}` : null, 'voiceover'),
+    loadArtifact(v.transcript_file ? `/api/transcripts?video=${encodeURIComponent(v.file)}` : null, 'transcript'),
+    state.plan ? Promise.resolve(state.plan) : loadArtifact(`/api/plan?day=${state.currentDay}`, 'plan'),
+  ]);
+  if (requestId !== _selectVideoRequestId || state.currentVideo !== file) return;
+  state.texts = texts;
+  state.voiceover = voiceover;
+  state.transcript = transcript;
+  if (!state.plan && plan) state.plan = plan;
 
   renderVideoList();
   import('./editor.js').then(mod => mod.renderActiveTab());
