@@ -15,19 +15,34 @@ def is_legacy_split_stem(stem: str) -> bool:
     return SEGMENT_SUFFIX_RE.search(stem) is not None
 
 
+def _indexed_source_stem(compressed_stem: str) -> str:
+    if "_" not in compressed_stem:
+        return compressed_stem
+    prefix, source_stem = compressed_stem.split("_", 1)
+    return source_stem if prefix.isdigit() else compressed_stem
+
+
+def _vindex_contains(vindex: VideoIndex | None, compressed_path: Path) -> bool:
+    return vindex is not None and any(segment.filename == compressed_path.name for segment in vindex.segments)
+
+
 def is_legacy_split_path(compressed_path: Path) -> bool:
     meta = VideoMeta.read(compressed_path)
-    if meta is not None and meta.split_info is not None:
-        return True
-    if is_legacy_split_stem(compressed_path.stem):
-        return True
-    original_stem = _extract_original_stem(compressed_path.stem)
-    vindex = VideoIndex.read(original_stem, compressed_path.parent)
-    if vindex is not None and vindex.is_split and len(vindex.segments) > 1:
-        name = compressed_path.name
-        if any(s.filename == name for s in vindex.segments):
-            return True
-    return False
+    if meta is not None:
+        return meta.split_info is not None or meta.is_split_segment
+
+    indexed_stem = _indexed_source_stem(compressed_path.stem)
+    exact_vindex = VideoIndex.read(indexed_stem, compressed_path.parent)
+    if _vindex_contains(exact_vindex, compressed_path):
+        assert exact_vindex is not None
+        return exact_vindex.is_split and len(exact_vindex.segments) > 1
+
+    original_stem = SEGMENT_SUFFIX_RE.sub("", indexed_stem)
+    legacy_vindex = VideoIndex.read(original_stem, compressed_path.parent)
+    if _vindex_contains(legacy_vindex, compressed_path):
+        assert legacy_vindex is not None
+        return legacy_vindex.is_split and len(legacy_vindex.segments) > 1
+    return is_legacy_split_stem(compressed_path.stem)
 
 
 def is_legacy_split_identity(identity: MediaIdentity | None) -> bool:
@@ -37,7 +52,7 @@ def is_legacy_split_identity(identity: MediaIdentity | None) -> bool:
         return True
     if abs(float(identity.segment_offset_sec or 0.0)) > 1e-6:
         return True
-    return is_legacy_split_stem(identity.compressed_stem)
+    return False
 
 
 def legacy_segment_offset_sec(identity: MediaIdentity | None) -> float:
@@ -140,7 +155,7 @@ def resolve_identity(
     if meta is not None:
         si = meta.split_info
         return MediaIdentity(
-            original_stem=si.original_stem if si else _extract_original_stem(compressed_stem),
+            original_stem=si.original_stem if si else Path(meta.source_path).stem,
             original_path=meta.source_path,
             compressed_stem=compressed_stem,
             compressed_path=str(compressed_resolved),
@@ -150,15 +165,20 @@ def resolve_identity(
             segment_duration_sec=si.segment_duration_sec if si else None,
         )
 
-    # Priority 2: Try .vindex for segment info
-    original_stem = _extract_original_stem(compressed_stem)
+    # Priority 2: Try the exact source stem before legacy suffix stripping.
+    indexed_stem = _indexed_source_stem(compressed_stem)
+    original_stem = indexed_stem
     vindex = VideoIndex.read(original_stem, compressed_path.parent)
+    if not _vindex_contains(vindex, compressed_path):
+        original_stem = SEGMENT_SUFFIX_RE.sub("", indexed_stem)
+        vindex = VideoIndex.read(original_stem, compressed_path.parent)
     if vindex is not None:
+        assert vindex is not None
         seg_num = None
         offset_sec = 0.0
         seg_dur = None
-        m = SEGMENT_SUFFIX_RE.search(compressed_stem)
-        if m:
+        m = SEGMENT_SUFFIX_RE.search(compressed_stem) if vindex.is_split and len(vindex.segments) > 1 else None
+        if m is not None:
             seg_num = int(m.group(1))
             for s in vindex.segments:
                 if s.segment_number == seg_num:
@@ -176,7 +196,18 @@ def resolve_identity(
             segment_duration_sec=seg_dur,
         )
 
-    # Priority 3: Filename fallback via videos.json / project_dir
+    # Priority 3: Filename fallback via videos.json / project_dir.
+    exact_path = _find_original_by_stem(indexed_stem, proj)
+    if exact_path is not None:
+        return MediaIdentity(
+            original_stem=indexed_stem,
+            original_path=str(exact_path),
+            compressed_stem=compressed_stem,
+            compressed_path=str(compressed_resolved),
+            index=idx,
+        )
+
+    original_stem = SEGMENT_SUFFIX_RE.sub("", indexed_stem)
     orig_path = _find_original_by_stem(original_stem, proj)
     seg_num = None
     m = SEGMENT_SUFFIX_RE.search(compressed_stem)
@@ -192,6 +223,42 @@ def resolve_identity(
         segment_offset_sec=0.0,
         segment_duration_sec=None,
     )
+
+
+def _identity_source_stem(compressed_path: Path) -> str:
+    meta = VideoMeta.read(compressed_path)
+    if meta is not None:
+        return Path(meta.source_path).stem
+    indexed_stem = _indexed_source_stem(compressed_path.stem)
+    exact_vindex = VideoIndex.read(indexed_stem, compressed_path.parent)
+    if _vindex_contains(exact_vindex, compressed_path):
+        assert exact_vindex is not None
+        return exact_vindex.source_stem
+    return SEGMENT_SUFFIX_RE.sub("", indexed_stem)
+
+
+def _canonical_source_stem(compressed_path: Path) -> str | None:
+    meta = VideoMeta.read(compressed_path)
+    if meta is not None:
+        if meta.split_info is None and not meta.is_split_segment:
+            return Path(meta.source_path).stem
+        return None
+    indexed_stem = _indexed_source_stem(compressed_path.stem)
+    vindex = VideoIndex.read(indexed_stem, compressed_path.parent)
+    if _vindex_contains(vindex, compressed_path) and vindex is not None and not vindex.is_split:
+        return vindex.source_stem
+    return None
+
+
+def prefer_canonical_compressed(paths: list[Path]) -> list[Path]:
+    canonical_sources = {
+        source_stem.casefold() for path in paths if (source_stem := _canonical_source_stem(path)) is not None
+    }
+    return [
+        path
+        for path in paths
+        if not is_legacy_split_path(path) or _identity_source_stem(path).casefold() not in canonical_sources
+    ]
 
 
 def load_identity(data: dict) -> MediaIdentity | None:

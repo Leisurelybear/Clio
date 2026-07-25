@@ -13,6 +13,7 @@ from clio.identity import (
     is_legacy_split_stem,
     legacy_segment_offset_sec,
     load_identity,
+    prefer_canonical_compressed,
     resolve_identity,
 )
 from clio.vmeta import SegmentEntry, SplitInfo, VideoIndex, VideoMeta
@@ -292,6 +293,29 @@ class TestIsLegacySplit:
             target_duration=100.0,
         ).write(compressed)
         assert is_legacy_split_path(compressed) is False
+
+    def test_natural_part_suffix_with_non_split_vmeta(self, tmp_path: Path):
+        source = tmp_path / "holiday_part01.mov"
+        compressed = tmp_path / "001_holiday_part01.mp4"
+        source.write_bytes(b"source")
+        compressed.write_bytes(b"compressed")
+        VideoMeta.build(source, compressed, 2400.0, 2400.0, split_info=None).write(compressed)
+
+        assert is_legacy_split_path(compressed) is False
+        identity = resolve_identity(compressed, "001", project_dir=tmp_path)
+        assert identity.original_stem == "holiday_part01"
+        assert identity.segment_index is None
+
+    def test_canonical_whole_filters_legacy_leftovers(self, tmp_path: Path):
+        source = tmp_path / "holiday.mov"
+        whole = tmp_path / "003_holiday.mp4"
+        segment = tmp_path / "001_holiday_seg01.mp4"
+        source.write_bytes(b"source")
+        whole.write_bytes(b"whole")
+        segment.write_bytes(b"segment")
+        VideoMeta.build(source, whole, 2400.0, 2400.0, split_info=None).write(whole)
+
+        assert prefer_canonical_compressed([segment, whole]) == [whole]
 
     def test_identity_helpers(self):
         plain = MediaIdentity(

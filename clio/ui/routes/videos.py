@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from clio._constants import VIDEO_EXTENSIONS, VIDEO_EXTS
+from clio.identity import prefer_canonical_compressed
 from clio.index import ArtifactIndex
 from clio.tasks._video_loader import load_selected_videos, save_selected_videos
 from clio.ui.services.file_service import (
@@ -280,12 +281,18 @@ def _build_videos_payload(
         if comp_dir.is_dir():
             # Pass 1: build flat video list + collect group members
             group_members: dict[str, list[tuple[str, int]]] = {}
-            for p in sorted(comp_dir.iterdir()):
-                if p.suffix.lower() not in VIDEO_EXTS:
-                    continue
+            compressed_paths = prefer_canonical_compressed(
+                sorted(p for p in comp_dir.iterdir() if p.is_file() and p.suffix.lower() in VIDEO_EXTS)
+            )
+            for p in compressed_paths:
                 stem = p.stem
                 idx = stem.split("_", 1)[0] if "_" in stem else ""
-                group_key, seg_num = _parse_segment_info(stem)
+                meta = VideoMeta.read(p)
+                group_key, seg_num = (
+                    (None, None)
+                    if meta is not None and meta.split_info is None and not meta.is_split_segment
+                    else _parse_segment_info(stem)
+                )
                 group = index.lookup(compressed_stem=stem)
                 orig = _find_original_for_compressed(stem, proj_dir, comp_dir, project_dir=proj_dir)
                 # Only filter when selection is non-empty. Empty videos.json still

@@ -25,6 +25,7 @@ from clio.identity import (
     _identity_to_dict,
     is_legacy_split_path,
     load_identity,
+    prefer_canonical_compressed,
     resolve_identity,
 )
 from clio.log import format_duration, timed
@@ -99,15 +100,20 @@ def _analyze_with_optional_windows(
     """Run Gemini analyze: legacy split files stay single-call; else use windows."""
 
     def _one_call(video_path: str) -> dict:
-        return analyze_video(
-            video_path,
-            config,
-            progress_callback=lambda msg: None,
-            token_store=token_store,
-            cancel_event=cancel_event,
-            context_override=effective_context,
-            task_prompts=task_prompts,
-        )
+        try:
+            return analyze_video(
+                video_path,
+                config,
+                progress_callback=lambda msg: None,
+                token_store=token_store,
+                cancel_event=cancel_event,
+                context_override=effective_context,
+                task_prompts=task_prompts,
+            )
+        except Exception as exc:
+            if cancel_event is not None and cancel_event.is_set():
+                raise InterruptedError("分析被用户取消") from exc
+            raise
 
     if is_legacy_split_path(compressed):
         return _one_call(str(compressed))
@@ -121,6 +127,7 @@ def _analyze_with_optional_windows(
         return merge_window_analyses([(windows[0], analysis)], overlap) if windows else analysis
 
     ffmpeg = resolve_binary(config.paths.ffmpeg, "ffmpeg")
+    ffprobe = resolve_binary(config.paths.ffprobe, "ffprobe")
     # Per-clip temp dir so concurrent max_workers cannot wipe sibling slices.
     dest = config.paths.output_dir / ".analyze_windows" / compressed.stem
     dest.mkdir(parents=True, exist_ok=True)
@@ -128,12 +135,13 @@ def _analyze_with_optional_windows(
     try:
         for w in windows:
             if cancel_event is not None and cancel_event.is_set():
-                raise RuntimeError("分析被用户取消")
+                raise InterruptedError("分析被用户取消")
             slice_path = slice_window_video(
                 source=compressed,
                 window=w,
                 dest_dir=dest,
                 ffmpeg=ffmpeg,
+                ffprobe=ffprobe,
                 cancel_event=cancel_event,
             )
             try:
@@ -227,11 +235,9 @@ def _process_video_item(
         state.mark(original.stem, "analyze", "skipped")
         return None
 
-    # Whole-clip hard cap: keep for legacy single-call segments. Non-legacy long
-    # clips are covered by analyze windows — applying the old 30min default here
-    # would skip 40min whole files and defeat remove-physical-split.
+    # Whole-clip quota guard applies before both single-call and windowed analysis.
     max_min = config.analyze.max_analyze_duration_min
-    if max_min > 0 and duration_sec > max_min * 60 and is_legacy_split_path(compressed):
+    if max_min > 0 and duration_sec > max_min * 60:
         print(f"  [跳过] {compressed.name} 时长 {format_duration(duration_sec)} 超过限制 {max_min} 分钟")
         if tracker:
             tracker.next(message=f"跳过 {compressed.name}（超长）")
@@ -264,6 +270,15 @@ def _process_video_item(
             effective_context=effective_context,
             task_prompts=task_prompts,
         )
+    except InterruptedError:
+        if cancel_event is not None:
+            cancel_event.set()
+        print(f"  [取消] 分析 {compressed.name} 被取消")
+        state.mark(original.stem, "analyze", "cancelled")
+        if tracker:
+            tracker.next(message=f"取消 {compressed.name}")
+            tracker.log(f"分析 {compressed.name} 被用户取消")
+        return None
     except Exception as e:
         elapsed_total = time.monotonic() - t0
         print(f"  [错误] 分析 {compressed.name} 失败: {e}（耗时 {format_duration(elapsed_total)}）")
@@ -332,7 +347,8 @@ def run_analyze_all(
     stem_cache = _build_stem_to_path(config.project_dir)
 
     def _list_compressed(d: Path) -> list[Path]:
-        return sorted(p for p in d.iterdir() if p.suffix.lower() in VIDEO_EXTS and p.is_file())
+        paths = sorted(p for p in d.iterdir() if p.suffix.lower() in VIDEO_EXTS and p.is_file())
+        return prefer_canonical_compressed(paths)
 
     if single_file:
         items: list[tuple[Path, Path, str]] = []

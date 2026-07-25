@@ -7,6 +7,22 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ## Remaining Open Items (2026-07-25)
 
+### R-037 Long-video split-removal hardening
+
+**Status:** Done (2026-07-25)
+
+- [x] Make sidecar metadata authoritative for legacy split detection
+- [x] Preserve natural `_partNN` / `_chunkNN` source identities
+- [x] Enforce whole-clip analyze duration caps
+- [x] Fail closed on excessive analyze-window counts
+- [x] Validate temp slice duration and fall back to exact re-encode
+- [x] Prefer canonical whole-file artifacts over legacy leftovers
+- [x] Propagate cancellation without reporting AI failure
+- [x] Improve overlap dedupe for paraphrased timeline rows
+- [x] Add regression coverage and run full validation
+
+Plan: `docs/superpowers/plans/2026-07-25-r037-long-video-split-removal-hardening-plan.md`
+
 ### R-036 Preserve playback progress across source switches
 
 **Status:** Done (2026-07-25)
@@ -59,6 +75,7 @@ Review: `docs/analysis/2026-07-25-full-project-review-and-fixes.md`
 
 | ID | Item | Notes |
 | --- | --- | --- |
+| R-037 | Long-video split-removal hardening | Authoritative identity; whole-file caps; fail-closed windows; exact slices; canonical artifact preference; cancellation and dedupe fixes; 1334 pytest + 318 Vitest pass |
 | R-036 | Preserve playback progress across source switches | Video offset conversion + plan global-time restore; playback state preserved; 318 Vitest pass |
 | R-035 | Stable plan preview and linear panel resizing | Fixed 16:9 preview viewport; non-accumulating panel drag math; 314 Vitest pass |
 | R-034 | Full project logic review and fixes | 7 verified fixes; config/Gemini/index matching/frontend async and timeline hardening; 1326 pytest + 310 Vitest pass |

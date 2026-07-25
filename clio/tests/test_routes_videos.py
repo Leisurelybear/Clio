@@ -19,6 +19,7 @@ from clio.ui.routes.videos import (
     handle_put_videos_relink,
     handle_put_videos_selected,
 )
+from clio.vmeta import VideoMeta
 
 
 def _clear_videos_cache() -> None:
@@ -110,6 +111,33 @@ class TestHandleGetVideos:
         assert len(payload["videos"]) == 1
         assert payload["videos"][0]["file"] == "001_GL010695.mp4"
         assert payload["videos"][0]["index"] == "001"
+
+    def test_compressed_prefers_canonical_and_preserves_natural_part_suffix(self, tmp_path: Path):
+        handler = MagicMock()
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
+        source = proj_dir / "holiday_part01.mov"
+        source.write_bytes(b"source")
+        proj_out = tmp_path / "output"
+        proj_out.mkdir()
+        comp_dir = proj_out / "compressed"
+        comp_dir.mkdir()
+        segment = comp_dir / "001_holiday_part01_seg01.mp4"
+        whole = comp_dir / "003_holiday_part01.mp4"
+        segment.write_bytes(b"segment")
+        whole.write_bytes(b"whole")
+        VideoMeta.build(source, whole, 2400.0, 2400.0, split_info=None).write(whole)
+
+        handler._resolve_project_dir.return_value = proj_dir
+        handler._get_project_output.return_value = proj_out
+        handler._send_json = MagicMock()
+
+        handle_get_videos(handler, {"source": ["compressed"]})
+
+        payload = handler._send_json.call_args[0][0]
+        assert [video["file"] for video in payload["videos"]] == [whole.name]
+        assert payload["videos"][0]["group_key"] is None
+        assert payload["videos"][0]["segment_label"] is None
 
     def test_source_original(self, tmp_path: Path):
         import json

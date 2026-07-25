@@ -8,10 +8,17 @@ docs/superpowers/specs/2026-07-18-remove-physical-split-design.md.
 from __future__ import annotations
 
 import copy
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
+from difflib import SequenceMatcher
+from math import ceil
 from pathlib import Path
 from typing import Any
+
+from clio.utils import get_duration_sec
+
+MAX_ANALYZE_WINDOWS = 1000
 
 
 @dataclass(frozen=True)
@@ -39,6 +46,12 @@ def build_analyze_windows(
     if duration_sec <= window_max:
         return [AnalyzeWindow(0, 0.0, float(duration_sec))]
     step = window_max - overlap
+    window_count = 1 + ceil((duration_sec - window_max) / step)
+    if window_count > MAX_ANALYZE_WINDOWS:
+        raise ValueError(
+            f"分析窗数量过多（{window_count} 个，最多 {MAX_ANALYZE_WINDOWS} 个），"
+            "请增大 window_max_min 或减小 window_overlap_sec"
+        )
     windows: list[AnalyzeWindow] = []
     start = 0.0
     i = 0
@@ -49,8 +62,6 @@ def build_analyze_windows(
             break
         start += step
         i += 1
-        if i > 1000:
-            break
     return windows
 
 
@@ -135,6 +146,21 @@ def _item_text(item: dict) -> str:
     return ""
 
 
+def _normalized_text(value: str) -> str:
+    return re.sub(r"[\W_]+", "", value.casefold())
+
+
+def _similar_item_text(left: dict, right: dict) -> bool:
+    left_text = _normalized_text(_item_text(left))
+    right_text = _normalized_text(_item_text(right))
+    if not left_text or not right_text:
+        return False
+    shorter, longer = sorted((left_text, right_text), key=len)
+    if len(shorter) >= 4 and shorter in longer:
+        return True
+    return SequenceMatcher(None, left_text, right_text).ratio() >= 0.72
+
+
 def merge_window_analyses(
     windows: list[tuple[AnalyzeWindow, dict]],
     overlap_sec: int,
@@ -189,21 +215,19 @@ def merge_window_analyses(
 
     deduped: list[dict] = []
     for item in timeline:
-        if not deduped:
-            deduped.append(item)
-            continue
-        prev = deduped[-1]
         t_item = _item_start(item)
-        t_prev = _item_start(prev)
-        if (
-            zones
-            and abs(t_item - t_prev) <= 5
-            and _item_text(item) == _item_text(prev)
-            and _in_overlap(t_item)
-            and _in_overlap(t_prev)
-        ):
-            if len(_item_text(item)) > len(_item_text(prev)):
-                deduped[-1] = item
+        duplicate_index = None
+        for index in range(len(deduped) - 1, -1, -1):
+            previous = deduped[index]
+            t_previous = _item_start(previous)
+            if t_item - t_previous > 5:
+                break
+            if _in_overlap(t_item) and _in_overlap(t_previous) and _similar_item_text(item, previous):
+                duplicate_index = index
+                break
+        if duplicate_index is not None:
+            if len(_item_text(item)) > len(_item_text(deduped[duplicate_index])):
+                deduped[duplicate_index] = item
             continue
         deduped.append(item)
 
@@ -240,6 +264,7 @@ def slice_window_video(
     window: AnalyzeWindow,
     dest_dir: Path,
     ffmpeg: str,
+    ffprobe: str | None = None,
     run_ffmpeg: Callable[..., Any] | None = None,
     cancel_event: Any | None = None,
 ) -> Path:
@@ -265,6 +290,20 @@ def slice_window_video(
 
     max_bytes = 200 * 1024 * 1024
 
+    def _has_output() -> bool:
+        return out.is_file() and out.stat().st_size > 0
+
+    def _valid_output(*, check_duration: bool) -> bool:
+        if not _has_output() or out.stat().st_size > max_bytes:
+            return False
+        if not check_duration or ffprobe is None:
+            return True
+        try:
+            actual_duration = get_duration_sec(out, ffprobe)
+        except Exception:
+            return False
+        return abs(actual_duration - dur) <= 0.5
+
     copy_args = [
         "-ss",
         str(start),
@@ -279,7 +318,7 @@ def slice_window_video(
     ]
     try:
         _run(copy_args)
-        if out.is_file() and 0 < out.stat().st_size <= max_bytes:
+        if _valid_output(check_duration=True):
             return out
         # empty or oversized copy → fall through to re-encode / shrink
         out.unlink(missing_ok=True)
@@ -308,7 +347,7 @@ def slice_window_video(
         str(out),
     ]
     _run(reencode_args)
-    if not out.is_file() or out.stat().st_size <= 0:
+    if not _has_output():
         raise RuntimeError(f"分析窗切片失败或为空: {out.name}")
     if out.stat().st_size > max_bytes:
         out.unlink(missing_ok=True)
@@ -332,13 +371,16 @@ def slice_window_video(
             str(out),
         ]
         _run(shrink_args)
-        if not out.is_file() or out.stat().st_size <= 0:
+        if not _has_output():
             raise RuntimeError(f"分析窗切片失败或为空: {out.name}")
         if out.stat().st_size > max_bytes:
             raise RuntimeError(
                 f"分析窗切片仍超过 200MB（{out.stat().st_size / 1024 / 1024:.0f} MB），"
                 f"请降低 compress 体积或缩短 window_max_min"
             )
+    if not _valid_output(check_duration=True):
+        out.unlink(missing_ok=True)
+        raise RuntimeError(f"分析窗切片时长不准确: {out.name}")
     return out
 
 

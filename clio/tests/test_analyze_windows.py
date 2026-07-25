@@ -33,6 +33,10 @@ class TestBuildAnalyzeWindows:
         for a, b in zip(ws, ws[1:]):
             assert b.start_sec < a.end_sec
 
+    def test_excessive_window_count_fails_closed(self):
+        with pytest.raises(ValueError, match="分析窗数量过多"):
+            build_analyze_windows(1200, window_max_min=1, overlap_sec=59)
+
 
 class TestShiftAndMerge:
     def test_shift_timeline_numeric(self):
@@ -99,6 +103,28 @@ class TestShiftAndMerge:
         merged = merge_window_analyses([(w0, a0), (w1, a1)], overlap_sec=20)
         assert sum(1 for t in merged["timeline"] if t.get("text") == "过马路") == 2
 
+    def test_merge_dedupes_paraphrases_with_intervening_event(self):
+        w0 = AnalyzeWindow(0, 0, 900)
+        w1 = AnalyzeWindow(1, 880, 1800)
+        a0 = {
+            "title": "A",
+            "summary": "s0",
+            "timeline": [{"start": 890, "end": 900, "text": "海边悠闲散步"}],
+        }
+        a1 = {
+            "title": "B",
+            "summary": "s1",
+            "timeline": [
+                {"start": 891, "end": 895, "text": "路边车辆经过"},
+                {"start": 892, "end": 902, "text": "在海边悠闲地散步"},
+            ],
+        }
+
+        merged = merge_window_analyses([(w0, a0), (w1, a1)], overlap_sec=20)
+
+        assert len(merged["timeline"]) == 2
+        assert any(item["text"] == "在海边悠闲地散步" for item in merged["timeline"])
+
 
 class TestSliceWindowVideo:
     def test_slice_window_video_invokes_ffmpeg(self, tmp_path: Path):
@@ -142,6 +168,32 @@ class TestSliceWindowVideo:
             ffmpeg="ffmpeg",
             run_ffmpeg=fake_run,
         )
+        assert out.is_file()
+        assert len(calls) == 2
+        assert "libx264" in calls[1]
+
+    def test_slice_reencodes_when_copy_duration_drifts(self, monkeypatch, tmp_path: Path):
+        src = tmp_path / "001_GL.mp4"
+        src.write_bytes(b"source")
+        dest = tmp_path / ".analyze_windows"
+        calls = []
+        durations = iter([62.0, 60.0])
+
+        def fake_run(args, ffmpeg, **kw):
+            calls.append(args)
+            Path(args[-1]).write_bytes(b"video")
+
+        monkeypatch.setattr("clio.analyze_windows.get_duration_sec", lambda *args: next(durations))
+
+        out = slice_window_video(
+            source=src,
+            window=AnalyzeWindow(0, 0, 60),
+            dest_dir=dest,
+            ffmpeg="ffmpeg",
+            ffprobe="ffprobe",
+            run_ffmpeg=fake_run,
+        )
+
         assert out.is_file()
         assert len(calls) == 2
         assert "libx264" in calls[1]
