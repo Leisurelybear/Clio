@@ -48,6 +48,60 @@ beforeEach(() => {
   vi.resetModules();
 });
 
+describe('updateSelectBtnVisibility', () => {
+  beforeEach(async () => {
+    document.body.innerHTML = `
+      <button id="btn-select-videos" style="display:none">取消选择</button>
+      <ul id="video-list"></ul>
+    `;
+    const { state } = await import('../state.js');
+    state.videos = [{ file: 'a.mp4', index: '001' }];
+    state.currentEntity = 'run';
+    state.selectionMode = true;
+    state.selectedFiles = ['a.mp4'];
+  });
+
+  it('shows 取消选择 while on run with selection mode', async () => {
+    const { updateSelectBtnVisibility } = await import('../sidebar-data.js');
+    const { state } = await import('../state.js');
+    updateSelectBtnVisibility();
+    const btn = document.getElementById('btn-select-videos');
+    expect(btn.style.display).toBe('flex');
+    expect(btn.innerHTML).toContain('取消选择');
+    expect(state.selectionMode).toBe(true);
+  });
+
+  it('clears selection and restores 选择视频 when leaving run', async () => {
+    const { updateSelectBtnVisibility } = await import('../sidebar-data.js');
+    const { state } = await import('../state.js');
+    state.currentEntity = 'plan';
+    // Simulate stale label left after prior selection mode
+    const btn = document.getElementById('btn-select-videos');
+    btn.innerHTML = '<span class="icon">✕</span> 取消选择';
+
+    updateSelectBtnVisibility();
+
+    expect(btn.style.display).toBe('none');
+    expect(state.selectionMode).toBe(false);
+    expect(state.selectedFiles).toEqual([]);
+    expect(btn.innerHTML).toContain('选择视频');
+    expect(btn.innerHTML).not.toContain('取消选择');
+  });
+
+  it('keeps 选择视频 when re-entering run after auto-clear', async () => {
+    const { updateSelectBtnVisibility } = await import('../sidebar-data.js');
+    const { state } = await import('../state.js');
+    state.currentEntity = 'plan';
+    updateSelectBtnVisibility();
+    state.currentEntity = 'run';
+    updateSelectBtnVisibility();
+    const btn = document.getElementById('btn-select-videos');
+    expect(btn.style.display).toBe('flex');
+    expect(btn.innerHTML).toContain('选择视频');
+    expect(state.selectionMode).toBe(false);
+  });
+});
+
 describe('relinkVideo', () => {
   it('opens relink modal with old path instead of using prompt', async () => {
     const { openRelinkModal } = await import('../sidebar-relink.js');

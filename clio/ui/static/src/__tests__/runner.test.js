@@ -4,7 +4,10 @@ import {
   renderRunPreviewHtml,
   renderSkippedDiagnosticsHtml,
   collectRunOptions,
+  getRunButtonText,
+  updateRunStartButtonState,
 } from '../runner.js';
+import { state } from '../state.js';
 
 describe('renderRunPreviewHtml', () => {
   it('renders totals and per-step counts', () => {
@@ -85,6 +88,53 @@ describe('collectRunOptions', () => {
   it('defaults use_transcripts when checkbox is missing', () => {
     document.getElementById('run-use-transcripts').remove();
     expect(collectRunOptions().use_transcripts).toBe(true);
+  });
+});
+
+describe('getRunButtonText / updateRunStartButtonState', () => {
+  beforeEach(() => {
+    state.selectionMode = false;
+    state.selectedFiles = [];
+    document.body.innerHTML = `<button id="btn-run-start" class="btn-primary"></button>`;
+  });
+
+  it('default label when not in selection mode', () => {
+    expect(getRunButtonText()).toContain('运行选中步骤');
+    expect(getRunButtonText()).not.toContain('请先勾选');
+    expect(getRunButtonText()).not.toMatch(/\(\d+\)/);
+  });
+
+  it('prompts to select when selection mode with empty list', () => {
+    state.selectionMode = true;
+    state.selectedFiles = [];
+    expect(getRunButtonText()).toContain('请先勾选视频');
+  });
+
+  it('includes selection count when files are checked', () => {
+    state.selectionMode = true;
+    state.selectedFiles = ['a.mp4', 'b.mp4', 'c.mp4'];
+    expect(getRunButtonText()).toContain('(3)');
+    expect(getRunButtonText()).toContain('运行选中步骤');
+  });
+
+  it('writes selection-aware label onto the start button', () => {
+    state.selectionMode = true;
+    state.selectedFiles = ['a.mp4'];
+    updateRunStartButtonState();
+    const btn = document.getElementById('btn-run-start');
+    expect(btn.disabled).toBe(false);
+    expect(btn.innerHTML).toContain('(1)');
+    expect(btn.innerHTML).toContain('运行选中步骤');
+  });
+
+  it('disables start button when selection mode has no files', () => {
+    state.selectionMode = true;
+    state.selectedFiles = [];
+    updateRunStartButtonState();
+    const btn = document.getElementById('btn-run-start');
+    expect(btn.disabled).toBe(true);
+    expect(btn.innerHTML).toContain('请先勾选视频');
+    expect(btn.title).toContain('勾选');
   });
 });
 
