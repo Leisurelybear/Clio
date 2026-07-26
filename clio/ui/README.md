@@ -165,9 +165,9 @@ header 右侧的 **`压缩` / `原视频`** 切换按钮决定侧栏列的是哪
 | --- | --- |
 | 拖拽 / ↑↓ | 调整 `sequence[]` 顺序（↑↓ 在展开面板） |
 | 删除 | 删除某一段（确认后；展开面板内） |
-| +插入 / 末尾插入 | 按视频 `index` 插入新段 |
-| 标题 / 时间轴 / 理由 / 口播提示 | 展开后改字段；理由/口播为可纵向拖高的 textarea；`Ctrl+S` 保存（后端校验非法时间轴） |
-| 起点 / 终点 | 用**当前片段对应视频**的播放头写入 `use_timeline`（plan 时间基：`player.currentTime − offset_sec`，与预览 seek 的 `+ offset_sec` 对称；未打开该段视频时会提示） |
+| +插入 / 末尾插入 | 从项目已有视频列表选择后插入新段（可搜索 index / 标题 / 文件名） |
+| 选区 | 弹窗内独立源视频 + 双端拖拽选 `use_timeline`（plan 时间基，含 `offset_sec`）；主成片预览不被改写 |
+| 标题 / 时间轴 / 理由 / 口播提示 | 展开后改字段；时间轴手写 `MM:SS-MM:SS`；理由/口播为可纵向拖高的 textarea；`Ctrl+S` 保存（后端校验非法时间轴） |
 | 就绪检查面板 | `POST /api/plan/readiness`：error 阻塞裁剪/导出；warning 可确认后 `force` 继续；点击带 `segment_index` 的 issue 会展开并滚到该段 |
 | 未保存改动 | 裁剪/导出前会提示先保存（不静默写盘） |
 
@@ -184,7 +184,7 @@ CLI 对齐：`python main.py cut|export ... --force` 仅忽略 **warning**，**e
 - 分段色块仍保留；**点击色块**跳到该段起点；播放/上一段/下一段沿全局轴连续预览
 - 播放器时钟显示 **`成片 mm:ss / 总 mm:ss`**
 - **波形**按 plan 把各源视频 peaks 按 `use_timeline` 切片拼接（成片轴）；拖波形同样 `seekToGlobal`。预览切段不重载单片波形
-- 当前媒体仍是**源视频 seek hop**（按段加载对应源片并 seek；`offset_sec` 与 起点/终点 对称）；Cut/合成片优先见 ROADMAP **R-031b**
+- 当前媒体仍是**源视频 seek hop**（按段加载对应源片并 seek；`offset_sec` 参与预览 seek）；Cut/合成片优先见 ROADMAP **R-031b**
 - 当前定位的 segment 会在规划列表（展开）和预览条里高亮（不必先点「预览播放」）
 - 再次点击播放按钮可暂停；播完所有 segment 后自动停止
 - 切换到视频 / 运行 / 设置 tab 或切换源时自动停止连续预览，并恢复单片波形

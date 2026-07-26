@@ -6,18 +6,17 @@ import { buildTimeline, clampGlobal } from './plan-timeline.js';
 import { recomposePlanWaveformFromCache, isPlanWaveformMode } from './waveform.js';
 import { addToast } from './toast.js';
 import { resolveEditorSaveTarget } from './editor-save.js';
+import { openPlanRangePicker } from './plan-range-picker.js';
 import {
   reorderSequence,
   removeSegment,
   patchSegment,
-  setTimelineBound,
   insertSegment,
   computeDropToIndex,
   computeDragAutoScrollDelta,
   nextExpandedAfterDelete,
   nextExpandedAfterInsert,
   nextExpandedAfterMove,
-  planSecFromPlayer,
 } from './plan-edit.js';
 
 let _readinessTimer = null;
@@ -229,55 +228,6 @@ function confirmWarningsIfNeeded() {
   return true;
 }
 
-function playerCurrentTimeSec() {
-  const player = $('player');
-  if (!player) return null;
-  const t = player.currentTime;
-  return Number.isFinite(t) ? t : null;
-}
-
-function applyTimelineBound(segIndex, which) {
-  const p = state.plan;
-  if (!p?.sequence?.[segIndex]) return;
-  const seg = p.sequence[segIndex];
-  const v = (state.videos || []).find((x) => String(x.index) === String(seg.index));
-  if (!v) {
-    addToast(`找不到视频 [${seg.index || '?'}]，无法写入时间轴`, 'warning');
-    return;
-  }
-  // Must be scrubbing the same clip this segment references (file match).
-  if (state.currentVideo && v.file && state.currentVideo !== v.file) {
-    addToast('请先点击该片段预览，再设起点/终点（当前播放的不是这段视频）', 'warning');
-    return;
-  }
-  const playerSec = playerCurrentTimeSec();
-  if (playerSec == null) {
-    addToast('请先在播放器中打开对应视频', 'warning');
-    return;
-  }
-  // use_timeline is plan/segment-local; preview seeks with +offset_sec.
-  const planSec = planSecFromPlayer(playerSec, v.offset_sec || 0);
-  if (planSec == null) {
-    addToast('无法读取播放器时间', 'warning');
-    return;
-  }
-  const next = setTimelineBound(seg.use_timeline || '', which, planSec);
-  p.sequence[segIndex] = patchSegment(seg, { use_timeline: next });
-  markDirty();
-  _refreshPreviewTimeline();
-  // Prefer in-place DOM update so focus/IME in the expanded panel survive.
-  const li = document.querySelector(`#plan-list [data-preview-index="${segIndex}"]`);
-  if (li) {
-    const headerTl = li.querySelector('.plan-seg-tl');
-    if (headerTl) headerTl.textContent = next || '—';
-    const input = li.querySelector('input[data-k="use_timeline"]');
-    if (input) input.value = next;
-    scheduleReadinessCheck();
-    return;
-  }
-  renderPlan();
-}
-
 /** Clamp composite playhead and rebuild preview bar after use_timeline changes. */
 function _refreshPreviewTimeline() {
   const seq = state.plan?.sequence;
@@ -288,28 +238,166 @@ function _refreshPreviewTimeline() {
   if (isPlanWaveformMode()) recomposePlanWaveformFromCache();
 }
 
-function promptInsertAfter(afterIndex) {
-  const p = state.plan;
-  if (!p) return;
-  const videos = state.videos || [];
-  const options = videos
-    .filter((v) => v.index)
-    .map((v) => `${v.index} ${v.title || v.file || ''}`.trim());
-  const hint = options.length
-    ? `可选 index 示例: ${options.slice(0, 8).join(' | ')}`
-    : '输入视频 index，例如 001';
-  const raw = prompt(`在第 ${afterIndex + 1} 段后插入片段\n${hint}\n\n视频 index:`, '');
-  if (raw == null) return;
-  const index = String(raw).trim();
-  if (!index) {
-    addToast('index 不能为空', 'warning');
+let _insertAfterIndex = -1;
+let _insertSelectedIndex = null;
+let _insertModalBound = false;
+
+function ensureInsertModalBound() {
+  if (_insertModalBound) return;
+  _insertModalBound = true;
+  const modal = $('modal-plan-insert');
+  if (!modal) return;
+  modal.querySelector('.modal-backdrop')?.addEventListener('click', closeInsertModal);
+  $('plan-insert-cancel')?.addEventListener('click', closeInsertModal);
+  $('plan-insert-confirm')?.addEventListener('click', confirmInsertSegment);
+  $('plan-insert-filter')?.addEventListener('input', (e) => {
+    renderInsertVideoList(e.target.value || '');
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (modal.style.display !== 'flex') return;
+    closeInsertModal();
+  });
+}
+
+function closeInsertModal() {
+  const modal = $('modal-plan-insert');
+  if (modal) modal.style.display = 'none';
+  _insertAfterIndex = -1;
+  _insertSelectedIndex = null;
+}
+
+function openInsertModal(afterIndex) {
+  ensureInsertModalBound();
+  const modal = $('modal-plan-insert');
+  if (!modal) {
+    addToast('插入对话框不可用', 'error');
     return;
   }
-  const v = videos.find((x) => String(x.index) === index);
-  const title = v?.title || v?.file || '';
+  _insertAfterIndex = afterIndex;
+  _insertSelectedIndex = null;
+  const filter = $('plan-insert-filter');
+  if (filter) filter.value = '';
+  const hint = $('plan-insert-hint');
+  if (hint) {
+    const n = (state.plan?.sequence?.length || 0);
+    if (n === 0 || afterIndex < 0) {
+      hint.textContent = '选择要插入到规划开头的视频';
+    } else if (afterIndex >= n - 1) {
+      hint.textContent = '选择要插入到末尾的视频';
+    } else {
+      hint.textContent = `选择要插入到第 ${afterIndex + 1} 段之后的视频`;
+    }
+  }
+  renderInsertVideoList('');
+  const confirmBtn = $('plan-insert-confirm');
+  if (confirmBtn) confirmBtn.disabled = true;
+  modal.style.display = 'flex';
+  setTimeout(() => filter?.focus(), 0);
+}
+
+function renderInsertVideoList(query) {
+  const list = $('plan-insert-list');
+  if (!list) return;
+  const q = String(query || '').trim().toLowerCase();
+  const videos = (state.videos || []).filter((v) => v && v.index);
+  const filtered = q
+    ? videos.filter((v) => {
+        const hay = `${v.index} ${v.title || ''} ${v.file || ''}`.toLowerCase();
+        return hay.includes(q);
+      })
+    : videos;
+
+  if (!filtered.length) {
+    list.innerHTML = videos.length
+      ? '<p class="muted">没有匹配的视频</p>'
+      : '<p class="muted">当前项目没有可用视频</p>';
+    return;
+  }
+
+  list.innerHTML = filtered.map((v) => {
+    const idx = String(v.index);
+    const title = v.title || v.file || '(无标题)';
+    const selected = _insertSelectedIndex != null && String(_insertSelectedIndex) === idx;
+    return `<button type="button" class="plan-insert-item${selected ? ' selected' : ''}" data-index="${escapeHtml(idx)}" title="${escapeHtml(v.file || '')}">
+      <span class="plan-insert-item-idx">[${escapeHtml(idx)}]</span>
+      <span class="plan-insert-item-title">${escapeHtml(title)}</span>
+    </button>`;
+  }).join('');
+
+  list.querySelectorAll('.plan-insert-item').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      _insertSelectedIndex = btn.dataset.index;
+      list.querySelectorAll('.plan-insert-item').forEach((el) => {
+        el.classList.toggle('selected', el.dataset.index === _insertSelectedIndex);
+      });
+      const confirmBtn = $('plan-insert-confirm');
+      if (confirmBtn) confirmBtn.disabled = false;
+    });
+    btn.addEventListener('dblclick', () => {
+      _insertSelectedIndex = btn.dataset.index;
+      confirmInsertSegment();
+    });
+  });
+}
+
+function confirmInsertSegment() {
+  const p = state.plan;
+  if (!p) return;
+  const index = _insertSelectedIndex != null ? String(_insertSelectedIndex).trim() : '';
+  if (!index) {
+    addToast('请先选择一个视频', 'warning');
+    return;
+  }
+  const v = (state.videos || []).find((x) => String(x.index) === index);
+  if (!v) {
+    addToast(`找不到视频 [${index}]`, 'warning');
+    return;
+  }
+  const afterIndex = _insertAfterIndex;
+  const title = v.title || v.file || '';
+  closeInsertModal();
   const next = insertSegment(p.sequence, afterIndex, { index, title });
   _expandedSegIndex = nextExpandedAfterInsert(afterIndex);
   applySequence(next, { highlightIndex: _expandedSegIndex });
+}
+
+function promptInsertAfter(afterIndex) {
+  if (!state.plan) return;
+  openInsertModal(afterIndex);
+}
+
+function openRangePickerForSegment(segIndex) {
+  const p = state.plan;
+  if (!p?.sequence?.[segIndex]) return;
+  const seg = p.sequence[segIndex];
+  const v = (state.videos || []).find((x) => String(x.index) === String(seg.index));
+  if (!v?.file) {
+    addToast(`找不到视频 [${seg.index || '?'}]，无法打开选区`, 'warning');
+    return;
+  }
+  openPlanRangePicker({
+    segIndex,
+    video: v,
+    useTimeline: seg.use_timeline || '',
+    title: seg.title || '',
+    onApply: ({ segIndex: i, use_timeline }) => {
+      if (!state.plan?.sequence?.[i]) return;
+      state.plan.sequence[i] = patchSegment(state.plan.sequence[i], { use_timeline });
+      markDirty();
+      _refreshPreviewTimeline();
+      const li = document.querySelector(`#plan-list [data-preview-index="${i}"]`);
+      if (li) {
+        const headerTl = li.querySelector('.plan-seg-tl');
+        if (headerTl) headerTl.textContent = use_timeline || '—';
+        const input = li.querySelector('input[data-k="use_timeline"]');
+        if (input) input.value = use_timeline;
+      } else {
+        renderPlan();
+      }
+      scheduleReadinessCheck();
+    },
+  });
 }
 
 export function renderPlan() {
@@ -405,8 +493,7 @@ export function renderPlan() {
         </label>
         <label class="plan-timeline-row">时间轴
           <input value="${escapeHtml(tlText)}" data-k="use_timeline" placeholder="00:10-00:45">
-          <button type="button" class="plan-ghost-btn" data-tl="start" title="用播放器当前位置作为起点">起点</button>
-          <button type="button" class="plan-ghost-btn" data-tl="end" title="用播放器当前位置作为终点">终点</button>
+          <button type="button" class="plan-ghost-btn" data-range-pick title="在源视频上拖选起止时间">选区</button>
         </label>
         <div class="plan-seg-fields">
           <label>理由
@@ -498,18 +585,16 @@ export function renderPlan() {
       e.stopPropagation();
       promptInsertAfter(i);
     });
+    li.querySelector('[data-range-pick]')?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openRangePickerForSegment(i);
+    });
     li.querySelector('[data-del]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!confirm(`删除第 ${i + 1} 段「${seg.title || seg.index || ''}」？`)) return;
       const nextSeq = removeSegment(p.sequence, i);
       _expandedSegIndex = nextExpandedAfterDelete(_expandedSegIndex, i, nextSeq.length);
       applySequence(nextSeq);
-    });
-    li.querySelectorAll('[data-tl]').forEach((btn) => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        applyTimelineBound(i, btn.dataset.tl);
-      });
     });
     li.addEventListener('dragstart', (e) => {
       _dragFromIndex = i;
