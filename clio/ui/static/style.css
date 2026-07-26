@@ -2510,3 +2510,106 @@ select.form-input { cursor: pointer; }
 .plan-insert-bar {
   margin: 8px 0 12px;
 }
+.plan-insert-list {
+  max-height: 40vh;
+  overflow-y: auto;
+  margin: var(--space-3) 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.plan-insert-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+.plan-insert-item:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-light);
+}
+.plan-insert-item.selected {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  box-shadow: var(--accent-glow);
+}
+.plan-insert-item-idx {
+  flex: 0 0 auto;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+.plan-insert-item-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.plan-range-video {
+  display: block;
+  width: 100%;
+  max-height: 50vh;
+  background: #000;
+  border-radius: var(--radius-md);
+  margin: var(--space-3) 0;
+}
+.plan-range-times {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-variant-numeric: tabular-nums;
+  font-size: var(--text-sm);
+  margin-bottom: var(--space-2);
+}
+.plan-range-track {
+  position: relative;
+  height: 28px;
+  margin: 8px 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-2);
+  border: 1px solid var(--border);
+  touch-action: none;
+  user-select: none;
+}
+.plan-range-fill {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: 0;
+  background: var(--accent-bg, rgba(59, 130, 246, 0.35));
+  border: 1px solid var(--accent);
+  border-radius: 2px;
+  pointer-events: none;
+}
+.plan-range-handle {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 12px;
+  margin-left: -6px;
+  padding: 0;
+  border: 1px solid var(--accent);
+  border-radius: 3px;
+  background: var(--bg-surface);
+  cursor: ew-resize;
+  z-index: 1;
+}
+.plan-range-handle:hover,
+.plan-range-handle:focus-visible {
+  background: var(--accent-bg);
+  outline: none;
+}
+.plan-range-handle:focus-visible {
+  box-shadow: 0 0 0 2px var(--border-focus);
+}

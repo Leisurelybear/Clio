@@ -239,6 +239,46 @@
   </div>
 </div>
 
+<!-- Plan insert: pick an existing project video -->
+<div id="modal-plan-insert" class="modal" style="display:none;">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog">
+    <h3>插入片段</h3>
+    <p id="plan-insert-hint" class="hint">选择要插入的视频</p>
+    <input id="plan-insert-filter" type="text" placeholder="搜索 index / 标题 / 文件名" autocomplete="off">
+    <div id="plan-insert-list" class="plan-insert-list" role="listbox" aria-label="可选视频"></div>
+    <div class="modal-actions">
+      <button id="plan-insert-cancel" class="btn-secondary" type="button">取消</button>
+      <button id="plan-insert-confirm" class="btn-primary" type="button" disabled>插入</button>
+    </div>
+  </div>
+</div>
+
+<!-- Plan range: dual-handle use_timeline on source video -->
+<div id="modal-plan-range" class="modal" style="display:none;">
+  <div class="modal-backdrop"></div>
+  <div class="modal-dialog modal-dialog-wide">
+    <h3 id="plan-range-title">选区</h3>
+    <p id="plan-range-error" class="err" style="display:none;"></p>
+    <video id="plan-range-video" class="plan-range-video" controls playsinline preload="metadata"></video>
+    <div class="plan-range-times">
+      <span id="plan-range-start-label">00:00</span>
+      <span class="muted">–</span>
+      <span id="plan-range-end-label">00:00</span>
+      <span id="plan-range-dur-label" class="muted"></span>
+    </div>
+    <div id="plan-range-track" class="plan-range-track" aria-label="选区时间轴">
+      <div id="plan-range-fill" class="plan-range-fill"></div>
+      <button type="button" id="plan-range-handle-start" class="plan-range-handle" data-which="start" aria-label="起点"></button>
+      <button type="button" id="plan-range-handle-end" class="plan-range-handle" data-which="end" aria-label="终点"></button>
+    </div>
+    <div class="modal-actions">
+      <button id="plan-range-cancel" class="btn-secondary" type="button">取消</button>
+      <button id="plan-range-apply" class="btn-primary" type="button">应用</button>
+    </div>
+  </div>
+</div>
+
 <!-- Offline video relink modal: type path or browse -->
 <div id="modal-relink" class="modal" style="display:none;">
   <div class="modal-backdrop"></div>
