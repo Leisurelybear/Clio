@@ -5,6 +5,7 @@ import {
   selectionFromUseTimeline,
   useTimelineFromFileSelection,
   clampFileSelection,
+  planSecFromPlayer,
 } from './plan-edit.js';
 
 let _bound = false;
@@ -85,9 +86,19 @@ function paintHandles() {
   const sl = $('plan-range-start-label');
   const el = $('plan-range-end-label');
   const dl = $('plan-range-dur-label');
+  const pl = $('plan-range-plan-label');
   if (sl) sl.textContent = formatTimelineSec(_startSec);
   if (el) el.textContent = formatTimelineSec(_endSec);
   if (dl) dl.textContent = `/ ${formatTimelineSec(_duration)}`;
+  if (pl) {
+    if (_offsetSec > 0) {
+      const ps = planSecFromPlayer(_startSec, _offsetSec) ?? 0;
+      const pe = planSecFromPlayer(_endSec, _offsetSec) ?? ps;
+      pl.textContent = `· 规划 ${formatTimelineSec(ps)}–${formatTimelineSec(pe)}`;
+    } else {
+      pl.textContent = '';
+    }
+  }
 }
 
 function seekToHandle(which) {
@@ -118,9 +129,32 @@ function setApplyEnabled(ok) {
 
 function stopDragListeners() {
   if (_onMove) document.removeEventListener('pointermove', _onMove);
-  if (_onUp) document.removeEventListener('pointerup', _onUp);
+  if (_onUp) {
+    document.removeEventListener('pointerup', _onUp);
+    document.removeEventListener('pointercancel', _onUp);
+  }
   // Keep _onMove/_onUp function refs — ensureBound only creates them once.
   _dragWhich = null;
+}
+
+function syncPlayButton() {
+  const video = $('plan-range-video');
+  const btn = $('plan-range-play');
+  if (!btn) return;
+  const playing = video && !video.paused && !video.ended;
+  btn.textContent = playing ? '暂停' : '播放';
+}
+
+function togglePlay() {
+  const video = $('plan-range-video');
+  if (!video || !video.src) return;
+  if (video.paused || video.ended) {
+    video.play().catch(() => {});
+  } else {
+    video.pause();
+  }
+  // play/pause events also update label; sync immediately for snappy UI
+  setTimeout(syncPlayButton, 0);
 }
 
 function applySelection() {
@@ -142,11 +176,22 @@ function ensureBound() {
   modal?.querySelector('.modal-backdrop')?.addEventListener('click', closePlanRangePicker);
   $('plan-range-cancel')?.addEventListener('click', closePlanRangePicker);
   $('plan-range-apply')?.addEventListener('click', applySelection);
+  $('plan-range-play')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    togglePlay();
+  });
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     if ($('modal-plan-range')?.style.display !== 'flex') return;
     closePlanRangePicker();
   });
+
+  const video = $('plan-range-video');
+  if (video) {
+    video.addEventListener('play', syncPlayButton);
+    video.addEventListener('pause', syncPlayButton);
+    video.addEventListener('ended', syncPlayButton);
+  }
 
   const track = $('plan-range-track');
   _onMove = (e) => {
@@ -162,9 +207,7 @@ function ensureBound() {
   };
   _onUp = () => {
     if (!_dragWhich) return;
-    _dragWhich = null;
-    document.removeEventListener('pointermove', _onMove);
-    document.removeEventListener('pointerup', _onUp);
+    stopDragListeners();
   };
 
   ['plan-range-handle-start', 'plan-range-handle-end'].forEach((id) => {
@@ -172,11 +215,17 @@ function ensureBound() {
       e.preventDefault();
       e.stopPropagation();
       const el = e.currentTarget;
+      // Restarting a drag: drop previous listeners first.
+      stopDragListeners();
       _dragWhich = el?.dataset?.which === 'end' ? 'end' : 'start';
       try { el.setPointerCapture?.(e.pointerId); } catch { /* ignore */ }
       document.addEventListener('pointermove', _onMove);
       document.addEventListener('pointerup', _onUp);
+      document.addEventListener('pointercancel', _onUp);
+      // Pause while scrubbing handles so playhead stays on the bound.
+      try { video?.pause(); } catch { /* ignore */ }
       seekToHandle(_dragWhich);
+      syncPlayButton();
     });
   });
 }
@@ -201,6 +250,9 @@ export function closePlanRangePicker() {
   _offsetSec = 0;
   setError('');
   setApplyEnabled(false);
+  syncPlayButton();
+  const pl = $('plan-range-plan-label');
+  if (pl) pl.textContent = '';
 }
 
 /**
@@ -266,4 +318,5 @@ export function openPlanRangePicker(opts) {
   video.src = videoUrlFor(opts.video);
   modal.style.display = 'flex';
   paintHandles();
+  syncPlayButton();
 }

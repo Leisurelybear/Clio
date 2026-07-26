@@ -2555,16 +2555,28 @@ select.form-input { cursor: pointer; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.plan-range-video-wrap {
+  position: relative;
+  margin: var(--space-3) 0;
+}
 .plan-range-video {
   display: block;
   width: 100%;
   max-height: 50vh;
   background: #000;
   border-radius: var(--radius-md);
-  margin: var(--space-3) 0;
+}
+.plan-range-play {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 4px 10px;
+  font-size: var(--text-sm);
+  opacity: 0.92;
 }
 .plan-range-times {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   font-variant-numeric: tabular-nums;
@@ -2604,6 +2616,8 @@ select.form-input { cursor: pointer; }
   background: var(--bg-surface);
   cursor: ew-resize;
   z-index: 1;
+  touch-action: none;
+  user-select: none;
 }
 .plan-range-handle:hover,
 .plan-range-handle:focus-visible {

@@ -259,13 +259,19 @@
   <div class="modal-backdrop"></div>
   <div class="modal-dialog modal-dialog-wide">
     <h3 id="plan-range-title">选区</h3>
+    <p id="plan-range-hint" class="hint">拖下方两端选择起止；画面随手柄 seek。应用写入规划时间轴。</p>
     <p id="plan-range-error" class="err" style="display:none;"></p>
-    <video id="plan-range-video" class="plan-range-video" controls playsinline preload="metadata"></video>
+    <div class="plan-range-video-wrap">
+      <video id="plan-range-video" class="plan-range-video" playsinline preload="metadata"></video>
+      <button type="button" id="plan-range-play" class="plan-range-play btn-secondary" title="播放/暂停当前画面">播放</button>
+    </div>
     <div class="plan-range-times">
+      <span class="muted">源片</span>
       <span id="plan-range-start-label">00:00</span>
       <span class="muted">–</span>
       <span id="plan-range-end-label">00:00</span>
       <span id="plan-range-dur-label" class="muted"></span>
+      <span id="plan-range-plan-label" class="muted"></span>
     </div>
     <div id="plan-range-track" class="plan-range-track" aria-label="选区时间轴">
       <div id="plan-range-fill" class="plan-range-fill"></div>
