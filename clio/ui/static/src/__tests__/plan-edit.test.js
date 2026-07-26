@@ -12,6 +12,11 @@ import {
   nextExpandedAfterInsert,
   nextExpandedAfterMove,
   planSecFromPlayer,
+  parseUseTimeline,
+  fileSecFromPlan,
+  clampFileSelection,
+  selectionFromUseTimeline,
+  useTimelineFromFileSelection,
 } from '../plan-edit.js';
 
 describe('plan-edit', () => {
@@ -196,5 +201,47 @@ describe('nextExpandedAfterMove', () => {
 
   it('returns null when nothing expanded', () => {
     expect(nextExpandedAfterMove(0, 2, null)).toBeNull();
+  });
+});
+
+describe('range picker helpers', () => {
+  it('parseUseTimeline reads mm:ss-mm:ss', () => {
+    expect(parseUseTimeline('00:10-00:40')).toEqual({ startSec: 10, endSec: 40 });
+    expect(parseUseTimeline('')).toBeNull();
+    expect(parseUseTimeline('nope')).toBeNull();
+    expect(parseUseTimeline('00:10')).toBeNull();
+  });
+
+  it('fileSecFromPlan adds positive offset only', () => {
+    expect(fileSecFromPlan(15, 40)).toBe(55);
+    expect(fileSecFromPlan(15, 0)).toBe(15);
+    expect(fileSecFromPlan(15, -5)).toBe(15);
+  });
+
+  it('clampFileSelection enforces min span and duration', () => {
+    expect(clampFileSelection({ startSec: 10, endSec: 40, duration: 100 }))
+      .toEqual({ startSec: 10, endSec: 40 });
+    expect(clampFileSelection({ startSec: -5, endSec: 200, duration: 50 }))
+      .toEqual({ startSec: 0, endSec: 50 });
+    expect(clampFileSelection({ startSec: 20, endSec: 20.5, duration: 100, minSpan: 1 }))
+      .toEqual({ startSec: 20, endSec: 21 });
+    expect(clampFileSelection({ startSec: 0, endSec: 0.2, duration: 0.5, minSpan: 1 }))
+      .toEqual({ startSec: 0, endSec: 0.5 });
+  });
+
+  it('selectionFromUseTimeline maps plan→file and defaults empty', () => {
+    expect(selectionFromUseTimeline('00:10-00:40', 100, 0))
+      .toEqual({ startSec: 10, endSec: 40 });
+    expect(selectionFromUseTimeline('00:10-00:40', 200, 40))
+      .toEqual({ startSec: 50, endSec: 80 });
+    expect(selectionFromUseTimeline('', 100, 0))
+      .toEqual({ startSec: 0, endSec: 5 });
+    expect(selectionFromUseTimeline('bad', 3, 0))
+      .toEqual({ startSec: 0, endSec: 3 });
+  });
+
+  it('useTimelineFromFileSelection maps file→plan', () => {
+    expect(useTimelineFromFileSelection(55, 80, 40)).toBe('00:15-00:40');
+    expect(useTimelineFromFileSelection(10, 25, 0)).toBe('00:10-00:25');
   });
 });

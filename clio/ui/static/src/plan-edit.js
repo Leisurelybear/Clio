@@ -146,6 +146,88 @@ export function planSecFromPlayer(playerSec, offsetSec = 0) {
   return Math.max(0, t - o);
 }
 
+/** @returns {{ startSec: number, endSec: number } | null} */
+export function parseUseTimeline(range) {
+  const parts = parseTimelineParts(range);
+  if (!parts) return null;
+  const startSec = timecodeToSec(parts.start);
+  const endSec = timecodeToSec(parts.end);
+  if (startSec == null || endSec == null) return null;
+  return { startSec, endSec };
+}
+
+/** Plan-local seconds → source file seconds (preview seek direction). */
+export function fileSecFromPlan(planSec, offsetSec = 0) {
+  const t = Number(planSec);
+  if (!Number.isFinite(t)) return 0;
+  const off = Number(offsetSec);
+  const o = Number.isFinite(off) && off > 0 ? off : 0;
+  return Math.max(0, t + o);
+}
+
+/**
+ * Clamp a file-time selection into [0, duration] with minSpan.
+ * If duration < minSpan, return full [0, duration].
+ */
+export function clampFileSelection({ startSec, endSec, duration, minSpan = 1 }) {
+  const dur = Number(duration);
+  const d = Number.isFinite(dur) && dur > 0 ? dur : 0;
+  let start = Number(startSec);
+  let end = Number(endSec);
+  if (!Number.isFinite(start)) start = 0;
+  if (!Number.isFinite(end)) end = start;
+  start = Math.max(0, Math.min(start, d));
+  end = Math.max(0, Math.min(end, d));
+  if (end < start) {
+    const tmp = start;
+    start = end;
+    end = tmp;
+  }
+  const span = Number(minSpan);
+  const min = Number.isFinite(span) && span > 0 ? span : 1;
+  if (d <= 0) return { startSec: 0, endSec: 0 };
+  if (d < min) return { startSec: 0, endSec: d };
+  if (end - start < min) {
+    if (start + min <= d) end = start + min;
+    else {
+      end = d;
+      start = Math.max(0, end - min);
+    }
+  }
+  return { startSec: start, endSec: end };
+}
+
+/**
+ * Build file-time selection from plan use_timeline + duration.
+ * Empty/invalid → default 0..min(5, duration), then clamp.
+ */
+export function selectionFromUseTimeline(useTimeline, duration, offsetSec = 0) {
+  const dur = Number(duration);
+  const d = Number.isFinite(dur) && dur > 0 ? dur : 0;
+  const parsed = parseUseTimeline(useTimeline);
+  let start;
+  let end;
+  if (parsed) {
+    start = fileSecFromPlan(parsed.startSec, offsetSec);
+    end = fileSecFromPlan(parsed.endSec, offsetSec);
+  } else {
+    start = 0;
+    end = Math.min(5, d);
+  }
+  return clampFileSelection({ startSec: start, endSec: end, duration: d, minSpan: 1 });
+}
+
+/** File-time selection → plan-local use_timeline string. */
+export function useTimelineFromFileSelection(startSec, endSec, offsetSec = 0) {
+  const startPlan = planSecFromPlayer(startSec, offsetSec);
+  const endPlan = planSecFromPlayer(endSec, offsetSec);
+  const s = startPlan == null ? 0 : startPlan;
+  const e = endPlan == null ? s : endPlan;
+  const lo = Math.min(s, e);
+  const hi = Math.max(s, e);
+  return `${formatTimelineSec(lo)}-${formatTimelineSec(hi)}`;
+}
+
 /**
  * Insert a new segment after atIndex (-1 = prepend).
  * @param {Array} sequence
