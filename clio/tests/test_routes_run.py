@@ -339,7 +339,7 @@ class TestHandlePostRerun:
         cfg.compressed_dir = comp_dir
         cfg.paths = SimpleNamespace(ffprobe="", output_dir=proj_out, input_dir=proj_dir)
         cfg.analyze = SimpleNamespace(skip_existing=True)
-        cfg.compress = SimpleNamespace(split_max_min=0)
+        cfg.compress = SimpleNamespace()
         handler._get_config.return_value = cfg
 
         # Capture the thread target's default arguments

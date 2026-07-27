@@ -76,9 +76,7 @@ def tmp_config(tmp_path: Path) -> Path:
         "      model: deepseek-chat\n"
         "compress:\n"
         "  target_size_mb: 5\n"
-        "  max_width: 640\n"
-        "  split_max_min: 15\n"
-        "  splits_subdir: splits\n",
+        "  max_width: 640\n",
         encoding="utf-8",
     )
     return tmp_path

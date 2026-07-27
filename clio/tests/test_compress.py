@@ -20,8 +20,6 @@ def _default_config() -> SimpleNamespace:
             codec="libx264",
             remove_audio=True,
             crf=23,
-            split_max_min=0,
-            splits_subdir="splits",
         ),
     )
 

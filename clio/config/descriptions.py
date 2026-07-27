@@ -38,9 +38,6 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     "compress.codec": "视频编码器，默认 libx264",
     "compress.crf": "CRF 压缩质量（0-51，越小质量越高，文件越大）",
     "compress.remove_audio": "是否移除音频（压缩后仅保留画面，可减小体积）",
-    "compress.split_max_min": "【已废弃】物理分段已移除；此键保留兼容旧配置，压缩阶段忽略",
-    "compress.splits_subdir": "【已废弃】物理分段已移除",
-    "compress.reencode_split": "【已废弃】物理分段已移除",
     # analyze
     "analyze.compressed_subdir": "压缩视频存放的子目录名",
     "analyze.texts_subdir": "AI 分析结果（文案）存放的子目录名",

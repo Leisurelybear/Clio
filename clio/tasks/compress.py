@@ -95,9 +95,7 @@ def run_compress_all(
         videos = [v for v in videos if _matches_selected_stem(v, selected)]
     config.compressed_dir.mkdir(parents=True, exist_ok=True)
 
-    # Phase 1: one compressed file per original (physical split removed — see
-    # docs/superpowers/specs/2026-07-18-remove-physical-split-design.md).
-    # compress.split_max_min is deprecated and ignored.
+    # Phase 1: one compressed file per original.
     items: list[tuple[Path, Path]] = [(video, video) for video in videos]
 
     # Phase 2: build existing lookup (source_stem -> (index, Path))

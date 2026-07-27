@@ -30,7 +30,7 @@ def _cfg(tmp_path: Path) -> SimpleNamespace:
             max_workers=1,
         ),
         ai=SimpleNamespace(context=""),
-        compress=SimpleNamespace(split_max_min=0, splits_subdir="splits"),
+        compress=SimpleNamespace(),
         plan=SimpleNamespace(max_clips_per_day=10, target_duration_sec=300),
         script=SimpleNamespace(target_words=150),
         project_dir=tmp_path / "project",

@@ -54,9 +54,6 @@ const FIELD_LABELS = {
   // compress (project)
   'compress.target_size_mb': '目标体积（MB）',
   'compress.max_width': '最大宽度（像素）',
-  'compress.split_max_min': '【废弃】物理分段阈值',
-  'compress.splits_subdir': '【废弃】分段子目录',
-  'compress.reencode_split': '【废弃】分段时重新编码',
   // whisper (project)
   'whisper.enabled': '启用 Whisper',
   'whisper.model_size': '模型大小',

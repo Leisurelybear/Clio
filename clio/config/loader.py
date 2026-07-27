@@ -217,6 +217,7 @@ _GLOBAL_ONLY_SECTIONS = {"proxy", "server", "naming"}
 # Split-section keys belonging to project
 _SPLIT_PROJECT_KEYS: dict[str, set[str]] = {
     "paths": {"output_dir"},
+    # Deprecated split keys stay here only so V1 migration moves them out of global config.
     "compress": {"target_size_mb", "max_width", "split_max_min", "splits_subdir", "reencode_split"},
     "ai": {"tasks", "context", "context_file"},
     "whisper": {"enabled", "model_size", "language", "device", "max_segments_per_clip", "transcripts_subdir"},
@@ -504,9 +505,6 @@ def load_project_config(
         compress=ProjectCompressConfig(
             target_size_mb=raw.get("compress", {}).get("target_size_mb", 5),
             max_width=raw.get("compress", {}).get("max_width", 640),
-            split_max_min=raw.get("compress", {}).get("split_max_min", 15),
-            splits_subdir=raw.get("compress", {}).get("splits_subdir", "splits"),
-            reencode_split=raw.get("compress", {}).get("reencode_split", False),
         ),
         analyze=AnalyzeConfig(**_filter_dc(raw.get("analyze", {}), AnalyzeConfig)),
         script=ScriptConfig(

@@ -16,7 +16,6 @@ vlog-video-analysis/
 │   ├── analyze.py              # AI-facing helpers: analyze, script, plan, refine
 │   ├── prompts.py              # Prompt constants and output contracts
 │   ├── compress.py             # Single-file ffmpeg compression
-│   ├── split.py                # Long video splitting and split manifests
 │   ├── cut.py                  # Segment cutting wrapper
 │   ├── transcribe.py           # Whisper ASR core
 │   ├── whisper_cli.py          # Whisper CLI install/check entry
@@ -101,7 +100,7 @@ vlog-video-analysis/
 │   │           ├── theme.js
 │   │           ├── toast.js
 │   │           └── utils.js
-│   └── tests/                 # 1010 pytest cases
+│   └── tests/                 # 1300+ pytest cases
 ├── docs/
 │   ├── cli-reference.md
 │   ├── archive/               # Archived completed roadmap/history sections

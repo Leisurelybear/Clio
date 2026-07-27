@@ -40,8 +40,6 @@ compress:
   max_width: 640
   fps: 15
   remove_audio: true
-  split_max_min: 15
-  splits_subdir: splits
 whisper:
   enabled: true
   model_size: small

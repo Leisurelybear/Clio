@@ -275,7 +275,6 @@ class TestValidateConfig:
             ("analyze.max_workers", lambda cfg: setattr(cfg.project_cfg.analyze, "max_workers", 0)),
             ("compress.target_size_mb", lambda cfg: setattr(cfg.project_cfg.compress, "target_size_mb", 0)),
             ("compress.max_width", lambda cfg: setattr(cfg.project_cfg.compress, "max_width", 0)),
-            ("compress.split_max_min", lambda cfg: setattr(cfg.project_cfg.compress, "split_max_min", -1)),
             ("naming.index_width", lambda cfg: setattr(cfg.global_cfg.naming, "index_width", 0)),
             ("ai.provider_ttl_min", lambda cfg: setattr(cfg.global_cfg.ai, "provider_ttl_min", -1)),
             (

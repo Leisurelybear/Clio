@@ -142,6 +142,39 @@ class TestV1ToV2Migration:
         assert cfg.compress.fps == 15
         assert cfg.compress.target_size_mb == 99
 
+    def test_legacy_split_keys_are_ignored_without_reinjection(self, tmp_path: Path):
+        project_path = tmp_path / "project.yaml"
+        project_path.write_text(
+            yaml.dump(
+                {
+                    "compress": {
+                        "target_size_mb": 8,
+                        "split_max_min": 15,
+                        "splits_subdir": "splits",
+                        "reencode_split": True,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        config_path = tmp_path / "config.yaml"
+        config_path.write_text("config_version: V2\n", encoding="utf-8")
+
+        config = load_config(config_path, project_dir=tmp_path)
+
+        assert config.compress.target_size_mb == 8
+        assert not hasattr(config.compress, "split_max_min")
+
+        fresh_project = tmp_path / "fresh"
+        fresh_project.mkdir()
+        fresh_project_yaml = fresh_project / "project.yaml"
+        fresh_project_yaml.write_text("compress:\n  target_size_mb: 6\n", encoding="utf-8")
+        load_config(config_path, project_dir=fresh_project)
+        fresh_raw = yaml.safe_load(fresh_project_yaml.read_text(encoding="utf-8"))
+        assert "split_max_min" not in fresh_raw["compress"]
+        assert "splits_subdir" not in fresh_raw["compress"]
+        assert "reencode_split" not in fresh_raw["compress"]
+
     def test_project_yaml_relative_paths_resolve_from_project_dir(self, tmp_path: Path):
         app_dir = tmp_path / "app"
         project_dir = tmp_path / "projects" / "trip"
@@ -336,6 +369,11 @@ class TestCombinedWrappers:
 
 
 class TestProhibitedFields:
+    def test_deprecated_split_field_rejected(self):
+        err = _validate_no_foreign_fields({"compress": {"split_max_min": 15}}, "project")
+        assert err is not None
+        assert "已废弃" in err
+
     def test_project_section_in_global(self):
         err = _validate_no_foreign_fields({"analyze": {}}, "global")
         assert err is not None

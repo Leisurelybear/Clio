@@ -5,7 +5,20 @@ Mark `[ ]` as `[x]` when done, `[~]` for in-progress, `[!]` for blocked.
 
 Design discussions / decision history in `AGENTS.md`, implementation details in git log.
 
-## Remaining Open Items (2026-07-25)
+## Remaining Open Items (2026-07-26)
+
+### R-038 Remove dead physical-split writer
+
+**Status:** Done (2026-07-26)
+
+- [x] Remove the unused `clio.split` writer and tests
+- [x] Remove deprecated split knobs from active config models
+- [x] Hide deprecated split knobs from examples and Web UI
+- [x] Preserve old YAML migration and ignore compatibility
+- [x] Update project maintenance documentation
+- [x] Run focused and full regression validation
+
+Plan: `docs/superpowers/plans/2026-07-26-r038-remove-dead-physical-split-writer-plan.md`
 
 ### R-037 Long-video split-removal hardening
 
@@ -67,9 +80,14 @@ Review: `docs/analysis/2026-07-25-full-project-review-and-fixes.md`
 | R-027e | Session logs: **load historical files** from `logs/YYYY-MM-DD-HH.log` | Medium | Medium |
 | R-028b | ffmpeg setup zip fallback (package manager fail → static build) | Medium | Medium |
 | R-028c | UI one-click ffmpeg install (banner action, Whisper-like) | Medium | Medium |
-| R-029d | Optional cleanup: delete dead physical-split write path / shrink legacy tests | Medium | Low |
 | R-031b | Plan preview: prefer cut / concat media on the global timeline | Medium | Medium |
 | R-032 | **Desktop app packaging** (Windows-first shell around local serve) | Large | High |
+
+### Recently completed (2026-07-26)
+
+| ID | Item | Notes |
+| --- | --- | --- |
+| R-038 | Remove dead physical-split writer | Deleted writer/tests; removed active config/UI knobs; old YAML ignored safely; legacy artifact reads retained; 1326 pytest + 318 Vitest pass |
 
 ### Recently completed (2026-07-25)
 
@@ -249,13 +267,14 @@ Spec/plan: `docs/superpowers/specs|plans/2026-07-23-r033-hardening-and-pipeline-
 | P1 | R-029b | **Done** (2026-07-18) | Compress never calls `split_video` |
 | P2 | R-029c | **Done** (2026-07-18) | `analyze_windows` + multi-window analyze fail-closed |
 | P3 | — | **Done** (2026-07-18) | cut/export legacy offset; UI labels; docs |
-| P4 | R-029d | Open | Optional dead-code cleanup |
+| P4 | R-029d | **Done** (2026-07-26) | Removed dead writer, tests, and active split config/UI fields |
 
 **Delivered:**
 - [x] Legacy gate + tests
-- [x] Compress 1 original → 1 file; `split_max_min` ignored; leftover `_seg*` no longer blocks whole-file compress
+- [x] Compress 1 original → 1 file; leftover `_seg*` no longer blocks whole-file compress
 - [x] Config `window_max_min` / `window_overlap_sec`; default whole-clip hard cap 0
 - [x] Temp slices under `output/.analyze_windows/<stem>/`; merge absolute timeline; fail-closed; >200MB shrink
+- [x] Dead physical split writer and active config/UI knobs removed; legacy YAML keys ignored
 - [x] `max_analyze_duration_min` hard-skip only for legacy segments (does not block windowed whole files)
 - [x] cut/export/plan/transcript_align use `legacy_segment_offset_sec`
 - [x] Config UI labels; README / cli-reference / AGENTS product copy

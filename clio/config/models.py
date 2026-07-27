@@ -157,9 +157,6 @@ class ProjectAIConfig:
 class ProjectCompressConfig:
     target_size_mb: float = 5
     max_width: int = 640
-    split_max_min: int = 15
-    splits_subdir: str = "splits"
-    reencode_split: bool = False
 
 
 @dataclass
@@ -276,18 +273,6 @@ class CombinedCompressConfig:
     def max_width(self) -> int:
         return self._project.max_width if self._project else 640
 
-    @property
-    def split_max_min(self) -> int:
-        return self._project.split_max_min if self._project else 15
-
-    @property
-    def splits_subdir(self) -> str:
-        return self._project.splits_subdir if self._project else "splits"
-
-    @property
-    def reencode_split(self) -> bool:
-        return self._project.reencode_split if self._project else False
-
 
 @dataclass
 class CombinedWhisperConfig:
@@ -366,9 +351,6 @@ class CompressConfig:
     codec: str = "libx264"
     crf: int = 32
     remove_audio: bool = True
-    split_max_min: int = 15
-    splits_subdir: str = "splits"
-    reencode_split: bool = False
 
 
 @dataclass

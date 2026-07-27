@@ -200,9 +200,13 @@ _SPLIT_GLOBAL: dict[str, set[str]] = {
 }
 _SPLIT_PROJECT: dict[str, set[str]] = {
     "paths": {"output_dir"},
-    "compress": {"target_size_mb", "max_width", "split_max_min", "splits_subdir", "reencode_split"},
+    "compress": {"target_size_mb", "max_width"},
     "ai": {"tasks", "context", "context_file"},
     "whisper": {"enabled", "model_size", "language", "device", "max_segments_per_clip", "transcripts_subdir"},
+}
+
+_DEPRECATED_FIELDS: dict[str, set[str]] = {
+    "compress": {"split_max_min", "splits_subdir", "reencode_split"},
 }
 
 
@@ -260,6 +264,13 @@ def _is_project_section(section: str) -> bool:
 def _validate_no_foreign_fields(obj: dict, layer: str) -> str | None:
     """Check obj has no fields belonging to the other layer.
     Returns error string or None."""
+    for section, fields in _DEPRECATED_FIELDS.items():
+        value = obj.get(section)
+        if isinstance(value, dict):
+            for key in value:
+                if key in fields:
+                    return f"'{section}.{key}' 已废弃，不能写入配置"
+
     split_sections = set(_SPLIT_GLOBAL.keys()) & set(_SPLIT_PROJECT.keys())
 
     if layer == "global":

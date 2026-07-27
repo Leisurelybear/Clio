@@ -218,7 +218,7 @@ class TestArtifactIndexBuild:
         assert len(group.texts) == 1
         assert group.texts[0].title == "Sunset Beach"
 
-    def test_split_video(self, tmp_path: Path):
+    def test_legacy_split_artifacts(self, tmp_path: Path):
         """One original mapped to multiple compressed segments."""
         compressed_dir = tmp_path / "compressed"
         texts_dir = tmp_path / "texts"

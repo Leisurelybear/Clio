@@ -21,9 +21,6 @@ def _cfg(tmp_path: Path, **overrides) -> SimpleNamespace:
         project_dir=tmp_path / "project",
         compressed_dir=tmp_path / "output" / "compressed",
         compress=SimpleNamespace(
-            split_max_min=0,
-            splits_subdir="splits",
-            reencode_split=False,
             target_size_mb=5,
             max_width=640,
             fps=15,
@@ -244,24 +241,3 @@ class TestRunCompressAll:
         outs = list(cfg.compressed_dir.glob("*.mp4"))
         assert len(outs) == 1
         assert outs[0].read_bytes() == b"good-content"
-
-    def test_ignores_split_max_min(self, monkeypatch, tmp_path: Path):
-        """Physical split is removed; split_max_min>0 must not create _seg files."""
-        cfg = _cfg(tmp_path)
-        cfg.compress.split_max_min = 15
-        _add_video(cfg, "long_clip.mp4")
-
-        monkeypatch.setattr("clio.tasks.compress.resolve_binary", lambda *a: "ffmpeg")
-        monkeypatch.setattr(
-            "clio.tasks.compress.compress_video",
-            lambda inp, outp, c, **kw: outp.write_bytes(b"\x00" * 300) or outp,
-        )
-        monkeypatch.setattr("clio.tasks.compress.get_duration_sec", lambda *a, **k: 3600.0)
-        monkeypatch.setattr("clio.tasks.compress._safe_duration", lambda *a, **k: 3600.0)
-
-        records = run_compress_all(cfg)
-        assert len(records) == 1
-        assert records[0].compressed_path is not None
-        assert "_seg" not in records[0].compressed_path.name
-        splits_dir = cfg.paths.output_dir / "splits"
-        assert not splits_dir.exists() or not any(splits_dir.glob("*"))

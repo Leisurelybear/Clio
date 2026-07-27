@@ -23,8 +23,6 @@ def _mock_config(tmp_path: Path):
     cfg.compress.codec = "libx264"
     cfg.compress.remove_audio = True
     cfg.compress.crf = 23
-    cfg.compress.split_max_min = 0
-    cfg.compress.splits_subdir = "splits"
     cfg.whisper.enabled = False
     return cfg
 
