@@ -3,7 +3,7 @@
 **Date**: 2026-07-29  
 **Status**: Draft — awaiting implementation plan  
 **Scope**: Ship Clio as a double-click Windows desktop app; replace custom in-browser directory/file pickers with native OS dialogs; keep the existing localhost HTTP transport for API, media, SSE, and static assets; polish config-page path inputs.  
-**Approach**: **Hybrid (ROADMAP Option A)** — pywebview (system WebView2) hosts the existing SPA over `http://127.0.0.1:<port>`; existing `ThreadingHTTPServer` + handlers stay; native dialogs only via a thin `js_api` (or small HTTP endpoints that call the same dialog helpers); PyInstaller onedir for packaging.  
+**Approach**: **Hybrid (ROADMAP Option A)** — pywebview (system WebView2) hosts the existing SPA over `http://127.0.0.1:<port>`; existing `ThreadingHTTPServer` + handlers stay; native dialogs only via a thin `js_api` (`pick_*`); PyInstaller onedir for packaging.  
 **Related**: R-032a–e (`ROADMAP.md:151`); R-038 done; config path inputs (`editor-config.js:185`); custom browse modal (`sidebar-browse.js`); video player (`viewer.js:140`); run SSE (`runner.js:351`, `routes/run.py:84`).
 
 ### Revision note (2026-07-29)
@@ -38,7 +38,7 @@ This revision **aligns with ROADMAP’s default lean** (`ROADMAP.md:170`): thin 
 - System tray, first-run wizard, open-data-folder buttons (R-032d).
 - Rewriting the frontend in React/Qt/native widgets.
 - Silent auto-update channel.
-- **Retiring the stdlib HTTP server or replacing `fetch` / `EventSource` / `<video src>` with a full `js_api` route mirror** (explicitly deferred; see §4.6).
+- **Retiring the stdlib HTTP server or replacing `fetch` / `EventSource` / `<video src>` with a full `js_api` route mirror** (explicitly deferred; see §4.7).
 - Changing AI / plan / cut / export business logic.
 - Single-instance enforcement (defer R-032d; v1 may open a second window).
 
@@ -118,11 +118,11 @@ Single OS process, two cooperative pieces:
 ┌──────────────────────────────────────────────────────────┐
 │  clio.ui.server (ThreadingHTTPServer)                    │
 │  static + all /api/* including video Range + SSE         │
-│  optional: thin /api/fs/pick_* that call dialogs.py      │
+│  (no /api/fs/pick_* — dialogs only via js_api)           │
 └──────────────────────────────────────────────────────────┘
 ```
 
-No LAN bind by default (still `127.0.0.1`). No CORS gymnastics beyond what serve mode already does. Desktop does **not** require the user-facing API token for local-only use (see §6.6); serve mode keeps token behavior.
+Desktop 启动的 server 仍在 `127.0.0.1`；桌面窗口与 server 同进程，按 §6.6 禁用 token（不弹 token 界面，非对外裸奔——server 仅绑 loopback）。serve mode 保留既有 token 行为。
 
 ### 4.2 Why HTTP stays (decision record)
 
@@ -160,7 +160,7 @@ def pick_file(
 - **Return contract** (must be stable for JS):
   - Success folder/file: absolute path string(s).
   - Cancel: `None` / empty list — **frontend must not clear or overwrite the input**.
-  - Bridge/HTTP envelope (recommended):
+  - `js_api` return envelope (recommended):
 
 ```json
 { "ok": true, "path": "D:\\trip\\2026-07" }
@@ -173,12 +173,12 @@ def pick_file(
 
 ### 4.4 Exposing dialogs to the frontend
 
-Two acceptable wiring styles (pick one in the implementation plan after the thread spike; both call the same `dialogs.py`):
+**Locked: `js_api` only for `pick_*`** — the single desktop-only surface. No new HTTP routes for picking.
 
-| Style | How JS calls | Pros |
-| --- | --- | --- |
-| **A. `js_api` only for pick_*** (recommended default) | `window.pywebview.api.pick_folder({ initial_dir })` | No new routes; clear desktop-only surface |
-| **B. HTTP thin routes** | `POST /api/fs/pick_folder` etc. | Same `api()` path as everything else; works if `js_api` threading is painful |
+| Why this shape | Detail |
+| --- | --- |
+| No new routes | Clear desktop-only surface; no fork in `api()` for pickers |
+| Threading is the real risk, and HTTP routes don't dodge it | Calling a native OS dialog from the HTTP server thread is *the same* GUI-on-background-thread problem as calling it from the `js_api` worker — Tk wants the main thread; Win32 COM needs `CoInitialize` on the calling thread. A `/api/fs/pick_*` route is not a safe fallback for `js_api` threading pain; it just moves the problem. Solve the thread model once, inside `js_api` (main-thread dispatch or COM-initialized worker), per the §8 spike. |
 
 Frontend helper (e.g. `pickFolder(initialDir)` in `api.js` or `desktop-bridge.js`):
 
@@ -192,7 +192,7 @@ Frontend helper (e.g. `pickFolder(initialDir)` in `api.js` or `desktop-bridge.js
 | Desktop (`pywebview` present) | Native dialogs for flows 1–6, 9, 10 |
 | `python main.py serve` + browser | **Manual path text only** for those flows; **delete** custom modal HTML/JS navigation; browse buttons are **hidden** (preferred) or show a one-line toast “请手动粘贴路径；桌面版支持系统对话框” — pick **hide** in implementation unless a visible affordance is needed for discoverability |
 
-Do **not** maintain two full picker UIs. Do **not** call Tk dialogs from the HTTP server thread for browser tabs (wrong UX process model). HTTP `/api/fs/pick_*` is only a fallback if `js_api` threading fails **inside the desktop process**, still not for external browsers.
+Do **not** maintain two full picker UIs. Do **not** add `/api/fs/pick_*` HTTP routes (would invite calling OS GUI dialogs from the server thread for external browser tabs — wrong process model and solves nothing).
 
 ### 4.5 Frontend changes (pickers only; transport mostly unchanged)
 
@@ -288,10 +288,11 @@ All path inputs stay editable. Dialog fills on success only; cancel leaves prior
 
 ### 6.6 Auth / token under desktop
 
-- Desktop local window: **no auth modal** on startup; do not require `api_token` for loopback desktop sessions (server started by the same process may disable token or auto-inject).
-- `viewer.js` / `runner.js` already append token query params when present — empty token must remain valid for desktop.
-- `python main.py serve` keeps existing token behavior for power users / LAN experiments.
-- Plan must specify the exact server flag (e.g. `api_token=None` when launched from desktop).
+- Desktop local window: **no auth modal** on startup; do not require `api_token` for loopback desktop sessions.
+- **已确认的 server 语义**：`clio.ui.server.run` 对 `api_token=None` 且 host 为 loopback（`127.0.0.1`/`localhost`/`""`）时，`TOKEN = ""`（跳过鉴权，见 `server.py:554-558`）——即"无 token"而非"生成临时 token"。Desktop 直接传 `api_token=None` 即可，无需改 server 默认行为，也无需进程内注入。
+- `viewer.js` / `runner.js` 已在 token 为空时跳过 token query 参数 —— 桌面窗口无 token 时这些 URL 不带 `?token=`，server 照常放行（loopback 无鉴权）。
+- `python main.py serve` keeps existing token behavior for power users / LAN experiments（host 非 loopback 时 server 会生成 token）。
+- Plan 中注明 desktop 启动时显式传 `api_token=None`（而非依赖默认），并复用 loopback 无鉴权分支。
 
 ### 6.7 ffmpeg / Whisper discovery (no install)
 
