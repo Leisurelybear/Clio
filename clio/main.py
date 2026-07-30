@@ -276,6 +276,11 @@ def main(argv: list[str] | None = None) -> int:
     p_serve.add_argument("--no-browser", action="store_true", help="不自动打开浏览器")
     p_serve.add_argument("--token", type=str, default=None, help="API Token（留空则自动生成）")
 
+    sub.add_parser(
+        "desktop",
+        help="启动桌面窗口（pywebview + 本地 UI，系统文件对话框）",
+    )
+
     p_tokens = sub.add_parser("tokens", help="查看 token 使用统计")
     p_tokens.set_defaults(func=cmd_tokens)
 
@@ -329,6 +334,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "doctor":
         project = getattr(args, "project", None) or getattr(args, "input", None)
         return run_doctor(config_path, project)
+
+    if args.command == "desktop":
+        # Self-contained: app.main loads config + starts server + window.
+        # Early return avoids _prepare_config / before_stop wrapping a long-lived GUI.
+        from clio.desktop.app import main as run_desktop
+
+        return run_desktop(config_path=config_path)
 
     # serve: timed startup breadcrumbs (cold import cost is before main())
     _serve_t0: float | None = None

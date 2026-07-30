@@ -111,6 +111,15 @@ def test_doctor_subcommand_handles_invalid_config_in_doctor(mock_run_doctor, cli
     mock_run_doctor.assert_called_once_with(cfg, None)
 
 
+@patch("clio.desktop.app.main")
+def test_desktop_subcommand(mock_run_desktop, cli_runner, config_path):
+    """desktop subcommand dispatches to clio.desktop.app.main with config_path."""
+    mock_run_desktop.return_value = 0
+    result = cli_runner(["--config", str(config_path), "desktop"])
+    assert result == 0
+    mock_run_desktop.assert_called_once_with(config_path=config_path)
+
+
 @patch("clio.tasks.transcribe.run_transcribe_all")
 def test_transcribe_force_flag(mock_run, cli_runner, config_path):
     """--force 应设置 skip_existing=False"""
