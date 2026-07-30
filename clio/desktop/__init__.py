@@ -1,4 +1,6 @@
 # clio/desktop/__init__.py
 """Desktop shell package."""
 
-__all__: list[str] = []
+from clio.desktop.app import main
+
+__all__ = ["main"]

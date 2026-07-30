@@ -44,9 +44,15 @@ def _askopenfilenames(**kwargs: Any) -> tuple[str, ...] | list[str] | str:
 
 
 def _video_filetypes(exts: list[str] | None = None) -> list[tuple[str, str]]:
+    # exts is None → default VIDEO_EXTENSIONS; empty list → all-files only (kind="any").
+    if exts is not None and not exts:
+        return [("All files", "*.*")]
     use = exts or sorted(e.lstrip(".").lower() for e in VIDEO_EXTENSIONS)
     pattern = " ".join(f"*.{e.lstrip('.')}" for e in use)
-    return [("Videos", pattern), ("All files", "*.*")]
+    if len(use) == 1 and use[0].lstrip(".").lower() == "exe":
+        return [("Executable", "*.exe"), ("All files", "*.*")]
+    label = "Videos" if exts is None else "Files"
+    return [(label, pattern), ("All files", "*.*")]
 
 
 def _normalize_existing(path: str | None) -> str | None:
