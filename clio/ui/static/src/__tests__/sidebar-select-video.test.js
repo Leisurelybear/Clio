@@ -30,7 +30,6 @@ vi.mock('../utils.js', () => ({
 vi.mock('../viewer.js', () => ({ playVideoSegment: vi.fn(), stopPreview: vi.fn() }));
 vi.mock('../waveform.js', () => ({ loadWaveformForCurrentVideo: vi.fn() }));
 vi.mock('../sidebar-rerun.js', () => ({ showRerunProgress: vi.fn(), hideRerunProgress: vi.fn() }));
-vi.mock('../sidebar-browse.js', () => ({ openBrowseDir: vi.fn(), loadBrowseDir: vi.fn() }));
 vi.mock('../sidebar-video-manage.js', () => ({ openVideoManager: vi.fn() }));
 vi.mock('../sidebar-data.js', () => ({
   loadProjects: vi.fn(), loadConfig: vi.fn(), loadFfmpegDeps: vi.fn(), loadPlans: vi.fn(),

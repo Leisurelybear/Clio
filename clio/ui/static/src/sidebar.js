@@ -7,7 +7,6 @@ import { api } from './api.js';
 import { seekToGlobal, stopPreview } from './viewer.js';
 import { loadWaveformForCurrentVideo } from './waveform.js';
 import { showRerunProgress, hideRerunProgress } from './sidebar-rerun.js';
-import { openBrowseDir, loadBrowseDir } from './sidebar-browse.js';
 import { openVideoManager } from './sidebar-video-manage.js';
 import {
   loadProjects, loadConfig, loadFfmpegDeps, loadPlans, loadProject, loadVideos, saveProject,
@@ -390,8 +389,6 @@ export {
   _findSourceSwitchTarget,
   _sourceSwitchSeekTime,
   _sourceSwitchResumePoint,
-  openBrowseDir,
-  loadBrowseDir,
   switchToOriginalThenCompress,
   goToRunTab,
   toggleSelection,

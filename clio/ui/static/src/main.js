@@ -327,23 +327,6 @@ async function init() {
       addToast('选择失败: ' + (err.message || err), 'error', 6000);
     }
   });
-  const browseSelect = $('browse-select');
-  if (browseSelect) {
-    browseSelect.onclick = () => {
-      const pathEl = $('browse-path');
-      if (!pathEl || !window._browseResolve) return;
-      window._browseResolve(pathEl.textContent);
-      window._browseResolve = null;
-      $('modal-browse-dir').style.display = 'none';
-    };
-  }
-  const browseCancel = $('browse-cancel');
-  if (browseCancel) {
-    browseCancel.onclick = () => {
-      window._browseResolve = null;
-      $('modal-browse-dir').style.display = 'none';
-    };
-  }
   $('btn-reload').onclick = async () => {
     try {
       const cur = state.currentVideo;
@@ -424,10 +407,6 @@ async function init() {
   window.addEventListener('beforeunload', (e) => {
     if (state.dirty) { e.preventDefault(); e.returnValue = '有未保存的修改'; }
   });
-  const browseModal = $('modal-browse-dir');
-  if (browseModal) {
-    // backdrop intentionally does NOT close — only Cancel button closes
-  }
   const rerunClose = $('rerun-close');
   if (rerunClose) rerunClose.onclick = hideRerunProgress;
   // Wire up auth modal
