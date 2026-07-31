@@ -19,6 +19,7 @@ a = Analysis(
     datas=[
         (str(ROOT / "clio" / "ui" / "static"), "clio/ui/static"),
         (str(ROOT / "templates"), "templates"),
+        (str(ROOT / "config.example.yaml"), "clio/config"),
     ],
     hiddenimports=[
         # pywebview picks its Windows platform (winforms / WebView2) at runtime.
