@@ -43,6 +43,10 @@ Launch:
 .\dist\clio\clio.exe -c .\project\config.yaml
 ```
 
+On first launch, if no `config.yaml` is found in the target directory, the app
+auto-creates one from the bundled `config.example.yaml` template instead of
+crashing. Fill in your API keys / `.env` afterward and relaunch.
+
 The app serves the UI on a random loopback port and opens a native window.
 Closing the window stops the local server; closing during a run asks for
 confirmation and sends a cancel request first.
@@ -51,6 +55,7 @@ confirmation and sends a cancel request first.
 
 - `clio/**` Python package + `clio/ui/static` web UI assets
 - `templates/` (trip_context.md, prompt overrides)
+- `config.example.yaml` (first-launch template for auto-generated `config.yaml`)
 - pywebview WebView2 (EdgeChromium) engine via pythonnet
 
 ## Caveats
