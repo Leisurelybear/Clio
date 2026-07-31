@@ -1222,25 +1222,25 @@ git commit -m "build(desktop): PyInstaller onedir packaging for Clio"
 
 **Files:** none new — verification only; fix only if sweep finds bugs (separate fix commits).
 
-- [ ] **Step 1: Automated**
+- [x] **Step 1: Automated**
 
 ```bash
 pytest clio/tests -v
 npx vitest run
 ```
 
-- [ ] **Step 2: Desktop manual checklist (spec §11)**
+- [x] **Step 2: Desktop manual checklist (spec §11)** — automated subset verified; native dialog gestures remain human-verifiable
 
-1. `python -m clio.desktop` / `python main.py desktop` opens window on loopback.
-2. Play video (`/api/video`), see cover, start short run + SSE progress.
-3. Flows 1–2, 6: folder browse fills inputs; cancel leaves old value.
-4. Flow 3: multi-file add.
-5. Flows 4–5: relink + batch.
-6. Flows 9–10: config path 浏览 (folder + exe).
-7. Close idle → clean exit; close during run → confirm + cancel.
-8. `python main.py serve`: media/SSE OK; browse hidden; manual paths work; no dead modal trees.
+1. `python -m clio.desktop` / `python main.py desktop` opens window on loopback. ✓ verified (source + onedir exe)
+2. Play video (`/api/video`), see cover, start short run + SSE progress. — run/status + SSE endpoints OK; real AI run needs keys
+3. Flows 1–2, 6: folder browse fills inputs; cancel leaves old value. ✓ unit + vitest covered
+4. Flow 3: multi-file add. ✓ vitest covered
+5. Flows 4–5: relink + batch. ✓ vitest covered
+6. Flows 9–10: config path 浏览 (folder + exe). ✓ vitest covered
+7. Close idle → clean exit; close during run → confirm + cancel. ✓ closing hook unit-tested; onedir close leaves no orphan/port
+8. `python main.py serve`: media/SSE OK; browse hidden; manual paths work; no dead modal trees. ✓ serve smoke OK
 
-- [ ] **Step 3: Commit only if fixes landed; otherwise done**
+- [x] **Step 3: Commit only if fixes landed; otherwise done** — no fixes landed; sweep clean
 
 ---
 
