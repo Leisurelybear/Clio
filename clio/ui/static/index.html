@@ -291,16 +291,7 @@
     <label style="display:block;margin:12px 0 4px;font-size:var(--text-sm);color:var(--text-secondary)">新路径</label>
     <div class="input-with-browse" style="display:flex;gap:8px;align-items:center">
       <input id="relink-new-path" type="text" placeholder="D:\Videos\GL010695.MP4" style="flex:1;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input,#1e1e1e);color:var(--text-primary);font:inherit;font-size:var(--text-sm)">
-      <button type="button" id="relink-toggle-browse" class="btn-secondary">浏览</button>
-    </div>
-    <div id="relink-browse-panel" style="display:none;margin-top:12px">
-      <div class="browse-path" id="relink-browse-path">正在加载...</div>
-      <div class="browse-dir-list" id="relink-browse-list" style="max-height:240px;overflow:auto">
-        <p class="muted">点击「浏览」加载目录</p>
-      </div>
-      <div class="modal-actions" style="margin-top:8px;">
-        <button type="button" id="relink-browse-up" class="btn-secondary" style="display:none">上级目录</button>
-      </div>
+      <button type="button" class="browse-btn btn-secondary" data-target="relink-new-path" data-pick-kind="video">浏览</button>
     </div>
     <div class="modal-actions" style="margin-top:12px;">
       <button type="button" id="relink-confirm" class="btn-primary">确认关联</button>
@@ -315,12 +306,11 @@
   <div class="modal-dialog modal-dialog-wide">
     <h3>批量重新关联离线视频</h3>
     <p class="hint">选择包含新文件的目录，按文件名自动匹配离线条目（忽略 001_ 序号前缀）。</p>
-    <div class="browse-path" id="br-path">正在加载...</div>
-    <div class="browse-dir-list" id="br-list" style="max-height:180px;overflow:auto">
-      <p class="muted">选择目录…</p>
+    <div class="input-with-browse" style="display:flex;gap:8px;align-items:center">
+      <input id="br-path-input" type="text" placeholder="D:\Videos\NewFiles" style="flex:1;box-sizing:border-box;padding:8px;border:1px solid var(--border);border-radius:4px;background:var(--bg-input,#1e1e1e);color:var(--text-primary);font:inherit;font-size:var(--text-sm)">
+      <button type="button" class="browse-btn btn-secondary" data-target="br-path-input" data-pick-kind="folder">浏览</button>
     </div>
     <div class="modal-actions" style="margin-top:8px;">
-      <button type="button" id="br-up" class="btn-secondary" style="display:none">上级目录</button>
       <button type="button" id="br-scan" class="btn-primary" disabled>扫描此目录并匹配</button>
     </div>
     <div id="br-result" style="margin-top:12px;font-size:var(--text-sm)"></div>

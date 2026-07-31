@@ -4,11 +4,14 @@ import { addToast } from './toast.js';
 import { matchBatchRelink } from './offline-media.js';
 import { state } from './state.js';
 
-let _path = '';
 let _pendingMatches = [];
 let _inited = false;
 
-export function openBatchRelinkModal() {
+function _pathValue() {
+  return ($('br-path-input')?.value || '').trim();
+}
+
+export async function openBatchRelinkModal() {
   _ensureInit();
   const modal = $('modal-batch-relink');
   if (!modal) return;
@@ -18,74 +21,45 @@ export function openBatchRelinkModal() {
   const apply = $('br-apply');
   if (apply) apply.disabled = true;
   modal.style.display = 'flex';
-  _loadDir('');
+  _updateScanEnabled();
+  const { isDesktop, pickFolder } = await import('./desktop-pick.js');
+  if (!isDesktop()) return;
+  try {
+    const dir = await pickFolder(state.currentProjectDir || '');
+    if (!dir) return;
+    const input = $('br-path-input');
+    if (input) input.value = dir;
+    _updateScanEnabled();
+    await _scanAndMatch();
+  } catch (e) {
+    addToast(String(e.message || e), 'error', 6000);
+  }
 }
 
 export function closeBatchRelinkModal() {
   const modal = $('modal-batch-relink');
   if (modal) modal.style.display = 'none';
   _pendingMatches = [];
-  _path = '';
 }
 
-async function _loadDir(path) {
-  _path = path || '';
-  const pathEl = $('br-path');
-  const listEl = $('br-list');
-  const upBtn = $('br-up');
+function _updateScanEnabled() {
   const scanBtn = $('br-scan');
-  if (!pathEl || !listEl) return;
-  pathEl.textContent = '加载中...';
-  listEl.innerHTML = '';
-  if (upBtn) upBtn.style.display = 'none';
-  if (scanBtn) scanBtn.disabled = true;
-  try {
-    const dirsRes = await api('GET', `/api/fs/dirs?path=${encodeURIComponent(_path)}`);
-    if (dirsRes.error) {
-      pathEl.textContent = '错误: ' + dirsRes.error;
-      return;
-    }
-    pathEl.textContent = dirsRes.path || '(请选择目录)';
-    if (dirsRes.parent && !dirsRes.is_drive_list && upBtn) {
-      upBtn.style.display = '';
-      upBtn.onclick = () => _loadDir(dirsRes.parent || '');
-    }
-    if (scanBtn) scanBtn.disabled = !!dirsRes.is_drive_list;
-
-    let html = '';
-    if (dirsRes.is_drive_list) {
-      html = (dirsRes.dirs || []).map(d =>
-        `<div class="browse-item" data-path="${escapeHtml(d)}">📁 ${escapeHtml(d)}</div>`
-      ).join('');
-    } else {
-      html = (dirsRes.dirs || []).map(d =>
-        `<div class="browse-item" data-path="${escapeHtml(d)}">📁 ${escapeHtml(d.replace(/^.*[\\/]/, ''))}</div>`
-      ).join('');
-      if (!(dirsRes.dirs || []).length) {
-        html = '<p class="muted">此目录无子文件夹（仍可扫描本层视频）</p>';
-      }
-    }
-    listEl.innerHTML = html;
-    listEl.querySelectorAll('.browse-item[data-path]').forEach(el => {
-      el.onclick = () => _loadDir(el.dataset.path);
-    });
-  } catch (e) {
-    pathEl.textContent = '加载失败: ' + e.message;
-  }
+  if (scanBtn) scanBtn.disabled = !_pathValue();
 }
 
 async function _scanAndMatch() {
+  const path = _pathValue();
   const result = $('br-result');
   const apply = $('br-apply');
   const scanBtn = $('br-scan');
-  if (!result || !_path) return;
+  if (!result || !path) return;
   if (scanBtn) {
     scanBtn.disabled = true;
     scanBtn.textContent = '扫描中...';
   }
   result.innerHTML = '<p class="muted">正在扫描视频并匹配…</p>';
   try {
-    const videosRes = await api('GET', `/api/fs/videos?path=${encodeURIComponent(_path)}`);
+    const videosRes = await api('GET', `/api/fs/videos?path=${encodeURIComponent(path)}`);
     const candidates = (videosRes.files || []).map(f => ({
       path: f.path,
       name: f.name || f.path,
@@ -122,8 +96,8 @@ async function _scanAndMatch() {
     if (apply) apply.disabled = true;
   } finally {
     if (scanBtn) {
-      scanBtn.disabled = false;
       scanBtn.textContent = '扫描此目录并匹配';
+      _updateScanEnabled();
     }
   }
 }
@@ -169,5 +143,16 @@ function _ensureInit() {
   $('br-cancel')?.addEventListener('click', closeBatchRelinkModal);
   $('br-scan')?.addEventListener('click', () => { _scanAndMatch(); });
   $('br-apply')?.addEventListener('click', () => { _applyMatches(); });
+  const input = $('br-path-input');
+  if (input) {
+    input.addEventListener('input', _updateScanEnabled);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!_pathValue()) return;
+        _scanAndMatch();
+      }
+    });
+  }
   $('modal-batch-relink')?.querySelector('.modal-backdrop')?.addEventListener('click', (e) => e.stopPropagation());
 }
