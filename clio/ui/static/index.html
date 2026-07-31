@@ -218,22 +218,17 @@
   </div>
 </div>
 
-<!-- Video Manager Modal -->
+<!-- Video Manager Modal (serve mode: paste absolute paths; desktop uses native multi-file dialog) -->
 <div id="modal-video-manage" class="modal" style="display:none;">
   <div class="modal-backdrop"></div>
   <div class="modal-dialog modal-dialog-wide">
     <h3>添加视频文件</h3>
-    <p class="hint">浏览目录，勾选视频文件后点击「添加选中」</p>
-    <div class="browse-path" id="vm-path">正在加载...</div>
-    <div class="browse-dir-list" id="vm-list">
-      <p class="muted">正在加载...</p>
+    <p class="hint">每行一个视频的绝对路径；或将视频文件拖到下方区域。</p>
+    <div id="vm-dropzone" class="vm-paste-drop">
+      <textarea id="vm-paste" rows="8" placeholder="例如：&#10;D:\Videos\clip01.mp4&#10;D:\Videos\clip02.mov"></textarea>
     </div>
-    <div id="vm-selected-count" class="vm-selected-count">已选 0 个文件</div>
     <div class="modal-actions" style="margin-top:12px;">
-      <button id="vm-up" class="btn-secondary">上级目录</button>
-      <button id="vm-mkdir" class="btn-secondary">新建文件夹</button>
-      <button id="vm-select-all" class="btn-secondary">全选</button>
-      <button id="vm-add" class="btn-primary" disabled>添加选中</button>
+      <button id="vm-add" class="btn-primary">添加</button>
       <button id="vm-cancel" class="btn-secondary">取消</button>
     </div>
   </div>

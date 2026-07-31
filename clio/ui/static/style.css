@@ -1767,7 +1767,27 @@ button[id$="-cancel"]:hover { background: var(--red-bg); color: var(--red); }
 .browse-item input[type="checkbox"] { margin: 0; cursor: pointer; flex-shrink: 0; }
 .browse-item .file-size { margin-left: auto; font-size: var(--text-xs); color: var(--text-tertiary); }
 .vm-selected-count { font-size: var(--text-sm); color: var(--text-secondary); padding: 4px 0; }
-.browse-dir-list.drop-zone-active {
+.vm-paste-drop {
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-2);
+  padding: 8px;
+  transition: border-color var(--transition-fast), background var(--transition-fast);
+}
+.vm-paste-drop textarea {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 160px;
+  resize: vertical;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  padding: 8px;
+  background: transparent;
+  color: var(--text-primary);
+  border: none;
+  outline: none;
+}
+.vm-paste-drop.drop-zone-active {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   outline: 2px dashed var(--accent);
