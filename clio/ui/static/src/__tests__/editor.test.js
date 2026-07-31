@@ -133,6 +133,41 @@ describe('_renderConfigForm - string', () => {
     expect(html).toContain('data-path="ai.context"');
     expect(html).toContain('trip_context.md');
   });
+
+  it('adds folder browse button for paths.output_dir', () => {
+    const html = _renderConfigForm('D:/out', 'paths.output_dir');
+    expect(html).toContain('browse-btn');
+    expect(html).toContain('data-pick-kind="folder"');
+    expect(html).toContain('data-target-path="paths.output_dir"');
+    expect(html).toContain('input-with-browse');
+    expect(html).toContain('value="D:/out"');
+  });
+
+  it('adds folder browse button for paths.logs_dir and export.jianying_draft_dir', () => {
+    expect(_renderConfigForm('', 'paths.logs_dir')).toContain('data-pick-kind="folder"');
+    expect(_renderConfigForm('', 'export.jianying_draft_dir')).toContain('data-pick-kind="folder"');
+  });
+
+  it('adds exe browse button for ffmpeg/ffprobe paths', () => {
+    expect(_renderConfigForm('ffmpeg.exe', 'paths.ffmpeg')).toContain('data-pick-kind="exe"');
+    expect(_renderConfigForm('ffprobe.exe', 'paths.ffprobe')).toContain('data-pick-kind="exe"');
+  });
+
+  it('adds any browse button for script.template_file', () => {
+    expect(_renderConfigForm('', 'script.template_file')).toContain('data-pick-kind="any"');
+  });
+
+  it('does not add browse button for random string keys or secrets', () => {
+    expect(_renderConfigForm('http://x', 'proxy.url')).not.toContain('browse-btn');
+    expect(_renderConfigForm('sk-test', 'ai.providers.gemini.api_key')).not.toContain('browse-btn');
+    expect(_renderConfigForm('GEMINI_API_KEY', 'ai.providers.gemini.api_key_env')).not.toContain('browse-btn');
+  });
+
+  it('keeps password input and hint for api_key paths', () => {
+    const html = _renderConfigForm('sk-test', 'ai.providers.gemini.api_key');
+    expect(html).toContain('type="password"');
+    expect(html).toContain('api_key_env');
+  });
 });
 
 describe('_renderConfigForm - object', () => {

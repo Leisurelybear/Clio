@@ -1,6 +1,7 @@
 import { state } from './state.js';
 import { $, $$, escapeHtml, markDirty, clearDirty, setStatus, setDeep } from './utils.js';
 import { api, icon } from './api.js';
+import { setBrowseButtonsVisible } from './desktop-pick.js';
 import {
   filterLogEntries,
   entryMatchesLogFilter,
@@ -90,6 +91,17 @@ export function labelFromPath(path) {
   const leaf = path.split('.').pop();
   if (FIELD_LABELS[leaf]) return FIELD_LABELS[leaf];
   return leaf;
+}
+
+export function pathPickKind(path) {
+  if (path === 'paths.ffmpeg' || path === 'paths.ffprobe') return 'exe';
+  if (path === 'script.template_file') return 'any';
+  if (
+    path === 'paths.output_dir' ||
+    path === 'paths.logs_dir' ||
+    path === 'export.jianying_draft_dir'
+  ) return 'folder';
+  return null;
 }
 
 function providerCapabilities(provider) {
@@ -200,7 +212,14 @@ export function _renderConfigForm(obj, path, descriptions = null) {
     } else if (path.endsWith('api_key')) {
       hint = '<br><span class="hint">API 密钥（直接填入）。<strong>不推荐</strong>，建议使用 <code>api_key_env</code> 配合 <code>.env</code> 文件更安全</span>';
     }
-    return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}${tip}</span> <input type="${isPwd ? 'password' : 'text'}" data-path="${path}" value="${escapeHtml(obj)}"></label>${hint}`;
+    const pickKind = pathPickKind(path);
+    const browseBtn = pickKind
+      ? `<button type="button" class="browse-btn" data-desktop-browse data-pick-kind="${pickKind}" data-target-path="${path}">浏览</button>`
+      : '';
+    const fieldInput = browseBtn
+      ? `<span class="input-with-browse"><input type="${isPwd ? 'password' : 'text'}" data-path="${path}" value="${escapeHtml(obj)}">${browseBtn}</span>`
+      : `<input type="${isPwd ? 'password' : 'text'}" data-path="${path}" value="${escapeHtml(obj)}">`;
+    return `<label class="config-field config-str"><span class="config-key">${labelFromPath(path)}${tip}</span> ${fieldInput}</label>${hint}`;
   }
   if (Array.isArray(obj)) {
     const allStr = obj.every(x => typeof x === 'string');
@@ -1239,6 +1258,9 @@ export function renderConfig() {
     </div>
     ${isFallback ? _renderFallbackWarn() : ''}
     <div id="config-tab-content">${contentHtml}</div>`;
+
+  // Hide desktop-only browse buttons in serve mode after each config re-render
+  setBrowseButtonsVisible(pane);
 
   // Tab switching
   pane.querySelectorAll('.config-tab-btn').forEach(btn => {

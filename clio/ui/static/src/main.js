@@ -302,10 +302,19 @@ async function init() {
     if (!btn) return;
     e.preventDefault();
     const targetId = btn.dataset.target;
+    const targetPath = btn.dataset.targetPath;
     const kind = btn.dataset.pickKind || btn.dataset.kind || 'folder';
-    const inp = targetId ? document.getElementById(targetId) : null;
+    let inp = targetId ? document.getElementById(targetId) : null;
     try {
-      const initial = (inp?.value || '').trim();
+      let initial = (inp?.value || '').trim();
+      if (targetPath) {
+        const lookupInp = btn.parentElement?.querySelector(`input[data-path="${CSS.escape(targetPath)}"], textarea[data-path="${CSS.escape(targetPath)}"]`)
+          || document.querySelector(`input[data-path="${CSS.escape(targetPath)}"], textarea[data-path="${CSS.escape(targetPath)}"]`);
+        if (lookupInp) {
+          inp = lookupInp;
+          initial = (lookupInp.value || '').trim();
+        }
+      }
       let path;
       if (kind === 'folder' || kind === 'directory') {
         path = await pickFolder(initial);
