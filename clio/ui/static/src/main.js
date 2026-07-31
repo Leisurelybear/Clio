@@ -3,6 +3,7 @@ import { $, $$, escapeHtml, setStatus, updateSidebarDay, clearDirty } from './ut
 import { api, submitToken } from './api.js';
 import { initLayout } from './layout.js';
 import { initTheme, toggleTheme } from './theme.js';
+import { pickFolder, pickFile, applyPickToInput, setBrowseButtonsVisible } from './desktop-pick.js';
 import { addToast } from './toast.js';
 import { updateRuntimeWarnings } from './runtime-warnings.js';
 import { setupPlayer } from './viewer.js';
@@ -23,8 +24,6 @@ import {
   selectLogs,
   selectTokens,
   setSource,
-  openBrowseDir,
-  loadBrowseDir,
   switchToOriginalThenCompress,
   goToRunTab,
   toggleSelection,
@@ -93,6 +92,7 @@ async function handleRuntimeWarningAction(actionId) {
 async function init() {
   initLayout();
   initTheme();
+  setBrowseButtonsVisible(document);
 
   // 从 URL 读取 project + project_dir 参数
   const urlParams = new URLSearchParams(window.location.search);
@@ -297,9 +297,26 @@ async function init() {
       else if (p.dataset.entity === 'tokens') selectTokens();
     };
   });
-  document.body.addEventListener('click', e => {
+  document.body.addEventListener('click', async (e) => {
     const btn = e.target.closest('.browse-btn');
-    if (btn) openBrowseDir(btn.dataset.target);
+    if (!btn) return;
+    e.preventDefault();
+    const targetId = btn.dataset.target;
+    const kind = btn.dataset.pickKind || btn.dataset.kind || 'folder';
+    const inp = targetId ? document.getElementById(targetId) : null;
+    try {
+      const initial = (inp?.value || '').trim();
+      let path;
+      if (kind === 'folder' || kind === 'directory') {
+        path = await pickFolder(initial);
+      } else {
+        path = await pickFile(initial, kind);
+      }
+      applyPickToInput(inp, path);
+    } catch (err) {
+      console.error(err);
+      addToast('选择失败: ' + (err.message || err), 'error', 6000);
+    }
   });
   const browseSelect = $('browse-select');
   if (browseSelect) {
