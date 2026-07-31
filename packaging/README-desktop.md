@@ -19,6 +19,20 @@ folder (onedir), no Python needed on the target machine.
 python -m PyInstaller packaging/clio.spec --noconfirm --clean
 ```
 
+### CI release (GitHub Actions)
+
+`.github/workflows/release.yml` builds the onedir on `windows-latest` and
+publishes it as a GitHub Release zip asset:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+Or run it manually from the Actions tab (version defaults to the tag, or
+`0.0.0-dev` for manual runs without a tag). Manual runs only upload a build
+artifact; real GitHub Releases are created for `v*` tags.
+
 Output: `dist/clio/clio.exe` (onedir — keep the whole `dist/clio` folder
 together; do not move the exe alone).
 
