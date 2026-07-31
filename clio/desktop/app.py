@@ -4,7 +4,45 @@
 from __future__ import annotations
 
 import sys
+from collections.abc import Callable
 from pathlib import Path
+
+from clio.desktop.server_host import fetch_run_status, request_run_cancel
+
+
+def _confirm_quit() -> bool:
+    """Native askyesno. Returns True (quit) when the user confirms or tkinter fails."""
+    try:
+        from tkinter import Tk, messagebox
+
+        root = Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        try:
+            return messagebox.askyesno("退出 Clio", "任务仍在运行，确定退出？")
+        finally:
+            root.destroy()
+    except Exception:  # noqa: BLE001 — never block quit on dialog failure
+        return True
+
+
+def _handle_closing(
+    host: str,
+    port: int,
+    confirm_quit: Callable[[], bool] | None = None,
+) -> bool:
+    """Close policy: abort close while a run is active unless the user confirms.
+
+    Returns True to allow the window to close, False to cancel the close request.
+    """
+    if confirm_quit is None:
+        confirm_quit = _confirm_quit
+    status = fetch_run_status(host, port)
+    if status.get("running"):
+        if not confirm_quit():
+            return False
+        request_run_cancel(host, port)
+    return True
 
 
 def main(
@@ -47,10 +85,17 @@ def main(
             height=800,
         )
 
-        # Close policy refined in Task 11; v1: stop server on window closed.
+        # Close policy (Task 12): cancel active run before closing the window.
+        def _on_closing() -> bool:
+            return _handle_closing(handle.host, handle.port)
+
         def _on_closed() -> None:
             stop_server(handle)
 
+        try:
+            window.events.closing += _on_closing
+        except Exception:  # noqa: BLE001 — event API may differ by version
+            pass
         try:
             window.events.closed += _on_closed
         except Exception:  # noqa: BLE001 — event API may differ by version

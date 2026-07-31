@@ -3,8 +3,10 @@
 
 from __future__ import annotations
 
+import json
 import secrets
 import threading
+import urllib.request
 from dataclasses import dataclass
 from http.server import ThreadingHTTPServer
 from pathlib import Path
@@ -76,3 +78,32 @@ def stop_server(handle: ServerHandle, timeout: float = 5.0) -> None:
         handle.server.server_close()
         handle.thread.join(timeout=timeout)
         before_stop()
+
+
+def fetch_run_status(host: str, port: int) -> dict:
+    """Probe GET /api/run/status on the local UI server.
+
+    Returns parsed JSON, or ``{}`` when the server is unreachable / malformed.
+    """
+    try:
+        url = f"http://{host}:{port}/api/run/status"
+        with urllib.request.urlopen(url, timeout=3) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}
+
+
+def request_run_cancel(host: str, port: int) -> None:
+    """POST /api/run/cancel on the local UI server (best-effort, no auth on desktop)."""
+    try:
+        url = f"http://{host}:{port}/api/run/cancel"
+        req = urllib.request.Request(
+            url,
+            data=b"{}",
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=5):
+            pass
+    except (OSError, ValueError):
+        pass

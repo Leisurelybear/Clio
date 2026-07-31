@@ -1161,7 +1161,7 @@ def _closing():
 
 Check pywebview version docs for `closing` return value semantics during spike; implement the strongest available.
 
-- [ ] **Step 1: Implement closing hook + cancel POST**
+- [x] **Step 1: Implement closing hook + cancel POST**
 - [ ] **Step 2: Manual: start a run, close window, confirm no orphan `python` / port free**
 - [ ] **Step 3: Commit**
 
