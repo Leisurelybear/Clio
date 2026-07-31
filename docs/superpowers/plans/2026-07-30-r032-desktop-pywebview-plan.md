@@ -77,7 +77,7 @@
   - `envelope_error(message: str) -> dict` → `{ok:false, error}`
   - Internal OS call is injectable via module-level `_askdirectory` / `_askopenfilename` / `_askopenfilenames` for tests (default = tkinter)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # clio/tests/test_desktop_dialogs.py
@@ -141,7 +141,7 @@ def test_pick_file_single(monkeypatch, tmp_path):
     assert dialogs.pick_file(str(tmp_path)) == str(f1.resolve())
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 ```bash
 pytest clio/tests/test_desktop_dialogs.py -v
@@ -149,7 +149,7 @@ pytest clio/tests/test_desktop_dialogs.py -v
 
 Expected: FAIL — `clio.desktop` / `dialogs` import missing.
 
-- [ ] **Step 3: Implement minimal `dialogs.py`**
+- [x] **Step 3: Implement minimal `dialogs.py`**
 
 ```python
 # clio/desktop/dialogs.py
@@ -265,7 +265,7 @@ For Task 1 keep `__init__.py` empty/`__all__ = []` so tests import `clio.desktop
 
 Also add `pick_file` overload used later for ffmpeg: callers pass `exts=["exe"]` or a dedicated `filetypes` later — for now `_video_filetypes` with `exts=["exe"]` yields `*.exe` which is enough for config ffmpeg/ffprobe.
 
-- [ ] **Step 4: Run tests to verify they pass**
+- [x] **Step 4: Run tests to verify they pass**
 
 ```bash
 pytest clio/tests/test_desktop_dialogs.py -v
@@ -273,7 +273,7 @@ pytest clio/tests/test_desktop_dialogs.py -v
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add clio/desktop/__init__.py clio/desktop/dialogs.py clio/tests/test_desktop_dialogs.py
@@ -296,7 +296,7 @@ git commit -m "feat(desktop): add mockable native dialog wrappers"
   - `save_last_dir(config_dir: Path, path: str) -> None` — stores **parent directory** of a file pick, or the folder itself for folder picks; schema `{"last_dir": "<abs>"}`
   - `resolve_initial_dir(config_dir: Path, preferred: str | None = None) -> str | None` — if `preferred` exists as dir use it; else last_dir if exists; else `None` (caller may fall back to `Path.home()`)
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```python
 # clio/tests/test_desktop_state.py
@@ -341,13 +341,13 @@ def test_resolve_falls_back_to_last(tmp_path: Path):
     assert resolve_initial_dir(tmp_path, str(tmp_path / "missing")) == str(other.resolve())
 ```
 
-- [ ] **Step 2: Run tests — expect FAIL**
+- [x] **Step 2: Run tests — expect FAIL**
 
 ```bash
 pytest clio/tests/test_desktop_state.py -v
 ```
 
-- [ ] **Step 3: Implement `state.py`**
+- [x] **Step 3: Implement `state.py`**
 
 ```python
 # clio/desktop/state.py
@@ -399,13 +399,13 @@ def resolve_initial_dir(config_dir: Path, preferred: str | None = None) -> str |
     return load_last_dir(config_dir)
 ```
 
-- [ ] **Step 4: Run tests — expect PASS**
+- [x] **Step 4: Run tests — expect PASS**
 
 ```bash
 pytest clio/tests/test_desktop_state.py -v
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add clio/desktop/state.py clio/tests/test_desktop_state.py
@@ -434,7 +434,7 @@ git commit -m "feat(desktop): persist last picked directory"
 
 **Note:** Do not call `run()` (it blocks on `serve_forever` on the caller thread and may open a browser). Copy the token + handler setup from `run()` carefully.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```python
 # clio/tests/test_desktop_server_host.py
@@ -464,13 +464,13 @@ def test_start_server_binds_loopback_and_serves(tmp_path, monkeypatch):
 
 If `load_config("config.yaml")` is heavy or path-sensitive, use the same pattern as `clio/tests/test_server.py` / `conftest.py` fixtures — **match existing test helpers** rather than inventing a new config factory. Open `clio/tests/test_server.py` and reuse its fixture approach if this test is awkward.
 
-- [ ] **Step 2: Run — expect FAIL**
+- [x] **Step 2: Run — expect FAIL**
 
 ```bash
 pytest clio/tests/test_desktop_server_host.py -v
 ```
 
-- [ ] **Step 3: Implement `server_host.py`**
+- [x] **Step 3: Implement `server_host.py`**
 
 Implement by adapting `clio/ui/server.py:run` (lines ~536–603):
 
@@ -484,13 +484,13 @@ Implement by adapting `clio/ui/server.py:run` (lines ~536–603):
 
 Do **not** print token URLs in desktop mode when token is empty; keep quiet or log to session log later.
 
-- [ ] **Step 4: Run — expect PASS**
+- [x] **Step 4: Run — expect PASS**
 
 ```bash
 pytest clio/tests/test_desktop_server_host.py -v
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add clio/desktop/server_host.py clio/tests/test_desktop_server_host.py
@@ -527,7 +527,7 @@ git commit -m "feat(desktop): start/stop localhost UI server on free port"
 1. `start_server` + `webview.create_window("Clio", url)` + `webview.start()` — confirm ES modules load (Network/console: no failed `.js` imports).
 2. From DevTools or a temporary button, call `window.pywebview.api.pick_folder()` — if it hangs/crashes, implement main-thread dispatch **or** switch `dialogs.py` to Win32 `IFileOpenDialog` and document the choice in a 3-line comment in `api.py`.
 
-- [ ] **Step 1: Implement `DesktopApi`**
+- [x] **Step 1: Implement `DesktopApi`**
 
 ```python
 # clio/desktop/api.py
@@ -586,7 +586,7 @@ def _exts_for_kind(kind: str) -> list[str] | None:
 
 If `kind == "any"` / `"exe"`, adjust `dialogs._video_filetypes` so `exts is None` with a `all_files_only` flag **or** add `filetypes` parameter. Minimal fix: when `exts == ["exe"]` return `[("Executable", "*.exe"), ("All files", "*.*")]`; when `exts is None` keep video defaults; add `kind` handling only in api.
 
-- [ ] **Step 2: Implement `app.py`**
+- [x] **Step 2: Implement `app.py`**
 
 ```python
 # clio/desktop/app.py
@@ -628,7 +628,7 @@ def main(argv: list[str] | None = None) -> int:
 
 Verify pywebview `events.closed` API for the pinned version; if different, use `webview.start()` return / guilib hooks. Goal: no orphan HTTP thread after window close.
 
-- [ ] **Step 3: `__main__.py` + package export**
+- [x] **Step 3: `__main__.py` + package export**
 
 ```python
 # clio/desktop/__main__.py
@@ -642,7 +642,7 @@ from clio.desktop.app import main
 __all__ = ["main"]
 ```
 
-- [ ] **Step 4: Add dependency**
+- [x] **Step 4: Add dependency**
 
 Append to `requirements.txt`:
 
@@ -650,7 +650,7 @@ Append to `requirements.txt`:
 pywebview>=5.0
 ```
 
-- [ ] **Step 5: Manual spike**
+- [x] **Step 5: Manual spike**
 
 ```bash
 pip install pywebview
@@ -658,14 +658,14 @@ python -m clio.desktop
 ```
 
 Checklist:
-- [ ] Window opens on `http://127.0.0.1:<ephemeral>/`
-- [ ] SPA loads (sidebar visible, no module errors)
-- [ ] In console: `await window.pywebview.api.pick_folder()` opens native dialog and returns envelope
-- [ ] Closing window returns to shell; no leftover python holding the port (`netstat` / re-run succeeds)
+- [x] Window opens on `http://127.0.0.1:<ephemeral>/`
+- [x] SPA loads (sidebar visible, no module errors)
+- [x] In console: `await window.pywebview.api.pick_folder()` opens native dialog and returns envelope
+- [x] Closing window returns to shell; no leftover python holding the port (`netstat` / re-run succeeds)
 
 If Tk deadlocks: implement Win32 path **before** proceeding to frontend tasks; keep the same `pick_*` function names.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add clio/desktop requirements.txt
@@ -684,7 +684,7 @@ git commit -m "feat(desktop): pywebview host with js_api pickers"
 - Produces: `python main.py desktop` → `clio.desktop.app.main()` (same as `-m clio.desktop`)
 - Args v1: optional `--config` already global on root parser
 
-- [ ] **Step 1: Add parser**
+- [x] **Step 1: Add parser**
 
 After `p_serve` block:
 
@@ -695,7 +695,7 @@ p_desktop = sub.add_parser(
 )
 ```
 
-- [ ] **Step 2: Dispatch**
+- [x] **Step 2: Dispatch**
 
 ```python
 elif args.command == "desktop":
@@ -716,7 +716,7 @@ From CLI:
 return run_desktop(config_path=config_path)
 ```
 
-- [ ] **Step 3: Run unit tests that cover argparse if any**
+- [x] **Step 3: Run unit tests that cover argparse if any**
 
 ```bash
 pytest clio/tests/test_main.py -v -k desktop
@@ -724,7 +724,7 @@ pytest clio/tests/test_main.py -v -k desktop
 pytest clio/tests/test_main.py -v
 ```
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add clio/main.py clio/desktop/app.py clio/tests/test_main.py
@@ -757,7 +757,7 @@ Envelope handling:
 // error: !r.ok && r.error → throw or return null + toast at call site; prefer throw Error(r.error)
 ```
 
-- [ ] **Step 1: Write failing Vitest**
+- [x] **Step 1: Write failing Vitest**
 
 ```js
 // clio/ui/static/src/__tests__/desktop-pick.test.js
@@ -824,13 +824,13 @@ describe('desktop-pick', () => {
 });
 ```
 
-- [ ] **Step 2: Run — expect FAIL**
+- [x] **Step 2: Run — expect FAIL**
 
 ```bash
 npx vitest run clio/ui/static/src/__tests__/desktop-pick.test.js
 ```
 
-- [ ] **Step 3: Implement `desktop-pick.js`**
+- [x] **Step 3: Implement `desktop-pick.js`**
 
 ```js
 export function isDesktop() {
@@ -880,13 +880,13 @@ export function setBrowseButtonsVisible(root = document) {
 }
 ```
 
-- [ ] **Step 4: Run — expect PASS**
+- [x] **Step 4: Run — expect PASS**
 
 ```bash
 npx vitest run clio/ui/static/src/__tests__/desktop-pick.test.js
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add clio/ui/static/src/desktop-pick.js clio/ui/static/src/__tests__/desktop-pick.test.js
@@ -906,7 +906,7 @@ git commit -m "feat(ui): add desktop native pick helpers"
 - Consumes: `pickFolder`, `applyPickToInput`, `setBrowseButtonsVisible` from `desktop-pick.js`
 - Replaces: `openBrowseDir(btn.dataset.target)`
 
-- [ ] **Step 1: Change browse delegation**
+- [x] **Step 1: Change browse delegation**
 
 In `main.js`:
 
@@ -936,12 +936,12 @@ document.body.addEventListener('click', async (e) => {
 
 Delete handlers for `browse-select` / `browse-cancel` once `#modal-browse-dir` is removed (Task 10 can delete HTML; this task can no-op if elements missing — keep null checks).
 
-- [ ] **Step 2: Manual check**
+- [x] **Step 2: Manual check**
 
 - Desktop: click 浏览 on 新建项目 → native folder dialog → path fills.
 - Serve: 浏览 buttons hidden; typing path still creates/opens project.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add clio/ui/static/src/main.js
@@ -1013,11 +1013,11 @@ For kind:
 
 Call `setBrowseButtonsVisible` again after config form re-render (hook where form HTML is injected).
 
-- [ ] **Step 1: Implement `pathPickKind` + button markup + re-hide/show after render**
-- [ ] **Step 2: Extend browse click handler for `data-target-path` + `data-pick-kind`**
-- [ ] **Step 3: Vitest — assert `_renderConfigForm` output contains 浏览 for `paths.output_dir` and not for random string keys** (export `_renderConfigForm` if needed for test, or test via public render entry already used in editor tests)
+- [x] **Step 1: Implement `pathPickKind` + button markup + re-hide/show after render**
+- [x] **Step 2: Extend browse click handler for `data-target-path` + `data-pick-kind`**
+- [x] **Step 3: Vitest — assert `_renderConfigForm` output contains 浏览 for `paths.output_dir` and not for random string keys** (export `_renderConfigForm` if needed for test, or test via public render entry already used in editor tests)
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add clio/ui/static/src/editor-config.js clio/ui/static/src/main.js clio/ui/static/src/__tests__/
