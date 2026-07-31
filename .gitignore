@@ -38,6 +38,10 @@ coverage.xml
 htmlcov/
 .mypy_cache/
 
+# PyInstaller build artifacts (packaging/clio.spec)
+/build/
+/dist/
+
 # Test mock artifacts
 MagicMock/
 

@@ -1,0 +1,25 @@
+# packaging/build-desktop.ps1
+# Build the Clio desktop shell as a PyInstaller onedir (R-032c).
+# Requires: pip install pyinstaller pywebview pythonnet
+param(
+    [switch]$NoClean
+)
+
+$ErrorActionPreference = "Stop"
+$root = Split-Path -Parent $PSScriptRoot
+Push-Location $root
+try {
+    $extra = @()
+    if (-not $NoClean) {
+        $extra += "--clean"
+    }
+    python -m PyInstaller $extra packaging/clio.spec --noconfirm
+    if ($LASTEXITCODE -ne 0) {
+        throw "PyInstaller failed with exit code $LASTEXITCODE"
+    }
+    Write-Host ""
+    Write-Host "Built: dist/clio/clio.exe" -ForegroundColor Green
+    Write-Host "Smoke test: & .\dist\clio\clio.exe"
+} finally {
+    Pop-Location
+}

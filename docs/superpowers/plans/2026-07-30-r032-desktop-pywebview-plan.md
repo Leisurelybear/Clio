@@ -1196,19 +1196,19 @@ datas = [
 
 Ensure static path resolution works under PyInstaller (`sys._MEIPASS`) — if `server` resolves static via package `__file__`, test onedir; if it assumes cwd, fix resolver in a **minimal** change (desktop-only or shared).
 
-- [ ] **Step 1: Write spec + build script**
-- [ ] **Step 2: Build on Windows**
+- [x] **Step 1: Write spec + build script**
+- [x] **Step 2: Build on Windows**
 
 ```bash
 pip install pyinstaller pywebview
 pyinstaller packaging/clio.spec
 ```
 
-- [ ] **Step 3: Smoke onedir**
+- [x] **Step 3: Smoke onedir**
   - Launch `dist/clio/clio.exe` (name per spec)
   - SPA loads, pick folder works, add video e2e
   - Record cold-start seconds in README
-- [ ] **Step 4: Document WebView2 Evergreen + SmartScreen unsigned warning**
+- [x] **Step 4: Document WebView2 Evergreen + SmartScreen unsigned warning**
 - [ ] **Step 5: Commit**
 
 ```bash
