@@ -318,9 +318,12 @@ class TestLoadConfig:
         assert cfg.compress.target_size_mb == 5
         assert cfg.proxy.enabled is False
 
-    def test_missing_file_raises(self):
+    def test_missing_file_raises(self, tmp_path):
+        blocker = tmp_path / "blocker"
+        blocker.write_text("x", encoding="utf-8")
+        missing = blocker / "config.yaml"
         with pytest.raises(FileNotFoundError):
-            load_config("/nonexistent/config.yaml")
+            load_config(missing)
 
     def test_example_config_path_resolves_repo_root(self):
         from clio.config.loader import _example_config_path
@@ -330,6 +333,21 @@ class TestLoadConfig:
         assert path.is_file()
         assert path.name == "config.example.yaml"
         assert "ai:" in path.read_text(encoding="utf-8")
+
+    def test_auto_generates_missing_config(self, tmp_path):
+        target = tmp_path / "nested" / "config.yaml"
+        cfg = load_config(target)
+        assert target.is_file()
+        assert "ai:" in target.read_text(encoding="utf-8")
+        assert cfg.compress.fps == 15
+        assert cfg.proxy.enabled is False
+
+    def test_missing_file_raises_when_generation_blocked(self, tmp_path):
+        blocker = tmp_path / "blocker"
+        blocker.write_text("x", encoding="utf-8")
+        missing = blocker / "config.yaml"
+        with pytest.raises(FileNotFoundError):
+            load_config(missing)
 
     def test_provider_ttl_min_from_config(self, tmp_path):
         cfg_path = tmp_path / "config.yaml"

@@ -99,6 +99,25 @@ def _example_config_path() -> Path | None:
     return None
 
 
+def _ensure_global_config(config_file: Path) -> None:
+    """Create config.yaml from the bundled example template when missing.
+
+    Failures (no template, unwritable dir) are swallowed so the normal
+    open() in load_global_config raises FileNotFoundError as before.
+    """
+    if config_file.is_file():
+        return
+    example = _example_config_path()
+    if example is None:
+        return
+    try:
+        config_file.parent.mkdir(parents=True, exist_ok=True)
+        config_file.write_text(example.read_text(encoding="utf-8"), encoding="utf-8")
+        print(f"[config] 未找到 {config_file.name}，已从示例生成默认配置: {config_file}")
+    except OSError:
+        return
+
+
 def deep_merge(base: dict, override: dict) -> dict:
     result = {}
     for key in base:
@@ -447,6 +466,7 @@ def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
     base = config_file.parent
     _load_dotenv(base)
 
+    _ensure_global_config(config_file)
     _migrate_if_needed(config_file)
     _upgrade_config_file(config_file, section_map=_GLOBAL_SECTION_DC_MAP)
 
