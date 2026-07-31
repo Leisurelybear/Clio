@@ -85,6 +85,20 @@ def _load_dotenv(base: Path, override: bool = False) -> None:
             os.environ[key] = value
 
 
+def _example_config_path() -> Path | None:
+    """Locate the bundled config.example.yaml template.
+
+    Resolution order: PyInstaller _internal bundle (clio/config/), then the
+    repo root in the dev tree (up three levels from clio/config/loader.py).
+    Returns None when neither exists.
+    """
+    for base in (Path(__file__).parent, Path(__file__).resolve().parent.parent.parent):
+        candidate = base / "config.example.yaml"
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def deep_merge(base: dict, override: dict) -> dict:
     result = {}
     for key in base:

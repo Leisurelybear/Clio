@@ -322,6 +322,15 @@ class TestLoadConfig:
         with pytest.raises(FileNotFoundError):
             load_config("/nonexistent/config.yaml")
 
+    def test_example_config_path_resolves_repo_root(self):
+        from clio.config.loader import _example_config_path
+
+        path = _example_config_path()
+        assert path is not None
+        assert path.is_file()
+        assert path.name == "config.example.yaml"
+        assert "ai:" in path.read_text(encoding="utf-8")
+
     def test_provider_ttl_min_from_config(self, tmp_path):
         cfg_path = tmp_path / "config.yaml"
         cfg_path.write_text(
