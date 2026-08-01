@@ -97,6 +97,14 @@ def _provider_key_detail(provider) -> str:
     return "缺少 api_key_env（请配置环境变量名，密钥放在 .env）"
 
 
+def provider_key_missing(provider, environ: Mapping[str, str] | None = None) -> str | None:
+    """Return a Chinese detail string when the provider's API key is missing, else None."""
+    environ = environ if environ is not None else os.environ
+    if _provider_has_key(provider, environ):
+        return None
+    return _provider_key_detail(provider)
+
+
 def collect_doctor_checks(
     config: AppConfig,
     *,

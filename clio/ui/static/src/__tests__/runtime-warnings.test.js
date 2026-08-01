@@ -86,7 +86,31 @@ describe('buildRuntimeWarnings', () => {
     expect(w).toBeTruthy();
     expect(w.level).toBe('warning');
     expect(w.text).toMatch(/ffmpeg|setup/i);
-    expect(w.action).toBeUndefined();
+    expect(w.action?.id).toBe('show-ffmpeg-help');
+  });
+
+  it('warns with go-settings action when providers lack API keys', () => {
+    const warnings = buildRuntimeWarnings({
+      config: {},
+      hostname: '127.0.0.1',
+      hasToken: true,
+      missingKeys: [{ provider: 'gemini', api_key_env: 'GEMINI_API_KEY', detail: '缺少' }],
+    });
+    const w = warnings.find((x) => x.id === 'deps-keys-missing');
+    expect(w).toBeTruthy();
+    expect(w.level).toBe('danger');
+    expect(w.action?.id).toBe('go-settings-keys');
+    expect(w.text).toMatch(/gemini/);
+  });
+
+  it('does not warn when missingKeys is empty', () => {
+    const warnings = buildRuntimeWarnings({
+      config: {},
+      hostname: '127.0.0.1',
+      hasToken: true,
+      missingKeys: [],
+    });
+    expect(warnings.some((x) => x.id === 'deps-keys-missing')).toBe(false);
   });
 
   it('does not warn when ffmpeg deps ok', () => {

@@ -1,9 +1,11 @@
-"""Dependency availability endpoints (ffmpeg/ffprobe)."""
+"""Dependency availability endpoints (ffmpeg/ffprobe, AI API keys)."""
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any
 
+from clio.doctor import provider_key_missing
 from clio.utils import probe_ffmpeg_deps
 
 if TYPE_CHECKING:
@@ -18,3 +20,35 @@ def handle_get_deps_ffmpeg(handler: HandlerProtocol, qs: dict[str, Any]) -> None
     ffmpeg = getattr(paths, "ffmpeg", "") or ""
     ffprobe = getattr(paths, "ffprobe", "") or ""
     handler._send_json(probe_ffmpeg_deps(ffmpeg, ffprobe))
+
+
+def handle_get_deps_keys(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
+    """GET /api/deps/keys — report providers referenced by tasks that lack a resolved API key.
+
+    Never leaks key values; only presence + env var name are returned.
+    """
+    proj_dir = handler._resolve_project_dir(qs)
+    cfg = handler._get_config(proj_dir)
+    referenced = sorted({task.provider for task in cfg.ai.tasks.values()})
+    missing: list[dict[str, str]] = []
+    for name in referenced:
+        provider = cfg.ai.providers.get(name)
+        if provider is None:
+            missing.append(
+                {
+                    "provider": name,
+                    "api_key_env": "",
+                    "detail": f"任务引用了未配置的 provider '{name}'",
+                }
+            )
+            continue
+        detail = provider_key_missing(provider, os.environ)
+        if detail:
+            missing.append(
+                {
+                    "provider": name,
+                    "api_key_env": provider.api_key_env or "",
+                    "detail": detail,
+                }
+            )
+    handler._send_json({"ok": True, "missing": missing})

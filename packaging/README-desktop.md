@@ -78,10 +78,28 @@ on first run. Workarounds:
 
 ### ffmpeg / ffprobe
 
-The app shells out to `ffmpeg` / `ffprobe` (compression, waveform, cutting).
-These are **not** bundled — the target machine must have them on `PATH`, or
-`config.yaml` `paths.ffmpeg` / `paths.ffprobe` must point at them. `setup.ps1`
-installs them for dev machines.
+The app shells out to `ffmpeg` / `ffprobe` (compression, waveform, cutting,
+transcription audio extraction). These are **not** bundled — the target machine
+must have them on `PATH`, or `config.yaml` `paths.ffmpeg` / `paths.ffprobe`
+must point at them.
+
+**Install on Windows** (any one option):
+
+1. **winget** (Windows 10/11 package manager):
+   ```powershell
+   winget install Gyan.FFmpeg
+   ```
+2. **Chocolatey**:
+   ```powershell
+   choco install ffmpeg
+   ```
+3. **Manual** — download a release build (gyan.dev or BtbN), extract to
+   `C:\ffmpeg`, then add `C:\ffmpeg\bin` to `PATH` (or set `paths.ffmpeg` /
+   `paths.ffprobe` in `config.yaml`).
+
+In the app, the top banner shows "如何安装" when ffmpeg is missing; after
+installing, click "重新检测" (or reload the window). `setup.ps1` also installs
+ffmpeg for dev machines.
 
 ### Whisper transcription is not bundled
 

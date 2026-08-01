@@ -42,6 +42,13 @@ window.addToast = addToast;
 let _orphanedCutBackups = [];
 
 async function refreshRuntimeWarningsBanner() {
+  let missingKeys = null;
+  try {
+    const r = await api('GET', '/api/deps/keys');
+    missingKeys = r.missing || [];
+  } catch {
+    missingKeys = null;
+  }
   try {
     const r = await api('GET', '/api/cut/orphaned-backups');
     _orphanedCutBackups = r.items || [];
@@ -51,6 +58,7 @@ async function refreshRuntimeWarningsBanner() {
   updateRuntimeWarnings(state.config, {
     orphanedCutBackups: _orphanedCutBackups,
     ffmpegDeps: state.deps,
+    missingKeys,
     onAction: handleRuntimeWarningAction,
   });
 }
@@ -64,6 +72,18 @@ async function refreshFfmpegDepsUi() {
 window.refreshFfmpegDepsUi = refreshFfmpegDepsUi;
 
 async function handleRuntimeWarningAction(actionId) {
+  if (actionId === 'show-ffmpeg-help') {
+    showFfmpegHelp();
+    return;
+  }
+  if (actionId === 'go-settings-keys') {
+    await selectConfig();
+    state.configTab = 'global';
+    clearDirty();
+    const { renderConfig } = await import('./editor-config.js');
+    renderConfig();
+    return;
+  }
   if (actionId !== 'restore-cut-backups') return;
   if (!_orphanedCutBackups.length) {
     setStatus('没有可恢复的裁剪备份', 'warn');
@@ -87,6 +107,43 @@ async function handleRuntimeWarningAction(actionId) {
     addToast('恢复失败: ' + e.message, 'error', 6000);
   }
   await refreshRuntimeWarningsBanner();
+}
+
+/** Show an in-app modal with ffmpeg/ffprobe install guidance (B-2). */
+function showFfmpegHelp() {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal';
+  backdrop.style.display = 'flex';
+  const steps = [
+    '下载 Windows 版 ffmpeg（含 ffprobe）：gyan.dev 或 BtbN 的 release 构建，或用包管理器（winget install ffmpeg / choco install ffmpeg）。',
+    '解压到本地目录（例如 C:\\ffmpeg），记下其中的 bin 文件夹路径。',
+    '把 bin 目录加入系统 PATH；或打开 设置 → 全局，在 paths.ffmpeg / paths.ffprobe 填完整路径。',
+    '配置完成后，点击下方「重新检测」立即生效。',
+  ].map((s, i) => `<li style="margin:6px 0">${i + 1}. ${s}</li>`).join('');
+  backdrop.innerHTML = `
+    <div class="modal-backdrop"></div>
+    <div class="modal-dialog" style="max-width:560px">
+      <h3 style="margin:0 0 var(--space-4)">安装 ffmpeg / ffprobe</h3>
+      <p class="muted" style="margin:0 0 12px">压缩、波形、裁剪、转录抽音都依赖这两个命令行工具。当前应用内未检测到。</p>
+      <ol style="margin:0 0 16px;padding-left:0;list-style:none;font-size:var(--text-sm)">
+        ${steps}
+      </ol>
+      <p class="muted" style="font-size:var(--text-xs);margin:0">打包版 README（README-desktop.md，与 clio.exe 同目录）也包含完整说明。</p>
+      <div class="modal-actions" style="margin-top:16px">
+        <a href="https://www.gyan.dev/ffmpeg/builds/" target="_blank" rel="noopener" class="btn-secondary" style="text-decoration:none">打开下载页</a>
+        <button id="ffmpeg-help-reprobe" class="btn-primary">重新检测</button>
+        <button id="ffmpeg-help-close" class="btn-secondary">关闭</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  const close = () => backdrop.remove();
+  backdrop.querySelector('.modal-backdrop').onclick = close;
+  backdrop.querySelector('#ffmpeg-help-close').onclick = close;
+  backdrop.querySelector('#ffmpeg-help-reprobe').onclick = async () => {
+    await refreshFfmpegDepsUi();
+    close();
+  };
 }
 
 async function init() {

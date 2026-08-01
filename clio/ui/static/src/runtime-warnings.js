@@ -6,7 +6,8 @@ function isLocalHost(hostname) {
 
 /**
  * Build runtime banner warnings (config / host / orphaned cut backups).
- * @param {{ config?: object, hostname?: string, hasToken?: boolean, orphanedCutBackups?: Array }} opts
+ * @param {{ config?: object, hostname?: string, hasToken?: boolean, orphanedCutBackups?: Array,
+ *           ffmpegDeps?: object|null, missingKeys?: Array }} opts
  */
 function buildRuntimeWarnings({
   config = {},
@@ -14,6 +15,7 @@ function buildRuntimeWarnings({
   hasToken = false,
   orphanedCutBackups = null,
   ffmpegDeps = null,
+  missingKeys = null,
 } = {}) {
   const warnings = [];
   const debugPrintPrompt = Boolean(config?.ai?.debug_print_prompt);
@@ -22,6 +24,16 @@ function buildRuntimeWarnings({
       id: 'debug-prompt',
       level: 'warning',
       text: 'ai.debug_print_prompt=true：AI 调用会把完整 prompt 写入日志/控制台，可能包含行程上下文或临时指令。',
+    });
+  }
+
+  if (Array.isArray(missingKeys) && missingKeys.length > 0) {
+    const names = missingKeys.map((k) => k.provider || '').filter(Boolean).join('、');
+    warnings.push({
+      id: 'deps-keys-missing',
+      level: 'danger',
+      text: `首次使用：AI 任务缺少 API 密钥（${names}）。请在设置 → Provider 中配置密钥，否则所有 AI 任务都会失败。`,
+      action: { id: 'go-settings-keys', label: '去设置' },
     });
   }
 
@@ -65,7 +77,8 @@ function buildRuntimeWarnings({
       level: 'warning',
       text:
         ffmpegDeps.detail ||
-        '未找到 ffmpeg/ffprobe。压缩 / 裁剪 / 转录抽音 / 波形等功能不可用。请运行 setup 脚本或配置 paths.ffmpeg。',
+        '未找到 ffmpeg/ffprobe。压缩 / 裁剪 / 转录抽音 / 波形等功能不可用。请安装 ffmpeg 或配置 paths.ffmpeg。',
+      action: { id: 'show-ffmpeg-help', label: '如何安装' },
     });
   }
 
@@ -116,6 +129,7 @@ function updateRuntimeWarnings(config, opts = {}) {
     hasToken: Boolean(sessionStorage.getItem('api_token')),
     orphanedCutBackups: opts.orphanedCutBackups,
     ffmpegDeps: opts.ffmpegDeps ?? null,
+    missingKeys: opts.missingKeys ?? null,
   });
   renderRuntimeWarnings(container, warnings, { onAction: opts.onAction });
 }
