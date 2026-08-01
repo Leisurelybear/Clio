@@ -4,6 +4,7 @@ import {
   pickFolder,
   applyPickToInput,
   setBrowseButtonsVisible,
+  initDesktopPickers,
 } from '../desktop-pick.js';
 
 describe('desktop-pick', () => {
@@ -57,5 +58,14 @@ describe('desktop-pick', () => {
   it('setBrowseButtonsVisible hides in serve mode', () => {
     setBrowseButtonsVisible(document);
     expect(document.querySelector('.browse-btn').style.display).toBe('none');
+  });
+
+  it('initDesktopPickers reveals buttons once pywebview bridge arrives', () => {
+    initDesktopPickers(document);
+    expect(document.querySelector('.browse-btn').style.display).toBe('none');
+
+    window.pywebview = { api: { pick_folder: vi.fn() } };
+    window.dispatchEvent(new Event('pywebviewready'));
+    expect(document.querySelector('.browse-btn').style.display).not.toBe('none');
   });
 });

@@ -3,7 +3,7 @@ import { $, $$, escapeHtml, setStatus, updateSidebarDay, clearDirty } from './ut
 import { api, submitToken } from './api.js';
 import { initLayout } from './layout.js';
 import { initTheme, toggleTheme } from './theme.js';
-import { pickFolder, pickFile, applyPickToInput, setBrowseButtonsVisible } from './desktop-pick.js';
+import { pickFolder, pickFile, applyPickToInput, initDesktopPickers } from './desktop-pick.js';
 import { addToast } from './toast.js';
 import { updateRuntimeWarnings } from './runtime-warnings.js';
 import { setupPlayer } from './viewer.js';
@@ -92,7 +92,7 @@ async function handleRuntimeWarningAction(actionId) {
 async function init() {
   initLayout();
   initTheme();
-  setBrowseButtonsVisible(document);
+  initDesktopPickers(document);
 
   // 从 URL 读取 project + project_dir 参数
   const urlParams = new URLSearchParams(window.location.search);

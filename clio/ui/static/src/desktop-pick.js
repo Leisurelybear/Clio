@@ -43,3 +43,8 @@ export function setBrowseButtonsVisible(root = document) {
     btn.style.display = show ? '' : 'none';
   });
 }
+
+export function initDesktopPickers(root = document) {
+  setBrowseButtonsVisible(root);
+  window.addEventListener('pywebviewready', () => setBrowseButtonsVisible(root));
+}
