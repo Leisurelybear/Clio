@@ -9,26 +9,26 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ### R-040 Desktop out-of-box usability gaps (direct download)
 
-**Status:** Open (2026-08-01)
+**Status:** Done (2026-08-01)
 
 Source: desktop review — a user who downloads `dist/clio` (release zip) can launch
 the UI and open projects, but several gaps block or degrade first-run use.
 
 **Blocking (首次体验就卡住):**
 
-- [ ] B-1 首次 API 密钥配置无引导 — 无向导，用户需自己找到 设置 → Provider 填密钥；缺 key 时所有 AI 任务失败
-- [ ] B-2 ffmpeg/ffprobe 未捆绑 — 打包不含 ffmpeg；压缩 / 波形 / 裁剪 / 转录抽音不可用（UI 有 banner 但无引导安装）
-- [ ] B-3 WebView2 Runtime 依赖 — Win10 需单独安装 Evergreen；缺失时窗口打不开，且说明不在 zip 内
-- [ ] B-4 未签名 exe → SmartScreen — 首次运行弹"Windows 已保护你的电脑"，非技术用户易放弃
+- [x] B-1 首次 API 密钥配置无引导 — 无向导，用户需自己找到 设置 → Provider 填密钥；缺 key 时所有 AI 任务失败
+- [x] B-2 ffmpeg/ffprobe 未捆绑 — 打包不含 ffmpeg；压缩 / 波形 / 裁剪 / 转录抽音不可用（UI 有 banner 但无引导安装）
+- [x] B-3 WebView2 Runtime 依赖 — Win10 需单独安装 Evergreen；缺失时窗口打不开，且说明不在 zip 内
+- [x] B-4 未签名 exe → SmartScreen — 首次运行弹"Windows 已保护你的电脑"，非技术用户易放弃
 
 **Functional (能跑但功能残缺):**
 
-- [ ] F-1 Whisper 转录在 exe 内不可用 — `excludes` 排除 torch 全家桶（合理），但 UI 安装按钮走
+- [x] F-1 Whisper 转录在 exe 内不可用 — `excludes` 排除 torch 全家桶（合理），但 UI 安装按钮走
       `sys.executable -m pip` = `clio.exe -m pip` 必然失败，且无提示（frozen 环境需改用外部 python/pip
       或明确提示改用源码版）
-- [ ] F-2 config.example.yaml 模型陈旧 — deepseek 仅 `[deepseek-chat, deepseek-reasoner]`；老项目绑定
+- [x] F-2 config.example.yaml 模型陈旧 — deepseek 仅 `[deepseek-chat, deepseek-reasoner]`；老项目绑定
       `deepseek-v4-flash` 等新模型时触发校验 ValueError（加载失败）；新用户从零建项目不遇到，升级路径有雷
-- [ ] F-3 README-desktop.md 未随包发布 — release zip 只有 dist/clio，WebView2 / SmartScreen / ffmpeg 说明用户看不到
+- [x] F-3 README-desktop.md 未随包发布 — release zip 只有 dist/clio，WebView2 / SmartScreen / ffmpeg 说明用户看不到
 
 **Done (本次会话已覆盖):**
 
