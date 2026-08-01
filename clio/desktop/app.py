@@ -178,7 +178,11 @@ def main(
             return _handle_closing(handle.host, handle.port)
 
         def _on_closed() -> None:
-            stop_server(handle)
+            """Closed event: stop the server.
+            Stop is also performed in finally (after webview.start() returns) to ensure
+            cleanup even if create_window/start() raised before registering the event.
+            """
+            pass  # stop handled by finally
 
         try:
             window.events.closing += _on_closing

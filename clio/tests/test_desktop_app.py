@@ -82,9 +82,17 @@ class _FakeHandle:
     port = 9999
 
 
+class _EventList(list):
+    """List supporting `+= handler` like pywebview's Event objects."""
+
+    def __iadd__(self, other):
+        self.append(other)
+        return self
+
+
 class _FakeWindow:
     def __init__(self):
-        self.events = types.SimpleNamespace(closing=[], closed=[])
+        self.events = types.SimpleNamespace(closing=_EventList(), closed=_EventList())
         self.shown = False
         self.restored = False
 
@@ -205,6 +213,31 @@ def test_main_removes_lock_on_close(monkeypatch, tmp_path):
     assert rv == 0
     fake_webview.start.assert_called_once()
     app_mod.remove_lock.assert_called_once()
+
+
+def test_main_closed_event_does_not_stop_server_double(monkeypatch, tmp_path):
+    """_on_closed no longer stops the server (finally owns cleanup after
+    webview.start() returns). stop_server must be called exactly once by the
+    finally block, not again by the window closed event."""
+    monkeypatch.setattr("clio.log.setup_logging", MagicMock())
+    stop_mock = MagicMock()
+    monkeypatch.setattr("clio.desktop.server_host.start_server", MagicMock(return_value=_FakeHandle()))
+    monkeypatch.setattr("clio.desktop.server_host.stop_server", stop_mock)
+    monkeypatch.setattr(app_mod, "is_web_running", MagicMock(return_value=False))
+    monkeypatch.setattr(app_mod, "focus_first_instance", MagicMock(return_value=False))
+    monkeypatch.setattr(app_mod, "write_lock", MagicMock())
+    monkeypatch.setattr(app_mod, "set_desktop_focus_callback", MagicMock())
+    monkeypatch.setattr(app_mod, "remove_lock", MagicMock())
+    fake = _install_fake_webview(monkeypatch)
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("key: value\n", encoding="utf-8")
+    rv = app_mod.main(argv=[], config_path=cfg_file)
+    assert rv == 0
+    window = fake.create_window.return_value
+    assert window.events.closed, "closed handler should be registered"
+    for handler in window.events.closed:
+        handler()
+    stop_mock.assert_called_once()
 
 
 def test_main_first_launch_passes_created_config_path(monkeypatch, tmp_path):
