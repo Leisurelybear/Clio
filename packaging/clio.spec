@@ -1,16 +1,43 @@
 # -*- mode: python ; coding: utf-8 -*-
 """PyInstaller onedir spec for the Clio desktop shell (R-032c).
 
-Build:
-    pip install pyinstaller pywebview
+Build (any of):
     pyinstaller packaging/clio.spec
+    pyinstaller packaging/clio.spec --target-architecture universal2   # macOS only
 
-Output: dist/clio/clio.exe (onedir).
+Output:
+    Windows: dist/clio/clio.exe (onedir)
+    macOS:   dist/clio/clio       (onedir; universal2 binary when requested)
+
+Platform-specific hidden imports are selected at spec-evaluation time from
+sys.platform so the same spec drives the Windows (WinForms + pythonnet /
+WebView2) and macOS (Cocoa + pyobjc) builds.
 """
 
+import sys
 from pathlib import Path
 
 ROOT = Path(SPECPATH).parent.resolve()
+
+IS_MAC = sys.platform == "darwin"
+
+_PLATFORM_HIDDENIMPORTS = [
+    # pywebview picks its platform backend lazily at runtime.
+    "webview.platforms.winforms",
+    # pythonnet bridge (Windows only).
+    "clr",
+    "pythonnet",
+]
+if IS_MAC:
+    _PLATFORM_HIDDENIMPORTS = [
+        "webview.platforms.cocoa",
+        # pyobjc frameworks consumed by webview/platforms/cocoa.py.
+        "AppKit",
+        "Foundation",
+        "WebKit",
+        "objc",
+        "PyObjCTools",
+    ]
 
 a = Analysis(
     [str(ROOT / "clio" / "desktop" / "__main__.py")],
@@ -22,12 +49,9 @@ a = Analysis(
         (str(ROOT / "config.example.yaml"), "clio/config"),
     ],
     hiddenimports=[
-        # pywebview picks its Windows platform (winforms / WebView2) at runtime.
-        "webview.platforms.winforms",
-        "clr",
-        "pythonnet",
         # Lazy `from tkinter import ...` inside dialogs.py / app.py.
         "tkinter",
+        *_PLATFORM_HIDDENIMPORTS,
     ],
     hookspath=[],
     hooksconfig={},
@@ -53,6 +77,8 @@ a = Analysis(
 )
 pyz = PYZ(a.pure)
 
+# console=False: windowed app on both platforms (desktop_rthook keeps
+# sys.stdout/stderr usable via os.devnull).
 exe = EXE(
     pyz,
     a.scripts,
@@ -73,3 +99,16 @@ coll = COLLECT(
     upx=False,
     name="clio",
 )
+
+# macOS ships GUI apps as a .app bundle (needed for window focus, menus, Dock).
+if IS_MAC:
+    app = BUNDLE(
+        coll,
+        name="clio.app",
+        bundle_identifier="com.clio.desktop",
+        info_plist={
+            "NSHighResolutionCapable": True,
+            "CFBundleName": "Clio",
+            "CFBundleDisplayName": "Clio",
+        },
+    )

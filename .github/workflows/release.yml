@@ -1,7 +1,11 @@
 name: Release desktop build
 
-# Build the Clio desktop shell (PyInstaller onedir) on Windows and publish
-# a GitHub Release with the packaged folder as a zip asset.
+# Build the Clio desktop shell (PyInstaller onedir) for Windows x64 and macOS
+# (universal2: Intel + Apple Silicon) and publish a GitHub Release with the
+# packaged apps as zip assets.
+#
+# Windows ARM64 runs the x64 build via built-in emulation (pythonnet has no
+# native win_arm64 wheel), so no separate ARM64 artifact is produced.
 #
 # Triggers:
 #   - push a semver tag:  git tag v0.1.0 && git push origin v0.1.0
@@ -22,13 +26,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-windows:
-    name: Build onedir (Windows)
-    runs-on: windows-latest
-    permissions:
-      contents: write
-      actions: read
+  version:
+    name: Compute release version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Compute release version
+        id: version
+        run: |
+          VER="${{ github.event.inputs.version }}"
+          if [ -z "$VER" ]; then
+            if [ "${{ github.event_name }}" = "push" ]; then
+              VER="${{ github.ref_name }}"
+              VER="${VER#v}"
+            else
+              VER="0.0.0-dev"
+            fi
+          fi
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
 
+  build-windows:
+    name: Build onedir (Windows x64)
+    runs-on: windows-latest
+    needs: version
+    permissions:
+      contents: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -84,40 +107,100 @@ jobs:
           if (-not $ok) { throw "desktop server did not serve index" }
           Write-Output "smoke OK"
 
-      - name: Compute release version
-        id: version
-        shell: pwsh
-        run: |
-          $ver = "${{ github.event.inputs.version }}"
-          if (-not $ver) {
-            if ("${{ github.event_name }}" -eq "push") { $ver = "${{ github.ref_name }}".TrimStart('v') }
-            else { $ver = "0.0.0-dev" }
-          }
-          Write-Output "version=$ver" >> $env:GITHUB_OUTPUT
-
       - name: Package onedir as zip
         shell: pwsh
         run: |
-          $name = "clio-${{ steps.version.outputs.version }}-windows-x64"
+          $name = "clio-${{ needs.version.outputs.version }}-windows-x64"
           Compress-Archive -Path "dist/clio" -DestinationPath "$name.zip" -CompressionLevel Optimal
           Write-Output "artifact=$name.zip"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
-          name: clio-${{ steps.version.outputs.version }}-windows-x64
-          path: clio-${{ steps.version.outputs.version }}-windows-x64.zip
+          name: clio-${{ needs.version.outputs.version }}-windows-x64
+          path: clio-${{ needs.version.outputs.version }}-windows-x64.zip
           if-no-files-found: error
 
+  build-macos:
+    name: Build onedir (macOS universal2)
+    runs-on: macos-26-intel
+    needs: version
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install universal2 Python (python.org)
+        run: |
+          # GitHub-hosted Python is single-arch; PyInstaller universal2 needs a
+          # universal2 interpreter + universal2 wheels (pyobjc ships them).
+          curl -L -o python.pkg "https://www.python.org/ftp/python/3.11.9/python-3.11.9-macos11.pkg"
+          sudo installer -pkg python.pkg -target /
+          echo "/Library/Frameworks/Python.framework/Versions/3.11/bin" >> "$GITHUB_PATH"
+
+      - name: Install build dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r requirements-locked.txt
+          python3 -m pip install pyinstaller
+          # macOS GUI backend: Cocoa/WebKit via pyobjc (universal2 wheels).
+          python3 -m pip install "pywebview" "pyobjc-core" "pyobjc-framework-Cocoa" "pyobjc-framework-WebKit" "pyobjc-framework-Quartz" "pyobjc-framework-Security"
+
+      - name: Build onedir (universal2)
+        run: python3 -m PyInstaller packaging/clio.spec --target-architecture universal2 --noconfirm --clean
+
+      - name: Verify artifacts
+        run: |
+          test -f "dist/clio.app/Contents/MacOS/clio" || { echo "clio binary missing"; exit 1; }
+          # datas land under Contents/Resources (or Contents/Resources/_internal) in v6+.
+          if ! find "dist/clio.app" -name "index.html" -path "*ui/static*" | grep -q .; then
+            echo "static assets missing"
+            exit 1
+          fi
+          lipo -info "dist/clio.app/Contents/MacOS/clio" | grep -q "universal2" || { echo "not a universal2 binary"; exit 1; }
+          echo "app OK"
+
+      - name: Package app as zip (app + README)
+        run: |
+          name="clio-${{ needs.version.outputs.version }}-macos-universal2"
+          staging="$RUNNER_TEMP/$name"
+          mkdir -p "$staging"
+          cp -R dist/clio.app "$staging/clio.app"
+          cp packaging/README-desktop.md "$staging/README-desktop.md"
+          ditto -c -k --sequesterRsrc --keepParent "$staging" "$name.zip"
+          test -f "$name.zip" || { echo "zip not created"; exit 1; }
+          echo "artifact=$name.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clio-${{ needs.version.outputs.version }}-macos-universal2
+          path: clio-${{ needs.version.outputs.version }}-macos-universal2.zip
+          if-no-files-found: error
+
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs: [version, build-windows, build-macos]
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = "${{ github.ref_name }}"
-          gh release create "$tag" `
-            "clio-${{ steps.version.outputs.version }}-windows-x64.zip" `
-            --title "Clio $tag" `
-            --notes "Desktop build for Windows (PyInstaller onedir). See packaging/README-desktop.md for WebView2 / ffmpeg / SmartScreen notes." `
+          VER="${{ needs.version.outputs.version }}"
+          tag="${{ github.ref_name }}"
+          gh release create "$tag" \
+            artifacts/clio-${VER}-windows-x64/*.zip \
+            artifacts/clio-${VER}-macos-universal2/*.zip \
+            --title "Clio $tag" \
+            --notes "Desktop builds for Windows x64 and macOS (universal2, Intel + Apple Silicon). See packaging/README-desktop.md for WebView2 / ffmpeg / SmartScreen notes. Windows ARM64: use the x64 build (runs under emulation)." \
             --repo "${{ github.repository }}"
