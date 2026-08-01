@@ -120,8 +120,13 @@ def main(
     from clio.log import setup_logging
 
     cfg_file = config_path if config_path.is_file() else None
-    cfg = load_config(str(config_path) if cfg_file else "config.yaml")
-    config_dir = config_path.parent.resolve() if cfg_file else Path.cwd()
+    cfg = load_config(str(config_path))
+    # load_config auto-creates config.yaml from the bundled example when missing
+    # (R-040 B-1). Re-resolve cfg_file so start_server receives the real path;
+    # passing None made every /api/config/* GET return HTTP 500.
+    if cfg_file is None and config_path.is_file():
+        cfg_file = config_path
+    config_dir = config_path.parent.resolve()
 
     setup_logging(cfg.paths.logs_dir)
 

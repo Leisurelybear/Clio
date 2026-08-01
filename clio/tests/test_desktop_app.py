@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import sys
 import types
+from pathlib import Path
 from unittest.mock import MagicMock
 
 import clio.desktop.app as app_mod
@@ -204,6 +205,35 @@ def test_main_removes_lock_on_close(monkeypatch, tmp_path):
     assert rv == 0
     fake_webview.start.assert_called_once()
     app_mod.remove_lock.assert_called_once()
+
+
+def test_main_first_launch_passes_created_config_path(monkeypatch, tmp_path):
+    """First launch in a dir without config.yaml: load_config auto-creates it
+    (R-040 B-1), so start_server must receive the real path instead of None
+    (None made every /api/config/* GET return 500)."""
+    captured = {}
+
+    def _fake_start(cfg, config_path=None, **kw):
+        captured["config_path"] = config_path
+        return _FakeHandle()
+
+    monkeypatch.setattr("clio.log.setup_logging", MagicMock())
+    monkeypatch.setattr("clio.desktop.server_host.start_server", _fake_start)
+    monkeypatch.setattr("clio.desktop.server_host.stop_server", MagicMock())
+    monkeypatch.setattr(app_mod, "is_web_running", MagicMock(return_value=False))
+    monkeypatch.setattr(app_mod, "focus_first_instance", MagicMock(return_value=False))
+    monkeypatch.setattr(app_mod, "write_lock", MagicMock())
+    monkeypatch.setattr(app_mod, "set_desktop_focus_callback", MagicMock())
+    monkeypatch.setattr(app_mod, "remove_lock", MagicMock())
+    _install_fake_webview(monkeypatch)
+
+    cfg_file = tmp_path / "config.yaml"
+    assert not cfg_file.exists()
+    rv = app_mod.main(argv=[], config_path=cfg_file)
+    assert rv == 0
+    assert cfg_file.is_file(), "load_config should auto-create config.yaml"
+    assert captured["config_path"] is not None
+    assert Path(captured["config_path"]).is_file()
 
 
 def test_main_sets_up_logging_with_config_logs_dir(monkeypatch, tmp_path):
