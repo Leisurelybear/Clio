@@ -106,6 +106,7 @@ def _run_main(monkeypatch, tmp_path, config_text: str = "key: value\n"):
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text(config_text, encoding="utf-8")
     monkeypatch.setattr("clio.config.load_config", MagicMock(return_value=MagicMock()))
+    monkeypatch.setattr("clio.log.setup_logging", MagicMock())
     monkeypatch.setattr("clio.desktop.server_host.start_server", MagicMock(return_value=_FakeHandle()))
     monkeypatch.setattr("clio.desktop.server_host.stop_server", MagicMock())
     fake_webview = _install_fake_webview(monkeypatch)
@@ -166,6 +167,7 @@ def test_main_takes_over_stale_lock(monkeypatch, tmp_path):
 
 def test_main_registers_focus_callback_that_shows_window(monkeypatch, tmp_path):
     monkeypatch.setattr("clio.config.load_config", MagicMock(return_value=MagicMock()))
+    monkeypatch.setattr("clio.log.setup_logging", MagicMock())
     monkeypatch.setattr("clio.desktop.server_host.start_server", MagicMock(return_value=_FakeHandle()))
     monkeypatch.setattr("clio.desktop.server_host.stop_server", MagicMock())
     monkeypatch.setattr(app_mod, "is_web_running", MagicMock(return_value=False))
@@ -202,3 +204,24 @@ def test_main_removes_lock_on_close(monkeypatch, tmp_path):
     assert rv == 0
     fake_webview.start.assert_called_once()
     app_mod.remove_lock.assert_called_once()
+
+
+def test_main_sets_up_logging_with_config_logs_dir(monkeypatch, tmp_path):
+    logs_dir = tmp_path / "logs"
+    cfg = MagicMock()
+    cfg.paths.logs_dir = logs_dir
+    monkeypatch.setattr("clio.config.load_config", MagicMock(return_value=cfg))
+    monkeypatch.setattr("clio.desktop.server_host.start_server", MagicMock(return_value=_FakeHandle()))
+    monkeypatch.setattr("clio.desktop.server_host.stop_server", MagicMock())
+    monkeypatch.setattr(app_mod, "is_web_running", MagicMock(return_value=False))
+    monkeypatch.setattr(app_mod, "focus_first_instance", MagicMock(return_value=False))
+    monkeypatch.setattr(app_mod, "write_lock", MagicMock())
+    monkeypatch.setattr(app_mod, "set_desktop_focus_callback", MagicMock())
+    setup_mock = MagicMock()
+    monkeypatch.setattr("clio.log.setup_logging", setup_mock)
+    _install_fake_webview(monkeypatch)
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("key: value\n", encoding="utf-8")
+    rv = app_mod.main(argv=[], config_path=cfg_file)
+    assert rv == 0
+    setup_mock.assert_called_once_with(logs_dir)

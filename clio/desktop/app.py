@@ -88,10 +88,13 @@ def main(
     from clio.config import load_config
     from clio.desktop.api import DesktopApi
     from clio.desktop.server_host import start_server, stop_server
+    from clio.log import setup_logging
 
     cfg_file = config_path if config_path.is_file() else None
     cfg = load_config(str(config_path) if cfg_file else "config.yaml")
     config_dir = config_path.parent.resolve() if cfg_file else Path.cwd()
+
+    setup_logging(cfg.paths.logs_dir)
 
     # Single instance: if another instance is already running, focus it and exit.
     lock = read_lock(config_dir)
