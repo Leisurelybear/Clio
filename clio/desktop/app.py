@@ -3,11 +3,39 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from collections.abc import Callable
 from pathlib import Path
 
 from clio.desktop.server_host import fetch_run_status, request_run_cancel
+from clio.desktop.single_instance import (
+    focus_first_instance,
+    is_web_running,
+    read_lock,
+    remove_lock,
+    write_lock,
+)
+from clio.ui.server import set_desktop_focus_callback
+
+
+def _confirm_web_continue() -> bool:
+    """Ask the user whether to launch the desktop app while the web UI is running."""
+    try:
+        from tkinter import Tk, messagebox
+
+        root = Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        try:
+            return messagebox.askyesno(
+                "Clio",
+                "检测到网页版正在运行（端口 8765），是否继续启动桌面版？",
+            )
+        finally:
+            root.destroy()
+    except Exception:  # noqa: BLE001 — never block startup on dialog failure
+        return True
 
 
 def _confirm_quit() -> bool:
@@ -65,6 +93,17 @@ def main(
     cfg = load_config(str(config_path) if cfg_file else "config.yaml")
     config_dir = config_path.parent.resolve() if cfg_file else Path.cwd()
 
+    # Single instance: if another instance is already running, focus it and exit.
+    lock = read_lock(config_dir)
+    if lock and focus_first_instance("127.0.0.1", lock["port"]):
+        print("Clio 已在运行，已聚焦原窗口")
+        return 0
+
+    # Web UI (serve) on the default port: let the user choose before launching.
+    if is_web_running():
+        if not _confirm_web_continue():
+            return 0
+
     handle = start_server(
         cfg,
         config_path=cfg_file,
@@ -85,6 +124,14 @@ def main(
             height=800,
         )
 
+        # Register focus callback for later desktop launches (single instance).
+        def _focus_window() -> None:
+            window.restore()
+            window.show()
+
+        set_desktop_focus_callback(_focus_window)
+        write_lock(config_dir, handle.port, os.getpid())
+
         # Close policy (Task 12): cancel active run before closing the window.
         def _on_closing() -> bool:
             return _handle_closing(handle.host, handle.port)
@@ -102,5 +149,6 @@ def main(
             pass
         webview.start()
     finally:
+        remove_lock(config_dir)
         stop_server(handle)
     return 0

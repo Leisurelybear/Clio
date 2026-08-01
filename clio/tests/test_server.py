@@ -659,6 +659,61 @@ class TestDoDELETE:
 
 
 # ===========================================================================
+# desktop focus callback registry
+# ===========================================================================
+
+
+class TestDesktopFocusCallback:
+    def test_no_callback_returns_503(self, handler_cls, monkeypatch):
+        from clio.ui.server import set_desktop_focus_callback
+
+        monkeypatch.setattr("clio.ui.server._desktop_focus_callback", None)
+        set_desktop_focus_callback(None)
+        handler = _build_handler(handler_cls, path="/api/desktop/focus", method="POST")
+        from clio.ui.server import handle_post_desktop_focus
+
+        handle_post_desktop_focus(handler, {}, {})
+        handler.send_response.assert_called_once_with(503)
+        data = json.loads(handler.wfile.getvalue())
+        assert data["ok"] is False
+
+    def test_callback_called_and_ok(self, handler_cls, monkeypatch):
+        from clio.ui.server import set_desktop_focus_callback
+
+        calls = []
+        set_desktop_focus_callback(lambda: calls.append("focused"))
+        try:
+            handler = _build_handler(handler_cls, path="/api/desktop/focus", method="POST")
+            from clio.ui.server import handle_post_desktop_focus
+
+            handle_post_desktop_focus(handler, {}, {})
+            assert calls == ["focused"]
+            assert handler.send_response.call_args.args[0] == 200
+            data = json.loads(handler.wfile.getvalue())
+            assert data["ok"] is True
+        finally:
+            set_desktop_focus_callback(None)
+
+    def test_callback_exception_returns_500(self, handler_cls, monkeypatch):
+        from clio.ui.server import set_desktop_focus_callback
+
+        def _boom():
+            raise RuntimeError("window not ready")
+
+        set_desktop_focus_callback(_boom)
+        try:
+            handler = _build_handler(handler_cls, path="/api/desktop/focus", method="POST")
+            from clio.ui.server import handle_post_desktop_focus
+
+            handle_post_desktop_focus(handler, {}, {})
+            assert handler.send_response.call_args.args[0] == 500
+            data = json.loads(handler.wfile.getvalue())
+            assert data["ok"] is False
+        finally:
+            set_desktop_focus_callback(None)
+
+
+# ===========================================================================
 # do_POST routing
 # ===========================================================================
 
@@ -929,6 +984,26 @@ class TestAuth:
         with patch("clio.ui.server.handle_get_env") as mock_fn:
             handler = _build_handler(handler_cls, path="/api/env")
             handler.do_GET()
+            mock_fn.assert_called_once()
+
+    # --- POST /api/desktop/focus (single-instance, must NOT require auth) ---
+
+    def test_focus_unauthenticated_without_token(self, handler_cls):
+        """POST /api/desktop/focus works with no token configured."""
+        with patch("clio.ui.server.handle_post_desktop_focus") as mock_fn:
+            handler = _build_handler(handler_cls, path="/api/desktop/focus", method="POST")
+            handler.headers.get.return_value = "2"
+            handler.rfile = io.BytesIO(b"{}")
+            handler.do_POST()
+            mock_fn.assert_called_once()
+
+    def test_focus_unauthenticated_even_with_token(self, auth_cls):
+        """POST /api/desktop/focus is reachable even when a token is configured."""
+        with patch("clio.ui.server.handle_post_desktop_focus") as mock_fn:
+            handler = _build_handler(auth_cls, path="/api/desktop/focus", method="POST")
+            handler.headers.get.return_value = "2"
+            handler.rfile = io.BytesIO(b"{}")
+            handler.do_POST()
             mock_fn.assert_called_once()
 
 

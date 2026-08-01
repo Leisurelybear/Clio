@@ -14,6 +14,7 @@ import json
 import mimetypes
 import shutil
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -127,6 +128,32 @@ from clio.ui.services.project_service import (
 from clio.utils import write_json_atomic
 
 STATIC_DIR = Path(__file__).parent / "static"
+
+_desktop_focus_callback: Callable[[], None] | None = None
+
+
+def set_desktop_focus_callback(callback: Callable[[], None] | None) -> None:
+    """Register the desktop shell's window-focus action (single instance mode).
+
+    The desktop host calls this after creating the pywebview window. The focus
+    endpoint stays registered server-side; a None callback means no window is
+    attached (web-only mode) and the endpoint answers 503.
+    """
+    global _desktop_focus_callback
+    _desktop_focus_callback = callback
+
+
+def handle_post_desktop_focus(handler, qs, obj) -> None:
+    """Handle POST /api/desktop/focus — bring the running desktop window to front."""
+    del qs, obj  # payload intentionally ignored
+    cb = _desktop_focus_callback
+    if cb is None:
+        return handler._send_json({"ok": False, "error": "desktop window unavailable"}, 503)
+    try:
+        cb()
+    except Exception as e:  # noqa: BLE001 — surface any focus failure to the caller
+        return handler._send_json({"ok": False, "error": str(e)}, 500)
+    return handler._send_json({"ok": True})
 
 
 def _handle_get_logs(handler, qs):
@@ -493,6 +520,7 @@ def make_handler(
             Route("POST", "/api/webhook/trigger", "handle_post_run_start"),
             Route("POST", "/api/run/preview", "handle_post_run_preview"),
             Route("POST", "/api/run/cancel", "handle_post_run_cancel"),
+            Route("POST", "/api/desktop/focus", "handle_post_desktop_focus", auth_required=False),
             Route("POST", "/api/ai/test", "handle_post_ai_test"),
             Route("POST", "/api/config/init", "handle_post_config_init"),
             Route("POST", "/api/providers", "handle_post_provider"),

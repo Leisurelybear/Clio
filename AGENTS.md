@@ -42,6 +42,11 @@ vlog-video-analysis/
 │   ├── vmeta.py               .vmeta/.vindex sidecar metadata
 │   ├── progress.py            Progress tracker (used by UI + CLI)
 │   ├── tasks/                 Pipeline steps (per-step modules)
+│   ├── desktop/               pywebview host + single-instance coordination
+│   │   ├── app.py             Window host, close policy, focus callback (R-039)
+│   │   ├── server_host.py     Non-blocking localhost server lifecycle
+│   │   ├── single_instance.py clio.lock + focus probe + web-8765 detection (R-039)
+│   │   └── state.py           desktop-state.json (last_dir persistence)
 │   ├── ui/                    Web UI (stdlib http.server)
 │   │   ├── server.py          HTTP server
 │   │   ├── routes/            Route handlers (split into focused modules)

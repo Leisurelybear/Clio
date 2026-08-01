@@ -7,6 +7,18 @@ Design discussions / decision history in `AGENTS.md`, implementation details in 
 
 ## Remaining Open Items (2026-07-26)
 
+### R-039 Desktop single-instance + web coexistence prompt
+
+**Status:** Done (2026-08-01)
+
+- [x] Add `clio/desktop/single_instance.py` (per-config-dir lock file + focus probe)
+- [x] Add `POST /api/desktop/focus` endpoint (unauthenticated, callback registry)
+- [x] Wire `app.py`: second launch focuses existing window and exits; stale lock takeover
+- [x] Prompt when web UI detected on default port 8765 (default continue)
+- [x] Add unit tests + run full regression (1375 passed)
+
+Design: `docs/superpowers/specs/2026-08-01-desktop-single-instance-design.md`
+
 ### R-038 Remove dead physical-split writer
 
 **Status:** Done (2026-07-26)
