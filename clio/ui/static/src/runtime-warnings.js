@@ -32,7 +32,7 @@ function buildRuntimeWarnings({
     warnings.push({
       id: 'deps-keys-missing',
       level: 'danger',
-      text: `首次使用：AI 任务缺少 API 密钥（${names}）。请在设置 → Provider 中配置密钥，否则所有 AI 任务都会失败。`,
+      text: `AI 任务缺少 API 密钥（${names}）。请在设置 → Provider 中配置密钥，否则 AI 任务会失败。`,
       action: { id: 'go-settings-keys', label: '去设置' },
     });
   }

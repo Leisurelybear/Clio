@@ -115,7 +115,7 @@ function showFfmpegHelp() {
   backdrop.className = 'modal';
   backdrop.style.display = 'flex';
   const steps = [
-    '下载 Windows 版 ffmpeg（含 ffprobe）：gyan.dev 或 BtbN 的 release 构建，或用包管理器（winget install ffmpeg / choco install ffmpeg）。',
+    '下载 Windows 版 ffmpeg（含 ffprobe）：gyan.dev 或 BtbN 的 release 构建，或用包管理器（winget install Gyan.FFmpeg / choco install ffmpeg）。',
     '解压到本地目录（例如 C:\\ffmpeg），记下其中的 bin 文件夹路径。',
     '把 bin 目录加入系统 PATH；或打开 设置 → 全局，在 paths.ffmpeg / paths.ffprobe 填完整路径。',
     '配置完成后，点击下方「重新检测」立即生效。',

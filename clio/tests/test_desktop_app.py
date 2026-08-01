@@ -247,13 +247,13 @@ def test_main_shows_webview2_error_when_start_raises(monkeypatch, tmp_path):
     monkeypatch.setattr(app_mod, "remove_lock", MagicMock())
     monkeypatch.setattr(app_mod, "set_desktop_focus_callback", MagicMock())
     error_shown = []
-    monkeypatch.setattr(app_mod, "_show_webview2_missing_error", lambda: error_shown.append(True))
+    monkeypatch.setattr(app_mod, "_show_window_start_error", lambda e: error_shown.append(e))
     _fake_webview_with_failing_start(monkeypatch)
     cfg_file = tmp_path / "config.yaml"
     cfg_file.write_text("key: value\n", encoding="utf-8")
     rv = app_mod.main(argv=[], config_path=cfg_file)
     assert rv == 1
-    assert error_shown == [True]
+    assert len(error_shown) == 1 and isinstance(error_shown[0], RuntimeError)
     app_mod.remove_lock.assert_called_once()
 
 
@@ -269,7 +269,7 @@ def test_main_shows_webview2_error_when_create_window_raises(monkeypatch, tmp_pa
     monkeypatch.setattr(app_mod, "remove_lock", MagicMock())
     monkeypatch.setattr(app_mod, "set_desktop_focus_callback", MagicMock())
     error_shown = []
-    monkeypatch.setattr(app_mod, "_show_webview2_missing_error", lambda: error_shown.append(True))
+    monkeypatch.setattr(app_mod, "_show_window_start_error", lambda e: error_shown.append(e))
     fake = types.ModuleType("webview")
     fake.create_window = MagicMock(side_effect=RuntimeError("no WebView2"))
     fake.start = MagicMock()
@@ -278,6 +278,6 @@ def test_main_shows_webview2_error_when_create_window_raises(monkeypatch, tmp_pa
     cfg_file.write_text("key: value\n", encoding="utf-8")
     rv = app_mod.main(argv=[], config_path=cfg_file)
     assert rv == 1
-    assert error_shown == [True]
+    assert len(error_shown) == 1 and isinstance(error_shown[0], RuntimeError)
     app_mod.write_lock.assert_not_called()
     app_mod.remove_lock.assert_called_once()

@@ -54,13 +54,20 @@ def _confirm_quit() -> bool:
         return True
 
 
-def _show_webview2_missing_error() -> None:
-    """Show a clear dialog when the WebView2 Runtime (B-3) is unavailable."""
+def _show_window_start_error(error: Exception) -> None:
+    """Show a clear dialog when the native window fails to open (B-3).
+
+    The most common cause on Windows 10 is a missing WebView2 Runtime, so the
+    message leads with that; the actual exception text is appended in case the
+    failure is something else (port clash, pythonnet load error, ...).
+    """
+    detail = f"{type(error).__name__}: {error}" if str(error) else type(error).__name__
     message = (
-        "Clio 窗口依赖 Microsoft WebView2 Runtime（Edge Chromium）。\n\n"
+        "Clio 窗口启动失败。最常见原因是缺少 WebView2 Runtime（Edge Chromium）。\n\n"
         "Windows 11 已自带；Windows 10 需要单独安装：\n"
         "https://developer.microsoft.com/microsoft-edge/webview2/\n\n"
-        "安装 Evergreen Runtime 后重新启动应用。"
+        "安装 Evergreen Runtime 后重新启动应用。\n\n"
+        f"技术细节：{detail}"
     )
     try:
         from tkinter import Tk, messagebox
@@ -69,11 +76,11 @@ def _show_webview2_missing_error() -> None:
         root.withdraw()
         root.attributes("-topmost", True)
         try:
-            messagebox.showerror("缺少 WebView2 运行时", message)
+            messagebox.showerror("Clio 窗口启动失败", message)
         finally:
             root.destroy()
     except Exception:  # noqa: BLE001 — headless/CI fallback: never block startup
-        print("缺少 WebView2 Runtime（Edge Chromium）:", message)
+        print("Clio 窗口启动失败:", message)
 
 
 def _handle_closing(
@@ -149,8 +156,8 @@ def main(
                 width=1280,
                 height=800,
             )
-        except Exception:  # noqa: BLE001 — WebView2 runtime missing is the common cause
-            _show_webview2_missing_error()
+        except Exception as e:  # noqa: BLE001 — WebView2 runtime missing is the common cause
+            _show_window_start_error(e)
             return 1
 
         # Register focus callback for later desktop launches (single instance).
@@ -178,8 +185,8 @@ def main(
             pass
         try:
             webview.start()
-        except Exception:  # noqa: BLE001 — WebView2 runtime missing is the common cause
-            _show_webview2_missing_error()
+        except Exception as e:  # noqa: BLE001 — WebView2 runtime missing is the common cause
+            _show_window_start_error(e)
             return 1
     finally:
         remove_lock(config_dir)
