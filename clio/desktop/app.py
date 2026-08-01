@@ -54,6 +54,28 @@ def _confirm_quit() -> bool:
         return True
 
 
+def _show_webview2_missing_error() -> None:
+    """Show a clear dialog when the WebView2 Runtime (B-3) is unavailable."""
+    message = (
+        "Clio 窗口依赖 Microsoft WebView2 Runtime（Edge Chromium）。\n\n"
+        "Windows 11 已自带；Windows 10 需要单独安装：\n"
+        "https://developer.microsoft.com/microsoft-edge/webview2/\n\n"
+        "安装 Evergreen Runtime 后重新启动应用。"
+    )
+    try:
+        from tkinter import Tk, messagebox
+
+        root = Tk()
+        root.withdraw()
+        root.attributes("-topmost", True)
+        try:
+            messagebox.showerror("缺少 WebView2 运行时", message)
+        finally:
+            root.destroy()
+    except Exception:  # noqa: BLE001 — headless/CI fallback: never block startup
+        print("缺少 WebView2 Runtime（Edge Chromium）:", message)
+
+
 def _handle_closing(
     host: str,
     port: int,
@@ -119,13 +141,17 @@ def main(
         import webview
 
         api = DesktopApi(config_dir)
-        window = webview.create_window(
-            "Clio",
-            url,
-            js_api=api,
-            width=1280,
-            height=800,
-        )
+        try:
+            window = webview.create_window(
+                "Clio",
+                url,
+                js_api=api,
+                width=1280,
+                height=800,
+            )
+        except Exception:  # noqa: BLE001 — WebView2 runtime missing is the common cause
+            _show_webview2_missing_error()
+            return 1
 
         # Register focus callback for later desktop launches (single instance).
         def _focus_window() -> None:
@@ -150,7 +176,11 @@ def main(
             window.events.closed += _on_closed
         except Exception:  # noqa: BLE001 — event API may differ by version
             pass
-        webview.start()
+        try:
+            webview.start()
+        except Exception:  # noqa: BLE001 — WebView2 runtime missing is the common cause
+            _show_webview2_missing_error()
+            return 1
     finally:
         remove_lock(config_dir)
         stop_server(handle)

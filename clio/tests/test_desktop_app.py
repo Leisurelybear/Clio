@@ -225,3 +225,59 @@ def test_main_sets_up_logging_with_config_logs_dir(monkeypatch, tmp_path):
     rv = app_mod.main(argv=[], config_path=cfg_file)
     assert rv == 0
     setup_mock.assert_called_once_with(logs_dir)
+
+
+def _fake_webview_with_failing_start(monkeypatch):
+    fake = types.ModuleType("webview")
+    fake.create_window = MagicMock(return_value=_FakeWindow())
+    fake.start = MagicMock(side_effect=RuntimeError("WebView2 runtime not found"))
+    monkeypatch.setitem(sys.modules, "webview", fake)
+    return fake
+
+
+def test_main_shows_webview2_error_when_start_raises(monkeypatch, tmp_path):
+    """B-3: WebView2 missing during webview.start() → clear dialog + non-zero exit."""
+    monkeypatch.setattr("clio.config.load_config", MagicMock(return_value=MagicMock()))
+    monkeypatch.setattr("clio.log.setup_logging", MagicMock())
+    monkeypatch.setattr("clio.desktop.server_host.start_server", MagicMock(return_value=_FakeHandle()))
+    monkeypatch.setattr("clio.desktop.server_host.stop_server", MagicMock())
+    monkeypatch.setattr(app_mod, "is_web_running", MagicMock(return_value=False))
+    monkeypatch.setattr(app_mod, "focus_first_instance", MagicMock(return_value=False))
+    monkeypatch.setattr(app_mod, "write_lock", MagicMock())
+    monkeypatch.setattr(app_mod, "remove_lock", MagicMock())
+    monkeypatch.setattr(app_mod, "set_desktop_focus_callback", MagicMock())
+    error_shown = []
+    monkeypatch.setattr(app_mod, "_show_webview2_missing_error", lambda: error_shown.append(True))
+    _fake_webview_with_failing_start(monkeypatch)
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("key: value\n", encoding="utf-8")
+    rv = app_mod.main(argv=[], config_path=cfg_file)
+    assert rv == 1
+    assert error_shown == [True]
+    app_mod.remove_lock.assert_called_once()
+
+
+def test_main_shows_webview2_error_when_create_window_raises(monkeypatch, tmp_path):
+    """B-3: WebView2 missing during create_window() → clear dialog + non-zero exit."""
+    monkeypatch.setattr("clio.config.load_config", MagicMock(return_value=MagicMock()))
+    monkeypatch.setattr("clio.log.setup_logging", MagicMock())
+    monkeypatch.setattr("clio.desktop.server_host.start_server", MagicMock(return_value=_FakeHandle()))
+    monkeypatch.setattr("clio.desktop.server_host.stop_server", MagicMock())
+    monkeypatch.setattr(app_mod, "is_web_running", MagicMock(return_value=False))
+    monkeypatch.setattr(app_mod, "focus_first_instance", MagicMock(return_value=False))
+    monkeypatch.setattr(app_mod, "write_lock", MagicMock())
+    monkeypatch.setattr(app_mod, "remove_lock", MagicMock())
+    monkeypatch.setattr(app_mod, "set_desktop_focus_callback", MagicMock())
+    error_shown = []
+    monkeypatch.setattr(app_mod, "_show_webview2_missing_error", lambda: error_shown.append(True))
+    fake = types.ModuleType("webview")
+    fake.create_window = MagicMock(side_effect=RuntimeError("no WebView2"))
+    fake.start = MagicMock()
+    monkeypatch.setitem(sys.modules, "webview", fake)
+    cfg_file = tmp_path / "config.yaml"
+    cfg_file.write_text("key: value\n", encoding="utf-8")
+    rv = app_mod.main(argv=[], config_path=cfg_file)
+    assert rv == 1
+    assert error_shown == [True]
+    app_mod.write_lock.assert_not_called()
+    app_mod.remove_lock.assert_called_once()
