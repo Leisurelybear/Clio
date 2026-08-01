@@ -17,6 +17,8 @@ try {
     if ($LASTEXITCODE -ne 0) {
         throw "PyInstaller failed with exit code $LASTEXITCODE"
     }
+    # Ship the desktop README (WebView2 / SmartScreen / ffmpeg notes) next to the exe.
+    Copy-Item "$root\packaging\README-desktop.md" (Join-Path $root "dist\clio\README-desktop.md") -Force
     Write-Host ""
     Write-Host "Built: dist/clio/clio.exe" -ForegroundColor Green
     Write-Host "Smoke test: & .\dist\clio\clio.exe"

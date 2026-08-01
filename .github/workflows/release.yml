@@ -56,6 +56,12 @@ jobs:
           if (-not (Test-Path "dist/clio/_internal/clio/ui/static/index.html")) { throw "static assets missing" }
           Write-Output "onedir OK"
 
+      - name: Copy desktop README next to exe
+        shell: pwsh
+        run: |
+          Copy-Item "packaging/README-desktop.md" (Join-Path "dist/clio" "README-desktop.md") -Force
+          if (-not (Test-Path "dist/clio/README-desktop.md")) { throw "README-desktop.md missing in bundle" }
+
       - name: Smoke test server startup
         shell: pwsh
         run: |
