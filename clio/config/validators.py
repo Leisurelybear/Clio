@@ -1,4 +1,8 @@
+import logging
+
 from clio.config.models import CANVAS_PRESETS, AppConfig, GlobalConfig
+
+logger = logging.getLogger("clio.config")
 
 _SUPPORTED_PROVIDER_TYPES = {"gemini", "openai", "openai_compat"}
 
@@ -41,11 +45,23 @@ def _require_video_provider_compatible(task_name: str, provider_name: str, provi
         )
 
 
-def _require_known_model(task_name: str, provider_name: str, task_model: str, provider_models: list[str]) -> None:
+def _warn_unknown_model(task_name: str, provider_name: str, task_model: str, provider_models: list[str]) -> None:
+    """Soft warning: a bound model outside the provider's declared list is not fatal.
+
+    Third-party gateways accept arbitrary model names (e.g. `deepseek-v4-flash`
+    on custom proxies), and old projects may bind models that a newer
+    config.example.yaml no longer lists. Downgraded from a hard load failure
+    (R-040 F-2) so upgrades never crash; the UI still offers a curated dropdown.
+    """
     if provider_models and task_model not in provider_models:
         available = ", ".join(provider_models)
-        raise ValueError(
-            f"ai.tasks.{task_name}.model = '{task_model}' 不在 ai.providers.{provider_name}.models 中: {available}。"
+        logger.warning(
+            "ai.tasks.%s.model = '%s' 不在 ai.providers.%s.models 中: %s。"
+            "如该模型可用，请把模型名加入 provider 的 models 列表。",
+            task_name,
+            task_model,
+            provider_name,
+            available,
         )
 
 
@@ -98,7 +114,7 @@ def _validate_config(config: AppConfig) -> None:
 
         provider_cfg = config.ai.providers[task_cfg.provider]
         _require_video_provider_compatible(task_name, task_cfg.provider, provider_cfg.type)
-        _require_known_model(task_name, task_cfg.provider, task_cfg.model, provider_cfg.models)
+        _warn_unknown_model(task_name, task_cfg.provider, task_cfg.model, provider_cfg.models)
 
 
 def validate_global_config(config: GlobalConfig) -> None:

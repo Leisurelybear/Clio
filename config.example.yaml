@@ -85,6 +85,8 @@ ai:
       models:
         - deepseek-chat
         - deepseek-reasoner
+        - deepseek-v4-flash
+        - deepseek-v4-pro
       # max_tokens: 0          # 0 = 不限制（默认）；设正数如 8192 可限制输出长度
       # timeout_sec: 120
       # retry_attempts: 2

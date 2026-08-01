@@ -232,6 +232,26 @@ class TestValidateConfig:
         with pytest.raises(ValueError, match="<无>"):
             _validate_config(cfg)
 
+    def test_task_model_outside_provider_models_is_warning_not_fatal(self, caplog):
+        """R-040 F-2: a bound model outside the provider's declared list must not crash load."""
+        provider = ProviderConfig(
+            name="deepseek",
+            type="openai",
+            api_key="k",
+            models=["deepseek-chat", "deepseek-reasoner"],
+        )
+        cfg = AppConfig(
+            global_cfg=GlobalConfig(ai=GlobalAIConfig(providers={"deepseek": provider})),
+            project_cfg=ProjectConfig(
+                ai=ProjectAIConfig(
+                    tasks={"voiceover": TaskConfig(provider="deepseek", model="deepseek-v4-flash")},
+                ),
+            ),
+        )
+        with caplog.at_level("WARNING", logger="clio.config"):
+            _validate_config(cfg)
+        assert any("deepseek-v4-flash" in r.message for r in caplog.records), caplog.text
+
     @pytest.mark.parametrize("fps,crf", [(0, 32), (15, -1), (15, 52)])
     def test_rejects_invalid_global_compress_values(self, fps, crf):
         cfg = AppConfig(global_cfg=GlobalConfig(compress=GlobalCompressConfig(fps=fps, crf=crf)))
