@@ -36,6 +36,18 @@ _INSTALL_THREAD: threading.Thread | None = None
 _INSTALL_CANCEL = threading.Event()
 
 
+def _is_frozen() -> bool:
+    """True when running from a PyInstaller bundle (clio.exe)."""
+    return bool(getattr(_sys, "frozen", False))
+
+
+_FROZEN_INSTALL_ERROR = (
+    "打包版（clio.exe）不内置 Whisper 依赖，无法在应用内安装。"
+    "请使用源码版：进入项目目录运行 `python main.py whisper install`，"
+    "或将 faster-whisper 安装到外部 Python 后手动下载模型缓存。"
+)
+
+
 def _install_progress_path(handler: HandlerProtocol, qs: dict[str, Any]) -> Path:
     proj_out = handler._get_project_output(qs)
     return proj_out / ".whisper_install.json"
@@ -79,6 +91,8 @@ def _pip_install_streaming(
     elapsed-time counter keeps the UI moving during silent large downloads
     (pip buffers its progress bar when stdout is a pipe, not a TTY).
     """
+    if _is_frozen():
+        return False, _FROZEN_INSTALL_ERROR
     cmd = [_sys.executable, "-m", "pip", "install", "--no-input"]
     if pip_index:
         cmd += ["-i", pip_index]
@@ -323,6 +337,16 @@ def _verify_install(cfg: Any, progress_path: Path, model_name: str) -> bool:
 
 
 def _run_install(handler: HandlerProtocol, qs: dict[str, Any], progress_path: Path) -> None:
+    if _is_frozen():
+        _write_install_progress(
+            progress_path,
+            {
+                "status": "error",
+                "progress_pct": 0,
+                "message": _FROZEN_INSTALL_ERROR,
+            },
+        )
+        return
     proj_dir = handler._resolve_project_dir(qs)
     cfg = handler._get_config(proj_dir)
     pip_index = pip_mirror_for_config(cfg)

@@ -1624,6 +1624,7 @@ async function _loadModelMgmt() {
     const avail = data.available || [];
     const cached = data.cached || [];
     const cublasOk = check.cublas !== false;
+    const frozen = check.frozen === true;
 
     let html = '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">';
 
@@ -1640,11 +1641,21 @@ async function _loadModelMgmt() {
     html += '<div>';
     const alreadyCached = cached.some(c => c.name === current && c.valid);
     const needsReverify = alreadyCached && !cublasOk;
-    const btnText = needsReverify ? '重新验证' : alreadyCached ? '已下载' : '下载模型';
-    const btnDisabled = alreadyCached && !needsReverify ? ' disabled' : '';
+    let btnText;
+    let btnDisabled;
+    if (frozen) {
+      btnText = '打包版不支持安装';
+      btnDisabled = ' disabled';
+    } else {
+      btnText = needsReverify ? '重新验证' : alreadyCached ? '已下载' : '下载模型';
+      btnDisabled = alreadyCached && !needsReverify ? ' disabled' : '';
+    }
     html += `<button id="btn-model-download" class="btn-primary" style="font-size:var(--text-sm)"${btnDisabled}>${icon('download', 14)} ${btnText}</button>`;
     if (needsReverify) {
       html += '<p style="font-size:var(--text-xs);color:var(--warn,#b8860b);margin:4px 0 0">模型文件已缓存，但 cuBLAS 环境验证未通过。点击「重新验证」重试。</p>';
+    }
+    if (frozen) {
+      html += '<p style="font-size:var(--text-xs);color:var(--warn,#b8860b);margin:4px 0 0">faster-whisper（约 4 GB）未打包进 clio.exe。如需转录，请改用源码版运行 <code>python main.py whisper install</code>。</p>';
     }
     html += '</div>';
 
@@ -1711,6 +1722,10 @@ async function _loadModelMgmt() {
     const dlBtn = $('btn-model-download');
     if (dlBtn) {
       dlBtn.onclick = async () => {
+        if (check.frozen === true) {
+          setStatus('打包版不支持在此安装 Whisper，请使用源码版运行 python main.py whisper install', 'warn');
+          return;
+        }
         dlBtn.disabled = true;
         dlBtn.textContent = '启动下载...';
         const prog = $('model-dl-progress');

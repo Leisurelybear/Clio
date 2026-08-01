@@ -12,6 +12,7 @@ import yaml
 
 from clio.ui.routes.whisper_download import (
     _install_progress_path,
+    _pip_install_streaming,
     _run_install,
     handle_post_whisper_install_cancel,
 )
@@ -21,6 +22,54 @@ from clio.ui.routes.whisper_routes import (
     handle_get_whisper_models,
     handle_put_whisper_model,
 )
+
+
+class TestFrozenInstallGuard:
+    """F-1: packaged (PyInstaller) builds cannot install whisper via pip."""
+
+    def test_run_install_fails_fast_when_frozen(self, tmp_path: Path) -> None:
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
+        proj_output = tmp_path / "output"
+        proj_output.mkdir()
+        handler = _make_handler(proj_dir, proj_output)
+        qs = {"project": "test"}
+        progress_file = _install_progress_path(handler, qs)
+
+        with patch("clio.ui.routes.whisper_download._is_frozen", return_value=True):
+            _run_install(handler, qs, progress_file)
+
+        status = json.loads(progress_file.read_text(encoding="utf-8"))
+        assert status["status"] == "error"
+        assert "打包版" in status["message"]
+        assert "源码版" in status["message"]
+
+    def test_pip_install_streaming_fails_fast_when_frozen(self, tmp_path: Path) -> None:
+        proj_output = tmp_path / "output"
+        proj_output.mkdir()
+        progress_file = proj_output / ".whisper_install.json"
+
+        with patch("clio.ui.routes.whisper_download._is_frozen", return_value=True):
+            ok, err = _pip_install_streaming(["faster-whisper"], progress_file, "test")
+
+        assert ok is False
+        assert "源码版" in err
+
+    def test_get_whisper_check_reports_frozen(self, tmp_path: Path) -> None:
+        proj_dir = tmp_path / "project_a"
+        proj_dir.mkdir()
+        proj_output = tmp_path / "output_a"
+        proj_output.mkdir()
+        handler = _make_handler(proj_dir, proj_output)
+
+        with (
+            patch("clio.ui.routes.whisper_check.check_whisper", return_value=False),
+            patch("clio.ui.routes.whisper_check.sys.frozen", True, create=True),
+        ):
+            handle_get_whisper_check(handler, {})
+
+        payload = handler._send_json.call_args[0][0]
+        assert payload["frozen"] is True
 
 
 class _FakePopen:

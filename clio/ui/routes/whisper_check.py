@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Any
 
 from clio.transcribe import _resolve_cache_dir, check_cublas, check_whisper
@@ -11,6 +12,7 @@ from clio.whisper_cache import is_model_cache_complete
 
 def handle_get_whisper_check(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     installed = check_whisper()
+    frozen = bool(getattr(sys, "frozen", False))
     cuda = False
     if installed:
         try:
@@ -36,6 +38,7 @@ def handle_get_whisper_check(handler: HandlerProtocol, qs: dict[str, Any]) -> No
         {
             "ok": True,
             "installed": installed,
+            "frozen": frozen,
             "cublas": check_cublas(),
             "cuda": cuda,
             "cache_path": cache_path,

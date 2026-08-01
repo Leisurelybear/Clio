@@ -27,6 +27,14 @@ except ImportError:
 def run_whisper_install(config_path: str | Path = "config.yaml") -> int:
     print("正在安装 faster-whisper...")
 
+    if getattr(sys, "frozen", False):
+        print(
+            "  [错误] 打包版（clio.exe）不内置 Whisper 依赖，无法在此安装。\n"
+            "         请使用源码版：进入项目目录运行 `python main.py whisper install`，\n"
+            "         或将 faster-whisper 安装到外部 Python 后手动下载模型缓存。"
+        )
+        return 1
+
     cfg = load_config(config_path)
     import os
 

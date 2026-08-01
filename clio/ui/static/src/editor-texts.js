@@ -449,6 +449,14 @@ export async function renderWhisperInstallPrompt(pane) {
   const div = document.createElement('div');
   div.id = 'whisper-install-prompt';
   div.style.cssText = 'margin-top:12px;padding:12px;background:var(--warning-bg,#2a2520);border:1px solid var(--warning-border,#b8860b);border-radius:6px';
+  if (check.frozen) {
+    div.innerHTML = `
+      <p style="margin:0 0 8px;font-weight:600">⚠ 打包版不内置 Whisper 转录</p>
+      <p style="margin:0;font-size:var(--text-sm);color:var(--text-secondary)">faster-whisper（约 4 GB）未打包进 clio.exe。如需转录，请改用源码版运行 <code>python main.py whisper install</code>。</p>
+    `;
+    pane.appendChild(div);
+    return;
+  }
   div.innerHTML = `
     <p style="margin:0 0 8px;font-weight:600">⚠ Whisper 模型未下载</p>
     <p style="margin:0 0 8px;font-size:var(--text-sm);color:var(--text-secondary)">需要下载 ${installed ? '模型文件（约 1-2 GB）' : 'faster-whisper 依赖及模型文件'}，请前往 <a href="#" id="whisper-go-settings" style="text-decoration:underline;color:var(--accent)">设置 → Whisper 模型管理</a> 手动下载。</p>
