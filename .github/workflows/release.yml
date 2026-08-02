@@ -168,6 +168,7 @@ jobs:
           mkdir -p "$staging"
           cp -R dist/clio.app "$staging/clio.app"
           cp packaging/README-desktop.md "$staging/README-desktop.md"
+          test -f "$staging/README-desktop.md" || { echo "README-desktop.md missing in bundle"; exit 1; }
           ditto -c -k --sequesterRsrc --keepParent "$staging" "$name.zip"
           test -f "$name.zip" || { echo "zip not created"; exit 1; }
           echo "artifact=$name.zip"
