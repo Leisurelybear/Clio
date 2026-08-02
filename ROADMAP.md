@@ -38,6 +38,17 @@ the UI and open projects, but several gaps block or degrade first-run use.
 
 Suggested priority: F-1 → F-2/F-3 → B-1 → B-2/B-3/B-4.
 
+**Post-review regression fixes (2026-08-03, from release/workflow review):**
+
+- [x] main.py no longer blocks auto-generation — removed the early `config_path.exists()`
+      early-exit so `load_config`/`_ensure_global_config` runs for every subcommand
+      (desktop/serve/doctor/etc. can all bootstrap a missing `config.yaml`)
+- [x] `read_lock()` treats an incomplete/broken `clio.lock` as stale — port must be a
+      non-bool int, else returns None; `app.py` reads `lock.get("port")` defensively
+- [x] `/api/deps/keys` falls back to globally declared providers when no project/tasks
+      exist, so the B-1 missing-key banner still guides first-run setup
+- [x] macOS release verifies README-desktop.md is staged (parity with Windows check)
+
 ### R-039 Desktop single-instance + web coexistence prompt
 
 **Status:** Done (2026-08-01)
