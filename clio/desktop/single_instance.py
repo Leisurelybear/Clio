@@ -32,7 +32,12 @@ def read_lock(config_dir: Path) -> dict | None:
         data = json.loads(p.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    return data if isinstance(data, dict) else None
+    if not isinstance(data, dict):
+        return None
+    port = data.get("port")
+    if not isinstance(port, int) or isinstance(port, bool):
+        return None
+    return data
 
 
 def write_lock(config_dir: Path, port: int, pid: int) -> None:

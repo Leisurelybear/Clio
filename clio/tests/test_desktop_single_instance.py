@@ -45,6 +45,16 @@ def test_read_lock_non_dict_returns_none(tmp_path):
     assert read_lock(tmp_path) is None
 
 
+def test_read_lock_missing_port_returns_none(tmp_path):
+    (tmp_path / "clio.lock").write_text(json.dumps({"pid": 999}), encoding="utf-8")
+    assert read_lock(tmp_path) is None
+
+
+def test_read_lock_non_int_port_returns_none(tmp_path):
+    (tmp_path / "clio.lock").write_text(json.dumps({"port": "8765", "pid": 999}), encoding="utf-8")
+    assert read_lock(tmp_path) is None
+
+
 def test_remove_lock_deletes_file(tmp_path):
     write_lock(tmp_path, port=4321, pid=1)
     assert (tmp_path / "clio.lock").is_file()

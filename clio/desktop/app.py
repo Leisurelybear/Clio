@@ -132,7 +132,7 @@ def main(
 
     # Single instance: if another instance is already running, focus it and exit.
     lock = read_lock(config_dir)
-    if lock and focus_first_instance("127.0.0.1", lock["port"]):
+    if lock and focus_first_instance("127.0.0.1", lock.get("port")):
         print("Clio 已在运行，已聚焦原窗口")
         return 0
 
