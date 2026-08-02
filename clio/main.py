@@ -327,9 +327,6 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
     config_path = Path(args.config)
-    if not config_path.exists():
-        print(f"配置文件不存在: {config_path}", file=sys.stderr)
-        return 1
 
     if args.command == "doctor":
         project = getattr(args, "project", None) or getattr(args, "input", None)

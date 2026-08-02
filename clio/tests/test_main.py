@@ -120,6 +120,16 @@ def test_desktop_subcommand(mock_run_desktop, cli_runner, config_path):
     mock_run_desktop.assert_called_once_with(config_path=config_path)
 
 
+@patch("clio.desktop.app.main")
+def test_desktop_subcommand_without_config_dispatches(mock_run_desktop, cli_runner, tmp_path):
+    """Missing config.yaml must not block desktop; app.main auto-generates it."""
+    missing = tmp_path / "config.yaml"
+    mock_run_desktop.return_value = 0
+    result = cli_runner(["--config", str(missing), "desktop"])
+    assert result == 0
+    mock_run_desktop.assert_called_once_with(config_path=missing)
+
+
 @patch("clio.tasks.transcribe.run_transcribe_all")
 def test_transcribe_force_flag(mock_run, cli_runner, config_path):
     """--force 应设置 skip_existing=False"""
