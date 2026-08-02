@@ -30,6 +30,10 @@ def handle_get_deps_keys(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
     proj_dir = handler._resolve_project_dir(qs)
     cfg = handler._get_config(proj_dir)
     referenced = sorted({task.provider for task in cfg.ai.tasks.values()})
+    if not referenced:
+        # No project/tasks yet (first launch): still surface globally declared
+        # providers so the "missing key" banner guides first-run setup (R-040 B-1).
+        referenced = sorted(cfg.ai.providers)
     missing: list[dict[str, str]] = []
     for name in referenced:
         provider = cfg.ai.providers.get(name)

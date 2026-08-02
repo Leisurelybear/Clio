@@ -119,3 +119,19 @@ class TestHandleGetDepsKeys:
         handle_get_deps_keys(h, {})
         payload = h._send_json.call_args[0][0]
         assert any(m["provider"] == "nope" for m in payload["missing"])
+
+    def test_falls_back_to_global_providers_when_no_tasks(self, tmp_path: Path, monkeypatch):
+        """B-1 first-launch: with no project/tasks, surface globally declared providers."""
+        h = _handler(tmp_path)
+        monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+        h._get_config.return_value = _cfg(
+            providers={
+                "deepseek": SimpleNamespace(api_key="", api_key_env="DEEPSEEK_API_KEY"),
+                "gemini": SimpleNamespace(api_key="", api_key_env="GEMINI_API_KEY"),
+            },
+            tasks={},
+        )
+        handle_get_deps_keys(h, {})
+        payload = h._send_json.call_args[0][0]
+        names = {m["provider"] for m in payload["missing"]}
+        assert names == {"deepseek", "gemini"}
