@@ -10,7 +10,7 @@ from pathlib import Path, PurePath, PureWindowsPath
 from typing import Literal
 
 from clio.config import AppConfig, load_config
-from clio.utils import discover_ffmpeg_bin
+from clio.utils import discover_ffmpeg_bin, no_console_kwargs
 
 DoctorStatus = Literal["OK", "WARN", "FAIL"]
 PLACEHOLDER_KEYS = {"your_api_key_here", "YOUR_API_KEY", ""}
@@ -67,7 +67,9 @@ def _node_version() -> str | None:
     if not node:
         return None
     try:
-        result = subprocess.run([node, "--version"], capture_output=True, text=True, check=False, timeout=5)
+        result = subprocess.run(
+            [node, "--version"], capture_output=True, text=True, check=False, timeout=5, **no_console_kwargs()
+        )
     except (OSError, subprocess.TimeoutExpired):
         return None
     return (result.stdout or result.stderr).strip() or None

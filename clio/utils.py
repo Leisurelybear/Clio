@@ -26,6 +26,17 @@ _PROBE_INFO_CACHE: dict[tuple[str, str, int, int], dict[str, float]] = {}
 # filenames in ffmpeg stderr.  These wrappers force utf-8 + errors=replace.
 
 
+def no_console_kwargs() -> dict:
+    """Windows kwargs to avoid a visible console window per subprocess.
+
+    GUI hosts (desktop UI) have no console; without CREATE_NO_WINDOW every
+    ffmpeg/ffprobe/pip child flashes a black console window. No-op elsewhere.
+    """
+    if os.name != "nt":
+        return {}
+    return {"creationflags": subprocess.CREATE_NO_WINDOW}
+
+
 def run_subprocess(
     cmd: list[str],
     **kwargs,
@@ -34,6 +45,8 @@ def run_subprocess(
     in_text = kwargs.get("text") or kwargs.get("universal_newlines") or kwargs.get("encoding")
     if in_text:
         kwargs.setdefault("errors", "replace")
+    if not kwargs.get("creationflags"):
+        kwargs.update(no_console_kwargs())
     return subprocess.run(cmd, **kwargs)
 
 
@@ -44,6 +57,8 @@ def popen_subprocess(
     """subprocess.Popen() wrapper — auto-adds errors=replace in text mode."""
     if kwargs.get("text") or kwargs.get("universal_newlines"):
         kwargs.setdefault("errors", "replace")
+    if not kwargs.get("creationflags"):
+        kwargs.update(no_console_kwargs())
     return subprocess.Popen(cmd, **kwargs)
 
 

@@ -20,7 +20,7 @@ from clio.schema import add_schema_version
 from clio.tasks._helpers import _matches_selected_stem, _selected_stems
 from clio.tasks.transcript_align import enrich_matching_analysis_files
 from clio.transcribe import check_whisper, transcribe_audio
-from clio.utils import find_videos, popen_subprocess, resolve_binary, write_json_atomic
+from clio.utils import find_videos, no_console_kwargs, popen_subprocess, resolve_binary, write_json_atomic
 
 # isort: split
 from clio.shutdown import register_process, unregister_process
@@ -46,7 +46,7 @@ def _get_video_duration(video_path: Path, ffprobe: str) -> float:
 
     cmd = [ffprobe, "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(video_path)]
     try:
-        r = _subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        r = _subprocess.run(cmd, capture_output=True, text=True, timeout=30, **no_console_kwargs())
         if r.returncode == 0 and r.stdout.strip():
             return float(r.stdout.strip())
     except Exception:

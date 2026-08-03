@@ -23,7 +23,7 @@ from clio.transcribe import (
     pip_mirror_for_config,
 )
 from clio.ui.handler_protocol import HandlerProtocol
-from clio.utils import run_subprocess
+from clio.utils import no_console_kwargs, run_subprocess
 from clio.whisper_cache import (
     REQUIRED_MODEL_FILES,
     ensure_model_cache_refs,
@@ -106,6 +106,7 @@ def _pip_install_streaming(
             errors="replace",
             bufsize=1,
             env={**os.environ, "PYTHONUNBUFFERED": "1"},
+            **no_console_kwargs(),
         )
     except OSError as e:
         return False, str(e)
