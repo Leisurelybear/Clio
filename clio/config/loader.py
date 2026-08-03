@@ -470,8 +470,11 @@ def load_global_config(config_path: str | Path = "config.yaml") -> GlobalConfig:
     _migrate_if_needed(config_file)
     _upgrade_config_file(config_file, section_map=_GLOBAL_SECTION_DC_MAP)
 
-    with config_file.open(encoding="utf-8") as f:
-        raw: dict[str, Any] = yaml.safe_load(f) or {}
+    try:
+        with config_file.open(encoding="utf-8") as f:
+            raw: dict[str, Any] = yaml.safe_load(f) or {}
+    except (NotADirectoryError, IsADirectoryError) as exc:
+        raise FileNotFoundError(exc) from exc
 
     # Providers use env var resolution
     ai_raw = raw.get("ai", {})
