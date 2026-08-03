@@ -1,5 +1,154 @@
 # Changelog
 
+## 2026-08-03
+
+### Fixed
+- fix(desktop): remove the early `config_path.exists()` exit so **all** CLI subcommands
+  (desktop / serve / doctor / …) bootstrap a missing `config.yaml` via the loader's
+  auto-generation — CLI entry now matches `python -m clio.desktop` behavior
+- fix(desktop): treat a broken or incomplete `clio.lock` as stale — `read_lock()` requires
+  a non-bool int `port`, else returns `None`; `app.py` reads `lock.get("port")` defensively
+  so a second launch after a crashed first instance no longer `KeyError`/`InvalidURL`
+- fix(ui): `/api/deps/keys` falls back to globally declared providers when no project/tasks
+  exist, so the B-1 missing-key banner still guides first-run setup
+- ci(release): hard-check `README-desktop.md` is staged in macOS zip (parity with Windows)
+- fix(config): normalize a missing `config.yaml` behind a non-directory path to
+  `FileNotFoundError` on POSIX (macOS/Linux), matching Windows behavior in `load_global_config`
+
+### Tests
+- `test_desktop_single_instance`: missing-port / non-int-port locks → `None`
+- `test_main`: `desktop` subcommand dispatches even when `config.yaml` is absent
+- `test_routes_deps`: no-tasks → falls back to global providers
+
+### Docs
+- ROADMAP R-040: record the post-review regression fixes above
+
+## 2026-08-01
+
+### Added
+- feat(config): **auto-generate** missing `config.yaml` from bundlable `config.example.yaml`
+  template (loader `_ensure_global_config`; repo-root + `_internal/clio/config/` lookup)
+- feat(desktop): **pywebview host** — start localhost UI server on a free port, open a native
+  window with `js_api` pickers; `desktop` subcommand entry (`python main.py desktop`)
+- feat(desktop): **single-instance lock + focus probe + web coexistence prompt** (R-039) —
+  second launch focuses the existing window; prompts when web UI is up on 8765
+- feat(desktop): **hourly file logging** in the desktop shell (`logs/`)
+- feat(ui): runtime **banners** guiding API-key and ffmpeg setup (R-040 B-1/B-2)
+- feat(desktop): clear dialog when WebView2 Runtime missing (R-040 B-3)
+- feat(packaging): ship `README-desktop.md` next to the exe (R-040 F-3)
+- feat(whisper): guard `pip install` in frozen desktop builds (R-040 F-1)
+- feat(config): allow out-of-list task models with a warning instead of fatal (R-040 F-2)
+- feat(packaging): **multi-platform desktop builds** — Windows x64 + macOS universal2
+  (PyInstaller onedir) with a GitHub Release publishing workflow
+- feat(desktop): native dialogs (browse folders / relink / multi-file-add videos)
+- feat(plan): write `source_inputs` input-pool on generated plans; list them in `plan.md`
+
+### Fixed
+- fix(desktop): pass auto-created `config.yaml` path to the server on first launch (5e863c4)
+- fix(desktop): `finally` owns the server shutdown instead of the window `closed` event
+- fix(desktop): refine window error dialog text + ffmpeg winget ID + key banner wording
+- feat(ui): native pick helpers route browse buttons to the OS folder dialog
+- carry-over 07-31 desktop items: cancel run + stop server on window close
+
+### Changed
+- pack: bundle `config.example.yaml` into the onedir (`clio/config/`)
+
+### Docs
+- specs/plans/designs for auto-generated config, desktop single-instance, hybrid desktop
+- ROADMAP R-039 / R-040 closed; multi-platform packaging recorded
+
+## 2026-07-31
+
+### Added
+- `desktop/app.py` pywebview host with `js_api` pickers; start/stop localhost server on free port
+- desktop `cli` subcommand (`clio desktop`); persist last picked directory
+- mockable native dialog wrappers; route browse buttons to native folder dialog
+- native dialog on WebView2 missing (B-3) / cancel + stop server on window close
+- native multi-file add videos; relink + batch relink dialogs; remove custom dir browser modal
+- native browse on config path fields
+
+### Docs
+- R-032 desktop implementation plan + hybrid design (HTTP + native dialogs only)
+
+## 2026-07-29
+
+### Docs
+- R-032 hybrid desktop design locked (js_api-only pickers, desktop token clarified)
+
+## 2026-07-27
+
+### Added
+- plan segment **range picker** modal; wire the 选区 button to it; harden interplay
+- pure range-picker timebase helpers + tests
+
+### Changed
+- remove the dead physical-split writer and its config knobs (R-038)
+
+## 2026-07-26
+
+### Fixed
+- fix(analyze): harden long-video window handling
+
+## 2026-07-25
+
+### Fixed
+- fix(ui): stable player viewport on source switch + linear panel resizing
+- fix(ui): preserve progress + nav state / ignore stale loads when switching video source
+- fix(ui): convert player time → transcript time
+- fix(analyze): merge `summary.csv` on selection re-analyze
+- fix(gemini): apply timeout + token limits
+- fix(config): reject invalid runtime settings
+- fix(media): normalize configurable index widths
+- fix(cut): reject non-string `day_label` with 400
+- fix(label): unlink partial labeled mp4 on cancel
+- fix(plan): let scrub only seek; resync select-videos label
+
+### Tests
+- UI: cover preview-bar scrub-only, select-videos label, run button
+- plan: cover `source_inputs` extras round-trip + skip legacy
+
+### Docs
+- full project review results; R-033 hardening marked done
+
+## 2026-07-24
+
+### Added
+- `source_inputs` design + implementation plan
+
+### Fixed
+- fix(analyze): re-raise cancel during window slice copy
+- fix(r033): strip masked `api_key` / plan `files=` skip / compress partial cleanup
+
+## 2026-07-23
+
+### Added
+- R-033 **hardening + pipeline robustness** design/plan: config write masking, input
+  sandboxing, body/token guards, run isolation, partial cleanup
+
+### Fixed
+- fix(config): validate global config on load and `PUT`; strip `api_key` on write + mask on GET
+- fix(ui): cap JSON body size, constant-time token compare
+- fix(ui): sandbox cut `output_dir` + run `project_dir`; sanitize day labels
+- fix(log): skip blank session_log rows in print-split writes
+- fix(pipeline): honor files filter, state keys, counts, ETA reset
+- fix(media): cleanup partials on cancel; strict waveform abspath
+- fix(ui): keep plan auto-advance after native play/seek/scrub
+
+### Tests
+- cover `_matches_selected_*` identity-only JSON
+
+### Docs
+- R-033 hardening + robustness design/plan; marked done
+
+## 2026-07-22
+
+### Added
+- store timestamped log entries; normalize + time format + `sinceMs` filter
+- show per-entry timestamps and recent-time chips in the UI (R-027d)
+
+### Docs
+- R-027d session log timestamps design + implementation plan
+
 ## 2026-07-21
 
 ### Added
