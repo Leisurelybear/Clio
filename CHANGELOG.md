@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-08-05
+
+### Fixed
+- fix(progress): `ProgressTracker.update()` only resets `current` when the phase actually
+  changes, so same-phase message-only updates (e.g. transcribe's per-percent callbacks)
+  no longer wipe the per-clip counter — the 转录 progress bar/percentage now advances
+- fix(ui): the 60s stale-progress warning no longer claims "正在后台下载模型 / Whisper 模型管理"
+  for non-transcribe phases; only `transcribe` shows the Whisper model hint, other phases
+  show a generic "可能仍在运行或网络连接异常" message
+- fix(desktop): enable `text_select=True` on the pywebview window — pywebview's default is
+  False, which made all desktop-app text unselectable/un-copyable
+- fix(ci): use `getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)` so the core mypy gate
+  passes on POSIX (Ubuntu CI) where the constant is absent
+
+### Tests
+- `test_progress`: same-phase message update preserves `current`; phase re-entry still resets
+- `test_desktop_app`: window is created with `text_select=True`
+- `test_runner` (Vitest): `staleWarningHtml` shows Whisper hint only for `transcribe`
+
+### Docs
+- CHANGELOG: record the two run-progress fixes, desktop text selection, and the CI mypy gate fix
+
 ## 2026-08-03
 
 ### Fixed

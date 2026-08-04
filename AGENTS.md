@@ -177,6 +177,12 @@ ruff check clio main.py
 
 Pre-commit hook auto-runs ruff on staged `.py` files (`.githooks/pre-commit`).
 
+CI also gates a mypy subset (Phase 4d). Reproduce locally with:
+
+```bash
+mypy clio/config/ clio/progress.py clio/export/__init__.py clio/log.py clio/schema.py clio/_str_enum.py --check-untyped-defs --show-error-codes
+```
+
 ### Verification Flow
 
 ```bash
