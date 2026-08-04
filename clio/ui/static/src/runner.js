@@ -383,6 +383,26 @@ function _stopRunSSE() {
   }
 }
 
+/** Re-fetch the video list so artifacts from a finished/cancelled/failed run show up. */
+async function refreshVideosAfterRun() {
+  try {
+    await import('./sidebar.js').then(mod => mod.loadVideos());
+  } catch { /* 刷新失败不阻断完成后的导航/提示 */ }
+}
+
+/** Stale-progress warning box; Whisper model hint only for the transcribe phase. */
+function staleWarningHtml(phase) {
+  const whisperHint = phase === 'transcribe'
+    ? `<span style="color:var(--text-secondary)">可前往 <a href="#" id="link-stale-settings" style="text-decoration:underline;color:var(--accent)" onclick="event.preventDefault();import('./sidebar.js').then(function(m){m.selectConfig()})">设置 → Whisper 模型管理</a> 检查模型状态</span>`
+    : '';
+  return `
+    <div id="stale-warn" style="display:none;margin-top:8px;padding:8px;background:var(--warning-bg,#2a2520);border:1px solid var(--warning-border,#b8860b);border-radius:6px;font-size:var(--text-sm)">
+      ⏳ 进度长时间未更新，可能仍在运行或网络连接异常<br>
+      ${whisperHint}
+    </div>
+  `;
+}
+
 async function _handleRunStatus(s) {
   const prog = $('run-progress');
   const btn = $('btn-run-start');
@@ -439,10 +459,7 @@ async function _handleRunStatus(s) {
             <div style="background:#333;border-radius:3px;height:8px;margin:8px 0">
               <div style="background:var(--accent);border-radius:3px;height:100%;width:${pct}%"></div>
             </div>
-            <div id="stale-warn" style="display:none;margin-top:8px;padding:8px;background:var(--warning-bg,#2a2520);border:1px solid var(--warning-border,#b8860b);border-radius:6px;font-size:var(--text-sm)">
-              ⏳ 进度长时间未更新，可能正在后台下载模型（约 1-2 GB）或网络连接异常<br>
-              <span style="color:var(--text-secondary)">可前往 <a href="#" id="link-stale-settings" style="text-decoration:underline;color:var(--accent)" onclick="event.preventDefault();import('./sidebar.js').then(function(m){m.selectConfig()})">设置 → Whisper 模型管理</a> 检查模型状态</span>
-            </div>
+            ${staleWarningHtml(s.phase)}
             ${logsHtml}
           `;
           // 超时停滞检测：如果 current/total/message 无变化超过 60 秒，显示提示
@@ -500,7 +517,7 @@ async function _handleRunStatus(s) {
       import('./sidebar.js').then(mod => mod.renderSteps());
       import('./sidebar.js').then(mod => mod.saveProject());
       try { state.plan = await api('GET', `/api/plan?day=${_lastRunDay}`); } catch {}
-      await import('./sidebar.js').then(mod => mod.loadVideos());
+      await refreshVideosAfterRun();
       const completedSteps = Array.isArray(s.steps) ? s.steps : _lastRunSteps;
       if (state.currentEntity === 'run' && (_expectDoneNavigation || _seenNonTerminal)) {
         await _showRunCompletionTarget(completedSteps);
@@ -522,6 +539,7 @@ async function _handleRunStatus(s) {
       setStatus('流水线已取消', 'warn');
       addToast(s.message || '流水线已取消', 'warning');
       if (hasRunDom) renderProcessingState($('run-state-container'));
+      await refreshVideosAfterRun();
     } else if (s.status === 'error') {
       _lastProgressSnapshot = null;
       _runActive = false;
@@ -536,6 +554,7 @@ async function _handleRunStatus(s) {
       setStatus('流水线出错', 'err');
       addToast(s.message || '流水线出错', 'error', 6000);
       if (hasRunDom) renderProcessingState($('run-state-container'));
+      await refreshVideosAfterRun();
     }
 }
 
@@ -664,4 +683,6 @@ export {
   renderRunPreviewHtml,
   buildSkippedDiagnostics,
   renderSkippedDiagnosticsHtml,
+  refreshVideosAfterRun,
+  staleWarningHtml,
 };

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   buildSkippedDiagnostics,
   renderRunPreviewHtml,
@@ -7,8 +7,14 @@ import {
   getRunButtonText,
   _shouldResetRunNavigationOnRender,
   updateRunStartButtonState,
+  refreshVideosAfterRun,
+  staleWarningHtml,
 } from '../runner.js';
 import { state } from '../state.js';
+
+vi.mock('../sidebar.js', () => ({
+  loadVideos: vi.fn(() => Promise.resolve()),
+}));
 
 describe('renderRunPreviewHtml', () => {
   it('renders totals and per-step counts', () => {
@@ -146,6 +152,34 @@ describe('getRunButtonText / updateRunStartButtonState', () => {
     expect(btn.disabled).toBe(true);
     expect(btn.innerHTML).toContain('请先勾选视频');
     expect(btn.title).toContain('勾选');
+  });
+});
+
+describe('staleWarningHtml', () => {
+  it('shows the Whisper model hint only for the transcribe phase', () => {
+    const html = staleWarningHtml('transcribe');
+    expect(html).toContain('stale-warn');
+    expect(html).toContain('Whisper 模型管理');
+    expect(html).toContain('link-stale-settings');
+  });
+
+  it('omits the Whisper hint for non-transcribe phases', () => {
+    for (const phase of ['compress', 'analyze', 'voiceover', 'plan', 'label', '启动', '']) {
+      const html = staleWarningHtml(phase);
+      expect(html).toContain('stale-warn');
+      expect(html).toContain('进度长时间未更新');
+      expect(html).not.toContain('Whisper');
+      expect(html).not.toContain('link-stale-settings');
+    }
+  });
+});
+
+describe('refreshVideosAfterRun', () => {
+  it('reloads the video list after a terminal run status', async () => {
+    const { loadVideos } = await import('../sidebar.js');
+    vi.mocked(loadVideos).mockClear();
+    await refreshVideosAfterRun();
+    expect(loadVideos).toHaveBeenCalled();
   });
 });
 
