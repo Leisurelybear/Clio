@@ -149,6 +149,18 @@ def test_main_continues_when_web_running_and_user_accepts(monkeypatch, tmp_path)
     assert app_mod.write_lock.call_args.args[2] == os.getpid()
 
 
+def test_main_creates_window_with_text_selection_enabled(monkeypatch, tmp_path):
+    """Desktop window must enable text selection (pywebview text_select default is False)."""
+    monkeypatch.setattr(app_mod, "is_web_running", MagicMock(return_value=False))
+    monkeypatch.setattr(app_mod, "read_lock", MagicMock(return_value=None))
+    monkeypatch.setattr(app_mod, "write_lock", MagicMock())
+    monkeypatch.setattr(app_mod, "set_desktop_focus_callback", MagicMock())
+    rv, fake_webview = _run_main(monkeypatch, tmp_path)
+    assert rv == 0
+    kwargs = fake_webview.create_window.call_args.kwargs
+    assert kwargs.get("text_select") is True
+
+
 def test_main_focuses_existing_instance_and_exits(monkeypatch, tmp_path):
     monkeypatch.setattr(app_mod, "is_web_running", MagicMock(return_value=False))
     monkeypatch.setattr(app_mod, "read_lock", MagicMock(return_value={"port": 4321, "pid": 1}))

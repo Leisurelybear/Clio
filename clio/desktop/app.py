@@ -160,6 +160,7 @@ def main(
                 js_api=api,
                 width=1280,
                 height=800,
+                text_select=True,
             )
         except Exception as e:  # noqa: BLE001 — WebView2 runtime missing is the common cause
             _show_window_start_error(e)
