@@ -97,7 +97,7 @@ def run_label_videos(
         selected = _selected_stems(files)
         json_files = [f for f in json_files if _matches_selected_artifact(f, selected)]
     if tracker:
-        tracker.update(phase="label", total=len(json_files), message=f"烧录序号（{len(json_files)} 个）...")
+        tracker.update(phase="label", total=len(json_files), current=0, message=f"烧录序号（{len(json_files)} 个）...")
     with timed(f"run_label_videos（{len(json_files)} 个）"):
         completed = 0
         elapsed_total = 0.0

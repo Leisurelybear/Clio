@@ -89,8 +89,8 @@ class ProgressTracker:
                 if phase != self._data["phase"]:
                     self._start = time.monotonic()
                     self._data["eta_sec"] = None
+                    self._data["current"] = 0
                 self._data["phase"] = phase
-                self._data["current"] = 0
             if current is not None:
                 self._data["current"] = current
             if total is not None:

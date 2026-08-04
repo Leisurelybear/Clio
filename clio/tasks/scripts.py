@@ -101,7 +101,9 @@ def run_generate_scripts(
     if not input_files:
         return
     if tracker:
-        tracker.update(phase="voiceover", total=len(input_files), message=f"生成口播文案（{len(input_files)} 条）...")
+        tracker.update(
+            phase="voiceover", total=len(input_files), current=0, message=f"生成口播文案（{len(input_files)} 条）..."
+        )
 
     max_workers = config.analyze.max_workers
     with timed(f"run_generate_scripts（{len(input_files)} 个，workers={max_workers}）"):

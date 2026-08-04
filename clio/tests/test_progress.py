@@ -151,3 +151,26 @@ class TestProgressTracker:
             data = json.loads(t._path.read_text(encoding="utf-8"))
             # elapsed 2, rate=1, remaining 8
             assert data["eta_sec"] == 8
+
+    def test_same_phase_message_update_preserves_current(self, tmp_path):
+        """Re-issuing phase with only a message must NOT reset current (regression)."""
+        t = ProgressTracker(tmp_path)
+        t.update(phase="transcribe", total=142, current=0)
+        t.next()
+        t.next()
+        # Progress callbacks (extract/whisper %) resend phase + message only.
+        t.update(phase="transcribe", message="GX010700: 提取音频 (50%)")
+        data = json.loads(t._path.read_text(encoding="utf-8"))
+        assert data["phase"] == "transcribe"
+        assert data["current"] == 2
+        assert data["total"] == 142
+
+    def test_phase_reentry_resets_current(self, tmp_path):
+        """Switching back to a previously-used phase still resets current."""
+        t = ProgressTracker(tmp_path)
+        t.update(phase="compress", total=5, current=3)
+        t.update(phase="analyze", total=5, current=2)
+        t.update(phase="compress", total=5)
+        data = json.loads(t._path.read_text(encoding="utf-8"))
+        assert data["phase"] == "compress"
+        assert data["current"] == 0
