@@ -34,7 +34,7 @@ def no_console_kwargs() -> dict:
     """
     if os.name != "nt":
         return {}
-    return {"creationflags": subprocess.CREATE_NO_WINDOW}
+    return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)}
 
 
 def run_subprocess(
