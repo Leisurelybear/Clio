@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-08-06
+
+### Added
+- feat(ui): plan-mode **floating subtitles** — during composite plan preview, the current
+  segment's spoken `voiceover` text is overlaid on the player and rotates at even intervals
+  across the segment's `use_timeline` duration
+- New `clio/ui/static/src/plan-subtitle.js`: pure helpers `splitSubtitleLines`
+  (Chinese/ASCII punctuation + long-line breaking), `scheduleSubtitleTiming` (even
+  distribution, last-line clamp), `subtitleIndexAtTime` (half-open range lookup), plus a
+  per-index cached loader `loadVoiceoverText` and the DOM renderer
+  `renderPlanSubtitle`/`hidePlanSubtitle`
+- `viewer.js` drives subtitles from the existing plan preview paths
+  (`seekToGlobal`, `player.ontimeupdate`, `stopPreview`, `renderPreviewBar`)
+
+### Tests
+- `plan-subtitle.test.js` (Vitest, 26 cases): line splitting, timing, line-at-time lookup,
+  cached loader, DOM renderer show/hide/line-change behavior
+
+### Docs
+- Design: `docs/superpowers/specs/2026-08-05-plan-subtitles-design.md`
+- Plan: `docs/superpowers/plans/2026-08-05-plan-subtitles.md`
+
 ## 2026-08-05
 
 ### Fixed
