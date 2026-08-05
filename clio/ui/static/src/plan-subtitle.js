@@ -40,3 +40,24 @@ export function splitSubtitleLines(text, maxLen = 16) {
   }
   return lines;
 }
+
+/**
+ * Evenly distribute lineCount lines across a segment duration.
+ * @param {number} durationSec
+ * @param {number} lineCount
+ * @returns {Array<{startSec: number, endSec: number, index: number}>}
+ */
+export function scheduleSubtitleTiming(durationSec, lineCount) {
+  const d = Number(durationSec);
+  const n = Number(lineCount);
+  if (!(d > 0) || !Number.isFinite(d)) return [];
+  if (!(n > 0) || !Number.isFinite(n)) return [];
+  const step = d / n;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const start = i * step;
+    const end = i === n - 1 ? d : (i + 1) * step;
+    out.push({ startSec: start, endSec: end, index: i });
+  }
+  return out;
+}

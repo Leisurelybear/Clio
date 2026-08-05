@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { splitSubtitleLines } from '../plan-subtitle.js';
+import { splitSubtitleLines, scheduleSubtitleTiming } from '../plan-subtitle.js';
 
 describe('splitSubtitleLines', () => {
   it('splits on Chinese sentence punctuation', () => {
@@ -22,5 +22,39 @@ describe('splitSubtitleLines', () => {
   it('empty / whitespace input → []', () => {
     expect(splitSubtitleLines('', 16)).toEqual([]);
     expect(splitSubtitleLines('   ', 16)).toEqual([]);
+  });
+});
+
+describe('scheduleSubtitleTiming', () => {
+  it('evenly distributes 2 lines over 60s', () => {
+    const s = scheduleSubtitleTiming(60, 2);
+    expect(s).toEqual([
+      { startSec: 0, endSec: 30, index: 0 },
+      { startSec: 30, endSec: 60, index: 1 },
+    ]);
+  });
+
+  it('last line clamped to duration', () => {
+    const s = scheduleSubtitleTiming(31, 2);
+    expect(s[1].endSec).toBe(31);
+    expect(s[1].startSec).toBeCloseTo(15.5);
+  });
+
+  it('3 lines over 30s', () => {
+    const s = scheduleSubtitleTiming(30, 3);
+    expect(s.map((x) => x.startSec)).toEqual([0, 10, 20]);
+    expect(s[2].endSec).toBe(30);
+  });
+
+  it('lineCount 0 → []', () => {
+    expect(scheduleSubtitleTiming(60, 0)).toEqual([]);
+    expect(scheduleSubtitleTiming(60, -2)).toEqual([]);
+  });
+
+  it('non-finite / zero duration → []', () => {
+    expect(scheduleSubtitleTiming(0, 3)).toEqual([]);
+    expect(scheduleSubtitleTiming(NaN, 3)).toEqual([]);
+    expect(scheduleSubtitleTiming(-5, 3)).toEqual([]);
+    expect(scheduleSubtitleTiming(Number.POSITIVE_INFINITY, 3)).toEqual([]);
   });
 });
