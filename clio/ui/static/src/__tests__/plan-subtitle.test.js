@@ -1,9 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   splitSubtitleLines,
   scheduleSubtitleTiming,
   subtitleIndexAtTime,
   loadVoiceoverText,
+  renderPlanSubtitle,
+  hidePlanSubtitle,
 } from '../plan-subtitle.js';
 
 describe('splitSubtitleLines', () => {
@@ -123,5 +125,89 @@ describe('loadVoiceoverText', () => {
     const fakeLoader = async () => ({ voiceover: '   ' });
     const text = await loadVoiceoverText('005', 'e.json', fakeLoader);
     expect(text).toBeNull();
+  });
+});
+
+function setPlayerSubtitleEl() {
+  const el = document.createElement('div');
+  el.id = 'plan-subtitle';
+  el.hidden = true;
+  document.body.appendChild(el);
+  return el;
+}
+
+const baseCtx = {
+  entity: 'plan', previewIndex: 0,
+  plan: { sequence: [{ index: '001', use_timeline: '00:00-00:30' }] },
+  videos: [{ index: '001', script_json: 'vy.json' }],
+  previewGlobalSec: 5,
+};
+
+describe('renderPlanSubtitle / hidePlanSubtitle', () => {
+  beforeEach(() => {
+    document.getElementById('plan-subtitle')?.remove();
+  });
+
+  it('renders the active line into the element', async () => {
+    const el = setPlayerSubtitleEl();
+    await renderPlanSubtitle({ ctx: baseCtx, textFor: async () => '第一行。第二行。' });
+    expect(el.hidden).toBe(false);
+    expect(el.textContent).toBe('第一行。');
+  });
+
+  it('skips DOM write when line unchanged', async () => {
+    const el = setPlayerSubtitleEl();
+    await renderPlanSubtitle({ ctx: baseCtx, textFor: async () => '一句。' });
+    const t1 = el.textContent;
+    await renderPlanSubtitle(
+      { ctx: { ...baseCtx, previewGlobalSec: 6 }, textFor: async () => '一句。' },
+    );
+    expect(el.textContent).toBe(t1);
+  });
+
+  it('re-writes when line changes', async () => {
+    const el = setPlayerSubtitleEl();
+    await renderPlanSubtitle({ ctx: baseCtx, textFor: async () => '第一句。第二句。' });
+    const t1 = el.textContent;
+    // jump to global 16s -> second line (duration 30, 2 lines -> line1 at [15,30))
+    await renderPlanSubtitle(
+      { ctx: { ...baseCtx, previewGlobalSec: 16 }, textFor: async () => '第一句。第二句。' },
+    );
+    expect(el.textContent).not.toBe(t1);
+    expect(el.textContent).toBe('第二句。');
+  });
+
+  it('hides when entity is not plan', async () => {
+    const el = setPlayerSubtitleEl();
+    await renderPlanSubtitle({ ctx: { ...baseCtx, entity: 'video' }, textFor: async () => 'x' });
+    expect(el.hidden).toBe(true);
+  });
+
+  it('hides when segment missing/no script_json', async () => {
+    const el = setPlayerSubtitleEl();
+    await renderPlanSubtitle({ ctx: { ...baseCtx, videos: [] }, textFor: async () => 'x' });
+    expect(el.hidden).toBe(true);
+  });
+
+  it('hides when text empty / null', async () => {
+    const el = setPlayerSubtitleEl();
+    await renderPlanSubtitle({ ctx: baseCtx, textFor: async () => null });
+    expect(el.hidden).toBe(true);
+  });
+
+  it('hidePlanSubtitle sets hidden', async () => {
+    const el = setPlayerSubtitleEl();
+    el.hidden = false;
+    hidePlanSubtitle();
+    expect(el.hidden).toBe(true);
+  });
+
+  it('renders null line when localSec at/after segment end', async () => {
+    const el = setPlayerSubtitleEl();
+    // use_timeline 00:00-00:30, complete 30s of sequence -> previewGlobalSec 30 maps to end
+    await renderPlanSubtitle(
+      { ctx: { ...baseCtx, previewGlobalSec: 30 }, textFor: async () => '一句。' },
+    );
+    expect(el.hidden).toBe(true);
   });
 });
