@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { splitSubtitleLines, scheduleSubtitleTiming } from '../plan-subtitle.js';
+import {
+  splitSubtitleLines,
+  scheduleSubtitleTiming,
+  subtitleIndexAtTime,
+} from '../plan-subtitle.js';
 
 describe('splitSubtitleLines', () => {
   it('splits on Chinese sentence punctuation', () => {
@@ -56,5 +60,31 @@ describe('scheduleSubtitleTiming', () => {
     expect(scheduleSubtitleTiming(NaN, 3)).toEqual([]);
     expect(scheduleSubtitleTiming(-5, 3)).toEqual([]);
     expect(scheduleSubtitleTiming(Number.POSITIVE_INFINITY, 3)).toEqual([]);
+  });
+});
+
+describe('subtitleIndexAtTime', () => {
+  const schedule = [
+    { startSec: 0, endSec: 15, index: 0 },
+    { startSec: 15, endSec: 30, index: 1 },
+  ];
+
+  it('boundary: startSec inclusive', () => {
+    expect(subtitleIndexAtTime(schedule, 0)).toBe(0);
+    expect(subtitleIndexAtTime(schedule, 15)).toBe(1);
+  });
+
+  it('endSec exclusive', () => {
+    expect(subtitleIndexAtTime(schedule, 14.999)).toBe(0);
+    expect(subtitleIndexAtTime(schedule, 30)).toBeNull();
+  });
+
+  it('mid range', () => {
+    expect(subtitleIndexAtTime(schedule, 7)).toBe(0);
+    expect(subtitleIndexAtTime(schedule, 22)).toBe(1);
+  });
+
+  it('empty schedule → null', () => {
+    expect(subtitleIndexAtTime([], 5)).toBeNull();
   });
 });

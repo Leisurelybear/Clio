@@ -61,3 +61,20 @@ export function scheduleSubtitleTiming(durationSec, lineCount) {
   }
   return out;
 }
+
+/**
+ * Index of the subtitle line active at localSec, or null when out of range.
+ * Half-open intervals [startSec, endSec).
+ * @param {{startSec:number,endSec:number,index:number}[]} schedule
+ * @param {number} localSec
+ * @returns {number|null}
+ */
+export function subtitleIndexAtTime(schedule, localSec) {
+  if (!Array.isArray(schedule) || schedule.length === 0) return null;
+  const t = Number(localSec);
+  if (!Number.isFinite(t)) return null;
+  for (const slot of schedule) {
+    if (t >= slot.startSec && t < slot.endSec) return slot.index;
+  }
+  return null;
+}
