@@ -766,6 +766,7 @@ button.match-badge:focus-visible { outline: 2px solid var(--border-focus); outli
   background: #000; border-radius: var(--radius-md); overflow: hidden;
   display: flex; justify-content: center;
   aspect-ratio: 16 / 9;
+  position: relative; /* anchor for plan-subtitle */
   max-height: 65vh;
   margin: var(--space-3) var(--space-3) 0;
   box-shadow: 0 4px 24px rgba(0,0,0,0.6);
@@ -774,6 +775,16 @@ button.match-badge:focus-visible { outline: 2px solid var(--border-focus); outli
   width: 100%; height: 100%; max-height: none; display: block;
   object-fit: contain; background: #000;
 }
+.plan-subtitle {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: 24px; z-index: 4; max-width: 80%;
+  padding: 6px 14px; border-radius: 8px;
+  background: rgba(0,0,0,.55); color: #fff;
+  font-size: 22px; line-height: 1.4; text-align: center;
+  text-shadow: 0 1px 3px rgba(0,0,0,.8);
+  pointer-events: none; overflow-wrap: break-word;
+}
+.plan-subtitle[hidden] { display: none; }
 
 .waveform-bar {
   position: relative;
