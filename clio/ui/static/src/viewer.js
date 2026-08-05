@@ -20,6 +20,7 @@ import {
   segmentWidths,
   locateSegmentByPlanSec,
 } from './plan-timeline.js';
+import { renderPlanSubtitleFromState, hidePlanSubtitle } from './plan-subtitle.js';
 
 function isGlobalTimelineUi() {
   return state.currentEntity === 'plan'
@@ -199,6 +200,7 @@ function seekToGlobal(globalSec, opts = {}) {
     : null;
 
   _loadAndSeekSource(v, seekSec, wantPlay);
+  renderPlanSubtitleFromState();
 
   const p = state.plan;
   if (p?.sequence?.length) {
@@ -354,6 +356,7 @@ function renderPreviewBar() {
   bar.style.display = isPlan ? 'flex' : 'none';
 
   if (!isPlan) {
+    hidePlanSubtitle();
     if (_wasPlanBar) {
       _wasPlanBar = false;
       _planWaveformIdxKey = '';
@@ -545,6 +548,7 @@ function stopPreview() {
   state._previewEndTime = null;
   const player = $('player');
   player.pause();
+  hidePlanSubtitle();
 
   renderPreviewBar();
   const segNameEl = $('preview-seg-name');
@@ -674,6 +678,7 @@ function setupPlayer() {
         softUpdatePreviewChrome(tl);
       }
       updateCompositeClock();
+      renderPlanSubtitleFromState();
     } else {
       $('player-time').textContent = `${fmtTime(player.currentTime)} / ${fmtTime(player.duration)}`;
     }
