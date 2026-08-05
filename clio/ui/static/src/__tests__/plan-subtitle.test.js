@@ -3,6 +3,7 @@ import {
   splitSubtitleLines,
   scheduleSubtitleTiming,
   subtitleIndexAtTime,
+  loadVoiceoverText,
 } from '../plan-subtitle.js';
 
 describe('splitSubtitleLines', () => {
@@ -86,5 +87,41 @@ describe('subtitleIndexAtTime', () => {
 
   it('empty schedule → null', () => {
     expect(subtitleIndexAtTime([], 5)).toBeNull();
+  });
+});
+
+describe('loadVoiceoverText', () => {
+  it('returns voiceover text via injected fetcher', async () => {
+    const fakeLoader = async () => ({ voiceover: '测试字幕' });
+    const text = await loadVoiceoverText('001', 'a.json', fakeLoader);
+    expect(text).toBe('测试字幕');
+  });
+
+  it('missing script_json → null without fetching', async () => {
+    const fetched = [];
+    const fakeLoader = async (url) => { fetched.push(url); return null; };
+    const text = await loadVoiceoverText('002', null, fakeLoader);
+    expect(text).toBeNull();
+    expect(fetched).toEqual([]);
+  });
+
+  it('loader failure → null', async () => {
+    const fakeLoader = async () => { throw new Error('boom'); };
+    const text = await loadVoiceoverText('003', 'c.json', fakeLoader);
+    expect(text).toBeNull();
+  });
+
+  it('caches resolved value: second call does not refetch', async () => {
+    let calls = 0;
+    const fakeLoader = async () => { calls += 1; return { voiceover: '缓存' }; };
+    await loadVoiceoverText('004', 'd.json', fakeLoader);
+    await loadVoiceoverText('004', 'd.json', fakeLoader);
+    expect(calls).toBe(1);
+  });
+
+  it('empty voiceover string → null', async () => {
+    const fakeLoader = async () => ({ voiceover: '   ' });
+    const text = await loadVoiceoverText('005', 'e.json', fakeLoader);
+    expect(text).toBeNull();
   });
 });

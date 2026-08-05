@@ -1,5 +1,7 @@
 // Pure helpers for plan-preview floating subtitles. No DOM.
 
+import { api } from './api.js';
+
 const SENTENCE_BREAKS = '。！？；…!?;';
 const BREAK_SET = new Set(SENTENCE_BREAKS.split(''));
 const MAX_PLUS_CARRY = 4; // allow punctuation to overflow maxLen slightly
@@ -77,4 +79,40 @@ export function subtitleIndexAtTime(schedule, localSec) {
     if (t >= slot.startSec && t < slot.endSec) return slot.index;
   }
   return null;
+}
+
+const _voiceoverCache = new Map(); // index -> Promise<string|null>
+
+/** Default fetcher: loads the voiceover file via clio api(). */
+async function apiFetch(scriptJson) {
+  return api('GET', `/api/voiceover?file=${encodeURIComponent(scriptJson)}`);
+}
+
+/**
+ * Get spoken narration text for a video index. Cached per index.
+ * fetchFn returns the raw voiceover JSON (e.g. {voiceover, ...}); the
+ * `voiceover` string field is extracted and trimmed here.
+ * @param {string|number} index
+ * @param {string|null} scriptJson  video.script_json basename
+ * @param {function|null} [fetchFn] injectable fetcher (tests); default apiFetch
+ * @returns {Promise<string|null>}
+ */
+export function loadVoiceoverText(index, scriptJson, fetchFn = apiFetch) {
+  const key = String(index ?? '');
+  const cached = _voiceoverCache.get(key);
+  if (cached) return cached;
+  if (!scriptJson) {
+    const p = Promise.resolve(null);
+    _voiceoverCache.set(key, p);
+    return p;
+  }
+  const p = Promise.resolve()
+    .then(() => fetchFn(scriptJson))
+    .then((d) => {
+      const text = d && typeof d.voiceover === 'string' ? d.voiceover.trim() : '';
+      return text || null;
+    })
+    .catch(() => null);
+  _voiceoverCache.set(key, p);
+  return p;
 }
