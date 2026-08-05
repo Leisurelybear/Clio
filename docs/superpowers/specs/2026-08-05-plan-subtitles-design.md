@@ -56,7 +56,8 @@ subtitleIndexAtTime(localSec) → current line index (or null)
 ```
 
 - `segment.duration` = `parseRange(use_timeline).duration` (already provided by `plan-timeline.js` `buildTimeline` → `segments[i].duration`).
-- Current `localSec` = `state.previewGlobalSec − segment.globalStart` (both plan-domain, from `viewer.js`).
+- Current `localSec` = `state.previewGlobalSec − segment.globalStart` (both plan-domain, from `viewer.js`). This matches the existing `globalToLocal` semantics (viewer.js:195-211), so subtitle timing stays aligned with the composite playhead.
+- Guard against stale in-flight fetches: at resolve time verify the segment index still equals the currently-previewed segment before applying text (see §6).
 
 ## 3. New module: `clio/ui/static/src/plan-subtitle.js`
 
@@ -97,7 +98,7 @@ DOM/loader helpers (non-pure, exported):
 }
 ```
 
-- `.player-wrap` gains `position: relative` so the absolute overlay anchors to it (verify current rule; add if absent).
+- `.player-wrap` currently has `display:flex; justify-content:center; aspect-ratio:16/9; overflow:hidden` and **no** `position` (style.css:765). Add `position: relative` so the absolute overlay anchors to it.
 
 ## 5. Wiring into `viewer.js`
 
