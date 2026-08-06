@@ -62,6 +62,12 @@ Placement note: `PreviewConfig` is added to the project-only section map so it p
 
 A merged property `AppConfig.preview` is added with project fallback (pattern matched by `plan`/`export`).
 
+### Config-loading assumptions (verified)
+
+- `loader.py` builds project config from the explicit `_PROJECT_SECTION_DC_MAP` + `_PROJECT_ONLY_SECTIONS` allowlists, so `preview` must be added to **both** (models.py:51-60, loader.py:245-280).
+- `_upgrade_config_file` walks `_PROJECT_SECTION_DC_MAP` and auto-adds missing keys' defaults (loader.py:145-175) — adding `preview` there gives free auto-upgrade of new subtitle defaults on existing projects.
+- The config editor UI (`editor-config.js` `_renderConfigProject`, line 345) renders from an explicit `order` array; `preview` is **not** added there, so it does **not** surface in the settings page — subtitle styling is exposed only in the plan page (avoids duplicate UI). Intended.
+
 ## 3. Renderer changes (`plan-subtitle.js`)
 
 ### 3.1 Style binding
@@ -123,10 +129,14 @@ In each expanded segment's `.plan-seg-panel`, after the existing 口播 textarea
 </div>
 ```
 
-- Load: when segment expands, resolve `seg.index → videos[].script_json → GET /api/voiceover`; fill `textarea` with `voiceover` string (or show "无口播文案" hint if missing).
-- Edit → store draft in memory (`state.planDraftSubtitles` keyed by index) + `markDirty()`.
-- Save → `PUT /api/voiceover?file=<script_json>` with `{ ...current, voiceover: <new text> }`; on success `invalidateVoiceoverCache(index)` and update preview; show status (`已保存` / error).
-- Readiness/tab-switch dirty guard: `shouldConfirmDirtyTabSwitch` treats subtitle draft as dirty (extend existing dirty handling in `editor-save.js`).
+- Load: when segment expands, resolve `seg.index → videos[].script_json → GET /api/voiceover`; fill `textarea` with the `voiceover` string (or show "无口播文案" hint if missing). Keep the **whole** loaded JSON object (`title`/`edit_tip`/`duration_hint_sec` etc.), not just the string, so a later merge preserves them.
+- Edit → store draft in memory for that segment + `markDirty()`.
+- Save → `PUT /api/voiceover?file=<script_json>` with **`{ ...loadedVoiceover, voiceover: <new text> }`** — spread the original object so other voiceover fields are preserved (editor-voiceover.js:59-58 prove those fields exist). On success `invalidateVoiceoverCache(index)` and update the preview; show status (`已保存` / error).
+- Readiness/tab-switch dirty guard: `shouldConfirmDirtyTabSwitch` treats subtitle draft as dirty (extend existing `editor-save.js` handling).
+- **Ctrl+S save-target consistency (review finding)** — with `entity === 'plan'`, `resolveEditorSaveTarget` returns `{ action: 'plan' }` → `PUT /api/plan` (editor-save.js:20-21), which would `clearDirty()` and **silently drop any unsaved subtitle draft** that shares the same dirty flag. Decision:
+  - Subtitle editing is **self-contained** under its own 保存字幕 button; that is the canonical save path for subtitle text.
+  - Track subtitle drafts under a **separate signal** (`state.subtitleDirtyIndexes: Set<index>`), not the shared plan dirty flag alone.
+  - When the plan save (Ctrl+S / 保存) runs while `subtitleDirtyIndexes` is non-empty, either (a) refuse+提示 "有未保存的字幕，请先点击对应片段的 保存字幕", or (b) flush the drafts via `/api/voiceover` first. Pick the least-surprise option during implementation; spec keeps the requirement (no silent drop).
 
 ## 7. Viewer wiring (`viewer.js`)
 
