@@ -20,6 +20,8 @@ from clio.config.models import (
     GlobalWhisperConfig,
     NamingConfig,
     PlanConfig,
+    PreviewConfig,
+    PreviewSubtitlesConfig,
     ProjectAIConfig,
     ProjectCompressConfig,
     ProjectConfig,
@@ -57,6 +59,7 @@ _PROJECT_SECTION_DC_MAP: dict[str, type] = {
     "script": ScriptConfig,
     "plan": PlanConfig,
     "export": ExportConfig,
+    "preview": PreviewConfig,
 }
 
 _MISSING = object()
@@ -242,7 +245,7 @@ _CONFIG_VERSION = "config_version"
 _V2 = "V2"
 
 # Sections entirely project-only (no split)
-_PROJECT_ONLY_SECTIONS = {"analyze", "script", "plan", "export"}
+_PROJECT_ONLY_SECTIONS = {"analyze", "script", "plan", "export", "preview"}
 
 # Sections entirely global-only (no split)
 _GLOBAL_ONLY_SECTIONS = {"proxy", "server", "naming"}
@@ -562,6 +565,11 @@ def load_project_config(
             transcripts_subdir=raw.get("whisper", {}).get("transcripts_subdir", "transcripts"),
         ),
         export=ExportConfig(**_filter_dc(raw.get("export", {}), ExportConfig)),
+        preview=PreviewConfig(
+            subtitles=PreviewSubtitlesConfig(
+                **_filter_dc(raw.get("preview", {}).get("subtitles", {}), PreviewSubtitlesConfig)
+            )
+        ),
     )
 
 

@@ -549,3 +549,23 @@ def test_validate_global_rejects_zero_timeout():
     )
     with pytest.raises(ValueError, match="timeout_sec"):
         validate_global_config(gc)
+
+
+def test_preview_subtitles_defaults():
+    from clio.config.models import PreviewConfig
+
+    pc = PreviewConfig()
+    s = pc.subtitles
+    assert s.enabled is True
+    assert s.mode == "auto"
+    assert s.max_lines == 2
+    assert s.max_len_per_line == 16
+    assert s.min_font_size == 14
+    assert s.scroll_speed == 40
+    assert s.font_size == 22
+    assert s.font_family == ""
+    assert s.font_color == "#ffffff"
+    assert s.background == "rgba(0,0,0,0.55)"
+    assert s.outline == "1px solid #000"
+    assert s.pos_x == 50
+    assert s.pos_y == 8

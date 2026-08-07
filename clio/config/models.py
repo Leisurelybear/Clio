@@ -74,6 +74,30 @@ class PlanConfig:
 
 
 @dataclass
+class PreviewSubtitlesConfig:
+    """Plan-preview subtitle appearance / layout (project-scoped)."""
+
+    enabled: bool = True
+    mode: str = "auto"  # auto | multi | scroll
+    max_lines: int = 2
+    max_len_per_line: int = 16
+    min_font_size: int = 14
+    scroll_speed: int = 40  # px/s in scroll mode
+    font_size: int = 22
+    font_family: str = ""  # empty = follow system
+    font_color: str = "#ffffff"
+    background: str = "rgba(0,0,0,0.55)"
+    outline: str = "1px solid #000"
+    pos_x: int = 50  # percent of player width, 0..100
+    pos_y: int = 8  # percent offset from player bottom, 0=bottom 100=top
+
+
+@dataclass
+class PreviewConfig:
+    subtitles: PreviewSubtitlesConfig = field(default_factory=PreviewSubtitlesConfig)
+
+
+@dataclass
 class ServerConfig:
     api_token: str | None = None
 
@@ -189,6 +213,7 @@ class ProjectConfig:
     plan: PlanConfig = field(default_factory=PlanConfig)
     whisper: ProjectWhisperConfig = field(default_factory=ProjectWhisperConfig)
     export: ExportConfig = field(default_factory=ExportConfig)
+    preview: PreviewConfig = field(default_factory=PreviewConfig)
 
 
 # ---------------------------------------------------------------------------
@@ -483,6 +508,12 @@ class AppConfig:
         if self._project_cfg is not None:
             return self._project_cfg.export
         return _EMPTY_PROJECT.export
+
+    @property
+    def preview(self) -> PreviewConfig:
+        if self._project_cfg is not None:
+            return self._project_cfg.preview
+        return _EMPTY_PROJECT.preview
 
     # -- non-split: global-only sections --
 
