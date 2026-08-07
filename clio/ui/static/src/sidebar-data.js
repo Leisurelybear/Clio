@@ -6,10 +6,18 @@ import { api, icon } from './api.js';
 import { updateRunFilesBadge } from './runner.js';
 import { summarizeOfflineVideos } from './offline-media.js';
 import {
-  buildVideoStepBadges,
   buildVideoMenuItems,
   videoMenuItemsToHtml,
 } from './video-menu.js';
+import {
+  buildVideoStageStatuses,
+  chipDefsForSource,
+  countChipStats,
+  countStageSummary,
+  matchVideoSearch,
+  videoMissingStage,
+  STAGE_CELLS,
+} from './sidebar-video-filter.js';
 import { selectVideosButtonHtml } from './select-btn.js';
 
 // ── Video relink helper ───────────────────────────────────────
@@ -140,8 +148,6 @@ export async function loadVideos() {
   const r = await api('GET', `/api/videos?source=${state.source}`);
   state.videos = r.videos;
   state.groups = r.groups || {};
-  const countEl = $('video-count');
-  if (countEl) countEl.textContent = `(${state.videos.length})`;
   updateSelectBtnVisibility();
   renderVideoList();
   // Hint when project has no selected originals yet
@@ -154,6 +160,21 @@ export async function loadVideos() {
       }
     } catch (_) { /* ignore */ }
   }
+}
+
+let _filterInputBound = false;
+export function initVideoFilterBar() {
+  if (_filterInputBound) return;
+  _filterInputBound = true;
+  const input = $('video-filter-input');
+  if (!input) return;
+  input.addEventListener('input', () => {
+    clearTimeout(state._filterDebounce);
+    state._filterDebounce = setTimeout(() => {
+      state.videoFilter.q = input.value;
+      renderVideoList();
+    }, 150);
+  });
 }
 
 export async function loadProject() {
@@ -184,20 +205,6 @@ export async function saveProject(extra) {
       projectName: state.projectName,
     }, extra || {}));
   } catch (e) { /* 静默 */ }
-}
-
-export function renderSteps() {
-  const ul = $('step-list');
-  if (!ul) return;
-  const labels = { compress: '压缩', analyze: '分析', scripts: '口播', transcribe: '转录', plan: '规划', label: '标号', cut: '裁剪' };
-  ul.innerHTML = '';
-  for (const [key, label] of Object.entries(labels)) {
-    const done = state.steps[key];
-    const li = document.createElement('li');
-    li.className = 'step-item' + (done ? ' done' : '');
-    li.innerHTML = `<span class="step-icon">${icon(done ? 'check' : 'circle', 14)}</span><span class="step-label">${label}</span>`;
-    ul.appendChild(li);
-  }
 }
 
 // ── Video list rendering ───────────────────────────────────────
@@ -288,8 +295,9 @@ function renderVideoItem(v) {
   } else {
     matchBadge = `<span class="match-badge miss" title="没有对应的${state.source === 'compressed' ? '原视频' : '压缩视频'}">无对应</span>`;
   }
-  const stepBadges = buildVideoStepBadges(v, state.source)
-    .map(s => `<span class="video-step-badge ${s.done ? 'done' : 'pending'}">${s.label}</span>`)
+  const stepStatuses = buildVideoStageStatuses(v, state.source);
+  const stepDots = STAGE_CELLS
+    .map(c => `<span class="video-step-dot ${stepStatuses[c.key] ? 'done' : 'pending'}" title="${c.label}: ${stepStatuses[c.key] ? '完成' : '待处理'}"></span>`)
     .join('');
   const menuHtml = videoMenuItemsToHtml(buildVideoMenuItems(v, state.source, state.deps));
 
@@ -298,7 +306,7 @@ function renderVideoItem(v) {
   li.innerHTML = `${videoThumbHtml(v)}
     <div class="video-info">
       <div class="video-name">${checkboxHtml}${v.index ? '[' + v.index + '] ' : ''}${escapeHtml(display)}${durHtml}</div>
-      <div class="video-step-badges">${stepBadges}</div>
+      <div class="video-step-dots">${stepDots}</div>
       ${v.title ? `<div class="video-title">${escapeHtml(v.title)}</div>` : ''}
       <div class="video-match">${matchBadge}</div>
     </div>
@@ -473,13 +481,42 @@ export function renderVideoList() {
     return;
   }
 
+  const q = state.videoFilter?.q || '';
+  const stage = state.videoFilter?.stage || '';
+  const visible = state.videos.filter((v) =>
+    matchVideoSearch(v, q) && (!stage || videoMissingStage(v, state.source, stage))
+  );
+
+  const countEl = $('video-count');
+  if (countEl) countEl.textContent = `(${visible.length}/${state.videos.length})`;
+
+  renderFilterChips();
+  renderStageCountBar();
+
+  if (visible.length === 0 && state.videos.length > 0) {
+    const li = document.createElement('li');
+    li.className = 'empty-state';
+    li.innerHTML = `
+      <p class="hint">没有匹配的视频，试试清除筛选</p>
+      <button type="button" class="sidebar-btn" id="btn-clear-video-filter">清除筛选</button>
+    `;
+    li.querySelector('#btn-clear-video-filter').onclick = () => {
+      state.videoFilter.q = '';
+      state.videoFilter.stage = '';
+      if ($('video-filter-input')) $('video-filter-input').value = '';
+      renderVideoList();
+    };
+    ul.appendChild(li);
+    return;
+  }
+
   const groups = {};
-  for (const v of state.videos.filter(v => v.group_key)) {
+  for (const v of visible.filter(v => v.group_key)) {
     (groups[v.group_key] ??= []).push(v);
   }
   const renderedGroups = new Set();
 
-  for (const v of state.videos) {
+  for (const v of visible) {
     if (!v.group_key) {
       ul.appendChild(renderVideoItem(v));
       continue;
@@ -546,5 +583,55 @@ function renderOfflineSummary() {
     btn.onclick = () => {
       import('./sidebar-batch-relink.js').then(m => m.openBatchRelinkModal());
     };
+  }
+}
+
+function renderFilterChips() {
+  const box = $('video-filter-chips');
+  if (!box) return;
+  const all = state.videos.length;
+  const stats = countChipStats(state.videos, state.source);
+  box.innerHTML = '';
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = 'video-filter-chip' + (!state.videoFilter.stage ? ' active' : '');
+  allBtn.textContent = `全部 ${all}`;
+  allBtn.onclick = () => { state.videoFilter.stage = ''; renderVideoList(); };
+  box.appendChild(allBtn);
+  for (const s of stats) {
+    if (s.count === 0) continue;
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'video-filter-chip' + (state.videoFilter.stage === s.key ? ' active' : '');
+    b.textContent = `${s.label} ${s.count}`;
+    b.onclick = () => {
+      state.videoFilter.stage = state.videoFilter.stage === s.key ? '' : s.key;
+      renderVideoList();
+    };
+    box.appendChild(b);
+  }
+}
+
+function renderStageCountBar() {
+  const box = $('stage-count-bar');
+  if (!box) return;
+  box.innerHTML = '';
+  if (!state.videos.length) {
+    box.hidden = true;
+    return;
+  }
+  box.hidden = false;
+  const summary = countStageSummary(state.videos, state.source);
+  for (const s of summary) {
+    const cell = document.createElement('div');
+    cell.className = 'stage-count-cell' + (state.videoFilter.stage === s.key ? ' active' : '');
+    cell.title = s.done === s.total ? `${s.label}: 全部完成` : `${s.label}: 缺 ${s.total - s.done} 个`;
+    cell.innerHTML = `<span class="stage-count-num">${s.done}/${s.total}</span>${s.label}`;
+    cell.onclick = () => {
+      const key = state.videoFilter.stage === s.key ? '' : s.key;
+      state.videoFilter.stage = key;
+      renderVideoList();
+    };
+    box.appendChild(cell);
   }
 }

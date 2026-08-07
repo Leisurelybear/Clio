@@ -39,6 +39,8 @@ const state = {
   selectedFiles: [],
   refining: null,  // {type: 'texts'|'scripts', file: string} when AI refine in progress
   deps: null,  // { ok, ffmpeg, ffprobe, missing, detail } from GET /api/deps/ffmpeg
+  videoFilter: { q: '', stage: '' },  // stage: '' | 'compress' | 'analyze' | 'voiceover' | 'transcribe' | 'offline'
+  _filterDebounce: null,
 };
 
 function clearSelection() {
