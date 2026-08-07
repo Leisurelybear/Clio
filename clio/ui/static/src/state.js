@@ -35,6 +35,7 @@ const state = {
   previewIndex: -1,
   previewGlobalSec: 0,
   _previewEndTime: null,
+  subtitleDirtyIndexes: new Set(),
   selectionMode: false,
   selectedFiles: [],
   refining: null,  // {type: 'texts'|'scripts', file: string} when AI refine in progress

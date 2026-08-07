@@ -1,6 +1,6 @@
 import { state } from './state.js';
 import { $, fmtTime, setStatus, escapeHtml, clearDirty } from './utils.js';
-import { icon } from './api.js';
+import { icon, api } from './api.js';
 import {
   loadWaveformForCurrentVideo,
   loadPlanWaveform,
@@ -20,7 +20,11 @@ import {
   segmentWidths,
   locateSegmentByPlanSec,
 } from './plan-timeline.js';
-import { renderPlanSubtitleFromState, hidePlanSubtitle } from './plan-subtitle.js';
+import {
+  renderPlanSubtitleFromState,
+  hidePlanSubtitle,
+  initSubtitleDrag,
+} from './plan-subtitle.js';
 
 function isGlobalTimelineUi() {
   return state.currentEntity === 'plan'
@@ -770,6 +774,32 @@ function setupPlayer() {
   }
 
   _setupPreviewBarDrag();
+  _setupSubtitleDrag();
+}
+
+/**
+ * Enable dragging the floating subtitle via its persistent handle. Position
+ * changes are persisted to the project-scoped preview.subtitles config so the
+ * subtitle stays where the user put it across sessions.
+ */
+function _setupSubtitleDrag() {
+  const handle = $('plan-subtitle')?.querySelector('.plan-subtitle-handle');
+  const stage = document.querySelector('.player-wrap');
+  initSubtitleDrag({
+    handle,
+    stage,
+    onCommit: async ({ x, y }) => {
+      const project = state.configProject || {};
+      const subtitles = project.preview?.subtitles || {};
+      project.preview = { ...(project.preview || {}), subtitles: { ...subtitles, pos_x: Math.round(x), pos_y: Math.round(y) } };
+      try {
+        await api('PUT', '/api/config/project', project);
+        setStatus('字幕位置已保存', 'ok');
+      } catch {
+        setStatus('字幕位置保存失败', 'warn');
+      }
+    },
+  });
 }
 
 export {
