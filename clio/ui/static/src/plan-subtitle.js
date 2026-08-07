@@ -370,6 +370,67 @@ export function hidePlanSubtitle() {
   if (el) { el.hidden = true; el.dataset.line = ''; }
 }
 
+const DEFAULT_POS_X = 50;
+const DEFAULT_POS_Y = 8;
+
+/**
+ * Clamp x/y percentages into [0,100]. Non-finite values fall back to the
+ * defaults so a missing config still lands the subtitle on-screen.
+ * @param {number} x
+ * @param {number} y
+ * @returns {[number, number]}
+ */
+export function clampPositionPct(x, y) {
+  const cx = Number.isFinite(Number(x)) ? Math.min(100, Math.max(0, Number(x))) : DEFAULT_POS_X;
+  const cy = Number.isFinite(Number(y)) ? Math.min(100, Math.max(0, Number(y))) : DEFAULT_POS_Y;
+  return [cx, cy];
+}
+
+/**
+ * Enable dragging the subtitle via its persistent handle. While dragging,
+ * updates the element's --st-pos-* CSS vars live and reports the final
+ * percentage position via onCommit (used to persist to config).
+ *
+ * @param {{handle:HTMLElement, stage:HTMLElement, onCommit?:function}} opts
+ */
+export function initSubtitleDrag({ handle, stage, onCommit }) {
+  const el = subtitleElement();
+  if (!el || !handle || !stage) return;
+  let dragging = false;
+
+  handle.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    dragging = true;
+    handle.style.cursor = 'grabbing';
+
+    const move = (me) => {
+      if (!dragging) return;
+      const rect = stage.getBoundingClientRect();
+      if (!rect || rect.width === 0 || rect.height === 0) return;
+      const pctX = ((me.clientX - rect.left) / rect.width) * 100;
+      const pctY = ((me.clientY - rect.top) / rect.height) * 100;
+      const [cx, cy] = clampPositionPct(pctX, pctY);
+      el.style.setProperty('--st-pos-x', `${cx}%`);
+      el.style.setProperty('--st-pos-y', `${cy}%`);
+      el.dataset.posX = String(cx);
+      el.dataset.posY = String(cy);
+    };
+
+    const up = () => {
+      if (!dragging) return;
+      dragging = false;
+      handle.style.cursor = '';
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      const [cx, cy] = [Number(el.dataset.posX), Number(el.dataset.posY)];
+      if (typeof onCommit === 'function') onCommit({ x: cx, y: cy });
+    };
+
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+  });
+}
+
 /** Production entry point: render from current app state. */
 export function renderPlanSubtitleFromState() {
   return renderPlanSubtitle({ textFor: loadVoiceoverText });
