@@ -46,6 +46,96 @@ export function splitSubtitleLines(text, maxLen = 16) {
 }
 
 /**
+ * Segment narration into display batches based on mode.
+ * auto  => short sentences single-line batch; long text packed up to maxLines lines.
+ * multi => each batch = maxLines lines fed in order.
+ * scroll=> single batch with the joined full text on one (long) line.
+ * @param {string} text
+ * @param {{mode?:string, maxLines?:number, maxLen?:number}} [opts]
+ * @returns {string[][]} batches of line strings
+ */
+export function planSubtitleBatches(text, opts = {}) {
+  const mode = opts.mode || 'auto';
+  const maxLines = Math.max(1, opts.maxLines || 2);
+  const maxLen = Math.max(1, opts.maxLen || 16);
+  const sentences = splitSubtitleLines(text, maxLen);
+  if (!sentences.length) return [];
+
+  if (mode === 'multi') {
+    const batches = [];
+    for (let i = 0; i < sentences.length; i += maxLines) {
+      batches.push(sentences.slice(i, i + maxLines));
+    }
+    return batches;
+  }
+  if (mode === 'scroll') {
+    return [[sentences.join('')]];
+  }
+  // auto
+  const batches = [];
+  let cur = [];
+  for (const s of sentences) {
+    if (cur.length >= maxLines) { batches.push(cur); cur = []; }
+    cur.push(s);
+  }
+  if (cur.length) batches.push(cur);
+  return batches;
+}
+
+/**
+ * Evenly distribute batchCount batches across durationSec.
+ * @param {number} durationSec
+ * @param {number} batchCount
+ * @returns {Array<{startSec:number,endSec:number,index:number}>}
+ */
+export function scheduleBatchTiming(durationSec, batchCount) {
+  const d = Number(durationSec);
+  const n = Number(batchCount);
+  if (!(d > 0) || !Number.isFinite(d)) return [];
+  if (!(n > 0) || !Number.isFinite(n)) return [];
+  const step = d / n;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    out.push({ startSec: i * step, endSec: i === n - 1 ? d : (i + 1) * step, index: i });
+  }
+  return out;
+}
+
+/**
+ * Active batch index at localSec, or null when out of range (half-open [start,end)).
+ * @param {Array<{startSec:number,endSec:number,index:number}>} schedule
+ * @param {number} localSec
+ * @returns {number|null}
+ */
+export function packAtTime(schedule, localSec) {
+  if (!Array.isArray(schedule) || !schedule.length) return null;
+  const t = Number(localSec);
+  if (!Number.isFinite(t)) return null;
+  for (const slot of schedule) {
+    if (t >= slot.startSec && t < slot.endSec) return slot.index;
+  }
+  return null;
+}
+
+/**
+ * Effective font px so text fits a container. Linear scale down toward
+ * minFontSize as chars exceed containerMaxChars.
+ * @param {string} text
+ * @param {number} basePx
+ * @param {number} containerMaxChars
+ * @param {number} minFontSize
+ * @returns {number} effective px (>= minFontSize, <= basePx)
+ */
+export function computeFontShrink(text, basePx, containerMaxChars, minFontSize) {
+  const len = String(text || '').length;
+  if (len <= 0) return basePx;
+  if (len <= containerMaxChars) return basePx;
+  const ratio = containerMaxChars / len;
+  const eff = basePx * ratio;
+  return Math.max(minFontSize, Math.min(basePx, Math.round(eff * 10) / 10));
+}
+
+/**
  * Evenly distribute lineCount lines across a segment duration.
  * @param {number} durationSec
  * @param {number} lineCount
