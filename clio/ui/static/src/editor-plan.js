@@ -858,8 +858,6 @@ export async function executeCut() {
     result.innerHTML = `<p class="ok">裁剪完成</p><p>输出目录: ${escapeHtml(r.output_dir)}</p>`;
     setStatus('裁剪完成', 'ok');
     addToast('裁剪完成', 'success');
-    state.steps.cut = true;
-    import('./sidebar.js').then(mod => mod.renderSteps());
     import('./sidebar.js').then(mod => mod.saveProject());
   } catch (e) {
     result.innerHTML = `<p class="err">错误: ${escapeHtml(e.message)}</p>`;

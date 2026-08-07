@@ -15,7 +15,6 @@ import {
   loadProject,
   loadPlans,
   loadVideos,
-  renderSteps,
   renderVideoList,
   selectVideo,
   selectPlan,
@@ -388,7 +387,6 @@ async function init() {
     try {
       const cur = state.currentVideo;
       await loadProject();
-      renderSteps();
       await refreshFfmpegDepsUi();
       await loadVideos();
       if (cur && state.videos.find(x => x.file === cur)) {
@@ -425,6 +423,19 @@ async function init() {
   $('btn-save').onclick = save;
   document.getElementById('btn-select-videos').addEventListener('click', toggleSelection);
   document.getElementById('btn-add-videos').addEventListener('click', () => import('./sidebar-video-manage.js').then(m => m.openVideoManager()));
+  const { initVideoFilterBar } = await import('./sidebar-data.js');
+  initVideoFilterBar();
+  document.getElementById('btn-project-menu')?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('project-menu');
+    if (menu) menu.hidden = !menu.hidden;
+  });
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.sidebar-project')) {
+      const menu = document.getElementById('project-menu');
+      if (menu) menu.hidden = true;
+    }
+  });
   $$('.tab').forEach(t => t.onclick = () => {
     const toTab = t.dataset.tab;
     if (shouldConfirmDirtyTabSwitch({ dirty: state.dirty, fromTab: state.currentTab, toTab })) {
@@ -527,7 +538,6 @@ async function init() {
     await loadFfmpegDeps();
     await refreshRuntimeWarningsBanner();
     await loadProject();
-    renderSteps();
     // 检查项目是否缺少 project.yaml，提示用户创建
     (async () => {
       if (!state.currentProjectName) return;

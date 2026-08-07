@@ -10,7 +10,7 @@ import { showRerunProgress, hideRerunProgress } from './sidebar-rerun.js';
 import { openVideoManager } from './sidebar-video-manage.js';
 import {
   loadProjects, loadConfig, loadFfmpegDeps, loadPlans, loadProject, loadVideos, saveProject,
-  updateSelectBtnVisibility, renderSteps, renderVideoList,
+  updateSelectBtnVisibility, renderVideoList,
 } from './sidebar-data.js';
 import { selectVideosButtonHtml } from './select-btn.js';
 
@@ -376,7 +376,6 @@ export {
   loadProject,
   loadVideos,
   saveProject,
-  renderSteps,
   renderVideoList,
   selectVideo,
   selectPlan,

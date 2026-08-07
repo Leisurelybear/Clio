@@ -2,7 +2,7 @@ import { state } from './state.js';
 import { $, escapeHtml, setStatus, updateEntityUI } from './utils.js';
 import { api } from './api.js';
 import { addToast } from './toast.js';
-import { loadVideos, renderSteps } from './sidebar-data.js';
+import { loadVideos, renderVideoList } from './sidebar-data.js';
 
 let _rerunPollTimer = null;
 let _rerunPollStart = 0;
@@ -157,5 +157,5 @@ async function refreshAfterRerun(task, file) {
     }
   }
 
-  renderSteps();
+  renderVideoList();
 }

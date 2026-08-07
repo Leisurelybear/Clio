@@ -514,7 +514,7 @@ async function _handleRunStatus(s) {
       state.plan = null;
       await import('./sidebar.js').then(mod => mod.loadPlans());
       updateSidebarDay();
-      import('./sidebar.js').then(mod => mod.renderSteps());
+      import('./sidebar.js').then(mod => mod.renderVideoList());
       import('./sidebar.js').then(mod => mod.saveProject());
       try { state.plan = await api('GET', `/api/plan?day=${_lastRunDay}`); } catch {}
       await refreshVideosAfterRun();
