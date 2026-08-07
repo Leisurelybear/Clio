@@ -224,13 +224,14 @@ export function invalidateVoiceoverCache(index) {
  * Pure and cheap -> callable from every timeupdate.
  */
 function readStateContext() {
+  const project = state.configProject || {};
   return {
     entity: state.currentEntity,
     previewIndex: state.previewIndex,
     plan: state.plan,
     videos: state.videos,
     previewGlobalSec: state.previewGlobalSec,
-    config: state.config,
+    config: project,
   };
 }
 
@@ -273,11 +274,13 @@ export function applySubtitleStyle(el, s, cfg = {}) {
   el.style.setProperty('--st-bg', vCfg(elCfg.background) || 'rgba(0,0,0,.55)');
   el.style.setProperty(
     '--st-outline',
-    vCfg(elCfg.outline) || '1px 1px 2px rgba(0,0,0,.8)',
+    vCfg(elCfg.outline) || '0 0 2px rgba(0,0,0,.8)',
   );
-  el.style.setProperty('--st-font-family', vCfg(elCfg.font_family) || "'system-ui, sans-serif'");
-  const posX = clampPercent(Number(elCfg.pos_x));
-  const posY = clampPercent(Number(elCfg.pos_y));
+  // font_family="" means follow system; otherwise emit the family unquoted so
+  // a comma-separated stack (e.g. "system-ui, sans-serif") is treated correctly.
+  const family = vCfg(elCfg.font_family);
+  el.style.setProperty('--st-font-family', family ? family.replace(/^['"]|['"]$/g, '') : 'system-ui, sans-serif');
+  const [posX, posY] = clampPositionPct(Number(elCfg.pos_x), Number(elCfg.pos_y));
   el.style.setProperty('--st-pos-x', pxToPct(posX));
   el.style.setProperty('--st-pos-y', pxToPct(posY));
   el.dataset.posX = String(posX);
@@ -285,7 +288,6 @@ export function applySubtitleStyle(el, s, cfg = {}) {
 }
 
 function vCfg(v) { return v == null || v === '' ? null : v; }
-function clampPercent(n) { return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 50; }
 function pxToPct(n) { return `${n}%`; }
 function effectiveFontPx(n) { return Number.isFinite(n) && n > 0 ? n : 22; }
 
@@ -397,36 +399,47 @@ export function initSubtitleDrag({ handle, stage, onCommit }) {
   if (!el || !handle || !stage) return;
   let dragging = false;
 
+  const move = (me) => {
+    if (!dragging) return;
+    const rect = stage.getBoundingClientRect();
+    if (!rect || rect.width === 0 || rect.height === 0) return;
+    const pctX = ((me.clientX - rect.left) / rect.width) * 100;
+    // pos_y is BOTTOM-offset (0=bottom, 100=top), so invert top-relative coords.
+    const pctY = ((rect.bottom - me.clientY) / rect.height) * 100;
+    const [cx, cy] = clampPositionPct(pctX, pctY);
+    el.style.setProperty('--st-pos-x', `${cx}%`);
+    el.style.setProperty('--st-pos-y', `${cy}%`);
+    el.dataset.posX = String(cx);
+    el.dataset.posY = String(cy);
+  };
+
+  const endDrag = (commit) => {
+    if (!dragging) return;
+    dragging = false;
+    handle.style.cursor = '';
+    document.removeEventListener('pointermove', move);
+    document.removeEventListener('pointerup', up);
+    document.removeEventListener('pointercancel', cancel);
+    if (!commit) return;
+    // Guard against release with no prior move (NaN / stale values).
+    const cx = Number(el.dataset.posX);
+    const cy = Number(el.dataset.posY);
+    const sx = Number.isFinite(cx) ? cx : DEFAULT_POS_X;
+    const sy = Number.isFinite(cy) ? cy : DEFAULT_POS_Y;
+    el.style.setProperty('--st-pos-x', `${sx}%`);
+    el.style.setProperty('--st-pos-y', `${sy}%`);
+    if (typeof onCommit === 'function') onCommit({ x: sx, y: sy });
+  };
+  const up = () => { endDrag(true); };
+  const cancel = () => { endDrag(false); };
+
   handle.addEventListener('pointerdown', (e) => {
     e.preventDefault();
     dragging = true;
     handle.style.cursor = 'grabbing';
-
-    const move = (me) => {
-      if (!dragging) return;
-      const rect = stage.getBoundingClientRect();
-      if (!rect || rect.width === 0 || rect.height === 0) return;
-      const pctX = ((me.clientX - rect.left) / rect.width) * 100;
-      const pctY = ((me.clientY - rect.top) / rect.height) * 100;
-      const [cx, cy] = clampPositionPct(pctX, pctY);
-      el.style.setProperty('--st-pos-x', `${cx}%`);
-      el.style.setProperty('--st-pos-y', `${cy}%`);
-      el.dataset.posX = String(cx);
-      el.dataset.posY = String(cy);
-    };
-
-    const up = () => {
-      if (!dragging) return;
-      dragging = false;
-      handle.style.cursor = '';
-      document.removeEventListener('pointermove', move);
-      document.removeEventListener('pointerup', up);
-      const [cx, cy] = [Number(el.dataset.posX), Number(el.dataset.posY)];
-      if (typeof onCommit === 'function') onCommit({ x: cx, y: cy });
-    };
-
     document.addEventListener('pointermove', move);
     document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', cancel);
   });
 }
 

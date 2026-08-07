@@ -17,6 +17,7 @@ from clio.config.models import (
     AnalyzeConfig,
     ExportConfig,
     PlanConfig,
+    PreviewConfig,
     ProjectAIConfig,
     ProjectCompressConfig,
     ProjectPathsConfig,
@@ -191,7 +192,7 @@ def handle_post_config_init(handler: HandlerProtocol, qs: dict[str, Any], obj: d
 
 # Layer field ownership (mirrors loader.py constants)
 _GLOBAL_SECTIONS = {"proxy", "server", "naming"}
-_PROJECT_SECTIONS = {"analyze", "script", "plan", "export"}
+_PROJECT_SECTIONS = {"analyze", "script", "plan", "export", "preview"}
 _SPLIT_GLOBAL: dict[str, set[str]] = {
     "paths": {"ffmpeg", "ffprobe", "logs_dir"},
     "ai": {"providers", "debug_print_prompt", "provider_ttl_min"},
@@ -234,6 +235,7 @@ def _project_config_defaults() -> dict[str, Any]:
         "plan": _json_safe(PlanConfig()),
         "whisper": _json_safe(ProjectWhisperConfig()),
         "export": _json_safe(ExportConfig()),
+        "preview": _json_safe(PreviewConfig()),
     }
 
 

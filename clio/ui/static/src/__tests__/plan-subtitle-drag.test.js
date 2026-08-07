@@ -34,14 +34,49 @@ describe('initSubtitleDrag', () => {
     const commits = [];
     const handle = el.querySelector('.plan-subtitle-handle');
     const stage = document.createElement('div');
-    stage.getBoundingClientRect = () => ({ width: 200, height: 100, left: 0, top: 0 });
+    stage.getBoundingClientRect = () => ({ width: 200, height: 100, left: 0, top: 0, bottom: 100 });
     initSubtitleDrag({ handle, stage, onCommit: (p) => commits.push(p) });
 
     handle.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, clientX: 100, clientY: 50 }));
     document.dispatchEvent(new MouseEvent('pointermove', { clientX: 140, clientY: 70 }));
     document.dispatchEvent(new MouseEvent('pointerup'));
-    expect(el.style.getPropertyValue('--st-pos-x')).toBeTruthy();
-    expect(el.style.getPropertyValue('--st-pos-y')).toBeTruthy();
+    expect(el.style.getPropertyValue('--st-pos-x')).toBe('70%');
+    // pos_y is bottom-offset: bottom=100, clientY=70 -> (100-70)/100*100=30
+    expect(el.style.getPropertyValue('--st-pos-y')).toBe('30%');
     expect(commits.length).toBe(1);
+    expect(commits[0]).toEqual({ x: 70, y: 30 });
+  });
+
+  it('release without move commits defaults (no NaN)', () => {
+    const el = mount();
+    const commits = [];
+    const handle = el.querySelector('.plan-subtitle-handle');
+    const stage = document.createElement('div');
+    stage.getBoundingClientRect = () => ({ width: 200, height: 100, left: 0, top: 0, bottom: 100 });
+    initSubtitleDrag({ handle, stage, onCommit: (p) => commits.push(p) });
+
+    handle.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    document.dispatchEvent(new MouseEvent('pointerup'));
+    expect(commits.length).toBe(1);
+    expect(Number.isFinite(commits[0].x)).toBe(true);
+    expect(Number.isFinite(commits[0].y)).toBe(true);
+  });
+
+  it('pointercancel ends drag without committing', () => {
+    const el = mount();
+    const commits = [];
+    const handle = el.querySelector('.plan-subtitle-handle');
+    const stage = document.createElement('div');
+    stage.getBoundingClientRect = () => ({ width: 200, height: 100, left: 0, top: 0, bottom: 100 });
+    const listeners = { move: 0, up: 0 };
+    const origAdd = document.addEventListener.bind(document);
+    const origRemove = document.removeEventListener.bind(document);
+    initSubtitleDrag({ handle, stage, onCommit: (p) => commits.push(p) });
+
+    handle.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }));
+    document.dispatchEvent(new MouseEvent('pointercancel'));
+    document.dispatchEvent(new MouseEvent('pointermove', { clientX: 150, clientY: 60 }));
+    document.dispatchEvent(new MouseEvent('pointerup'));
+    expect(commits.length).toBe(0);
   });
 });

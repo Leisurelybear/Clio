@@ -87,7 +87,7 @@ class PreviewSubtitlesConfig:
     font_family: str = ""  # empty = follow system
     font_color: str = "#ffffff"
     background: str = "rgba(0,0,0,0.55)"
-    outline: str = "1px solid #000"
+    outline: str = "0 0 2px rgba(0,0,0,0.8)"  # text-shadow syntax for legibility
     pos_x: int = 50  # percent of player width, 0..100
     pos_y: int = 8  # percent offset from player bottom, 0=bottom 100=top
 

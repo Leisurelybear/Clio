@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import yaml
 
 from clio.ui.routes.config_routes import (
+    _merge_project_with_defaults,
     handle_get_config,
     handle_get_config_global,
     handle_get_config_project,
@@ -82,6 +83,38 @@ class TestHandleGetConfigRaw:
         assert payload.get("_config_source") == "global_fallback"
         # Default ai.context should be set
         assert payload.get("ai", {}).get("context") == ""
+
+
+class TestPreviewSectionRoundTrip:
+    def test_merge_preserves_preview(self):
+        merged = _merge_project_with_defaults(
+            {
+                "preview": {"subtitles": {"mode": "multi", "pos_x": 20}},
+            }
+        )
+        assert merged.get("preview", {}).get("subtitles", {}).get("mode") == "multi"
+        assert merged["preview"]["subtitles"]["pos_x"] == 20
+
+    def test_get_config_project_includes_preview_defaults(self, tmp_path: Path):
+        handler = MagicMock()
+        cfg = tmp_path / "config.yaml"
+        cfg.write_bytes(b"")
+        proj_dir = tmp_path / "default"
+        proj_dir.mkdir()
+        (proj_dir / "project.yaml").write_text(
+            yaml.dump({"preview": {"subtitles": {"font_size": 18}}}), encoding="utf-8"
+        )
+        handler.config_path = cfg
+        handler.project_dir = proj_dir
+        handler._resolve_project_dir.return_value = proj_dir
+        handler._send_json = MagicMock()
+
+        handle_get_config_project(handler, {})
+
+        payload = handler._send_json.call_args[0][0]
+        assert payload["preview"]["subtitles"]["font_size"] == 18
+        # defaults merged for absent fields
+        assert payload["preview"]["subtitles"]["mode"] == "auto"
 
 
 class TestHandlePostConfigInit:

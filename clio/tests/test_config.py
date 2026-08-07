@@ -566,7 +566,7 @@ def test_preview_subtitles_defaults():
     assert s.font_family == ""
     assert s.font_color == "#ffffff"
     assert s.background == "rgba(0,0,0,0.55)"
-    assert s.outline == "1px solid #000"
+    assert s.outline == "0 0 2px rgba(0,0,0,0.8)"
     assert s.pos_x == 50
     assert s.pos_y == 8
 

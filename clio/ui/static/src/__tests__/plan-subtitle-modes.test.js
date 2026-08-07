@@ -6,6 +6,7 @@ import {
   computeFontShrink,
   renderPlanSubtitle,
 } from '../plan-subtitle.js';
+import { state } from '../state.js';
 
 describe('planSubtitleBatches', () => {
   it('packs short sentences into a single batch', () => {
@@ -89,7 +90,15 @@ describe('computeFontShrink', () => {
 });
 
 describe('renderPlanSubtitle (style + batched)', () => {
-  beforeEach(() => { document.getElementById('plan-subtitle')?.remove(); });
+  beforeEach(() => {
+    document.getElementById('plan-subtitle')?.remove();
+    state.configProject = null;
+    state.currentEntity = 'video';
+    state.plan = null;
+    state.videos = [];
+    state.previewIndex = -1;
+    state.previewGlobalSec = 0;
+  });
 
   function mount() {
     const el = document.createElement('div');
@@ -133,5 +142,32 @@ describe('renderPlanSubtitle (style + batched)', () => {
       textFor: async () => 'x',
     });
     expect(el.hidden).toBe(true);
+  });
+});
+
+describe('renderPlanSubtitle (production config source)', () => {
+  const origState = state;
+
+  beforeEach(() => {
+    document.getElementById('plan-subtitle')?.remove();
+  });
+
+  it('reads subtitle settings from state.configProject when no ctx given', async () => {
+    const el = document.createElement('div');
+    el.id = 'plan-subtitle'; el.hidden = true;
+    el.innerHTML = '<span class="plan-subtitle-handle"></span><span class="plan-subtitle-text"></span>';
+    document.body.appendChild(el);
+
+    origState.currentEntity = 'plan';
+    origState.previewIndex = 0;
+    origState.previewGlobalSec = 5;
+    origState.plan = { sequence: [{ index: '001', use_timeline: '00:00-00:30' }] };
+    origState.videos = [{ index: '001', script_json: 'vy.json' }];
+    // Production wiring: settings live under configProject (merged project config).
+    origState.configProject = { preview: { subtitles: { font_size: 18, pos_x: 30 } } };
+
+    await renderPlanSubtitle({ textFor: async () => '一行。' });
+    expect(el.style.getPropertyValue('--st-font-size')).toBe('18px');
+    expect(el.style.getPropertyValue('--st-pos-x')).toBe('30%');
   });
 });
