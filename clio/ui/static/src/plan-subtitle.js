@@ -210,6 +210,16 @@ export function loadVoiceoverText(index, scriptJson, fetchFn = apiFetch) {
 }
 
 /**
+ * Drop cached voiceover text. With an index arg only that entry is cleared;
+ * without args the whole cache is emptied (e.g. after batch edits).
+ * @param {string|number} [index]
+ */
+export function invalidateVoiceoverCache(index) {
+  if (index == null) { _voiceoverCache.clear(); return; }
+  _voiceoverCache.delete(String(index));
+}
+
+/**
  * Build a context object from the current app state for renderPlanSubtitle.
  * Pure and cheap -> callable from every timeupdate.
  */

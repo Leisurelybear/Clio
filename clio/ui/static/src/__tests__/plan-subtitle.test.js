@@ -4,6 +4,7 @@ import {
   scheduleSubtitleTiming,
   subtitleIndexAtTime,
   loadVoiceoverText,
+  invalidateVoiceoverCache,
   renderPlanSubtitle,
   hidePlanSubtitle,
 } from '../plan-subtitle.js';
@@ -125,6 +126,27 @@ describe('loadVoiceoverText', () => {
     const fakeLoader = async () => ({ voiceover: '   ' });
     const text = await loadVoiceoverText('005', 'e.json', fakeLoader);
     expect(text).toBeNull();
+  });
+
+  it('invalidateVoiceoverCache forces refetch on next load', async () => {
+    let calls = 0;
+    const fakeLoader = async () => { calls += 1; return { voiceover: '更新' }; };
+    await loadVoiceoverText('006', 'f.json', fakeLoader);
+    invalidateVoiceoverCache('006');
+    const text = await loadVoiceoverText('006', 'f.json', fakeLoader);
+    expect(calls).toBe(2);
+    expect(text).toBe('更新');
+  });
+
+  it('invalidateVoiceoverCache all-sentinel clears every entry', async () => {
+    let calls = 0;
+    const fakeLoader = async () => { calls += 1; return { voiceover: 'x' }; };
+    await loadVoiceoverText('007', 'g.json', fakeLoader);
+    await loadVoiceoverText('008', 'h.json', fakeLoader);
+    invalidateVoiceoverCache();
+    await loadVoiceoverText('007', 'g.json', fakeLoader);
+    await loadVoiceoverText('008', 'h.json', fakeLoader);
+    expect(calls).toBe(4);
   });
 });
 
