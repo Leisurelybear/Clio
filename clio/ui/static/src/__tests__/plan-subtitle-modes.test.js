@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   planSubtitleBatches,
   scheduleBatchTiming,
   packAtTime,
   computeFontShrink,
+  renderPlanSubtitle,
 } from '../plan-subtitle.js';
 
 describe('planSubtitleBatches', () => {
@@ -84,5 +85,53 @@ describe('computeFontShrink', () => {
   it('never exceeds base or drops below min', () => {
     const r = computeFontShrink('abc', 22, 100, 14);
     expect(r).toBe(22);
+  });
+});
+
+describe('renderPlanSubtitle (style + batched)', () => {
+  beforeEach(() => { document.getElementById('plan-subtitle')?.remove(); });
+
+  function mount() {
+    const el = document.createElement('div');
+    el.id = 'plan-subtitle'; el.hidden = true;
+    el.innerHTML = '<span class="plan-subtitle-handle"></span><span class="plan-subtitle-text"></span>';
+    document.body.appendChild(el);
+    return el;
+  }
+
+  const ctx = {
+    entity: 'plan', previewIndex: 0,
+    plan: { sequence: [{ index: '001', use_timeline: '00:00-00:30' }] },
+    videos: [{ index: '001', script_json: 'vy.json' }],
+    previewGlobalSec: 5,
+    config: { preview: { subtitles: { mode: 'auto', font_size: 18 } } },
+  };
+
+  it('applies style from config and writes into .plan-subtitle-text', async () => {
+    const el = mount();
+    await renderPlanSubtitle({ ctx, textFor: async () => '一行字幕。' });
+    expect(el.style.getPropertyValue('--st-font-size')).toBe('18px');
+    expect(el.querySelector('.plan-subtitle-text').textContent).toContain('一行字幕');
+    expect(el.hidden).toBe(false);
+  });
+
+  it('multi mode renders multiple lines', async () => {
+    const el = mount();
+    await renderPlanSubtitle({
+      ctx: { ...ctx, config: { preview: { subtitles: { mode: 'multi', max_lines: 2 } } } },
+      textFor: async () => '第一句。第二句。',
+    });
+    const text = el.querySelector('.plan-subtitle-text').textContent;
+    expect(text).toContain('第一句。');
+    expect(text).toContain('第二句。');
+  });
+
+  it('disabled subtitles hide layer', async () => {
+    const el = mount();
+    await renderPlanSubtitle({
+      ctx: { ...ctx, config: { preview: { subtitles: { enabled: false, mode: 'auto' } } } },
+      textFor: async () => 'x',
+    });
+    expect(el.hidden).toBe(true);
   });
 });

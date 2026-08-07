@@ -220,6 +220,7 @@ function readStateContext() {
     plan: state.plan,
     videos: state.videos,
     previewGlobalSec: state.previewGlobalSec,
+    config: state.config,
   };
 }
 
@@ -227,6 +228,57 @@ function readStateContext() {
 function subtitleElement() {
   return document.getElementById('plan-subtitle');
 }
+
+/**
+ * Resolve effective subtitle settings, filling config-driven values with
+ * sensible defaults.
+ * @param {{preview?:{subscribeconnections?:object}} | null} [config]
+ * @returns {{enabled:boolean, mode:string, maxLines:number, maxLen:number,
+ *             fontPx:number, shrinkMinPx:number}}
+ */
+export function subtitleSettings(config) {
+  const s = config?.preview?.subtitles || {};
+  return {
+    enabled: s.enabled !== false,
+    mode: s.mode || 'auto',
+    maxLines: Math.max(1, Number(s.max_lines) || 2),
+    maxLen: Math.max(1, Number(s.max_len) || 16),
+    fontPx: Number(s.font_size) || 22,
+    fontSizeMinPx: Number(s.font_size_min) || 14,
+  };
+}
+
+/**
+ * Map resolved settings + position to CSS variables on the subtitle element.
+ * Pure except for writing to the passed element.
+ * @param {HTMLElement} el
+ * @param {object} s resolved subtitleSettings() output
+ * @param {{color?:string, background?:string, outline_color?:string,
+ *           font_family?:string, pos_x?:number, pos_y?:number}} [cfg]
+ */
+export function applySubtitleStyle(el, s, cfg = {}) {
+  const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+  const elCfg = cfg;
+  el.style.setProperty('--st-font-size', `${s.fontPx}px`);
+  el.style.setProperty('--st-color', vCfg(elCfg.color) || '#fff');
+  el.style.setProperty('--st-bg', vCfg(elCfg.background) || 'rgba(0,0,0,.55)');
+  el.style.setProperty(
+    '--st-outline',
+    vCfg(elCfg.outline_color) ? `0 0 2px ${vCfg(elCfg.outline_color)}, 0 0 2px ${vCfg(elCfg.outline_color)}` : '1px 1px 2px rgba(0,0,0,.8)',
+  );
+  el.style.setProperty('--st-font-family', vCfg(elCfg.font_family) || "'system-ui, sans-serif'");
+  const posX = clampPercent(Number(elCfg.pos_x));
+  const posY = clampPercent(Number(elCfg.pos_y));
+  el.style.setProperty('--st-pos-x', pxToPct(posX));
+  el.style.setProperty('--st-pos-y', pxToPct(posY));
+  el.dataset.posX = String(posX);
+  el.dataset.posY = String(posY);
+}
+
+function vCfg(v) { return v == null || v === '' ? null : v; }
+function clampPercent(n) { return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 50; }
+function pxToPct(n) { return `${n}%`; }
+function effectiveFontPx(n) { return Number.isFinite(n) && n > 0 ? n : 22; }
 
 /**
  * Render the active subtitle line into #plan-subtitle; hide when nothing
@@ -243,9 +295,13 @@ export async function renderPlanSubtitle(opts = {}) {
   const textFor = opts.textFor || loadVoiceoverText;
   const clear = () => { el.hidden = true; el.dataset.line = ''; };
 
+  const st = subtitleSettings(c.config);
+  const cfg = c.config?.preview?.subtitles || {};
+
   if (c.entity !== 'plan' || !Number.isFinite(c.previewIndex) || c.previewIndex < 0) {
     clear(); return;
   }
+  if (!st.enabled) { clear(); return; }
   const p = c.plan;
   const seg = p?.sequence?.[c.previewIndex];
   if (!seg) { clear(); return; }
@@ -262,24 +318,39 @@ export async function renderPlanSubtitle(opts = {}) {
     && String(live.plan?.sequence?.[live.previewIndex]?.index ?? '') === idx;
   if (!current || !text) { clear(); return; }
 
-  const lines = splitSubtitleLines(text);
-  if (!lines.length) { clear(); return; }
+  const batches = planSubtitleBatches(text, {
+    mode: st.mode, maxLines: st.maxLines, maxLen: st.maxLen,
+  });
+  if (!batches.length) { clear(); return; }
 
   const tl = buildTimeline((p?.sequence) || []);
   const tseg = tl.segments[c.previewIndex];
   if (!tseg || tseg.duration <= 0) { clear(); return; }
 
-  const schedule = scheduleSubtitleTiming(tseg.duration, lines.length);
+  const schedule = scheduleBatchTiming(tseg.duration, batches.length);
   const localSec = Math.min(tseg.duration, Math.max(0, c.previewGlobalSec - tseg.globalStart));
-  const lineIdx = subtitleIndexAtTime(schedule, localSec);
-  if (lineIdx == null) { clear(); return; }
+  const batchIdx = packAtTime(schedule, localSec);
+  if (batchIdx == null) { clear(); return; }
 
-  const content = lines[lineIdx];
-  if (el.dataset.line === String(lineIdx) && !el.hidden && el.textContent === content) {
+  const lines = batches[batchIdx];
+  const textEl = el.querySelector('.plan-subtitle-text');
+  const content = lines.filter(Boolean).join('\n');
+
+  applySubtitleStyle(el, st, cfg);
+
+  // Shrink font to fit very long lines (scroll mode especially).
+  const longest = Math.max(...lines.map((l) => l.length), 1);
+  const effectiveFont = st.mode === 'scroll'
+    ? computeFontShrink(content, st.fontPx, st.maxLen * st.maxLines + 12, st.fontSizeMinPx)
+    : st.fontPx;
+  el.style.setProperty('--st-font-size', `${effectiveFontPx(effectiveFont)}px`);
+
+  const key = String(batchIdx);
+  if (el.dataset.line === key && !el.hidden && (textEl?.textContent || '') === content) {
     return; // no change
   }
-  el.textContent = content;
-  el.dataset.line = String(lineIdx);
+  if (textEl) textEl.textContent = content;
+  el.dataset.line = key;
   el.hidden = false;
 }
 

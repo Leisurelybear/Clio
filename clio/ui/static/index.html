@@ -96,7 +96,10 @@
   <section id="player-pane">
     <div class="player-wrap">
       <video id="player" controls preload="metadata"></video>
-      <div id="plan-subtitle" class="plan-subtitle" hidden></div>
+      <div id="plan-subtitle" class="plan-subtitle" hidden>
+        <span class="plan-subtitle-handle" title="拖动字幕位置" aria-hidden="true">⠿</span>
+        <span class="plan-subtitle-text"></span>
+      </div>
     </div>
     <div id="waveform-bar" class="waveform-bar" hidden>
       <canvas id="waveform-canvas" aria-hidden="true"></canvas>

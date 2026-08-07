@@ -776,15 +776,27 @@ button.match-badge:focus-visible { outline: 2px solid var(--border-focus); outli
   object-fit: contain; background: #000;
 }
 .plan-subtitle {
-  position: absolute; left: 50%; transform: translateX(-50%);
-  bottom: 24px; z-index: 4; max-width: 80%;
+  --st-font-size: 22px; --st-font-family: ''; --st-color: #fff;
+  --st-bg: rgba(0,0,0,.55); --st-outline: 1px 1px 2px rgba(0,0,0,.8);
+  --st-pos-x: 50%; --st-pos-y: 8%;
+  position: absolute; left: var(--st-pos-x); top: var(--st-pos-y);
+  transform: translate(-50%, -50%); z-index: 4; max-width: 80%;
   padding: 6px 14px; border-radius: 8px;
-  background: rgba(0,0,0,.55); color: #fff;
-  font-size: 22px; line-height: 1.4; text-align: center;
-  text-shadow: 0 1px 3px rgba(0,0,0,.8);
-  pointer-events: none; overflow-wrap: break-word;
+  background: var(--st-bg); color: var(--st-color);
+  font-size: var(--st-font-size); font-family: var(--st-font-family);
+  line-height: 1.4; text-align: center;
+  text-shadow: var(--st-outline);
+  overflow-wrap: break-word;
 }
 .plan-subtitle[hidden] { display: none; }
+.plan-subtitle-handle {
+  position: absolute; top: 2px; right: 2px;
+  pointer-events: auto; cursor: grab; user-select: none;
+  opacity: .5; font-size: 12px; line-height: 1;
+  color: var(--st-color);
+}
+.plan-subtitle-handle:hover { opacity: 1; }
+.plan-subtitle-text { white-space: pre-wrap; }
 
 .waveform-bar {
   position: relative;
