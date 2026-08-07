@@ -447,7 +447,9 @@ aside, section { overflow-y: auto; overflow-x: hidden; }
   background: var(--accent-bg);
 }
 
-/* ── Expand arrows on collapsed resize handles ────────────── */
+/* ── Expand arrows on collapsed resize handles ──────────────
+   Both sit at the top (header-row height) so fold/unfold are
+   always in the same place the panel header used to be.       */
 body.sidebar-collapsed .resize-handle[data-side="sidebar"] {
   background: var(--bg-surface-2);
 }
@@ -460,8 +462,7 @@ body.sidebar-collapsed .resize-handle[data-side="sidebar"]::after {
   color: var(--text-secondary);
   line-height: 1;
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 9px;
   left: 50%;
   margin-left: 0.5px;
   opacity: 0.95;
@@ -472,23 +473,28 @@ body.sidebar-collapsed .resize-handle[data-side="sidebar"]:hover::after {
   color: var(--accent);
   font-size: 26px;
 }
+body.editor-collapsed .resize-handle[data-side="editor"] {
+  background: var(--bg-surface-2);
+}
+body.editor-collapsed .resize-handle[data-side="editor"]:hover {
+  background: var(--accent-bg);
+}
 body.editor-collapsed .resize-handle[data-side="editor"]::after {
   content: '‹';
-  font-size: 16px;
-  color: var(--text-muted);
+  font-size: 22px;
+  color: var(--text-secondary);
   line-height: 1;
   position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 9px;
   left: 50%;
   margin-left: -0.5px;
-  opacity: 0.6;
+  opacity: 0.95;
   pointer-events: none;
-  transition: opacity var(--transition-fast);
+  transition: all var(--transition-fast);
 }
 body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
-  opacity: 1;
   color: var(--accent);
+  font-size: 26px;
 }
 
 /* ── Panel Headers ─────────────────────────────────────────── */
@@ -528,7 +534,8 @@ body.editor-collapsed .resize-handle[data-side="editor"]:hover::after {
 /* Sticky header: project dropdown in the panel bar */
 #sidebar .panel-header { position: relative; }
 .sidebar-project { position: relative; margin-left: auto; display: flex; gap: 4px; align-items: center; }
-#btn-collapse-sidebar { flex: 0 0 26px; justify-content: center; padding: 3px 0; font-weight: 700; }
+#btn-collapse-sidebar,
+#btn-collapse-editor { flex: 0 0 26px; justify-content: center; padding: 3px 0; font-weight: 700; }
 #btn-project-menu { font-size: var(--text-xs); padding: 3px 9px; }
 .project-menu {
   position: absolute; right: 0; top: calc(100% + 4px); z-index: 30;

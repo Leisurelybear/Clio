@@ -30,6 +30,10 @@ function setupCollapseButtons() {
     document.body.classList.toggle('sidebar-collapsed');
     saveLayout();
   });
+  $('btn-collapse-editor')?.addEventListener('click', () => {
+    document.body.classList.toggle('editor-collapsed');
+    saveLayout();
+  });
 }
 
 // ── Resize Handles (drag + click to collapse) ──────────────
