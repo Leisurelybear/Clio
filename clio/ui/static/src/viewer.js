@@ -25,6 +25,10 @@ import {
   hidePlanSubtitle,
   initSubtitleDrag,
 } from './plan-subtitle.js';
+import {
+  renderSubtitleSettingsPanel,
+  mergeSubtitleSettings,
+} from './subtitle-settings.js';
 
 function isGlobalTimelineUi() {
   return state.currentEntity === 'plan'
@@ -354,6 +358,26 @@ function _planIndexesKey(tl) {
   return `${state.source || 'compressed'}|${idxs.join(',')}`;
 }
 
+function _renderPlanSubtitleSettings() {
+  const wrap = $('subtitle-settings-wrap');
+  if (!wrap) return;
+  if (state.currentEntity !== 'plan') { wrap.innerHTML = ''; return; }
+  const project = state.configProject || {};
+  renderSubtitleSettingsPanel(wrap, {
+    config: project,
+    onChange: (updates) => {
+      const merged = mergeSubtitleSettings(state.configProject, updates);
+      state.configProject = merged;
+      api('PUT', '/api/config/project', merged).then(() => {
+        setStatus('字幕样式已保存', 'ok');
+        renderPlanSubtitleFromState();
+      }).catch(() => {
+        setStatus('字幕样式保存失败', 'warn');
+      });
+    },
+  });
+}
+
 function renderPreviewBar() {
   const bar = $('preview-bar');
   if (!bar) return;
@@ -405,10 +429,12 @@ function renderPreviewBar() {
     + `<div class="preview-progress-fill" id="preview-progress-fill" style="width:${pct}%"></div>`
     + `<div class="preview-playhead" id="preview-playhead" style="left:${pct}%"></div>`;
 
-  // Segment blocks are visual only. Seek/scrub is via bar drag (mousedown on segBar);
+  // Fragment blocks are visual only. Seek/scrub is via bar drag (mousedown on segBar);
   // jump-to-segment-start lives on the plan list accordion, not here.
 
   if (isGlobalTimelineUi()) updateCompositeClock();
+
+  _renderPlanSubtitleSettings();
 
   // Full peaks fetch when entering plan, leaving plan-mode, or unique video indexes/source change.
   // Otherwise recompose from cache (use_timeline / order edits).

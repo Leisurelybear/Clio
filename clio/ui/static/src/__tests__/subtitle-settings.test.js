@@ -1,0 +1,145 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import {
+  subtitleControlsModel,
+  mergeSubtitleSettings,
+  safeColor,
+  renderSubtitleSettingsPanel,
+} from '../subtitle-settings.js';
+
+describe('subtitleControlsModel', () => {
+  it('uses config values', () => {
+    const m = subtitleControlsModel({
+      preview: {
+        subtitles: {
+          font_size: 28, min_font_size: 12, font_color: '#f00',
+          background: 'rgba(0,0,0,.8)', outline: '2px solid #000',
+          font_family: 'sans-serif', mode: 'scroll',
+          max_lines: 3, max_len_per_line: 20,
+        },
+      },
+    });
+    expect(m).toEqual({
+      font_size: 28, min_font_size: 12, font_color: '#f00',
+      background: 'rgba(0,0,0,.8)', outline: '2px solid #000',
+      font_family: 'sans-serif', mode: 'scroll',
+      max_lines: 3, max_len_per_line: 20,
+    });
+  });
+
+  it('fills defaults when config missing', () => {
+    const m = subtitleControlsModel(null);
+    expect(m.font_size).toBe(22);
+    expect(m.min_font_size).toBe(14);
+    expect(m.font_color).toBe('#fff');
+    expect(m.mode).toBe('auto');
+    expect(m.max_lines).toBe(2);
+    expect(m.max_len_per_line).toBe(16);
+  });
+});
+
+describe('mergeSubtitleSettings', () => {
+  it('preserves other preview/project fields, updates subtitles', () => {
+    const merged = mergeSubtitleSettings(
+      { preview: { subtitles: { font_size: 22 } } },
+      { font_size: 30, mode: 'scroll' },
+    );
+    expect(merged.preview.subtitles).toEqual({ font_size: 30, mode: 'scroll' });
+    expect(merged.preview.subtitles.font_size).toBe(30);
+  });
+
+  it('creates preview.subtitles when absent', () => {
+    const merged = mergeSubtitleSettings(
+      { some: 1 },
+      { font_size: 26 },
+    );
+    expect(merged.preview.subtitles.font_size).toBe(26);
+    expect(merged.some).toBe(1);
+  });
+
+  it('null/undefined project → fresh object', () => {
+    const merged = mergeSubtitleSettings(null, { font_size: 26 });
+    expect(merged.preview.subtitles.font_size).toBe(26);
+  });
+
+  it('drops undefined values so stale keys are removed', () => {
+    const merged = mergeSubtitleSettings(
+      { preview: { subtitles: { font_size: 22, mode: 'auto' } } },
+      { font_size: 30, mode: undefined },
+    );
+    expect(merged.preview.subtitles).toEqual({ font_size: 30 });
+  });
+});
+
+describe('safeColor', () => {
+  it('passes through valid hex/color strings', () => {
+    expect(safeColor('#ffffff')).toBe('#ffffff');
+    expect(safeColor('#fff')).toBe('#fff');
+    expect(safeColor('')).toBe('');
+    expect(safeColor(null)).toBe(null);
+  });
+});
+
+describe('renderSubtitleSettingsPanel', () => {
+  beforeEach(() => { document.querySelector('.test-subs-wrap')?.remove(); });
+
+  function mountConfig(over = {}) {
+    return {
+      preview: {
+        subtitles: {
+          font_size: 26, min_font_size: 12, font_color: '#123456',
+          mode: 'auto', ...over,
+        },
+      },
+    };
+  }
+
+  it('renders controls populated from config', () => {
+    const changed = [];
+    const wrap = document.createElement('div');
+    wrap.className = 'test-subs-wrap';
+    document.body.appendChild(wrap);
+    renderSubtitleSettingsPanel(wrap, {
+      config: mountConfig(),
+      onChange: (u) => changed.push(u),
+    });
+
+    const size = wrap.querySelector('[data-subtle="font_size"]');
+    const color = wrap.querySelector('[data-subtle="font_color"]');
+    const mode = wrap.querySelector('[data-subtle="mode"]');
+    expect(size).toBeTruthy();
+    expect(size.value).toBe('26');
+    expect(color.value).toBe('#123456');
+    expect(mode.value).toBe('auto');
+  });
+
+  it('emits onChange with numberized font_size', () => {
+    const changed = [];
+    const wrap = document.createElement('div');
+    wrap.className = 'test-subs-wrap';
+    document.body.appendChild(wrap);
+    renderSubtitleSettingsPanel(wrap, {
+      config: mountConfig(),
+      onChange: (u) => changed.push(u),
+    });
+    const size = wrap.querySelector('[data-subtle="font_size"]');
+    size.value = '30';
+    size.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(changed.length).toBe(1);
+    expect(changed[0].font_size).toBe(30);
+  });
+
+  it('emits onChange with string color', () => {
+    const changed = [];
+    const wrap = document.createElement('div');
+    wrap.className = 'test-subs-wrap';
+    document.body.appendChild(wrap);
+    renderSubtitleSettingsPanel(wrap, {
+      config: mountConfig(),
+      onChange: (u) => changed.push(u),
+    });
+    const color = wrap.querySelector('[data-subtle="font_color"]');
+    color.value = '#abcdef';
+    color.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(changed[0].font_color).toBe('#abcdef');
+  });
+});

@@ -799,6 +799,45 @@ button.match-badge:focus-visible { outline: 2px solid var(--border-focus); outli
 .plan-subtitle-handle:hover { opacity: 1; }
 .plan-subtitle-text { white-space: pre-wrap; }
 
+.subtitle-settings {
+  margin-top: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  padding: var(--space-2) var(--space-3);
+}
+.subtitle-settings summary {
+  cursor: pointer;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: var(--text-sm);
+  user-select: none;
+}
+.subtitle-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.subtitle-settings-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+.subtitle-settings-grid input,
+.subtitle-settings-grid select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  font-size: var(--text-sm);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-2);
+  color: var(--text-primary);
+}
+
 .waveform-bar {
   position: relative;
   height: 32px;
