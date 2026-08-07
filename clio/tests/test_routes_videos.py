@@ -258,6 +258,83 @@ class TestHandleGetVideos:
         assert mock_build.call_count == 1
         assert handler._send_json.call_count == 2
 
+    def test_disk_cache_serves_after_memory_cleared(self, tmp_path: Path):
+        """A fresh process (empty in-memory cache) must load the payload from a
+        persisted disk cache instead of rebuilding, as long as the signature is
+        unchanged. Eliminates the cold-start rebuild cost per app launch."""
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
+        proj_out = tmp_path / "output"
+        proj_out.mkdir()
+        comp_dir = proj_out / "compressed"
+        comp_dir.mkdir()
+        (comp_dir / "001_GL010695.mp4").write_bytes(b"")
+
+        def _make_handler():
+            handler = MagicMock()
+            handler._resolve_project_dir.return_value = proj_dir
+            handler._get_project_output.return_value = proj_out
+            handler._get_config.return_value = SimpleNamespace(
+                whisper=SimpleNamespace(transcripts_subdir="transcripts"),
+                paths=SimpleNamespace(ffprobe="ffprobe"),
+            )
+            handler._send_json = MagicMock()
+            return handler
+
+        # First build populates both in-memory and persisted caches.
+        handle_get_videos(_make_handler(), {"source": ["compressed"]})
+
+        # Simulate an app restart: in-memory cache is gone, only disk cache remains.
+        _clear_videos_cache()
+        handler2 = _make_handler()
+
+        with patch(
+            "clio.ui.routes.videos._build_videos_payload",
+            wraps=__import__("clio.ui.routes.videos", fromlist=["_build_videos_payload"])._build_videos_payload,
+        ) as mock_build2:
+            handle_get_videos(handler2, {"source": ["compressed"]})
+
+        assert mock_build2.call_count == 0, "should serve from persisted disk cache"
+        assert handler2._send_json.call_count == 1
+        payload = handler2._send_json.call_args[0][0]
+        assert payload["videos"][0]["file"] == "001_GL010695.mp4"
+
+    def test_disk_cache_rebuilds_when_signature_changes(self, tmp_path: Path):
+        """Adding/removing a file changes the signature, so the stale persisted
+        cache must not be served; the payload is rebuilt."""
+        proj_dir = tmp_path / "input"
+        proj_dir.mkdir()
+        proj_out = tmp_path / "output"
+        proj_out.mkdir()
+        comp_dir = proj_out / "compressed"
+        comp_dir.mkdir()
+        (comp_dir / "001_GL010695.mp4").write_bytes(b"")
+
+        def _make_handler():
+            handler = MagicMock()
+            handler._resolve_project_dir.return_value = proj_dir
+            handler._get_project_output.return_value = proj_out
+            handler._get_config.return_value = SimpleNamespace(
+                whisper=SimpleNamespace(transcripts_subdir="transcripts"),
+                paths=SimpleNamespace(ffprobe="ffprobe"),
+            )
+            handler._send_json = MagicMock()
+            return handler
+
+        handle_get_videos(_make_handler(), {"source": ["compressed"]})
+
+        # Change a file so the signature no longer matches the persisted cache.
+        (comp_dir / "001_GL010695.mp4").write_bytes(b"changed")
+
+        _clear_videos_cache()
+        handler2 = _make_handler()
+        with patch(
+            "clio.ui.routes.videos._build_videos_payload",
+            wraps=__import__("clio.ui.routes.videos", fromlist=["_build_videos_payload"])._build_videos_payload,
+        ) as mock_build2:
+            handle_get_videos(handler2, {"source": ["compressed"]})
+        assert mock_build2.call_count == 1, "signature change must force rebuild"
+
     def test_selected_set_includes_video_with_vmeta(self, tmp_path: Path):
         """Compressed view + selected_set: include video whose .vmeta.source_path
         matches a path in videos.json (original outside proj_dir)."""

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 import threading
 from copy import deepcopy
@@ -29,6 +31,45 @@ _SEG_RE = re.compile(r"^(.+)_(?:seg|part|pt|chunk)(\d+)$", re.IGNORECASE)
 _VIDEOS_CACHE_LOCK = threading.Lock()
 _VIDEOS_CACHE_MAX = 20
 _VIDEOS_CACHE: dict[tuple[str, str, str], tuple[tuple[Any, ...], dict[str, Any]]] = {}
+
+
+def _cache_dir(proj_out: Path) -> Path:
+    return proj_out / ".cache"
+
+
+def _disk_cache_path(proj_out: Path, source: str) -> Path:
+    return _cache_dir(proj_out) / f"videos_{source}.json"
+
+
+def _signature_hash(signature: tuple[Any, ...]) -> str:
+    return hashlib.sha256(json.dumps(signature, default=str).encode("utf-8")).hexdigest()
+
+
+def _load_disk_cache(proj_out: Path, source: str, signature: tuple[Any, ...]) -> dict[str, Any] | None:
+    """Load payload from persisted cache if the stored signature matches."""
+    path = _disk_cache_path(proj_out, source)
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if data.get("version") != 1 or data.get("signature") != _signature_hash(signature):
+        return None
+    payload = data.get("payload")
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def _save_disk_cache(proj_out: Path, source: str, signature: tuple[Any, ...], payload: dict[str, Any]) -> None:
+    try:
+        cache_dir = _cache_dir(proj_out)
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        data = {"version": 1, "signature": _signature_hash(signature), "payload": payload}
+        tmp = cache_dir / f"videos_{source}.json.tmp"
+        tmp.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(_disk_cache_path(proj_out, source))
+    except OSError:
+        pass
 
 
 def _parse_segment_info(stem: str) -> tuple[str | None, int | None]:
@@ -150,7 +191,18 @@ def handle_get_videos(handler: HandlerProtocol, qs: dict[str, Any]) -> None:
         if cached is not None and cached[0] == signature:
             return handler._send_json(deepcopy(cached[1]))
 
+    # Persisted cache survives process restart (cold start); only a signature
+    # change forces a rebuild.
+    disk_payload = _load_disk_cache(proj_out, source, signature)
+    if disk_payload is not None:
+        with _VIDEOS_CACHE_LOCK:
+            if len(_VIDEOS_CACHE) >= _VIDEOS_CACHE_MAX and cache_key not in _VIDEOS_CACHE:
+                _VIDEOS_CACHE.pop(next(iter(_VIDEOS_CACHE)))
+            _VIDEOS_CACHE[cache_key] = (signature, deepcopy(disk_payload))
+        return handler._send_json(disk_payload)
+
     payload = _build_videos_payload(handler, proj_dir, proj_out, comp_dir, source, cfg, selected_set=selected_set)
+    _save_disk_cache(proj_out, source, signature, payload)
     with _VIDEOS_CACHE_LOCK:
         if len(_VIDEOS_CACHE) >= _VIDEOS_CACHE_MAX and cache_key not in _VIDEOS_CACHE:
             _VIDEOS_CACHE.pop(next(iter(_VIDEOS_CACHE)))
