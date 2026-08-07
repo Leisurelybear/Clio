@@ -29,6 +29,7 @@ import {
   renderSubtitleSettingsPanel,
   mergeSubtitleSettings,
 } from './subtitle-settings.js';
+import { phaseNewSource, captureFrame, fadeHide } from './video-fade.js';
 
 function isGlobalTimelineUi() {
   return state.currentEntity === 'plan'
@@ -121,6 +122,7 @@ export function playerSrcMatchesFile(playerSrc, file, source) {
  */
 function _loadAndSeekSource(v, seekSec, wantPlay) {
   const player = $('player');
+  const fadeCanvas = $('video-fade');
   const doSeek = () => {
     player.currentTime = seekSec;
     if (wantPlay) player.play().catch(() => {});
@@ -135,6 +137,18 @@ function _loadAndSeekSource(v, seekSec, wantPlay) {
   if (same) {
     doSeek();
   } else {
+    // Freeze the previous frame while the new source loads to avoid a black
+    // flash; fade the snapshot out once the new first frame is decoded.
+    if (fadeCanvas) {
+      const drew = captureFrame(player, fadeCanvas);
+      if (drew) {
+        fadeCanvas.style.visibility = 'visible';
+        fadeCanvas.style.opacity = '1';
+        fadeCanvas.classList.remove('video-fade-hide');
+        const hideOnReady = () => fadeHide(fadeCanvas);
+        player.addEventListener('loadeddata', hideOnReady, { once: true });
+      }
+    }
     player.onloadedmetadata = () => {
       if (!isGlobalTimelineUi()) {
         $('player-time').textContent = `${fmtTime(0)} / ${fmtTime(player.duration)}`;

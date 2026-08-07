@@ -775,6 +775,15 @@ button.match-badge:focus-visible { outline: 2px solid var(--border-focus); outli
   width: 100%; height: 100%; max-height: none; display: block;
   object-fit: contain; background: #000;
 }
+.video-fade {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  object-fit: contain; pointer-events: none;
+  background: transparent; visibility: hidden;
+  opacity: 0; transition: opacity 200ms ease;
+  z-index: 2;
+}
+.video-fade[hidden] { display: none; }
+.video-fade.video-fade-hide { opacity: 0; }
 .plan-subtitle {
   --st-font-size: 22px; --st-font-family: system-ui, sans-serif; --st-color: #fff;
   --st-bg: rgba(0,0,0,.55); --st-outline: 0 0 2px rgba(0,0,0,.8);
