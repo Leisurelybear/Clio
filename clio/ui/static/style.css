@@ -67,6 +67,9 @@
   --sidebar-w: 240px;
   --editor-w: 400px;
   --handle-w: 5px;
+  --handle-w-collapsed: 14px;
+  --sidebar-handle: var(--handle-w);
+  --editor-handle: var(--handle-w);
 }
 
 /* ── Light Theme ────────────────────────────────────────────── */
@@ -395,7 +398,7 @@ header > * { -webkit-app-region: no-drag; }
 main {
   flex: 1;
   display: grid;
-  grid-template-columns: var(--sidebar-w) var(--handle-w) 1fr var(--handle-w) var(--editor-w);
+  grid-template-columns: var(--sidebar-w) var(--sidebar-handle) 1fr var(--editor-handle) var(--editor-w);
   min-height: 0;
   overflow: hidden;
 }
@@ -403,9 +406,11 @@ main {
 /* Collapsed states */
 body.sidebar-collapsed {
   --sidebar-w: 0px;
+  --sidebar-handle: var(--handle-w-collapsed);
 }
 body.editor-collapsed {
   --editor-w: 0px;
+  --editor-handle: var(--handle-w-collapsed);
 }
 
 /* Floating editor state */
@@ -426,6 +431,8 @@ aside, section { overflow-y: auto; overflow-x: hidden; }
   justify-content: center;
   width: var(--handle-w);
 }
+.resize-handle[data-side="sidebar"] { width: var(--sidebar-handle); }
+.resize-handle[data-side="editor"] { width: var(--editor-handle); }
 .resize-handle::before {
   content: '';
   position: absolute;
