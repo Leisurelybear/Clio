@@ -29,6 +29,17 @@ def _require_positive(field_name: str, value: int | float) -> None:
         raise ValueError(f"{field_name} must be > 0, got: {value}")
 
 
+def _require_choice(field_name: str, value: str, choices: tuple[str, ...]) -> None:
+    if value not in choices:
+        available = ", ".join(choices)
+        raise ValueError(f"{field_name} must be one of {available}, got: {value}")
+
+
+def _require_range(field_name: str, value: int | float, minimum: int | float, maximum: int | float) -> None:
+    if value < minimum or value > maximum:
+        raise ValueError(f"{field_name} must be in [{minimum}, {maximum}], got: {value}")
+
+
 def _require_supported_provider_type(provider_name: str, provider_type: str) -> None:
     if provider_type not in _SUPPORTED_PROVIDER_TYPES:
         available = ", ".join(sorted(_SUPPORTED_PROVIDER_TYPES))
@@ -91,6 +102,15 @@ def _validate_config(config: AppConfig) -> None:
     if config.export.canvas_ratio not in CANVAS_PRESETS:
         available = ", ".join(CANVAS_PRESETS)
         raise ValueError(f"export.canvas_ratio must be one of {available}, got: {config.export.canvas_ratio}")
+    _require_choice("preview.subtitles.mode", config.preview.subtitles.mode, ("auto", "multi", "scroll"))
+    _require_min("preview.subtitles.max_lines", config.preview.subtitles.max_lines, 1)
+    _require_min("preview.subtitles.max_len_per_line", config.preview.subtitles.max_len_per_line, 1)
+    _require_min("preview.subtitles.min_font_size", config.preview.subtitles.min_font_size, 4)
+    _require_min("preview.subtitles.font_size", config.preview.subtitles.font_size, 4)
+    _require_min("preview.subtitles.scroll_speed", config.preview.subtitles.scroll_speed, 0)
+    _require_max("preview.subtitles.scroll_speed", config.preview.subtitles.scroll_speed, 500)
+    _require_range("preview.subtitles.pos_x", config.preview.subtitles.pos_x, 0, 100)
+    _require_range("preview.subtitles.pos_y", config.preview.subtitles.pos_y, 0, 100)
     if config.project_cfg is not None:
         config.project_cfg.whisper.sanitize()
 

@@ -12,6 +12,7 @@ from clio.config.models import (
     NamingConfig,
     PathsConfig,
     PlanConfig,
+    PreviewSubtitlesConfig,
     ProviderConfig,
     ProxyConfig,
     ScriptConfig,
@@ -35,6 +36,7 @@ _CONFIG_DC_MAP: list[tuple[str, type]] = [
     ("script", ScriptConfig),
     ("plan", PlanConfig),
     ("whisper", WhisperConfig),
+    ("preview.subtitles", PreviewSubtitlesConfig),
 ]
 
 

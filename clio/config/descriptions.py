@@ -67,4 +67,18 @@ CONFIG_DESCRIPTIONS: dict[str, str] = {
     "whisper.cache_dir": "Whisper 模型缓存目录，留空使用程序默认路径",
     "whisper.transcripts_subdir": "转录结果存放的子目录名",
     "whisper.hf_endpoint": "HuggingFace 镜像地址。国内推荐 hf-mirror.com，留空用官方",
+    # preview.subtitles
+    "preview.subtitles.enabled": "plan 预览是否显示字幕",
+    "preview.subtitles.mode": "字幕显示模式: auto | multi | scroll",
+    "preview.subtitles.max_lines": "多行模式下最多同时显示行数",
+    "preview.subtitles.max_len_per_line": "每行最大字数",
+    "preview.subtitles.min_font_size": "自动缩字号时最小字号 (px)",
+    "preview.subtitles.scroll_speed": "滚动模式下滚动速度 (px/s)",
+    "preview.subtitles.font_size": "字幕字号 (px)",
+    "preview.subtitles.font_family": "字幕字体族 (空=跟随系统)",
+    "preview.subtitles.font_color": "字幕文字颜色",
+    "preview.subtitles.background": "字幕背景 (rgba)",
+    "preview.subtitles.outline": "字幕描边样式",
+    "preview.subtitles.pos_x": "字幕水平位置 (占播放器宽 %，0~100)",
+    "preview.subtitles.pos_y": "字幕垂直偏移 (自播放器底部 %，0=底部)",
 }

@@ -569,3 +569,37 @@ def test_preview_subtitles_defaults():
     assert s.outline == "1px solid #000"
     assert s.pos_x == 50
     assert s.pos_y == 8
+
+
+def test_validate_preview_subtitles_mode():
+    from clio.config.models import PreviewConfig, PreviewSubtitlesConfig
+
+    cfg = AppConfig(
+        global_cfg=GlobalConfig(),
+        project_cfg=ProjectConfig(
+            preview=PreviewConfig(subtitles=PreviewSubtitlesConfig(mode="bad")),
+        ),
+    )
+    with pytest.raises(ValueError, match="preview.subtitles.mode"):
+        _validate_config(cfg)
+
+
+def test_validate_preview_subtitles_pos_range():
+    from clio.config.models import PreviewConfig, PreviewSubtitlesConfig
+
+    cfg = AppConfig(
+        global_cfg=GlobalConfig(),
+        project_cfg=ProjectConfig(
+            preview=PreviewConfig(subtitles=PreviewSubtitlesConfig(pos_x=150)),
+        ),
+    )
+    with pytest.raises(ValueError, match="preview.subtitles.pos_x"):
+        _validate_config(cfg)
+
+    ok = AppConfig(
+        global_cfg=GlobalConfig(),
+        project_cfg=ProjectConfig(
+            preview=PreviewConfig(subtitles=PreviewSubtitlesConfig(pos_x=50, pos_y=8)),
+        ),
+    )
+    assert _validate_config(ok) is None
