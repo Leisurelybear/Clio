@@ -37,9 +37,9 @@ const state = {
   _previewEndTime: null,
   selectionMode: false,
   selectedFiles: [],
-  refining: null,  // {type: 'texts'|'scripts', file: string} when AI refine in progress
+refining: null,  // {type: 'texts'|'scripts', file: string} when AI refine in progress
   deps: null,  // { ok, ffmpeg, ffprobe, missing, detail } from GET /api/deps/ffmpeg
-  videoFilter: { q: '', stage: '' },  // stage: '' | 'compress' | 'analyze' | 'voiceover' | 'transcribe' | 'offline'
+  videoFilter: { q: '', stage: '', mode: 'missing' },  // stage: '' | compress/analyze/voiceover/transcribe/offline; mode: 'missing' (chips) | 'done' (count bar)
   _filterDebounce: null,
 };
 

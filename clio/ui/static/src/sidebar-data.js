@@ -16,6 +16,7 @@ import {
   countStageSummary,
   matchVideoSearch,
   videoMissingStage,
+  videoStageDone,
   STAGE_CELLS,
 } from './sidebar-video-filter.js';
 import { selectVideosButtonHtml } from './select-btn.js';
@@ -183,6 +184,8 @@ export async function loadProject() {
     if (proj.currentDay) state.currentDay = proj.currentDay;
     if (proj.source && proj.source !== state.source) {
       state.source = proj.source;
+      state.videoFilter = { q: '', stage: '', mode: 'missing' };
+      if ($('video-filter-input')) $('video-filter-input').value = '';
       $$('.source-toggle button').forEach(b => b.classList.toggle('active', b.dataset.source === state.source));
     }
     state.steps = proj.steps || {};
@@ -478,13 +481,22 @@ export function renderVideoList() {
         };
       }
     }
+    const countEl = $('video-count');
+    if (countEl) countEl.textContent = '(0/0)';
+    renderFilterChips();
+    renderStageCountBar();
     return;
   }
 
   const q = state.videoFilter?.q || '';
   const stage = state.videoFilter?.stage || '';
+  const mode = state.videoFilter?.mode || 'missing';
   const visible = state.videos.filter((v) =>
-    matchVideoSearch(v, q) && (!stage || videoMissingStage(v, state.source, stage))
+    matchVideoSearch(v, q) && (!stage || (
+      mode === 'done'
+        ? videoStageDone(v, state.source, stage)
+        : videoMissingStage(v, state.source, stage)
+    ))
   );
 
   const countEl = $('video-count');
@@ -503,6 +515,7 @@ export function renderVideoList() {
     li.querySelector('#btn-clear-video-filter').onclick = () => {
       state.videoFilter.q = '';
       state.videoFilter.stage = '';
+      state.videoFilter.mode = 'missing';
       if ($('video-filter-input')) $('video-filter-input').value = '';
       renderVideoList();
     };
@@ -592,20 +605,28 @@ function renderFilterChips() {
   const all = state.videos.length;
   const stats = countChipStats(state.videos, state.source);
   box.innerHTML = '';
+  const isMissingFilter = state.videoFilter.mode !== 'done';
   const allBtn = document.createElement('button');
   allBtn.type = 'button';
   allBtn.className = 'video-filter-chip' + (!state.videoFilter.stage ? ' active' : '');
   allBtn.textContent = `全部 ${all}`;
-  allBtn.onclick = () => { state.videoFilter.stage = ''; renderVideoList(); };
+  allBtn.onclick = () => {
+    state.videoFilter.stage = '';
+    state.videoFilter.mode = 'missing';
+    renderVideoList();
+  };
   box.appendChild(allBtn);
   for (const s of stats) {
     if (s.count === 0) continue;
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'video-filter-chip' + (state.videoFilter.stage === s.key ? ' active' : '');
+    b.className = 'video-filter-chip' + (
+      isMissingFilter && state.videoFilter.stage === s.key ? ' active' : ''
+    );
     b.textContent = `${s.label} ${s.count}`;
     b.onclick = () => {
       state.videoFilter.stage = state.videoFilter.stage === s.key ? '' : s.key;
+      state.videoFilter.mode = 'missing';
       renderVideoList();
     };
     box.appendChild(b);
@@ -622,14 +643,29 @@ function renderStageCountBar() {
   }
   box.hidden = false;
   const summary = countStageSummary(state.videos, state.source);
+  const isDoneFilter = state.videoFilter.mode === 'done';
   for (const s of summary) {
     const cell = document.createElement('div');
-    cell.className = 'stage-count-cell' + (state.videoFilter.stage === s.key ? ' active' : '');
-    cell.title = s.done === s.total ? `${s.label}: 全部完成` : `${s.label}: 缺 ${s.total - s.done} 个`;
+    const isActive = isDoneFilter && state.videoFilter.stage === s.key;
+    cell.className = 'stage-count-cell' + (s.done === 0 ? ' empty' : '') + (isActive ? ' active' : '');
     cell.innerHTML = `<span class="stage-count-num">${s.done}/${s.total}</span>${s.label}`;
+    if (s.done === 0) {
+      cell.title = `${s.label}: 尚无完成`;
+    } else if (s.done === s.total) {
+      cell.title = isDoneFilter && isActive ? `${s.label}: 全部 ${s.done} 个已完成` : `${s.label}: 全部完成`;
+    } else {
+      cell.title = `${s.label}: 已完成 ${s.done}，缺 ${s.total - s.done}`;
+    }
     cell.onclick = () => {
-      const key = state.videoFilter.stage === s.key ? '' : s.key;
-      state.videoFilter.stage = key;
+      if (s.done === 0) return;
+      const activeNow = state.videoFilter.stage === s.key && state.videoFilter.mode === 'done';
+      if (activeNow) {
+        state.videoFilter.stage = '';
+        state.videoFilter.mode = 'missing';
+      } else {
+        state.videoFilter.stage = s.key;
+        state.videoFilter.mode = 'done';
+      }
       renderVideoList();
     };
     box.appendChild(cell);

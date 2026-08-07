@@ -253,6 +253,8 @@ async function setSource(source, options = {}) {
   state.currentVideo = null;
   state.selectionMode = false;
   state.selectedFiles = [];
+  state.videoFilter = { q: '', stage: '', mode: 'missing' };
+  if ($('video-filter-input')) $('video-filter-input').value = '';
   state.texts = null;
   state.voiceover = null;
   $$('.source-toggle button').forEach(b => b.classList.toggle('active', b.dataset.source === source));
