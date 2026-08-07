@@ -176,6 +176,7 @@ function seekToGlobal(globalSec, opts = {}) {
   );
   if (!v) {
     setStatus(`跳过视频 [${loc.videoIndex}]，找不到对应文件`, 'warn');
+    hidePlanSubtitle();
     updateCompositeClock();
     softUpdatePreviewChrome(tl);
     _softUpdateSegBlockClasses(loc.segIndex);

@@ -96,4 +96,18 @@ describe('composePlanPeaks', () => {
     expect(r.targetBins).toBe(2000);
     expect(r.peaks).toHaveLength(2000);
   });
+
+  it('null entry (no audio) zero-fills without crashing', () => {
+    const tl = buildTimeline(seq);
+    const r = composePlanPeaks(tl, {
+      '001': { peaks: Array(20).fill(0.5), duration_sec: 10 },
+      '002': null, // no_audio source → degraded to missing
+    }, { targetBins: 400 });
+    expect(r.peaks).toHaveLength(400);
+    expect(r.missingSegIndexes).toContain(1);
+    const seg0Bins = Math.round((10 / 15) * 400);
+    const seg0 = r.peaks.slice(0, seg0Bins);
+    expect(seg0.every((p) => p === 0.5)).toBe(true);
+    expect(r.peaks.slice(seg0Bins).every((p) => p === 0)).toBe(true);
+  });
 });

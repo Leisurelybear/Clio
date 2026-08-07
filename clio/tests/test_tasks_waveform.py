@@ -228,11 +228,10 @@ class TestResolveBinaryContract:
     def test_extract_uses_path_discovery_when_ffmpeg_empty(self, tmp_path: Path):
         src = tmp_path / "v.mp4"
         src.write_bytes(b"v")
-        calls = {}
+        calls = []
 
         def fake_resolve(configured, fallback):
-            calls["configured"] = configured
-            calls["fallback"] = fallback
+            calls.append((configured, fallback))
             if configured:
                 raise FileNotFoundError(f"找不到可执行文件: {configured}")
             return "C:/fake/ffmpeg.exe"
@@ -248,8 +247,8 @@ class TestResolveBinaryContract:
         ):
             out = wf.extract_peaks_for_video(src, ffmpeg="", duration_sec=1.0)
 
-        assert calls.get("configured") == ""
-        assert calls.get("fallback") == "ffmpeg"
+        ffmpeg_call = next(c for c in calls if c[1] == "ffmpeg")
+        assert ffmpeg_call == ("", "ffmpeg")
         assert out["status"] == "ready"
         assert len(out["peaks"]) > 0
 
@@ -327,6 +326,75 @@ class TestOrphanLockRecovery:
             with patch("clio.utils.probe_ffmpeg_deps", return_value=deps_ok):
                 out2 = wf.ensure_waveform(tmp_path, src, ffmpeg="")
             assert out2["status"] == "ready"
+
+
+class TestNoAudioStream:
+    def test_has_audio_stream_false_for_compressed(self, tmp_path: Path):
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+
+        class _R:
+            stdout = ""
+            returncode = 0
+
+        with (
+            patch("clio.utils.resolve_binary", return_value="C:/fake/ffprobe.exe"),
+            patch("clio.utils.run_subprocess", return_value=_R()) as run,
+        ):
+            assert wf.has_audio_stream(src, ffprobe="") is False
+        run.assert_called_once()
+
+    def test_has_audio_stream_true_when_probe_finds_stream(self, tmp_path: Path):
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+
+        class _R:
+            stdout = "audio\n"
+            returncode = 0
+
+        with (
+            patch("clio.utils.resolve_binary", return_value="C:/fake/ffprobe.exe"),
+            patch("clio.utils.run_subprocess", return_value=_R()),
+        ):
+            assert wf.has_audio_stream(src, ffprobe="") is True
+
+    def test_has_audio_stream_true_on_probe_error(self, tmp_path: Path):
+        """Probe failure must not skip — fall back to letting ffmpeg error."""
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+        with patch("clio.utils.resolve_binary", side_effect=FileNotFoundError("ffprobe")):
+            assert wf.has_audio_stream(src, ffprobe="") is True
+
+    def test_extract_no_audio_returns_ready_without_ffmpeg(self, tmp_path: Path):
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+        with (
+            patch("clio.utils.resolve_binary", return_value="C:/fake/ffmpeg.exe"),
+            patch("clio.tasks.waveform.has_audio_stream", return_value=False),
+            patch("clio.utils.run_ffmpeg") as run,
+        ):
+            out = wf.extract_peaks_for_video(src, ffmpeg="", duration_sec=10.0, audio_source="compressed", ffprobe="")
+        assert out["status"] == "ready"
+        assert out["no_audio"] is True
+        assert out["peaks"] == []
+        run.assert_not_called()
+
+    def test_extract_with_audio_runs_ffmpeg(self, tmp_path: Path):
+        src = tmp_path / "v.mp4"
+        src.write_bytes(b"v")
+
+        def fake_run(args, ffmpeg, **kwargs):
+            Path(args[-1]).write_bytes(b"RIFF" + (b"\x00" * 40) + (b"\x00\x00" * 100))
+
+        with (
+            patch("clio.utils.resolve_binary", return_value="C:/fake/ffmpeg.exe"),
+            patch("clio.tasks.waveform.has_audio_stream", return_value=True),
+            patch("clio.utils.run_ffmpeg", side_effect=fake_run),
+        ):
+            out = wf.extract_peaks_for_video(src, ffmpeg="", duration_sec=1.0, audio_source="compressed", ffprobe="")
+        assert out["status"] == "ready"
+        assert out.get("no_audio") is None
+        assert out["peaks"] != []
 
 
 class TestMissingBinaryEarlyFail:

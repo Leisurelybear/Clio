@@ -213,6 +213,41 @@ def _spawn_job(fn: Callable[[], None]) -> None:
     t.start()
 
 
+def has_audio_stream(video_path: Path, ffprobe: str) -> bool:
+    """True if the media file has at least one audio stream (via ffprobe).
+
+    Non-fatal: returns True on any probe failure so callers fall back to the
+    old behavior (ffmpeg will surface a real error) rather than mis-skipping.
+    """
+    from clio.utils import resolve_binary, run_subprocess
+
+    try:
+        ffprobe_bin = resolve_binary(ffprobe or "", "ffprobe")
+    except Exception:
+        # No usable ffprobe → cannot verify; let the work proceed normally.
+        return True
+    try:
+        result = run_subprocess(
+            [
+                ffprobe_bin,
+                "-v",
+                "error",
+                "-select_streams",
+                "a",
+                "-show_entries",
+                "stream=codec_type",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                str(video_path),
+            ],
+            capture_output=True,
+            text=True,
+        )
+    except Exception:
+        return True
+    return bool((result.stdout or "").strip())
+
+
 def extract_peaks_for_video(
     video_path: Path,
     ffmpeg: str,
@@ -235,6 +270,20 @@ def extract_peaks_for_video(
         except Exception:
             dur = 0.0
     bins = bin_count_for_duration(dur if dur and dur > 0 else 60.0)
+    # No audio stream (e.g. compressed files stripped with -an): a waveform is
+    # impossible. Return a clean ready payload instead of crashing ffmpeg with
+    # "Invalid argument", and mark it so the UI can show a friendly message.
+    if not has_audio_stream(video_path, ffprobe):
+        return {
+            "version": WAVEFORM_VERSION,
+            "source_path": str(video_path.resolve()),
+            "audio_source": audio_source,
+            "duration_sec": float(dur or 0.0),
+            "bin_count": bins,
+            "peaks": [],
+            "no_audio": True,
+            "status": "ready",
+        }
     tmp = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
     tmp.close()
     tmp_path = Path(tmp.name)

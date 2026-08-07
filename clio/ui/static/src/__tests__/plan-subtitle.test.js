@@ -210,4 +210,25 @@ describe('renderPlanSubtitle / hidePlanSubtitle', () => {
     );
     expect(el.hidden).toBe(true);
   });
+
+  it('clears when the previewed segment changes while fetching (stale-guard)', async () => {
+    const el = setPlayerSubtitleEl();
+    // shared ctx object: read before and after the await; user seeks away mid-fetch
+    const shared = { ...baseCtx, previewIndex: 0 };
+    let resolveText;
+    const gate = new Promise((r) => { resolveText = r; });
+    const renderP = renderPlanSubtitle({
+      ctx: shared,
+      textFor: async () => { await gate; return '目标字幕。'; },
+    });
+    // while awaiting, user seeks to a different segment
+    shared.previewIndex = 1;
+    shared.plan = { sequence: [
+      { index: '001', use_timeline: '00:00-00:30' },
+      { index: '002', use_timeline: '00:00-00:30' },
+    ] };
+    resolveText();
+    await renderP;
+    expect(el.hidden).toBe(true);
+  });
 });

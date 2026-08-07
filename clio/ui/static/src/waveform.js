@@ -356,6 +356,11 @@ export async function loadPlanWaveform() {
         pendingKeys.push(idx);
         return;
       }
+      if (body.no_audio) {
+        // Compressed file has no audio stream — nothing to draw for this index.
+        _planCache.set(idx, null);
+        return;
+      }
       if (body.status === 'error' || (!Array.isArray(body.peaks) && body.status !== 'ready')) {
         _planCache.set(idx, null);
         return;
@@ -409,6 +414,10 @@ export async function loadPlanWaveform() {
           if (token !== _planLoadToken || !body) return;
           if (body.status === 'pending') {
             still.push(idx);
+            return;
+          }
+          if (body.no_audio) {
+            _planCache.set(idx, null);
             return;
           }
           if (Array.isArray(body.peaks) || body.status === 'ready') {
@@ -479,6 +488,10 @@ export async function loadWaveformForCurrentVideo() {
       }
       if (body.status === 'error') {
         setWaveformStatus(body.error ? `波形失败: ${body.error}` : '波形生成失败');
+        return;
+      }
+      if (body.no_audio) {
+        setWaveformStatus('无可用音频源');
         return;
       }
       if (Array.isArray(body.peaks) || body.status === 'ready') {
