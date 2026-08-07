@@ -19,7 +19,11 @@ export function captureFrame(player, canvas) {
   }
   canvas.width = w;
   canvas.height = h;
-  ctx.drawImage(player, 0, 0, w, h);
+  try {
+    ctx.drawImage(player, 0, 0, w, h);
+  } catch {
+    return false;
+  }
   return true;
 }
 
@@ -91,8 +95,7 @@ export function scheduleFadeWhenPaintable(player, canvas, opts = {}) {
  */
 export function phaseNewSource(player, canvas, opts = {}) {
   const drew = captureFrame(player, canvas);
-  if (!drew) return () => {};
-  const cancel = scheduleFadeWhenPaintable(player, canvas, opts);
   if (opts.setSrc) opts.setSrc();
-  return cancel;
+  if (!drew) return () => {};
+  return scheduleFadeWhenPaintable(player, canvas, opts);
 }

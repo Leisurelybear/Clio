@@ -153,4 +153,26 @@ describe('phaseNewSource', () => {
     const cancel = phaseNewSource(player, canvas, {});
     expect(typeof cancel).toBe('function');
   });
+
+  it('always calls setSrc even when capture has no frame (video must still load)', () => {
+    const { canvas } = makeCanvas();
+    const player = makePlayer({ videoWidth: 0, videoHeight: 0 });
+    const setSrc = vi.fn();
+    phaseNewSource(player, canvas, { setSrc });
+    expect(setSrc).toHaveBeenCalled();
+    expect(canvas.style.visibility).toBeUndefined();
+  });
+
+  it('calls setSrc even when drawImage throws', () => {
+    const ctx = { clearRect: vi.fn(), drawImage: vi.fn(() => { throw new Error('no frame'); }) };
+    const canvas = {
+      getContext: vi.fn(() => ctx),
+      style: {},
+      classList: { add: vi.fn(), remove: vi.fn() },
+    };
+    const player = makePlayer();
+    const setSrc = vi.fn();
+    phaseNewSource(player, canvas, { setSrc });
+    expect(setSrc).toHaveBeenCalled();
+  });
 });
