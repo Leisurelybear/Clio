@@ -436,6 +436,11 @@ async function init() {
       if (menu) menu.hidden = true;
     }
   });
+  document.getElementById('project-menu')?.addEventListener('click', (e) => {
+    if (e.target.closest('.project-menu-item')) {
+      document.getElementById('project-menu').hidden = true;
+    }
+  });
   $$('.tab').forEach(t => t.onclick = () => {
     const toTab = t.dataset.tab;
     if (shouldConfirmDirtyTabSwitch({ dirty: state.dirty, fromTab: state.currentTab, toTab })) {

@@ -21,7 +21,15 @@ function initLayout() {
   if (saved.editorCollapsed) document.body.classList.add('editor-collapsed');
 
   setupResizeHandles();
+  setupCollapseButtons();
   setupKeyboardShortcuts();
+}
+
+function setupCollapseButtons() {
+  $('btn-collapse-sidebar')?.addEventListener('click', () => {
+    document.body.classList.toggle('sidebar-collapsed');
+    saveLayout();
+  });
 }
 
 // ── Resize Handles (drag + click to collapse) ──────────────
