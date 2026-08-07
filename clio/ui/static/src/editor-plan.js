@@ -31,34 +31,6 @@ export function getPlanExpandedIndex() {
 }
 
 /**
- * Replace the `voiceover` field of parsed subtitle JSON while keeping all
- * other fields (edit_tip, duration_hint_sec, ...) intact.
- * @param {object|null} obj loaded voiceover JSON
- * @param {string} newText
- * @returns {object}
- */
-export function mergeSubtitle(obj, newText) {
-  return { ...(obj || {}), voiceover: String(newText || '') };
-}
-
-/**
- * Save edited subtitle text for a video's voiceover file, then invalidate the
- * renderer's cache so the preview reflects the change immediately.
- * @param {string|number} vid video index
- * @param {string} scriptJson voiceover file basename
- * @param {object} loaded previously loaded voiceover payload
- * @param {string} newText
- * @returns {Promise<boolean>} true when the server accepted the write
- */
-export async function saveSubtitleDraft(vid, scriptJson, loaded, newText) {
-  const { invalidateVoiceoverCache } = await import('./plan-subtitle.js');
-  const body = mergeSubtitle(loaded, newText);
-  const r = await api('PUT', `/api/voiceover?file=${encodeURIComponent(scriptJson)}`, body);
-  invalidateVoiceoverCache(String(vid));
-  return !!(r && r.ok !== false);
-}
-
-/**
  * @param {number|null} index
  * @param {{ render?: boolean }} [opts]
  */
@@ -429,54 +401,31 @@ function openRangePickerForSegment(segIndex) {
 }
 
 /**
- * Bind the segment subtitle edit textarea: load the segment video's voiceover
- * JSON asynchronously and save edits back via PUT /api/voiceover. Keeps a
- * dirty index set so Ctrl+S won't overwrite the external file mid-edit.
+ * Prefill a segment's subtitle textarea with the saved plan subtitle, or fall
+ * back to the video's voiceover text as a starting point (read from it, never
+ * written back). Editing only updates the plan's subtitle field.
  * @param {HTMLElement} li
  * @param {object} seg
- * @param {number} i
  */
-function _bindSubtitleEdit(li, seg, i) {
-  const v = state.videos.find((x) => String(x.index) === String(seg.index));
-  const subEl = li.querySelector('[data-k="subtitle_edit"]');
-  const subSave = li.querySelector('[data-subtitle-save]');
-  const subStatus = li.querySelector('.plan-seg-subtitle-status');
-  if (!subEl || !subSave) return;
-
-  let loadedVoiceover = null;
-  if (!v) {
-    subEl.placeholder = '无关联视频';
-  } else if (!v.script_json) {
-    subEl.placeholder = '无口播文案文件';
-  } else {
-    api('GET', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`)
-      .then((d) => {
-        loadedVoiceover = d || {};
-        const text = typeof d?.voiceover === 'string' ? d.voiceover : '';
-        if (subEl.value === '') subEl.value = text;
-        subStatus.textContent = '';
-      })
-      .catch(() => { subStatus.textContent = '加载失败'; });
+function _prefillSubtitle(li, seg) {
+  const subEl = li.querySelector('[data-k="subtitle"]');
+  if (!subEl) return;
+  const planText = typeof seg.subtitle === 'string' ? seg.subtitle.trim() : '';
+  if (planText) {
+    subEl.value = planText;
+    subEl.placeholder = '';
+    return;
   }
-
-  subEl.addEventListener('input', () => {
-    state.subtitleDirtyIndexes.add(i);
-    markDirty();
-  });
-
-  subSave.addEventListener('click', async () => {
-    if (!v || !v.script_json) { subStatus.textContent = '无口播文案'; return; }
-    subSave.disabled = true;
-    try {
-      const ok = await saveSubtitleDraft(v, v.script_json, loadedVoiceover || {}, subEl.value);
-      subStatus.textContent = ok ? '已保存' : '保存失败';
-      if (ok) state.subtitleDirtyIndexes.delete(i);
-    } catch {
-      subStatus.textContent = '保存失败';
-    } finally {
-      subSave.disabled = false;
-    }
-  });
+  const v = state.videos.find((x) => String(x.index) === String(seg.index));
+  if (!v) { subEl.placeholder = '无关联视频'; return; }
+  if (!v.script_json) { subEl.placeholder = '无口播文案文件'; return; }
+  api('GET', `/api/voiceover?file=${encodeURIComponent(v.script_json)}`)
+    .then((d) => {
+      const text = typeof d?.voiceover === 'string' ? d.voiceover : '';
+      subEl.placeholder = text ? '从口播文案预填，编辑将保存到规划' : '无口播文案';
+      if (subEl.value === '') subEl.value = text;
+    })
+    .catch(() => { subEl.placeholder = '加载失败'; });
 }
 
 export function renderPlan() {
@@ -583,13 +532,9 @@ export function renderPlan() {
           </label>
         </div>
         <div class="plan-seg-subtitles">
-          <label>字幕 (编辑实际成片字幕)
-            <textarea rows="3" data-k="subtitle_edit" placeholder="加载中…"></textarea>
+          <label>成片字幕 (保存到规划)
+            <textarea rows="3" data-k="subtitle" placeholder="加载中…"></textarea>
           </label>
-          <div class="plan-seg-subtitle-row">
-            <button type="button" class="plan-ghost-btn" data-subtitle-save>保存字幕</button>
-            <span class="plan-seg-subtitle-status"></span>
-          </div>
         </div>
         <div class="plan-seg-actions">
           <button type="button" class="plan-icon-btn" data-move="up" title="上移" ${i === 0 ? 'disabled' : ''}>↑</button>
@@ -638,7 +583,6 @@ export function renderPlan() {
       renderPlan();
     });
     li.querySelectorAll('[data-k]').forEach(inp => {
-      if (inp.dataset.k === 'subtitle_edit') return; // handled by subtitle draft save
       inp.oninput = (e) => {
         p.sequence[i] = patchSegment(p.sequence[i], { [e.target.dataset.k]: e.target.value });
         // Keep collapsed header title/timeline in sync without full re-render on every keystroke
@@ -658,7 +602,7 @@ export function renderPlan() {
         scheduleReadinessCheck();
       };
     });
-    _bindSubtitleEdit(li, seg, i);
+    _prefillSubtitle(li, seg);
     li.querySelector('[data-move="up"]')?.addEventListener('click', (e) => {
       e.stopPropagation();
       if (i <= 0) return;
@@ -946,10 +890,6 @@ export async function save() {
   });
   if (target.action === 'noop') {
     setStatus(target.reason || '当前页无可保存内容', 'warn');
-    return;
-  }
-  if (state.subtitleDirtyIndexes && state.subtitleDirtyIndexes.size > 0) {
-    setStatus('有未保存的字幕，请先在对应片段点击「保存字幕」', 'warn');
     return;
   }
   try {

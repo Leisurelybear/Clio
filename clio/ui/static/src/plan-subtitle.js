@@ -291,6 +291,12 @@ function vCfg(v) { return v == null || v === '' ? null : v; }
 function pxToPct(n) { return `${n}%`; }
 function effectiveFontPx(n) { return Number.isFinite(n) && n > 0 ? n : 22; }
 
+export function resolveSegmentSubtitleText(seg, voiceoverText) {
+  const planText = typeof seg?.subtitle === 'string' ? seg.subtitle.trim() : '';
+  if (planText) return planText;
+  return voiceoverText;
+}
+
 /**
  * Render the active subtitle line into #plan-subtitle; hide when nothing
  * should show. opts.ctx overrides reading app state (tests). opts.textFor
@@ -319,9 +325,11 @@ export async function renderPlanSubtitle(opts = {}) {
 
   const idx = String(seg.index ?? '');
   const v = (c.videos || []).find((x) => String(x.index) === idx);
-  if (!v || !v.script_json) { clear(); return; }
+  const segHasSubtitle = typeof seg.subtitle === 'string' && seg.subtitle.trim() !== '';
+  if (!segHasSubtitle && (!v || !v.script_json)) { clear(); return; }
 
-  const text = await textFor(idx, v.script_json);
+  const voiceText = v?.script_json ? await textFor(idx, v.script_json) : null;
+  const text = resolveSegmentSubtitleText(seg, voiceText);
   // Stale-guard: user may have sought to another segment while awaiting.
   const live = opts.ctx ? opts.ctx : readStateContext();
   const current = live.entity === 'plan'

@@ -7,7 +7,24 @@ import {
   invalidateVoiceoverCache,
   renderPlanSubtitle,
   hidePlanSubtitle,
+  resolveSegmentSubtitleText,
 } from '../plan-subtitle.js';
+
+describe('resolveSegmentSubtitleText', () => {
+  it('prefers plan subtitle when set', () => {
+    const seg = { index: '001', subtitle: ' 我改的字幕 ' };
+    expect(resolveSegmentSubtitleText(seg, 'AI 原旁白')).toBe('我改的字幕');
+  });
+
+  it('falls back to voiceover when plan subtitle empty/absent', () => {
+    expect(resolveSegmentSubtitleText({ index: '001' }, 'AI 原旁白')).toBe('AI 原旁白');
+    expect(resolveSegmentSubtitleText({ index: '001', subtitle: '' }, null)).toBe(null);
+  });
+
+  it('returns empty when neither present', () => {
+    expect(resolveSegmentSubtitleText({ index: '001', subtitle: '' }, '')).toBe('');
+  });
+});
 
 describe('splitSubtitleLines', () => {
   it('splits on Chinese sentence punctuation', () => {

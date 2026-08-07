@@ -7,7 +7,7 @@ from typing import Any
 
 from clio.cut import parse_time_range
 
-_SEGMENT_KNOWN = frozenset({"index", "title", "reason", "use_timeline", "voiceover_hint"})
+_SEGMENT_KNOWN = frozenset({"index", "title", "reason", "use_timeline", "voiceover_hint", "subtitle"})
 _PLAN_KNOWN = frozenset(
     {
         "day_title",
@@ -44,6 +44,7 @@ class PlanSegment:
     reason: str = ""
     use_timeline: str = ""
     voiceover_hint: str = ""
+    subtitle: str = ""
     extras: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -62,6 +63,7 @@ class PlanSegment:
             reason=str(data.get("reason") or ""),
             use_timeline=str(data.get("use_timeline") or "").strip(),
             voiceover_hint=str(data.get("voiceover_hint") or ""),
+            subtitle=str(data.get("subtitle") or ""),
             extras=extras,
         )
 
@@ -72,6 +74,7 @@ class PlanSegment:
             "reason": self.reason,
             "use_timeline": self.use_timeline,
             "voiceover_hint": self.voiceover_hint,
+            "subtitle": self.subtitle,
         }
         d.update(self.extras)
         return d

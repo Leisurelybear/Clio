@@ -98,3 +98,29 @@ def test_source_inputs_roundtrip_via_extras():
     }
     out = Plan.from_dict(raw).to_dict()
     assert out["source_inputs"] == [{"index": "001", "source_stem": "A"}]
+
+
+def test_segment_subtitle_is_known_field_roundtrip_not_extras():
+    raw = {
+        "day_title": "d",
+        "sequence": [
+            {
+                "index": "001",
+                "subtitle": "第一句字幕",
+            }
+        ],
+    }
+    plan = Plan.from_dict(raw)
+    seg = plan.sequence[0]
+    assert seg.subtitle == "第一句字幕"
+    assert "subtitle" not in seg.extras
+    out = plan.to_dict()
+    assert out["sequence"][0]["subtitle"] == "第一句字幕"
+
+
+def test_segment_subtitle_defaults_to_empty():
+    plan = Plan.from_dict({"sequence": [{"index": "001"}]})
+    assert plan.sequence[0].subtitle == ""
+    out = plan.to_dict()
+    assert "subtitle" in out["sequence"][0]
+    assert out["sequence"][0]["subtitle"] == ""
