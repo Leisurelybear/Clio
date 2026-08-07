@@ -29,7 +29,9 @@ import {
   renderSubtitleSettingsPanel,
   mergeSubtitleSettings,
 } from './subtitle-settings.js';
-import { phaseNewSource, captureFrame, fadeHide } from './video-fade.js';
+import { phaseNewSource } from './video-fade.js';
+
+let _fadeCancel = null;
 
 function isGlobalTimelineUi() {
   return state.currentEntity === 'plan'
@@ -120,6 +122,15 @@ export function playerSrcMatchesFile(playerSrc, file, source) {
  * @param {number} seekSec
  * @param {boolean} wantPlay
  */
+function buildVideoSrc(v) {
+  const projParam = state.currentProjectName
+    ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
+  const tokenParam = sessionStorage.getItem('api_token');
+  const extraParam = tokenParam ? `&token=${encodeURIComponent(tokenParam)}` : '';
+  const absParam = v?.abs_path ? `&abspath=${encodeURIComponent(v.abs_path)}` : '';
+  return `/api/video?file=${encodeURIComponent(v.file)}&source=${state.source}${absParam}${projParam}${extraParam}`;
+}
+
 function _loadAndSeekSource(v, seekSec, wantPlay) {
   const player = $('player');
   const fadeCanvas = $('video-fade');
@@ -138,16 +149,15 @@ function _loadAndSeekSource(v, seekSec, wantPlay) {
     doSeek();
   } else {
     // Freeze the previous frame while the new source loads to avoid a black
-    // flash; fade the snapshot out once the new first frame is decoded.
+    // flash; fade the snapshot out only once the new frame is actually
+    // painted (readyState>=2 and not mid-seek), or after a short timeout.
     if (fadeCanvas) {
-      const drew = captureFrame(player, fadeCanvas);
-      if (drew) {
-        fadeCanvas.style.visibility = 'visible';
-        fadeCanvas.style.opacity = '1';
-        fadeCanvas.classList.remove('video-fade-hide');
-        const hideOnReady = () => fadeHide(fadeCanvas);
-        player.addEventListener('loadeddata', hideOnReady, { once: true });
-      }
+      if (_fadeCancel) _fadeCancel();
+      _fadeCancel = phaseNewSource(player, fadeCanvas, {
+        setSrc: () => { player.src = buildVideoSrc(v); },
+      });
+    } else {
+      player.src = buildVideoSrc(v);
     }
     player.onloadedmetadata = () => {
       if (!isGlobalTimelineUi()) {
@@ -155,12 +165,6 @@ function _loadAndSeekSource(v, seekSec, wantPlay) {
       }
       doSeek();
     };
-    const projParam = state.currentProjectName
-      ? `&project=${encodeURIComponent(state.currentProjectName)}` : '';
-    const tokenParam = sessionStorage.getItem('api_token');
-    const extraParam = tokenParam ? `&token=${encodeURIComponent(tokenParam)}` : '';
-    const absParam = v?.abs_path ? `&abspath=${encodeURIComponent(v.abs_path)}` : '';
-    player.src = `/api/video?file=${encodeURIComponent(v.file)}&source=${state.source}${absParam}${projParam}${extraParam}`;
   }
   if (!isGlobalTimelineUi()) {
     loadWaveformForCurrentVideo();

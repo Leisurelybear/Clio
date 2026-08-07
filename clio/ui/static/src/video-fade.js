@@ -23,6 +23,10 @@ export function captureFrame(player, canvas) {
   return true;
 }
 
+function isPaintable(player) {
+  return !player.seeking && (player.readyState ? player.readyState >= 2 : false);
+}
+
 /**
  * Fade a snapshot overlay out to hidden.
  * @param {HTMLCanvasElement} canvas
@@ -44,29 +48,51 @@ function show(canvas) {
 }
 
 /**
- * Hide the snapshot overlay once the (new) source is ready to paint.
+ * Return a cancel function that shows the overlay now and fades it out once
+ * the (new) source has actually painted a target frame (readyState >= 2 and
+ * not mid-seek). Polls via requestAnimationFrame; bails after a timeout by
+ * fading anyway so the overlay never sticks.
  * @param {HTMLVideoElement} player
  * @param {HTMLCanvasElement} canvas
+ * @param {{ raf?: Function, maxMs?: number, stepMs?: number }} [opts]
+ * @returns {() => void} cancel showing / early fade
  */
-export function setupFadeOnReady(player, canvas) {
-  player.addEventListener('loadeddata', () => {
-    show(canvas);
+export function scheduleFadeWhenPaintable(player, canvas, opts = {}) {
+  const raf = opts.raf || (typeof requestAnimationFrame === 'function' ? requestAnimationFrame : null);
+  const maxMs = opts.maxMs ?? 1500;
+  const stepMs = opts.stepMs ?? 16;
+  show(canvas);
+  let elapsed = 0;
+  let cancelled = false;
+  const tryFade = () => {
+    if (cancelled) return;
+    if (isPaintable(player) || elapsed >= maxMs) {
+      fadeHide(canvas);
+      return;
+    }
+    elapsed += stepMs;
+    if (raf) raf(tryFade);
+    else setTimeout(tryFade, stepMs);
+  };
+  tryFade();
+  return () => {
+    cancelled = true;
     fadeHide(canvas);
-  });
+  };
 }
 
 /**
  * Snapshot the current frame, keep it visible while the source switches, and
- * fade it out when the new source has its first decoded frame.
+ * fade it out once the new source has painted a target frame.
  * @param {HTMLVideoElement} player
  * @param {HTMLCanvasElement} canvas
- * @param {{ setSrc?: (() => void) }} [opts]
- * @returns {boolean} whether a frame was captured (overlay shown)
+ * @param {{ setSrc?: () => void, maxMs?: number, raf?: Function }} [opts]
+ * @returns {() => void} cancels / fades early
  */
 export function phaseNewSource(player, canvas, opts = {}) {
   const drew = captureFrame(player, canvas);
-  show(canvas);
-  setupFadeOnReady(player, canvas);
+  if (!drew) return () => {};
+  const cancel = scheduleFadeWhenPaintable(player, canvas, opts);
   if (opts.setSrc) opts.setSrc();
-  return drew;
+  return cancel;
 }
