@@ -1,5 +1,45 @@
 # Changelog
 
+## 2026-08-08
+
+### Added
+- feat(ui): **sidebar optimization** — the top task area is fixed/filter-scroll (project
+  actions moved into a `项目 ▾` dropdown in the panel header, the 5 entity nav icons become
+  one sticky icon row), and the sidebar can collapse via a `‹` header button (`Ctrl+B`).
+  The editor panel got a matching `»` collapse button (`Ctrl+\`); both collapsed handles
+  widen and show a top-aligned expand arrow so fold/unfold live at the same height.
+- Video list **search + status chips**: search narrows by index / filename / title; chips
+  (`缺分析 / 缺口播 / 缺转录 / 离线`, plus `未压缩` in the original view) filter to videos
+  missing that stage; the heading shows `(可见数/总数)`.
+- Per-video rows now show **4 stage dots** (压缩/分析/口播/转录) instead of text badges.
+- New pure module `clio/ui/static/src/sidebar-video-filter.js` — stage-status / search
+  predicates (unit-testable) consumed by `sidebar-data.js`.
+- Bottom **stage count bar** replaces the old directory-scan `流水线` `step-list`: 4 cells of
+  `完成数/总数` computed from each video's own artifact fields; clicking a cell lists the
+  videos that already completed that stage (the `全完成` cells are no longer a dead end).
+
+### Fixed
+- fix(ui): count-bar cells now filter to **completed** items, so the visible `done/total`
+  number matches the rows you get (previously a click filtered the *missing* set and an
+  all-done cell hit a misleading "没有匹配的视频" empty state)
+- fix(ui): the stage filter is reset when switching `压缩 / 原视频` (a stale `未压缩` filter
+  from the original view no longer leaves the compressed view empty)
+- fix(ui): the project menu is renamed to `项目 ▾` so the trigger no longer repeats a menu
+  item, and the menu self-closes after picking an action
+
+### Refactor
+- `renderSteps()` removed (its `state.steps` reader and 4 call sites dropped); list
+  freshness now goes through `renderVideoList()`
+
+### Tests
+- New `sidebar-video-filter.test.js` (Vitest, 11 cases) for stage/status/chip/count/search
+  helpers; full suite 433 cases green, backend 1409 passed
+
+### Docs
+- Design: `docs/superpowers/specs/2026-08-08-sidebar-optimization-design.md`
+- Plan: `docs/superpowers/plans/2026-08-08-sidebar-optimization-plan.md`
+- `clio/ui/README.md` gained a 侧边栏 section describing search/chips/count bar/collapse
+
 ## 2026-08-06
 
 ### Added

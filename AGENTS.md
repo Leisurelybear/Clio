@@ -52,7 +52,8 @@ vlog-video-analysis/
 │   │   ├── routes/            Route handlers (split into focused modules)
 │   │   └── static/            Frontend (no build step, ES modules)
 │   │       └── src/           ES modules: editor-plan.js, plan-edit.js,
-│   │                           sidebar.js, runner.js, editor-config.js, ...
+│   │                          sidebar.js, sidebar-data.js, sidebar-video-filter.js,
+│   │                          runner.js, editor-config.js, ...
 │   └── ai/                    AI providers
 │       ├── base.py            TaskName enum, Provider Protocol
 │       ├── factory.py         Provider lookup by name

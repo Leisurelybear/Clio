@@ -141,4 +141,15 @@ See `clio/compress.py`.
 - Writes back via `yaml.dump()` only when something changed; prints a summary to stdout
 - **Trade-off**: PyYAML does not preserve comments — a one-time loss when new fields are injected
 - Uses atomic write (tmp + `os.replace`) to prevent partial writes on crash
+
+### 9.22 Sidebar Video Filter: Reset on Source Switch
+
+- `state.videoFilter = { q, stage, mode }` must be reset whenever `state.source` changes —
+  both in `sidebar.js setSource()` and the `proj.source` branch of `loadProject()`.
+  A stale `stage='compress'` filter from the original view (未压缩 chip) yields a dead-empty
+  list in the compressed view, where no such chip exists to recover.
+- Chips filter by **missing** stage (`mode='missing'`), count-bar cells filter by **done**
+  (`mode='done'`); keep the two modes mutually exclusive or the same cell toggles both.
+- Helper predicates live in pure `sidebar-video-filter.js` (unit-tested); do not inline the
+  same logic in `sidebar-data.js`.
 - Only the user's local config files are touched; `config.example.yaml` is never modified

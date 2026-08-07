@@ -86,6 +86,7 @@ vlog-video-analysis/
 │   │           ├── state.js
 │   │           ├── sidebar.js
 │   │           ├── sidebar-data.js
+│   │           ├── sidebar-video-filter.js
 │   │           ├── sidebar-rerun.js
 │   │           ├── sidebar-browse.js
 │   │           ├── runner.js

@@ -75,6 +75,29 @@ Provider registry also has focused backend endpoints for integrations and future
 
 These endpoints require the same API token as other sensitive config routes and invalidate the server config cache after writes.
 
+## 侧边栏 (Sidebar)
+
+侧边栏顶部区域固定紧凑：
+
+- 右上 **`项目 ▾`** 下拉 = 打开项目 / 新建项目 / 打开当前目录；旁边 **`‹`** 按钮折叠左侧栏（`Ctrl+B`），右侧编辑器顶栏 **`»`** 折叠（`Ctrl+\`）。收起后把手顶部会出现 `›` / `‹` 箭头，点击可展开。
+- **编排 / 设置 / 运行 / 日志 / 统计** 5 个入口收成一行图标并吸顶，滚动视频列表时保持可见。
+
+视频列表上方是**搜索 + 状态筛选**：
+
+- 搜索框按 `index / 文件名(去序号前缀) / 标题` 不区分大小写子串过滤。
+- 状态 chips（`缺分析 / 缺口播 / 缺转录 / 离线`；原视频视图另有 `未压缩`）点击即只显示缺少该阶段的视频；`全部` 取消。
+- 列表标题显示 `(可见数/总数)`。
+
+视频行用 **4 个小圆点**（压缩/分析/口播/转录）替代文字角标，圆点 = 该制品文件（`text_json`/`script_json`/`transcript_file`，原视图压缩另看 `match`）已生成。
+
+列表底部的**阶段计数条**按每个视频自己的制品字段精确统计（替代旧的按目录扫描的 `流水线` 列表）：
+
+- 每格显示 `完成数/总数`，点击 = 只看该阶段**已完成**的视频；
+- 想筛"缺少"用上面的 chips（两者语义互补，高亮互斥）；
+- 测试全绿后底部清零（0 完成）的格子不可点。
+
+切换 `压缩 / 原视频` 源时会自动清空搜索和已选阶段筛选。
+
 ## 数据来源
 
 UI 只读 / 写 `config.yaml` 里 `paths.output_dir` 下的文件：
