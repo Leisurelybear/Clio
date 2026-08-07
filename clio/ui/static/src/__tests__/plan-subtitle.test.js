@@ -154,8 +154,13 @@ function setPlayerSubtitleEl() {
   const el = document.createElement('div');
   el.id = 'plan-subtitle';
   el.hidden = true;
+  el.innerHTML = '<span class="plan-subtitle-handle"></span><span class="plan-subtitle-text"></span>';
   document.body.appendChild(el);
   return el;
+}
+
+function subtitleText(el) {
+  return el.querySelector('.plan-subtitle-text')?.textContent || '';
 }
 
 const baseCtx = {
@@ -174,29 +179,30 @@ describe('renderPlanSubtitle / hidePlanSubtitle', () => {
     const el = setPlayerSubtitleEl();
     await renderPlanSubtitle({ ctx: baseCtx, textFor: async () => '第一行。第二行。' });
     expect(el.hidden).toBe(false);
-    expect(el.textContent).toBe('第一行。');
+    expect(subtitleText(el)).toBe('第一行。\n第二行。');
   });
 
   it('skips DOM write when line unchanged', async () => {
     const el = setPlayerSubtitleEl();
     await renderPlanSubtitle({ ctx: baseCtx, textFor: async () => '一句。' });
-    const t1 = el.textContent;
+    const t1 = subtitleText(el);
     await renderPlanSubtitle(
       { ctx: { ...baseCtx, previewGlobalSec: 6 }, textFor: async () => '一句。' },
     );
-    expect(el.textContent).toBe(t1);
+    expect(subtitleText(el)).toBe(t1);
   });
 
   it('re-writes when line changes', async () => {
     const el = setPlayerSubtitleEl();
-    await renderPlanSubtitle({ ctx: baseCtx, textFor: async () => '第一句。第二句。' });
-    const t1 = el.textContent;
-    // jump to global 16s -> second line (duration 30, 2 lines -> line1 at [15,30))
+    const multiCtx = { ...baseCtx, config: { preview: { subtitles: { mode: 'multi', max_lines: 1 } } } };
+    await renderPlanSubtitle({ ctx: multiCtx, textFor: async () => '第一句。第二句。' });
+    const t1 = subtitleText(el);
+    // jump to global 16s -> second batch (30s, 2 batches -> batch1 at [15,30))
     await renderPlanSubtitle(
-      { ctx: { ...baseCtx, previewGlobalSec: 16 }, textFor: async () => '第一句。第二句。' },
+      { ctx: { ...multiCtx, previewGlobalSec: 16 }, textFor: async () => '第一句。第二句。' },
     );
-    expect(el.textContent).not.toBe(t1);
-    expect(el.textContent).toBe('第二句。');
+    expect(subtitleText(el)).not.toBe(t1);
+    expect(subtitleText(el)).toBe('第二句。');
   });
 
   it('hides when entity is not plan', async () => {

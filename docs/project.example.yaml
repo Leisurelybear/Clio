@@ -61,6 +61,22 @@ export:
   canvas_ratio: 16:9
   output_subdir: export
 
+# plan 预览字幕显示外观 (project-scoped)
+preview:
+  subtitles:
+    enabled: true
+    mode: auto          # auto | multi | scroll
+    max_lines: 2
+    max_len_per_line: 16
+    min_font_size: 14
+    scroll_speed: 40
+    font_size: 22
+    font_color: "#ffffff"
+    background: "rgba(0,0,0,0.55)"
+    outline: "1px solid rgba(0,0,0,0.8)"
+    pos_x: 50
+    pos_y: 8
+
 # Whisper ASR 项目级覆盖
 whisper:
   enabled: true

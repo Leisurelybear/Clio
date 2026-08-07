@@ -252,9 +252,9 @@ export function subtitleSettings(config) {
     enabled: s.enabled !== false,
     mode: s.mode || 'auto',
     maxLines: Math.max(1, Number(s.max_lines) || 2),
-    maxLen: Math.max(1, Number(s.max_len) || 16),
+    maxLen: Math.max(1, Number(s.max_len_per_line) || 16),
     fontPx: Number(s.font_size) || 22,
-    fontSizeMinPx: Number(s.font_size_min) || 14,
+    fontSizeMinPx: Number(s.min_font_size) || 14,
   };
 }
 
@@ -267,14 +267,13 @@ export function subtitleSettings(config) {
  *           font_family?:string, pos_x?:number, pos_y?:number}} [cfg]
  */
 export function applySubtitleStyle(el, s, cfg = {}) {
-  const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
   const elCfg = cfg;
   el.style.setProperty('--st-font-size', `${s.fontPx}px`);
-  el.style.setProperty('--st-color', vCfg(elCfg.color) || '#fff');
+  el.style.setProperty('--st-color', vCfg(elCfg.font_color) || '#fff');
   el.style.setProperty('--st-bg', vCfg(elCfg.background) || 'rgba(0,0,0,.55)');
   el.style.setProperty(
     '--st-outline',
-    vCfg(elCfg.outline_color) ? `0 0 2px ${vCfg(elCfg.outline_color)}, 0 0 2px ${vCfg(elCfg.outline_color)}` : '1px 1px 2px rgba(0,0,0,.8)',
+    vCfg(elCfg.outline) || '1px 1px 2px rgba(0,0,0,.8)',
   );
   el.style.setProperty('--st-font-family', vCfg(elCfg.font_family) || "'system-ui, sans-serif'");
   const posX = clampPercent(Number(elCfg.pos_x));
